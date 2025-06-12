@@ -1,0 +1,686 @@
+import React, { useState, useEffect, useRef } from 'react';
+import ApiService from '../services/api';
+
+const StudentList = () => {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  
+  // Face registration states
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [selectedStudentForFace, setSelectedStudentForFace] = useState(null);
+  const [faceRegistrationLoading, setFaceRegistrationLoading] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [registrationMode, setRegistrationMode] = useState('camera'); // 'camera' or 'upload'
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Cleanup camera stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  // Handle video loaded event
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleVideoReady = () => {
+      setCameraReady(true);
+      setCameraError(null);
+    };
+
+    const handleVideoError = () => {
+      setCameraReady(false);
+      setCameraError('Camera không thể khởi động');
+    };
+
+    video.addEventListener('loadedmetadata', handleVideoReady);
+    video.addEventListener('error', handleVideoError);
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleVideoReady);
+      video.removeEventListener('error', handleVideoError);
+    };
+  }, [showFaceModal, registrationMode]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const studentsData = await ApiService.getStudents();
+      // Đảm bảo studentsData luôn là array
+      setStudents(Array.isArray(studentsData) ? studentsData : []);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      setError('Không thể tải danh sách học sinh từ server. Hiển thị dữ liệu mẫu.');
+      
+      // Mock data fallback
+      setStudents([
+        {
+          id: 1,
+          student_id: 'SV001',
+          full_name: 'Nguyễn Văn An',
+          class_name: '10A1',
+          grade: '10',
+          email: 'an.nguyen@student.edu.vn',
+          phone: '0123456789'
+        },
+        {
+          id: 2,
+          student_id: 'SV002',
+          full_name: 'Trần Thị Bình',
+          class_name: '10A1',
+          grade: '10',
+          email: 'binh.tran@student.edu.vn',
+          phone: '0123456790'
+        },
+        {
+          id: 3,
+          student_id: 'SV003',
+          full_name: 'Lê Minh Châu',
+          class_name: '10A2',
+          grade: '10',
+          email: 'chau.le@student.edu.vn',
+          phone: '0123456791'
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter students based on search and class - với safety check
+  const filteredStudents = Array.isArray(students) ? students.filter(student => {
+    const matchesSearch = student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.student_id?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesClass = selectedClass === '' || student.class_name === selectedClass;
+    return matchesSearch && matchesClass;
+  }) : [];
+
+  // Get unique classes for filter - với safety check
+  const classes = Array.isArray(students) ? 
+    [...new Set(students.map(student => student.class_name).filter(Boolean))].sort() : 
+    [];
+
+  // Face registration functions
+  const startFaceRegistration = async (student) => {
+    setSelectedStudentForFace(student);
+    setShowFaceModal(true);
+    setCapturedImage(null);
+    setUploadedImage(null);
+    setRegistrationMode('camera');
+    setCameraReady(false);
+    setCameraError(null);
+    
+    // Cleanup any existing stream first
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        } 
+      });
+      
+      setCameraStream(stream);
+      
+      // Wait for video element to be available
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setCameraError('Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập.');
+      setRegistrationMode('upload'); // Chuyển sang upload mode nếu không có camera
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) {
+      alert('Camera chưa sẵn sàng. Vui lòng thử lại.');
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    // Check if video is ready
+    if (video.readyState < 2) {
+      alert('Video chưa sẵn sàng. Vui lòng đợi một chút và thử lại.');
+      return;
+    }
+
+    // Check if video has actual dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      alert('Camera chưa sẵn sàng. Vui lòng thử lại.');
+      return;
+    }
+
+    try {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Clear canvas first
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw video frame to canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Convert to image data URL
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setCapturedImage(imageDataUrl);
+      
+    } catch (error) {
+      console.error('Error capturing photo:', error);
+      alert('Có lỗi khi chụp ảnh. Vui lòng thử lại.');
+    }
+  };
+
+  const resetCamera = async () => {
+    setCameraReady(false);
+    setCameraError(null);
+    
+    // Stop existing stream
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      setCameraStream(null);
+    }
+
+    // Clear video source
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    // Restart camera
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        } 
+      });
+      
+      setCameraStream(stream);
+      
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error restarting camera:', error);
+      setCameraError('Không thể khởi động lại camera. Vui lòng kiểm tra quyền truy cập.');
+    }
+  };
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Vui lòng chọn file ảnh (JPG, PNG, etc.)');
+      return;
+    }
+
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setUploadedImage({ file, previewUrl });
+    setCapturedImage(null);
+  };
+
+  const submitFaceRegistration = async () => {
+    if ((!capturedImage && !uploadedImage) || !selectedStudentForFace) return;
+    
+    setFaceRegistrationLoading(true);
+    try {
+      let response;
+      
+      if (registrationMode === 'upload' && uploadedImage) {
+        // Use FormData for file upload
+        const formData = new FormData();
+        formData.append('file', uploadedImage.file);
+        
+        response = await fetch(`http://localhost:8000/api/ai/register/${selectedStudentForFace.id}`, {
+          method: 'POST',
+          body: formData
+        });
+      } else if (capturedImage) {
+        // Use base64 for camera capture
+        const base64Image = capturedImage.split(',')[1];
+        
+        response = await fetch(`http://localhost:8000/api/ai/register-base64/${selectedStudentForFace.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_base64: base64Image,
+            confidence_threshold: 0.6
+          })
+        });
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`Đăng ký khuôn mặt thành công cho ${selectedStudentForFace.full_name}!`);
+        closeFaceModal();
+      } else {
+        alert(`Lỗi: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error registering face:', error);
+      alert('Có lỗi xảy ra khi đăng ký khuôn mặt');
+    } finally {
+      setFaceRegistrationLoading(false);
+    }
+  };
+
+  const closeFaceModal = () => {
+    setShowFaceModal(false);
+    setSelectedStudentForFace(null);
+    setCapturedImage(null);
+    setUploadedImage(null);
+    setRegistrationMode('camera');
+    setCameraReady(false);
+    setCameraError(null);
+    
+    // Stop camera stream with proper cleanup
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      setCameraStream(null);
+    }
+
+    // Clear video source
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // Clean up uploaded image URL
+    if (uploadedImage?.previewUrl) {
+      URL.revokeObjectURL(uploadedImage.previewUrl);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="student-list">
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-gray-800 mb-2">Danh sách học sinh</h2>
+        <p className="text-gray-600">Quản lý thông tin học sinh</p>
+        {error && (
+          <div className="mt-2 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Search and Filter */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tìm kiếm
+            </label>
+            <input
+              type="text"
+              placeholder="Tên hoặc mã học sinh..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Lớp
+            </label>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Tất cả lớp</option>
+              {classes.map(className => (
+                <option key={className} value={className}>{className}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={fetchStudents}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Làm mới
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Students Table */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {/* Header */}
+        <div className="bg-gray-50 grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b items-center">
+          <div className="col-span-2">Mã SV</div>
+          <div className="col-span-3">Họ tên</div>
+          <div className="col-span-1">Lớp</div>
+          <div className="col-span-3">Email</div>
+          <div className="col-span-1">SĐT</div>
+          <div className="col-span-2 text-center">Thao tác</div>
+        </div>
+
+        {/* Body */}
+        <div className="divide-y divide-gray-200">
+          {filteredStudents.length === 0 ? (
+            <div className="px-4 py-8 text-center text-gray-500">
+              {searchTerm || selectedClass ? 'Không tìm thấy học sinh nào' : 'Chưa có học sinh nào'}
+            </div>
+          ) : (
+            filteredStudents.map((student) => (
+              <div key={student.id} className="grid grid-cols-12 gap-4 px-4 py-4 hover:bg-gray-50 items-center">
+                <div className="col-span-2 text-sm font-medium text-gray-900 truncate">
+                  {student.student_id}
+                </div>
+                <div className="col-span-3 text-sm text-gray-900 truncate">
+                  <div className="font-medium">{student.full_name}</div>
+                </div>
+                <div className="col-span-1 text-sm text-gray-900">
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    {student.class_name}
+                  </span>
+                </div>
+                <div className="col-span-3 text-sm text-gray-600 truncate">
+                  {student.email || 'Chưa có'}
+                </div>
+                <div className="col-span-1 text-sm text-gray-600 truncate">
+                  {student.phone || 'Chưa có'}
+                </div>
+                <div className="col-span-2 text-sm font-medium flex justify-center">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex gap-1">
+                      <button className="px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors">
+                        👁️
+                      </button>
+                      <button className="px-2 py-1 text-xs bg-green-100 text-green-700 hover:bg-green-200 rounded transition-colors">
+                        ✏️
+                      </button>
+                    </div>
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={() => startFaceRegistration(student)}
+                        className="px-2 py-1 text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 rounded transition-colors whitespace-nowrap"
+                        title="Đăng ký khuôn mặt"
+                      >
+                        🤖
+                      </button>
+                      <button className="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors">
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Face Registration Modal */}
+        {showFaceModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">
+                  Đăng ký khuôn mặt - {selectedStudentForFace?.full_name}
+                </h3>
+                <button
+                  onClick={closeFaceModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Mode Selection */}
+                <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setRegistrationMode('camera')}
+                    className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      registrationMode === 'camera'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    📷 Camera
+                  </button>
+                  <button
+                    onClick={() => setRegistrationMode('upload')}
+                    className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      registrationMode === 'upload'
+                        ? 'bg-white text-purple-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    📁 Upload
+                  </button>
+                </div>
+
+                {/* Camera Mode */}
+                {registrationMode === 'camera' && (
+                  <>
+                    {!capturedImage ? (
+                      <div className="text-center">
+                        {cameraError ? (
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                            <div className="text-red-600 text-lg mb-2">❌</div>
+                            <p className="text-red-700 font-medium">{cameraError}</p>
+                            <div className="mt-3 space-x-2">
+                              <button
+                                onClick={resetCamera}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                              >
+                                🔄 Thử lại Camera
+                              </button>
+                              <button
+                                onClick={() => setRegistrationMode('upload')}
+                                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                              >
+                                📁 Chuyển sang Upload
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="relative">
+                              <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                className="w-full max-w-md mx-auto rounded-lg border"
+                              />
+                              {!cameraReady && (
+                                <div className="absolute inset-0 bg-gray-200 rounded-lg flex items-center justify-center">
+                                  <div className="text-center">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                    <p className="text-gray-600">Đang khởi động camera...</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-4">
+                              <button
+                                onClick={capturePhoto}
+                                disabled={!cameraReady}
+                                className={`px-6 py-2 rounded-md transition-colors ${
+                                  cameraReady 
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                }`}
+                              >
+                                📸 Chụp ảnh
+                              </button>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-2">
+                              {cameraReady 
+                                ? 'Hãy nhìn thẳng vào camera và bấm "Chụp ảnh"'
+                                : 'Đang chuẩn bị camera, vui lòng đợi...'
+                              }
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <img
+                          src={capturedImage}
+                          alt="Captured face"
+                          className="w-full max-w-md mx-auto rounded-lg border"
+                        />
+                        <div className="mt-4 space-x-2">
+                          <button
+                            onClick={() => setCapturedImage(null)}
+                            className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                          >
+                            🔄 Chụp lại
+                          </button>
+                          <button
+                            onClick={submitFaceRegistration}
+                            disabled={faceRegistrationLoading}
+                            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {faceRegistrationLoading ? '⏳ Đang xử lý...' : '✅ Đăng ký'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Upload Mode */}
+                {registrationMode === 'upload' && (
+                  <>
+                    {!uploadedImage ? (
+                      <div className="text-center">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full max-w-md mx-auto border-2 border-dashed border-purple-300 rounded-lg p-8 cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                        >
+                          <div className="text-center">
+                            <span className="text-6xl block mb-4">📁</span>
+                            <p className="text-purple-600 font-medium">Nhấn để chọn ảnh</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Hỗ trợ: JPG, PNG, WebP
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <img
+                          src={uploadedImage.previewUrl}
+                          alt="Uploaded face"
+                          className="w-full max-w-md mx-auto rounded-lg border"
+                        />
+                        <div className="mt-4 space-x-2">
+                          <button
+                            onClick={() => {
+                              URL.revokeObjectURL(uploadedImage.previewUrl);
+                              setUploadedImage(null);
+                              if (fileInputRef.current) {
+                                fileInputRef.current.value = '';
+                              }
+                            }}
+                            className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                          >
+                            🔄 Chọn lại
+                          </button>
+                          <button
+                            onClick={submitFaceRegistration}
+                            disabled={faceRegistrationLoading}
+                            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {faceRegistrationLoading ? '⏳ Đang xử lý...' : '✅ Đăng ký'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Summary */}
+      <div className="mt-6 bg-gray-50 rounded-lg p-4">
+        <p className="text-sm text-gray-600">
+          Hiển thị {filteredStudents.length} / {students.length} học sinh
+          {selectedClass && ` trong lớp ${selectedClass}`}
+          {searchTerm && ` với từ khóa "${searchTerm}"`}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default StudentList; 
