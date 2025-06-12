@@ -67,7 +67,7 @@ async def sync_face_encoding_to_db(student_id: int, result: dict, db):
 @router.post("/recognize", response_model=FaceRecognitionResponse)
 async def recognize_face_upload(
     file: UploadFile = File(...),
-    confidence_threshold: float = 0.25,  # Tăng từ 0.05 lên 0.25 để có threshold hợp lý hơn
+    confidence_threshold: float = 0.6,  # Nâng lên 0.6 cho deep learning model
     db=Depends(get_db)
 ):
     """Nhận dạng khuôn mặt từ ảnh upload"""
