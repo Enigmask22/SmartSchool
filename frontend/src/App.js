@@ -8,6 +8,7 @@ import StudentList from './components/StudentList';
 import AttendanceView from './components/AttendanceView';
 import AICamera from './components/AICamera';
 import FaceManagement from './components/FaceManagement';
+import ContinuousRecognition from './components/ContinuousRecognition';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -41,6 +42,8 @@ function App() {
         return <AttendanceView />;
       case 'camera':
         return <AICamera />;
+      case 'continuous':
+        return <ContinuousRecognition />;
       case 'faces':
         return <FaceManagement />;
       default:

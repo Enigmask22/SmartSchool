@@ -2,11 +2,15 @@
 API Router cho AI Computer Vision
 """
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 import base64
 import os
 import shutil
+import asyncio
+import time
+from typing import Dict, Set
+import json
 
 from models.schemas import (
     FaceRecognitionRequest, FaceRecognitionResponse, 
@@ -18,6 +22,14 @@ from utils.logger import setup_logger
 
 logger = setup_logger()
 router = APIRouter()
+
+# Global state cho continuous recognition
+continuous_recognition_state = {
+    "is_running": False,
+    "last_recognition": {},  # {student_id: timestamp}
+    "cooldown_period": 10,   # Tăng từ 30s lên 60s để tránh spam
+    "active_connections": set()
+}
 
 async def sync_face_encoding_to_db(student_id: int, result: dict, db):
     """Helper function để đồng bộ face encoding lên database với logging chi tiết"""
@@ -63,6 +75,303 @@ async def sync_face_encoding_to_db(student_id: int, result: dict, db):
         logger.error(f"[DB Sync] Error syncing to database for student {student_id}: {sync_error}")
         import traceback
         logger.error(traceback.format_exc())
+
+@router.websocket("/recognition/stream")
+async def continuous_recognition_stream(websocket: WebSocket):
+    """WebSocket endpoint cho continuous face recognition"""
+    await websocket.accept()
+    continuous_recognition_state["active_connections"].add(websocket)
+    
+    try:
+        logger.info("🔗 Client connected to continuous recognition stream")
+        
+        while True:
+            try:
+                # Nhận frame từ client
+                data = await websocket.receive_text()
+                frame_data = json.loads(data)
+                
+                if frame_data.get("type") == "frame":
+                    image_base64 = frame_data.get("image")
+                    
+                    if continuous_recognition_state["is_running"] and image_base64:
+                        # Process recognition
+                        result = await process_continuous_recognition(image_base64, websocket)
+                        
+                        # Send result back
+                        await websocket.send_text(json.dumps({
+                            "type": "recognition_result",
+                            "data": result
+                        }))
+                
+                elif frame_data.get("type") == "control":
+                    # Handle control commands
+                    command = frame_data.get("command")
+                    if command == "start":
+                        continuous_recognition_state["is_running"] = True
+                        await websocket.send_text(json.dumps({
+                            "type": "status",
+                            "message": "🎥 Continuous recognition started",
+                            "is_running": True
+                        }))
+                    elif command == "stop":
+                        continuous_recognition_state["is_running"] = False
+                        await websocket.send_text(json.dumps({
+                            "type": "status", 
+                            "message": "⏹️ Continuous recognition stopped",
+                            "is_running": False
+                        }))
+                        
+            except asyncio.TimeoutError:
+                continue
+                
+    except WebSocketDisconnect:
+        logger.info("🔌 Client disconnected from continuous recognition stream")
+    except Exception as e:
+        logger.error(f"❌ Error in continuous recognition stream: {e}")
+    finally:
+        continuous_recognition_state["active_connections"].discard(websocket)
+
+async def process_continuous_recognition(image_base64: str, websocket: WebSocket):
+    """Xử lý continuous recognition với cooldown logic"""
+    try:
+        # Fix import error - sử dụng get_db thay vì get_db_instance
+        from database.connection import get_db
+        db = get_db()
+        
+        # Perform recognition với threshold cao hơn cho continuous mode
+        result = await face_recognition_service.recognize_face(image_base64, db, 0.75)  # Tăng từ 0.65 lên 0.75
+        
+        if result.get("success") and result.get("faces"):
+            current_time = time.time()
+            recognized_students = []
+            
+            logger.info(f"🔍 Recognition result: {len(result['faces'])} faces detected")
+            
+            # Chỉ xử lý nếu detect đúng 1 face để tránh confusion
+            if len(result["faces"]) != 1:
+                logger.warning(f"⚠️ Detected {len(result['faces'])} faces, skipping to avoid confusion")
+                return {
+                    "success": True,
+                    "recognized_students": [],
+                    "total_faces": len(result["faces"]),
+                    "timestamp": current_time,
+                    "message": f"Detected {len(result['faces'])} faces - requires exactly 1 face"
+                }
+            
+            for i, face in enumerate(result["faces"]):
+                student_id = face.get("student_id")
+                confidence = face.get("confidence", 0)
+                
+                logger.info(f"   Face {i+1}: student_id={student_id}, confidence={confidence:.3f}")
+                
+                # Chỉ accept confidence > 75% để tránh false positives
+                if student_id != "unknown" and confidence > 0.75:
+                    # Check cooldown
+                    last_time = continuous_recognition_state["last_recognition"].get(student_id, 0)
+                    time_diff = current_time - last_time
+                    
+                    if time_diff >= continuous_recognition_state["cooldown_period"]:
+                        # Update last recognition time
+                        continuous_recognition_state["last_recognition"][student_id] = current_time
+                        
+                        # Get student info from database
+                        try:
+                            student_response = db.table("students").select("*").eq("id", int(student_id)).execute()
+                            if student_response.data:
+                                student_data = student_response.data[0]
+                                
+                                # Auto-create attendance record
+                                attendance_result = await create_auto_attendance(student_data, db)
+                                
+                                recognized_students.append({
+                                    "student": student_data,
+                                    "confidence": round(confidence * 100, 1),
+                                    "attendance": attendance_result,
+                                    "cooldown_remaining": 0
+                                })
+                                
+                                logger.info(f"✅ Auto-recognized: {student_data.get('full_name')} ({confidence*100:.1f}%)")
+                        except Exception as e:
+                            logger.error(f"❌ Error processing student {student_id}: {e}")
+                    else:
+                        # Still in cooldown
+                        remaining = continuous_recognition_state["cooldown_period"] - time_diff
+                        logger.info(f"⏱️ Student {student_id} in cooldown: {remaining:.0f}s remaining")
+                else:
+                    logger.info(f"❌ Rejected: student_id={student_id}, confidence={confidence:.3f} < 0.75")
+            
+            return {
+                "success": True,
+                "recognized_students": recognized_students,
+                "total_faces": len(result["faces"]),
+                "timestamp": current_time
+            }
+        
+        return {
+            "success": True,
+            "recognized_students": [],
+            "total_faces": len(result.get("faces", [])),
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error in continuous recognition: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": time.time()
+        }
+
+async def create_auto_attendance(student_data: dict, db):
+    """Tự động tạo attendance record"""
+    try:
+        from datetime import datetime, date
+        
+        today = date.today().isoformat()
+        now = datetime.now().isoformat()
+        
+        # Check if attendance already exists today
+        existing = db.table("attendance").select("*").eq("student_id", student_data["id"]).eq("date", today).execute()
+        
+        if existing.data:
+            # Update existing attendance
+            attendance_id = existing.data[0]["id"]
+            update_data = {
+                "status": "present",
+                "check_in_time": now,
+                "updated_at": now,
+                "recognition_confidence": 85.0  # Default confidence for auto-recognition
+            }
+            
+            response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()
+            
+            return {
+                "type": "updated",
+                "message": f"Cập nhật điểm danh cho {student_data['full_name']}",
+                "data": response.data[0] if response.data else None
+            }
+        else:
+            # Create new attendance
+            attendance_data = {
+                "student_id": student_data["id"],
+                "date": today,
+                "status": "present",
+                "check_in_time": now,
+                "recognition_confidence": 85.0,
+                "created_at": now,
+                "updated_at": now
+            }
+            
+            response = db.table("attendance").insert(attendance_data).execute()
+            
+            return {
+                "type": "created",
+                "message": f"Điểm danh thành công cho {student_data['full_name']}",
+                "data": response.data[0] if response.data else None
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ Error creating auto-attendance: {e}")
+        return {
+            "type": "error",
+            "message": f"Lỗi tạo điểm danh: {str(e)}"
+        }
+
+@router.post("/recognition/control", response_model=ResponseModel)
+async def control_continuous_recognition(action: str):
+    """Control continuous recognition (start/stop)"""
+    try:
+        if action == "start":
+            continuous_recognition_state["is_running"] = True
+            continuous_recognition_state["last_recognition"] = {}  # Reset cooldowns
+            message = "🎥 Continuous recognition started"
+        elif action == "stop":
+            continuous_recognition_state["is_running"] = False
+            message = "⏹️ Continuous recognition stopped"
+        elif action == "reset":
+            continuous_recognition_state["last_recognition"] = {}  # Reset cooldowns
+            message = "🔄 Recognition cooldowns reset"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action. Use: start, stop, reset")
+        
+        # Notify all connected clients
+        for websocket in continuous_recognition_state["active_connections"]:
+            try:
+                await websocket.send_text(json.dumps({
+                    "type": "control_update",
+                    "is_running": continuous_recognition_state["is_running"],
+                    "message": message
+                }))
+            except:
+                pass  # Ignore disconnected clients
+        
+        return ResponseModel(
+            success=True,
+            message=message,
+            data={
+                "is_running": continuous_recognition_state["is_running"],
+                "active_connections": len(continuous_recognition_state["active_connections"]),
+                "cooldown_period": continuous_recognition_state["cooldown_period"]
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error controlling recognition: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/recognition/status", response_model=ResponseModel)
+async def get_recognition_status():
+    """Lấy trạng thái continuous recognition"""
+    try:
+        current_time = time.time()
+        active_cooldowns = {}
+        
+        for student_id, last_time in continuous_recognition_state["last_recognition"].items():
+            remaining = continuous_recognition_state["cooldown_period"] - (current_time - last_time)
+            if remaining > 0:
+                active_cooldowns[student_id] = round(remaining)
+        
+        return ResponseModel(
+            success=True,
+            message="Recognition status retrieved",
+            data={
+                "is_running": continuous_recognition_state["is_running"],
+                "active_connections": len(continuous_recognition_state["active_connections"]),
+                "cooldown_period": continuous_recognition_state["cooldown_period"],
+                "active_cooldowns": active_cooldowns,
+                "total_recognized_today": len(continuous_recognition_state["last_recognition"])
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting recognition status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/recognition/settings", response_model=ResponseModel)
+async def update_recognition_settings(settings: dict):
+    """Cập nhật settings cho continuous recognition"""
+    try:
+        cooldown_period = settings.get("cooldown_period", 30)
+        
+        if cooldown_period < 5 or cooldown_period > 300:
+            raise HTTPException(status_code=400, detail="Cooldown period must be between 5-300 seconds")
+        
+        continuous_recognition_state["cooldown_period"] = cooldown_period
+        
+        logger.info(f"🔧 Updated cooldown period to {cooldown_period} seconds")
+        
+        return ResponseModel(
+            success=True,
+            message=f"Đã cập nhật thời gian chờ thành {cooldown_period} giây",
+            data={
+                "cooldown_period": cooldown_period
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/recognize", response_model=FaceRecognitionResponse)
 async def recognize_face_upload(

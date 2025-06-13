@@ -21,6 +21,8 @@ py setup.py
 ```bash
 cd backend
 venv\Scripts\activate     # Windows
+uvicorn main:app --host 0.0.0.0 --port 8000
+ --reload
 # source venv/bin/activate  # Linux/Mac
 python main.py
 ```

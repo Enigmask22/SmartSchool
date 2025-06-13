@@ -29,10 +29,15 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS middleware
+# CORS middleware - Cập nhật để support WebSocket
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "ws://localhost:3000",
+        "ws://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
