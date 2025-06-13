@@ -507,7 +507,7 @@ const ContinuousRecognition = () => {
               <Info className="mr-2 text-blue-600 mt-0.5" size={16} />
               <div className="text-sm text-blue-800">
                 <strong>Về độ tin cậy:</strong> InsightFace AI sử dụng thuật toán ArcFace với độ tin cậy 20-50% là bình thường và rất chính xác. 
-                Độ tin cậy 39-49% như bạn thấy là <strong>kết quả tốt</strong> và đảm bảo nhận diện chính xác 85-90%.
+                Hệ thống hiển thị cả <strong>độ tin cậy gốc</strong> (20-50%) và <strong>độ chính xác quy đổi</strong> (40-100%) để dễ hiểu hơn.
               </div>
             </div>
           </div>
@@ -546,23 +546,23 @@ const ContinuousRecognition = () => {
             <div className="space-y-2 text-sm">
               <div className="flex items-center">
                 <div className="w-3 h-3 bg-emerald-600 rounded mr-2"></div>
-                <span>≥45%: Xuất sắc (95%+)</span>
+                <span>≥45% (90%+): Xuất sắc</span>
               </div>
               <div className="flex items-center">
                 <div className="w-3 h-3 bg-green-600 rounded mr-2"></div>
-                <span>35-44%: Rất cao (90%+)</span>
+                <span>35-44% (70-88%): Rất cao</span>
               </div>
               <div className="flex items-center">
                 <div className="w-3 h-3 bg-blue-600 rounded mr-2"></div>
-                <span>25-34%: Cao (85%+)</span>
+                <span>25-34% (50-68%): Cao</span>
               </div>
               <div className="flex items-center">
                 <div className="w-3 h-3 bg-yellow-600 rounded mr-2"></div>
-                <span>20-24%: Tốt (80%+)</span>
+                <span>20-24% (40-48%): Tốt</span>
               </div>
               <div className="flex items-center">
                 <div className="w-3 h-3 bg-orange-600 rounded mr-2"></div>
-                <span>&lt;20%: Chấp nhận được</span>
+                <span>&lt;20% (&lt;40%): Chấp nhận được</span>
               </div>
             </div>
           </div>
@@ -677,10 +677,10 @@ const ContinuousRecognition = () => {
                           <div>
                             <div className="font-semibold">{recognition.student.full_name}</div>
                             <div className="text-sm opacity-90">
-                              Độ tin cậy: {recognition.confidence}% ({confidenceLabel})
+                              Độ tin cậy: {recognition.confidence} | Độ chính xác: {Math.round(recognition.confidence * 2)}%
                             </div>
                             <div className="text-xs opacity-75">
-                              {recognition.accuracy || 'InsightFace AI'}
+                              {confidenceLabel} - InsightFace AI
                             </div>
                           </div>
                           <CheckCircle size={24} />
@@ -747,7 +747,7 @@ const ContinuousRecognition = () => {
                             {recognition.student.student_code}
                           </div>
                           <div className="text-sm text-green-600">
-                            {recognition.confidence}% - {recognition.timestamp}
+                            {Math.round(recognition.confidence/100)} ({Math.round(recognition.confidence * 2)}%) - {recognition.timestamp}
                           </div>
                         </div>
                         
