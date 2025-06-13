@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ApiService from '../services/api';
+import MultipleFaceRegistration from './MultipleFaceRegistration';
 
 const StudentList = () => {
   const [students, setStudents] = useState([]);
@@ -15,13 +16,22 @@ const StudentList = () => {
   const [cameraStream, setCameraStream] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
-  const [registrationMode, setRegistrationMode] = useState('camera'); // 'camera' or 'upload'
+  const [registrationMode, setRegistrationMode] = useState('camera'); // 'camera' or 'upload' or 'multiple'
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+  
+  // Multiple samples states
+  const [multipleFiles, setMultipleFiles] = useState([]);
+  const [multipleResults, setMultipleResults] = useState([]);
+  
+  // Multiple Face Registration Modal
+  const [showMultipleModal, setShowMultipleModal] = useState(false);
+  const [selectedStudentForMultiple, setSelectedStudentForMultiple] = useState(null);
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  const multipleFileInputRef = useRef(null);
 
   // Cleanup camera stream when component unmounts
   useEffect(() => {
@@ -298,6 +308,8 @@ const StudentList = () => {
       if (result.success) {
         alert(`Đăng ký khuôn mặt thành công cho ${selectedStudentForFace.full_name}!`);
         closeFaceModal();
+        // Refresh students list to show updated status
+        fetchStudents();
       } else {
         alert(`Lỗi: ${result.message}`);
       }
@@ -340,6 +352,111 @@ const StudentList = () => {
     // Clean up uploaded image URL
     if (uploadedImage?.previewUrl) {
       URL.revokeObjectURL(uploadedImage.previewUrl);
+    }
+    
+    // Clean up multiple files
+    multipleFiles.forEach(file => {
+      if (file.previewUrl) {
+        URL.revokeObjectURL(file.previewUrl);
+      }
+    });
+    setMultipleFiles([]);
+    setMultipleResults([]);
+    
+    // Reset multiple file input
+    if (multipleFileInputRef.current) {
+      multipleFileInputRef.current.value = '';
+    }
+  };
+
+  const handleMultipleFileSelect = (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length > 10) {
+      alert('Tối đa 10 ảnh mỗi lần');
+      return;
+    }
+    
+    const fileObjects = files.map((file, index) => ({
+      file,
+      id: index,
+      name: file.name,
+      previewUrl: URL.createObjectURL(file),
+      status: 'pending' // pending, success, error
+    }));
+    
+    setMultipleFiles(fileObjects);
+  };
+
+  const removeMultipleFile = (fileId) => {
+    setMultipleFiles(prev => {
+      const updated = prev.filter(f => f.id !== fileId);
+      // Revoke URL for removed file
+      const removedFile = prev.find(f => f.id === fileId);
+      if (removedFile) {
+        URL.revokeObjectURL(removedFile.previewUrl);
+      }
+      return updated;
+    });
+  };
+
+  const submitMultipleFaceRegistration = async () => {
+    if (multipleFiles.length === 0 || !selectedStudentForFace) return;
+    
+    setFaceRegistrationLoading(true);
+    setMultipleResults([]);
+    
+    try {
+      const formData = new FormData();
+      multipleFiles.forEach(fileObj => {
+        formData.append('files', fileObj.file);
+      });
+      
+      const response = await fetch(`http://localhost:8000/api/ai/register-multiple/${selectedStudentForFace.id}`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setMultipleResults(result.data.results || []);
+        alert(`Đăng ký thành công ${result.data.successful_registrations}/${result.data.total_images} ảnh cho ${selectedStudentForFace.full_name}!`);
+        
+        // Update file statuses
+        setMultipleFiles(prev => prev.map((file, index) => ({
+          ...file,
+          status: result.data.results[index]?.success ? 'success' : 'error',
+          message: result.data.results[index]?.message || ''
+        })));
+        
+        // Refresh students list
+        fetchStudents();
+      } else {
+        alert(`Lỗi: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error registering multiple faces:', error);
+      alert('Có lỗi xảy ra khi đăng ký nhiều khuôn mặt');
+    } finally {
+      setFaceRegistrationLoading(false);
+    }
+  };
+
+  const handleEdit = (student) => {
+    // TODO: Implement edit functionality
+    alert(`Chức năng sửa thông tin cho ${student.full_name} sẽ được thêm sau`);
+  };
+
+  const handleDelete = async (studentId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa học sinh này?')) {
+      try {
+        await ApiService.deleteStudent(studentId);
+        alert('Xóa học sinh thành công!');
+        fetchStudents();
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        alert('Có lỗi xảy ra khi xóa học sinh');
+      }
     }
   };
 
@@ -446,24 +563,33 @@ const StudentList = () => {
                 </div>
                 <div className="col-span-2 text-sm font-medium flex justify-center">
                   <div className="flex flex-col gap-1">
-                    <div className="flex gap-1">
-                      <button className="px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors">
-                        👁️
-                      </button>
-                      <button className="px-2 py-1 text-xs bg-green-100 text-green-700 hover:bg-green-200 rounded transition-colors">
-                        ✏️
-                      </button>
-                    </div>
-                    <div className="flex gap-1">
-                      <button 
+                    <div className="flex gap-2">
+                      <button
                         onClick={() => startFaceRegistration(student)}
-                        className="px-2 py-1 text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 rounded transition-colors whitespace-nowrap"
-                        title="Đăng ký khuôn mặt"
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
                       >
-                        🤖
+                        📷 Đăng ký khuôn mặt
                       </button>
-                      <button className="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors">
-                        🗑️
+                      <button
+                        onClick={() => {
+                          setSelectedStudentForMultiple(student);
+                          setShowMultipleModal(true);
+                        }}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                      >
+                        📸 Nhiều ảnh
+                      </button>
+                      <button
+                        onClick={() => handleEdit(student)}
+                        className="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700"
+                      >
+                        ✏️ Sửa
+                      </button>
+                      <button
+                        onClick={() => handleDelete(student.id)}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                      >
+                        🗑️ Xóa
                       </button>
                     </div>
                   </div>
@@ -511,6 +637,16 @@ const StudentList = () => {
                     }`}
                   >
                     📁 Upload
+                  </button>
+                  <button
+                    onClick={() => setRegistrationMode('multiple')}
+                    className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      registrationMode === 'multiple'
+                        ? 'bg-white text-green-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    📸 Nhiều ảnh
                   </button>
                 </div>
 
@@ -611,24 +747,23 @@ const StudentList = () => {
                   <>
                     {!uploadedImage ? (
                       <div className="text-center">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                        />
-                        <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full max-w-md mx-auto border-2 border-dashed border-purple-300 rounded-lg p-8 cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors"
-                        >
-                          <div className="text-center">
-                            <span className="text-6xl block mb-4">📁</span>
-                            <p className="text-purple-600 font-medium">Nhấn để chọn ảnh</p>
-                            <p className="text-sm text-gray-500 mt-1">
-                              Hỗ trợ: JPG, PNG, WebP
-                            </p>
-                          </div>
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700"
+                          >
+                            📁 Chọn ảnh từ máy tính
+                          </button>
+                          <p className="text-sm text-gray-600 mt-2">
+                            Chọn ảnh khuôn mặt rõ ràng, đủ sáng
+                          </p>
                         </div>
                       </div>
                     ) : (
@@ -663,6 +798,131 @@ const StudentList = () => {
                     )}
                   </>
                 )}
+
+                {/* Multiple Mode */}
+                {registrationMode === 'multiple' && (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-blue-800 mb-2">📸 Đăng ký nhiều ảnh (Độ chính xác cao)</h4>
+                      <p className="text-sm text-blue-700">
+                        Chụp 5-10 ảnh với góc độ khác nhau để đạt độ chính xác 90%+:
+                      </p>
+                      <ul className="text-xs text-blue-600 mt-2 space-y-1">
+                        <li>• Nhìn thẳng, nghiêng trái/phải 15-30°</li>
+                        <li>• Cười và không cười</li>
+                        <li>• Ánh sáng tự nhiên và đèn</li>
+                        <li>• Khoảng cách gần và xa</li>
+                      </ul>
+                    </div>
+
+                    {multipleFiles.length === 0 ? (
+                      <div className="text-center">
+                        <div className="border-2 border-dashed border-green-300 rounded-lg p-8">
+                          <input
+                            ref={multipleFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleMultipleFileSelect}
+                            className="hidden"
+                          />
+                          <button
+                            onClick={() => multipleFileInputRef.current?.click()}
+                            className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700"
+                          >
+                            📸 Chọn nhiều ảnh (tối đa 10)
+                          </button>
+                          <p className="text-sm text-gray-600 mt-2">
+                            Chọn 5-10 ảnh khuôn mặt với góc độ khác nhau
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex justify-between items-center mb-3">
+                          <h5 className="font-medium">Đã chọn {multipleFiles.length} ảnh:</h5>
+                          <button
+                            onClick={() => multipleFileInputRef.current?.click()}
+                            className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200"
+                          >
+                            + Thêm ảnh
+                          </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-3 max-h-60 overflow-y-auto">
+                          {multipleFiles.map((fileObj) => (
+                            <div key={fileObj.id} className="relative">
+                              <img
+                                src={fileObj.previewUrl}
+                                alt={fileObj.name}
+                                className="w-full h-24 object-cover rounded border"
+                              />
+                              <button
+                                onClick={() => removeMultipleFile(fileObj.id)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600"
+                              >
+                                ×
+                              </button>
+                              {fileObj.status !== 'pending' && (
+                                <div className={`absolute bottom-0 left-0 right-0 text-xs p-1 text-center ${
+                                  fileObj.status === 'success' 
+                                    ? 'bg-green-500 text-white' 
+                                    : 'bg-red-500 text-white'
+                                }`}>
+                                  {fileObj.status === 'success' ? '✅' : '❌'}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="mt-4 text-center space-x-2">
+                          <button
+                            onClick={() => {
+                              multipleFiles.forEach(file => URL.revokeObjectURL(file.previewUrl));
+                              setMultipleFiles([]);
+                              setMultipleResults([]);
+                              if (multipleFileInputRef.current) {
+                                multipleFileInputRef.current.value = '';
+                              }
+                            }}
+                            className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                          >
+                            🔄 Chọn lại
+                          </button>
+                          <button
+                            onClick={submitMultipleFaceRegistration}
+                            disabled={faceRegistrationLoading || multipleFiles.length === 0}
+                            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {faceRegistrationLoading ? '⏳ Đang xử lý...' : `✅ Đăng ký ${multipleFiles.length} ảnh`}
+                          </button>
+                        </div>
+                        
+                        {multipleResults.length > 0 && (
+                          <div className="mt-4 bg-gray-50 p-3 rounded">
+                            <h6 className="font-medium mb-2">Kết quả:</h6>
+                            <div className="space-y-1 text-sm">
+                              {multipleResults.map((result, index) => (
+                                <div key={index} className={`flex items-center gap-2 ${
+                                  result.success ? 'text-green-700' : 'text-red-700'
+                                }`}>
+                                  <span>{result.success ? '✅' : '❌'}</span>
+                                  <span>{result.message}</span>
+                                  {result.detection_score && (
+                                    <span className="text-xs text-gray-500">
+                                      ({(result.detection_score * 100).toFixed(1)}%)
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -679,6 +939,20 @@ const StudentList = () => {
           {searchTerm && ` với từ khóa "${searchTerm}"`}
         </p>
       </div>
+
+      {/* Multiple Face Registration Modal */}
+      {showMultipleModal && selectedStudentForMultiple && (
+        <MultipleFaceRegistration
+          student={selectedStudentForMultiple}
+          onClose={() => {
+            setShowMultipleModal(false);
+            setSelectedStudentForMultiple(null);
+          }}
+          onSuccess={() => {
+            fetchStudents(); // Refresh students list
+          }}
+        />
+      )}
     </div>
   );
 };

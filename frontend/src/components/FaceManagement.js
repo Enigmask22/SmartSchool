@@ -29,6 +29,13 @@ const FaceManagement = () => {
       
       setStudents(Array.isArray(studentsResponse) ? studentsResponse : []);
       
+      // Log để debug
+      console.log('Students data:', studentsResponse);
+      if (studentsResponse && studentsResponse.length > 0) {
+        console.log('Sample student:', studentsResponse[0]);
+        console.log('Has insightface_encoding:', !!studentsResponse[0].insightface_encoding);
+      }
+      
     } catch (error) {
       console.error('Error fetching data:', error);
       setError('Không thể tải thông tin AI system');
@@ -112,27 +119,33 @@ const FaceManagement = () => {
                 {aiStatus.service_status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
               </div>
               <div className="text-sm text-gray-600">Trạng thái service</div>
+              <div className="text-xs text-gray-500 mt-1">{aiStatus.service_name}</div>
             </div>
             
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
-                {aiStatus.total_encodings}
+                {aiStatus.database_encodings || 0}
               </div>
               <div className="text-sm text-gray-600">Khuôn mặt đã đăng ký</div>
+              <div className="text-xs text-gray-500 mt-1">Database: {aiStatus.database_encodings}, Local: {aiStatus.local_ai_encodings}</div>
             </div>
             
             <div className="bg-purple-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-purple-600">
-                {(aiStatus.tolerance * 100).toFixed(0)}%
+                {aiStatus.accuracy || 'N/A'}
               </div>
               <div className="text-sm text-gray-600">Độ chính xác</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {aiStatus.similarity_threshold ? `Threshold: ${aiStatus.similarity_threshold}` : 'Advanced AI'}
+              </div>
             </div>
             
             <div className="bg-orange-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
-                {aiStatus.min_face_size}px
+                {aiStatus.sync_status === 'synced' ? '✅' : '⚠️'}
               </div>
-              <div className="text-sm text-gray-600">Kích thước tối thiểu</div>
+              <div className="text-sm text-gray-600">Trạng thái đồng bộ</div>
+              <div className="text-xs text-gray-500 mt-1 capitalize">{aiStatus.sync_status?.replace('_', ' ')}</div>
             </div>
           </div>
         ) : (
@@ -194,9 +207,9 @@ const FaceManagement = () => {
                   </span>
                 </div>
                 <div className="col-span-4 text-sm text-gray-900">
-                  {student.face_encoding ? (
+                  {(student.face_encoding || student.insightface_encoding) ? (
                     <span className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full inline-flex items-center">
-                      ✅ Đã đăng ký
+                      ✅ Đã đăng ký {student.insightface_encoding ? '(InsightFace)' : '(MediaPipe)'}
                     </span>
                   ) : (
                     <span className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded-full inline-flex items-center">
@@ -205,7 +218,7 @@ const FaceManagement = () => {
                   )}
                 </div>
                 <div className="col-span-2 text-sm font-medium flex justify-center">
-                  {student.face_encoding ? (
+                  {(student.face_encoding || student.insightface_encoding) ? (
                     <button 
                       onClick={() => deleteFaceEncoding(student.id, student.full_name)}
                       className="px-3 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors inline-flex items-center gap-1"

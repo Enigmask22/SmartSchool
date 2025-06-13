@@ -15,7 +15,7 @@ from models.schemas import (
 )
 from database.connection import get_db
 from utils.logger import setup_logger
-from ai.face_recognition_service import face_recognition_service
+from ai.face_recognition_insightface import insightface_service
 
 logger = setup_logger()
 router = APIRouter()
