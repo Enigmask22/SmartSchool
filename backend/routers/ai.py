@@ -272,7 +272,7 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
                                 student_data = student_response.data[0]
                                 
                                 # Auto-create attendance record
-                                attendance_result = await create_auto_attendance(student_data, db)
+                                attendance_result = await create_auto_attendance(student_data, db, confidence)
                                 
                                 # Determine accuracy level based on confidence - Adjusted for realistic InsightFace scores
                                 if confidence >= 0.45:
@@ -336,13 +336,15 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
             "accuracy_mode": "ULTRA-HIGH"
         }
 
-async def create_auto_attendance(student_data: dict, db):
+async def create_auto_attendance(student_data: dict, db, confidence: float = 0.85):
     """Tự động tạo attendance record"""
     try:
-        from datetime import datetime, date
+        from datetime import datetime, date, timezone, timedelta
         
+        # Sử dụng timezone Việt Nam (UTC+7)
+        vietnam_tz = timezone(timedelta(hours=7))
         today = date.today().isoformat()
-        now = datetime.now().isoformat()
+        now = datetime.now(vietnam_tz).isoformat()
         
         # Check if attendance already exists today
         existing = db.table("attendance").select("*").eq("student_id", student_data["id"]).eq("date", today).execute()
@@ -354,7 +356,9 @@ async def create_auto_attendance(student_data: dict, db):
                 "status": "present",
                 "check_in_time": now,
                 "updated_at": now,
-                "recognition_confidence": 85.0  # Default confidence for auto-recognition
+                "confidence_score": confidence,  # Store as decimal
+                "method": "auto",
+                "notes": f"Điểm danh tự động - Confidence: {confidence*100:.1f}%"
             }
             
             response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()
@@ -371,18 +375,28 @@ async def create_auto_attendance(student_data: dict, db):
                 "date": today,
                 "status": "present",
                 "check_in_time": now,
-                "recognition_confidence": 85.0,
+                "confidence_score": confidence,  # Store as decimal
+                "method": "auto",
+                "notes": f"Điểm danh tự động - Confidence: {confidence*100:.1f}%",
                 "created_at": now,
                 "updated_at": now
             }
             
             response = db.table("attendance").insert(attendance_data).execute()
             
-            return {
-                "type": "created",
-                "message": f"Điểm danh thành công cho {student_data['full_name']}",
-                "data": response.data[0] if response.data else None
-            }
+            if response.data:
+                logger.info(f"✅ Created attendance record for student {student_data['id']}: {response.data[0]}")
+                return {
+                    "type": "created",
+                    "message": f"Điểm danh thành công cho {student_data['full_name']}",
+                    "data": response.data[0]
+                }
+            else:
+                logger.error(f"❌ Failed to create attendance record for student {student_data['id']}")
+                return {
+                    "type": "error",
+                    "message": f"Lỗi tạo điểm danh cho {student_data['full_name']}"
+                }
             
     except Exception as e:
         logger.error(f"❌ Error creating auto-attendance: {e}")

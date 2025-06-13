@@ -28,6 +28,15 @@ const StudentList = () => {
   const [showMultipleModal, setShowMultipleModal] = useState(false);
   const [selectedStudentForMultiple, setSelectedStudentForMultiple] = useState(null);
   
+  // Edit student states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+  
+  // Show inactive students option
+  const [showInactive, setShowInactive] = useState(false);
+  
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -69,15 +78,27 @@ const StudentList = () => {
   useEffect(() => {
     fetchStudents();
   }, []);
+  
+  useEffect(() => {
+    fetchStudents();
+  }, [showInactive]);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const studentsData = await ApiService.getStudents();
-      // Đảm bảo studentsData luôn là array
-      setStudents(Array.isArray(studentsData) ? studentsData : []);
+      // Add is_active parameter based on showInactive checkbox
+      const params = showInactive ? { is_active: null } : {};
+      const response = await ApiService.getStudents(params);
+      console.log('Students API response:', response);
+      
+      if (response.success && response.data) {
+        setStudents(Array.isArray(response.data) ? response.data : []);
+      } else {
+        console.warn('Invalid response structure:', response);
+        setStudents([]);
+      }
     } catch (error) {
       console.error('Error fetching students:', error);
       setError('Không thể tải danh sách học sinh từ server. Hiển thị dữ liệu mẫu.');
@@ -443,19 +464,98 @@ const StudentList = () => {
   };
 
   const handleEdit = (student) => {
-    // TODO: Implement edit functionality
-    alert(`Chức năng sửa thông tin cho ${student.full_name} sẽ được thêm sau`);
+    setSelectedStudentForEdit(student);
+    setEditForm({
+      full_name: student.full_name || '',
+      email: student.email || '',
+      phone: student.phone || '',
+      class_name: student.class_name || '',
+      grade: student.grade || '',
+      date_of_birth: student.date_of_birth || '',
+      address: student.address || '',
+      parent_name: student.parent_name || '',
+      parent_phone: student.parent_phone || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditFormChange = (field, value) => {
+    setEditForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const submitEditForm = async () => {
+    if (!selectedStudentForEdit || !editForm.full_name.trim()) {
+      alert('Vui lòng nhập đầy đủ thông tin bắt buộc');
+      return;
+    }
+
+    // Filter out empty strings and convert to null for optional fields
+    const cleanFormData = {};
+    Object.keys(editForm).forEach(key => {
+      const value = editForm[key];
+      if (value !== '' && value !== null && value !== undefined) {
+        cleanFormData[key] = value;
+      }
+    });
+
+    console.log('Debug - editForm data:', editForm);
+    console.log('Debug - cleaned data:', cleanFormData);
+    console.log('Debug - student ID:', selectedStudentForEdit.id);
+
+    setEditLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/students/${selectedStudentForEdit.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cleanFormData)
+      });
+
+      if (response.ok) {
+        alert('Cập nhật thông tin học sinh thành công!');
+        setShowEditModal(false);
+        fetchStudents();
+      } else {
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        throw new Error(`Failed to update student: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+    } catch (error) {
+      console.error('Error updating student:', error);
+      alert('Có lỗi xảy ra khi cập nhật thông tin học sinh');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setSelectedStudentForEdit(null);
+    setEditForm({});
   };
 
   const handleDelete = async (studentId) => {
+    console.log('Delete button clicked for student ID:', studentId);
+    
     if (window.confirm('Bạn có chắc chắn muốn xóa học sinh này?')) {
       try {
-        await ApiService.deleteStudent(studentId);
-        alert('Xóa học sinh thành công!');
-        fetchStudents();
+        console.log('Calling ApiService.deleteStudent with ID:', studentId);
+        const response = await ApiService.deleteStudent(studentId);
+        console.log('Delete response:', response);
+        
+        if (response.success) {
+          alert('Xóa học sinh thành công!');
+          fetchStudents();
+        } else {
+          alert(`Lỗi: ${response.message || 'Không thể xóa học sinh'}`);
+        }
       } catch (error) {
         console.error('Error deleting student:', error);
-        alert('Có lỗi xảy ra khi xóa học sinh');
+        alert('Có lỗi xảy ra khi xóa học sinh: ' + error.message);
       }
     }
   };
@@ -512,92 +612,127 @@ const StudentList = () => {
             </select>
           </div>
 
-          <div className="flex items-end">
-            <button
-              onClick={fetchStudents}
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Làm mới
-            </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Hiển thị
+            </label>
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-600">Đã xóa</span>
+              </label>
+              <button
+                onClick={fetchStudents}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Làm mới
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Students Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        {/* Header */}
-        <div className="bg-gray-50 grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b items-center">
-          <div className="col-span-2">Mã SV</div>
-          <div className="col-span-3">Họ tên</div>
-          <div className="col-span-1">Lớp</div>
-          <div className="col-span-3">Email</div>
-          <div className="col-span-1">SĐT</div>
-          <div className="col-span-2 text-center">Thao tác</div>
-        </div>
-
-        {/* Body */}
-        <div className="divide-y divide-gray-200">
-          {filteredStudents.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-500">
+      {/* Students Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredStudents.length === 0 ? (
+          <div className="col-span-full text-center py-12">
+            <div className="text-gray-400 text-6xl mb-4">👥</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
               {searchTerm || selectedClass ? 'Không tìm thấy học sinh nào' : 'Chưa có học sinh nào'}
-            </div>
-          ) : (
-            filteredStudents.map((student) => (
-              <div key={student.id} className="grid grid-cols-12 gap-4 px-4 py-4 hover:bg-gray-50 items-center">
-                <div className="col-span-2 text-sm font-medium text-gray-900 truncate">
-                  {student.student_id}
-                </div>
-                <div className="col-span-3 text-sm text-gray-900 truncate">
-                  <div className="font-medium">{student.full_name}</div>
-                </div>
-                <div className="col-span-1 text-sm text-gray-900">
-                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                    {student.class_name}
-                  </span>
-                </div>
-                <div className="col-span-3 text-sm text-gray-600 truncate">
-                  {student.email || 'Chưa có'}
-                </div>
-                <div className="col-span-1 text-sm text-gray-600 truncate">
-                  {student.phone || 'Chưa có'}
-                </div>
-                <div className="col-span-2 text-sm font-medium flex justify-center">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => startFaceRegistration(student)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                      >
-                        📷 Đăng ký khuôn mặt
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedStudentForMultiple(student);
-                          setShowMultipleModal(true);
-                        }}
-                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                      >
-                        📸 Nhiều ảnh
-                      </button>
-                      <button
-                        onClick={() => handleEdit(student)}
-                        className="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700"
-                      >
-                        ✏️ Sửa
-                      </button>
-                      <button
-                        onClick={() => handleDelete(student.id)}
-                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                      >
-                        🗑️ Xóa
-                      </button>
+            </h3>
+            <p className="text-gray-500">
+              {searchTerm || selectedClass ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm' : 'Hãy thêm học sinh mới để bắt đầu'}
+            </p>
+          </div>
+        ) : (
+          filteredStudents.map((student) => (
+            <div key={student.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden">
+              {/* Header with avatar and basic info */}
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-2xl font-bold">
+                    {student.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold truncate">{student.full_name}</h3>
+                    <p className="text-blue-100 text-sm">{student.student_id}</p>
+                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-white/20 mt-1">
+                      🎓 {student.class_name}
                     </div>
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+
+              {/* Student info */}
+              <div className="p-6 space-y-3">
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  <div className="flex items-center space-x-3">
+                    <span className="w-5 h-5 flex items-center justify-center text-gray-400">📧</span>
+                    <span className="text-gray-600 truncate">{student.email || 'Chưa có email'}</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className="w-5 h-5 flex items-center justify-center text-gray-400">📱</span>
+                    <span className="text-gray-600">{student.phone || 'Chưa có SĐT'}</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className="w-5 h-5 flex items-center justify-center text-gray-400">📚</span>
+                    <span className="text-gray-600">Khối {student.grade || 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => startFaceRegistration(student)}
+                      className="flex items-center justify-center space-x-2 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      title="Đăng ký khuôn mặt"
+                    >
+                      <span className="text-base">📷</span>
+                      <span>Đăng ký</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedStudentForMultiple(student);
+                        setShowMultipleModal(true);
+                      }}
+                      className="flex items-center justify-center space-x-2 bg-green-50 hover:bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      title="Nhiều ảnh"
+                    >
+                      <span className="text-base">📸</span>
+                      <span>Nhiều ảnh</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleEdit(student)}
+                      className="flex items-center justify-center space-x-2 bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      title="Sửa thông tin"
+                    >
+                      <span className="text-base">✏️</span>
+                      <span>Sửa</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleDelete(student.id)}
+                      className="flex items-center justify-center space-x-2 bg-red-50 hover:bg-red-100 text-red-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      title="Xóa học sinh"
+                    >
+                      <span className="text-base">🗑️</span>
+                      <span>Xóa</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
         {/* Face Registration Modal */}
         {showFaceModal && (
@@ -929,7 +1064,6 @@ const StudentList = () => {
             </div>
           </div>
         )}
-      </div>
 
       {/* Summary */}
       <div className="mt-6 bg-gray-50 rounded-lg p-4">
@@ -939,6 +1073,178 @@ const StudentList = () => {
           {searchTerm && ` với từ khóa "${searchTerm}"`}
         </p>
       </div>
+
+      {/* Edit Student Modal */}
+      {showEditModal && selectedStudentForEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Sửa thông tin học sinh
+              </h3>
+              <button
+                onClick={closeEditModal}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mã học sinh (Không thể thay đổi)
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedStudentForEdit.student_id || ''}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                    readOnly
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Họ và tên *
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.full_name || ''}
+                    onChange={(e) => handleEditFormChange('full_name', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: Nguyễn Văn An"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editForm.email || ''}
+                    onChange={(e) => handleEditFormChange('email', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: student@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="tel"
+                    value={editForm.phone || ''}
+                    onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: 0123456789"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Lớp
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.class_name || ''}
+                    onChange={(e) => handleEditFormChange('class_name', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: 10A1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Khối
+                  </label>
+                  <select
+                    value={editForm.grade || ''}
+                    onChange={(e) => handleEditFormChange('grade', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Chọn khối</option>
+                    <option value="10">Khối 10</option>
+                    <option value="11">Khối 11</option>
+                    <option value="12">Khối 12</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ngày sinh
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.date_of_birth || ''}
+                    onChange={(e) => handleEditFormChange('date_of_birth', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tên phụ huynh
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.parent_name || ''}
+                    onChange={(e) => handleEditFormChange('parent_name', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: Nguyễn Văn Bình"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SĐT phụ huynh
+                  </label>
+                  <input
+                    type="tel"
+                    value={editForm.parent_phone || ''}
+                    onChange={(e) => handleEditFormChange('parent_phone', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: 0987654321"
+                  />
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Địa chỉ
+                </label>
+                <textarea
+                  value={editForm.address || ''}
+                  onChange={(e) => handleEditFormChange('address', e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={submitEditForm}
+                  disabled={editLoading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {editLoading ? '⏳ Đang lưu...' : '💾 Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Multiple Face Registration Modal */}
       {showMultipleModal && selectedStudentForMultiple && (

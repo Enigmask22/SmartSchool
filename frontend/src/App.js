@@ -35,7 +35,7 @@ function App() {
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard setCurrentView={setCurrentView} />;
       case 'students':
         return <StudentList />;
       case 'attendance':
@@ -47,7 +47,7 @@ function App() {
       case 'faces':
         return <FaceManagement />;
       default:
-        return <Dashboard />;
+        return <Dashboard setCurrentView={setCurrentView} />;
     }
   };
 

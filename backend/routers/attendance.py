@@ -4,7 +4,7 @@ API Router cho quản lý điểm danh
 
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 
 from models.schemas import (
     Attendance, AttendanceCreate, AttendanceUpdate,
@@ -26,16 +26,17 @@ async def check_in_attendance(
     try:
         # Kiểm tra đã điểm danh hôm nay chưa
         today = date.today()
+        vietnam_tz = timezone(timedelta(hours=7))
         existing = db.table("attendance").select("*").eq("student_id", attendance.student_id).eq("date", today.isoformat()).execute()
         
         if existing.data:
             # Update existing attendance
             update_data = {
-                "check_in_time": datetime.now().isoformat(),
+                "check_in_time": datetime.now(vietnam_tz).isoformat(),
                 "status": attendance.status,
                 "notes": attendance.notes,
                 "confidence_score": attendance.confidence_score,
-                "updated_at": datetime.now().isoformat()
+                "updated_at": datetime.now(vietnam_tz).isoformat()
             }
             
             response = db.table("attendance").update(update_data).eq("id", existing.data[0]["id"]).execute()
@@ -50,9 +51,9 @@ async def check_in_attendance(
             attendance_data = attendance.dict()
             attendance_data.update({
                 "date": today.isoformat(),
-                "check_in_time": datetime.now().isoformat(),
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
+                "check_in_time": datetime.now(vietnam_tz).isoformat(),
+                "created_at": datetime.now(vietnam_tz).isoformat(),
+                "updated_at": datetime.now(vietnam_tz).isoformat()
             })
             
             response = db.table("attendance").insert(attendance_data).execute()
@@ -86,9 +87,10 @@ async def check_out_attendance(
             raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi điểm danh")
         
         # Update check out time
+        vietnam_tz = timezone(timedelta(hours=7))
         update_data = {
-            "check_out_time": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
+            "check_out_time": datetime.now(vietnam_tz).isoformat(),
+            "updated_at": datetime.now(vietnam_tz).isoformat()
         }
         
         response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()
@@ -121,13 +123,8 @@ async def get_attendance_records(
 ):
     """Lấy danh sách điểm danh với filter"""
     try:
-        # Build query with JOIN
-        query = db.table("attendance").select("""
-            *,
-            students:student_id (
-                id, student_id, full_name, class_name, grade, profile_image
-            )
-        """)
+        # Build query with JOIN - use simpler approach
+        query = db.table("attendance").select("*")
         
         # Apply filters
         if date_from:
@@ -150,9 +147,29 @@ async def get_attendance_records(
         offset = (page - 1) * page_size
         response = query.order("date", desc=True).order("check_in_time", desc=True).range(offset, offset + page_size - 1).execute()
         
+        # Get attendance records
+        attendance_data = response.data or []
+        
+        # Manually join with students data
+        if attendance_data:
+            # Get all student_ids from attendance records
+            student_ids = list(set([record["student_id"] for record in attendance_data if record.get("student_id")]))
+            
+            if student_ids:
+                # Get students data
+                students_response = db.table("students").select("id, student_id, full_name, class_name, grade, profile_image").in_("id", student_ids).execute()
+                students_data = students_response.data or []
+                
+                # Create lookup dict
+                students_lookup = {student["id"]: student for student in students_data}
+                
+                # Add students data to attendance records
+                for record in attendance_data:
+                    record["students"] = students_lookup.get(record["student_id"])
+        
         return ListResponse(
             success=True,
-            data=response.data or [],
+            data=attendance_data,
             total=total,
             page=page,
             page_size=page_size
@@ -211,25 +228,39 @@ async def get_today_attendance(
         today = date.today()
         
         # Build query
-        query = db.table("attendance").select("""
-            *,
-            students:student_id (
-                id, student_id, full_name, class_name, grade, profile_image
-            )
-        """).eq("date", today.isoformat())
-        
-        if class_name:
-            # Join with students to filter by class
-            query = query.eq("students.class_name", class_name)
+        query = db.table("attendance").select("*").eq("date", today.isoformat())
         
         response = query.order("check_in_time", desc=False).execute()
+        attendance_data = response.data or []
+        
+        # Manually join with students data
+        if attendance_data:
+            # Get all student_ids from attendance records
+            student_ids = list(set([record["student_id"] for record in attendance_data if record.get("student_id")]))
+            
+            if student_ids:
+                # Get students data
+                students_response = db.table("students").select("id, student_id, full_name, class_name, grade, profile_image").in_("id", student_ids).execute()
+                students_data = students_response.data or []
+                
+                # Create lookup dict
+                students_lookup = {student["id"]: student for student in students_data}
+                
+                # Add students data to attendance records
+                for record in attendance_data:
+                    record["students"] = students_lookup.get(record["student_id"])
+        
+        # Filter by class_name if specified
+        if class_name and attendance_data:
+            attendance_data = [record for record in attendance_data 
+                             if record.get("students") and record["students"].get("class_name") == class_name]
         
         return ListResponse(
             success=True,
-            data=response.data or [],
-            total=len(response.data) if response.data else 0,
+            data=attendance_data,
+            total=len(attendance_data),
             page=1,
-            page_size=len(response.data) if response.data else 0
+            page_size=len(attendance_data)
         )
         
     except Exception as e:
@@ -383,8 +414,9 @@ async def update_attendance(
             raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi điểm danh")
         
         # Prepare update data
+        vietnam_tz = timezone(timedelta(hours=7))
         update_data = attendance_update.dict(exclude_unset=True)
-        update_data["updated_at"] = datetime.now().isoformat()
+        update_data["updated_at"] = datetime.now(vietnam_tz).isoformat()
         
         # Update database
         response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()

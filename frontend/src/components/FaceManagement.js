@@ -19,7 +19,7 @@ const FaceManagement = () => {
       // Fetch AI status and students data in parallel
       const [statusResponse, studentsResponse] = await Promise.all([
         fetch('http://localhost:8000/api/ai/status'),
-        ApiService.getStudents()
+        ApiService.getStudents({})
       ]);
       
       if (statusResponse.ok) {
@@ -27,7 +27,12 @@ const FaceManagement = () => {
         setAiStatus(statusData.data);
       }
       
-      setStudents(Array.isArray(studentsResponse) ? studentsResponse : []);
+      // Handle students response properly
+      if (studentsResponse.success && studentsResponse.data) {
+        setStudents(Array.isArray(studentsResponse.data) ? studentsResponse.data : []);
+      } else {
+        setStudents([]);
+      }
       
       // Log để debug
       console.log('Students data:', studentsResponse);

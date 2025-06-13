@@ -5,7 +5,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
     { id: 'dashboard', label: 'Trang chủ', icon: '🏠' },
     { id: 'students', label: 'Học sinh', icon: '👥' },
     { id: 'attendance', label: 'Điểm danh', icon: '📋' },
-    { id: 'camera', label: 'AI Camera', icon: '📷' },
+    // { id: 'camera', label: 'AI Camera', icon: '📷' },
     { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
     { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
   ];

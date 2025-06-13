@@ -35,6 +35,11 @@ async def create_student(
         
         # Tạo student data
         student_data = student.dict()
+        
+        # Convert date fields to string format
+        if student_data.get("date_of_birth"):
+            student_data["date_of_birth"] = student_data["date_of_birth"].isoformat()
+        
         student_data["created_at"] = datetime.now().isoformat()
         student_data["updated_at"] = datetime.now().isoformat()
         
@@ -63,7 +68,7 @@ async def get_students(
     search: Optional[str] = Query(None),
     class_name: Optional[str] = Query(None),
     grade: Optional[str] = Query(None),
-    is_active: Optional[bool] = Query(None),
+    is_active: Optional[bool] = Query(True),
     db=Depends(get_db)
 ):
     """Lấy danh sách học sinh với phân trang và filter"""
@@ -148,6 +153,11 @@ async def update_student(
         
         # Prepare update data
         update_data = student_update.dict(exclude_unset=True)
+        
+        # Convert date fields to string format
+        if update_data.get("date_of_birth"):
+            update_data["date_of_birth"] = update_data["date_of_birth"].isoformat()
+        
         update_data["updated_at"] = datetime.now().isoformat()
         
         # Update database

@@ -33,8 +33,8 @@ class ApiService {
       const result = await response.json();
       
       // Backend trả về format {success: true, data: [...]}
-      // Trả về data nếu có, nếu không trả về toàn bộ result
-      return result.data !== undefined ? result.data : result;
+      // Trả về toàn bộ result để component có thể xử lý success/error
+      return result;
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
@@ -57,8 +57,54 @@ class ApiService {
   }
 
   // Students
-  async getStudents() {
-    return this.request('/students/');
+  async getStudents(params = {}) {
+    const queryParams = new URLSearchParams();
+    Object.keys(params).forEach(key => {
+      if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+        queryParams.append(key, params[key]);
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return this.request(`/students/${queryString ? '?' + queryString : ''}`);
+  }
+
+  // Classes
+  async getClasses() {
+    return this.request('/students/classes/list');
+  }
+
+  // Attendance
+  async getAttendanceRecords(params = {}) {
+    const queryParams = new URLSearchParams();
+    Object.keys(params).forEach(key => {
+      if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+        queryParams.append(key, params[key]);
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return this.request(`/attendance/${queryString ? '?' + queryString : ''}`);
+  }
+
+  async getTodayAttendance(className = null) {
+    const queryParams = className ? `?class_name=${className}` : '';
+    return this.request(`/attendance/today${queryParams}`);
+  }
+
+  async getAttendanceStats(targetDate = null) {
+    const queryParams = targetDate ? `?target_date=${targetDate}` : '';
+    return this.request(`/attendance/stats${queryParams}`);
+  }
+
+  async markAttendance(attendanceData) {
+    return this.request('/attendance/check-in', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(attendanceData),
+    });
   }
 
   async getStudent(id) {
@@ -85,10 +131,11 @@ class ApiService {
     });
   }
 
-  // Attendance
+  // Attendance (deprecated - use getAttendanceRecords instead)
   async getAttendance(date = null) {
-    const endpoint = date ? `/attendance/?date=${date}` : '/attendance/';
-    return this.request(endpoint);
+    // Redirect to new method
+    const params = date ? { date_from: date, date_to: date } : {};
+    return this.getAttendanceRecords(params);
   }
 
   async markAttendance(studentId, status, notes = '') {
@@ -102,7 +149,8 @@ class ApiService {
     });
   }
 
-  async getAttendanceStats(date = null) {
+  // This method is deprecated, redirect to the new one above
+  async getAttendanceStatsOld(date = null) {
     const endpoint = date ? `/attendance/stats/?date=${date}` : '/attendance/stats/';
     return this.request(endpoint);
   }
@@ -137,15 +185,15 @@ class ApiService {
   // Dashboard stats
   async getDashboardStats() {
     try {
-      const [students, , statsResponse] = await Promise.all([
-        this.getStudents(),
+      const [studentsResponse, , statsResponse] = await Promise.all([
+        this.getStudents({}),
         this.getAttendance(),
         this.getAttendanceStats(),
       ]);
 
-      // students đã được extract data từ {success: true, data: [...]}
-      // statsResponse cũng đã được extract
-      const stats = statsResponse || {};
+      // Extract data from response objects
+      const students = studentsResponse.success ? studentsResponse.data : [];
+      const stats = statsResponse.success ? statsResponse.data : {};
 
       return {
         totalStudents: Array.isArray(students) ? students.length : 0,

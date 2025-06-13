@@ -112,7 +112,12 @@ const ContinuousRecognition = () => {
             setRecentRecognitions(prev => [
               {
                 ...recognition,
-                timestamp: new Date().toLocaleTimeString(),
+                timestamp: new Date().toLocaleTimeString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  timeZone: 'Asia/Ho_Chi_Minh'
+                }),
                 id: Date.now() + Math.random()
               },
               ...prev.slice(0, 9) // Keep only last 10
@@ -677,7 +682,7 @@ const ContinuousRecognition = () => {
                           <div>
                             <div className="font-semibold">{recognition.student.full_name}</div>
                             <div className="text-sm opacity-90">
-                              Độ tin cậy: {recognition.confidence} | Độ chính xác: {Math.round(recognition.confidence * 2)}%
+                              Độ tin cậy: {(recognition.confidence/100).toFixed(3)} | Độ chính xác: {Math.round(recognition.confidence * 2)}%
                             </div>
                             <div className="text-xs opacity-75">
                               {confidenceLabel} - InsightFace AI
@@ -747,7 +752,7 @@ const ContinuousRecognition = () => {
                             {recognition.student.student_code}
                           </div>
                           <div className="text-sm text-green-600">
-                            {Math.round(recognition.confidence/100)} ({Math.round(recognition.confidence * 2)}%) - {recognition.timestamp}
+                            {(recognition.confidence/100).toFixed(3)} ({Math.round(recognition.confidence * 2)}%) - {recognition.timestamp}
                           </div>
                         </div>
                         

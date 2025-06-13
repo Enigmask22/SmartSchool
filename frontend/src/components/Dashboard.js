@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import ApiService from '../services/api';
+import AddStudentModal from './AddStudentModal';
+import ReportView from './ReportView';
 
-const Dashboard = () => {
+const Dashboard = ({ setCurrentView }) => {
   const [stats, setStats] = useState({
     totalStudents: 0,
     presentToday: 0,
@@ -11,6 +13,10 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Modal states
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -37,6 +43,19 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle navigation to AI attendance
+  const handleAIAttendance = () => {
+    // Navigate to continuous recognition page
+    if (setCurrentView) {
+      setCurrentView('continuous');
+    }
+  };
+
+  // Handle add student success
+  const handleAddStudentSuccess = () => {
+    fetchStats(); // Refresh dashboard stats
   };
 
   if (loading) {
@@ -96,18 +115,21 @@ const Dashboard = () => {
             description="Sử dụng camera để điểm danh tự động"
             icon="📷"
             color="bg-blue-600"
+            onClick={handleAIAttendance}
           />
           <QuickActionButton
             title="Thêm học sinh"
             description="Đăng ký học sinh mới"
             icon="➕"
             color="bg-green-600"
+            onClick={() => setShowAddStudentModal(true)}
           />
           <QuickActionButton
             title="Xem báo cáo"
             description="Thống kê chi tiết điểm danh"
             icon="📈"
             color="bg-purple-600"
+            onClick={() => setShowReportModal(true)}
           />
         </div>
       </div>
@@ -133,6 +155,18 @@ const Dashboard = () => {
           />
         </div>
       </div>
+
+      {/* Modals */}
+      <AddStudentModal 
+        isOpen={showAddStudentModal}
+        onClose={() => setShowAddStudentModal(false)}
+        onSuccess={handleAddStudentSuccess}
+      />
+      
+      <ReportView 
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+      />
     </div>
   );
 };
@@ -151,9 +185,12 @@ const StatCard = ({ title, value, icon, color }) => (
   </div>
 );
 
-const QuickActionButton = ({ title, description, icon, color }) => (
-  <button className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
-    <div className={`${color} text-white p-2 rounded-lg w-fit mb-3`}>
+const QuickActionButton = ({ title, description, icon, color, onClick }) => (
+  <button 
+    onClick={onClick}
+    className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all duration-200 group"
+  >
+    <div className={`${color} text-white p-2 rounded-lg w-fit mb-3 group-hover:scale-110 transition-transform`}>
       <span className="text-xl">{icon}</span>
     </div>
     <h4 className="font-semibold text-gray-800">{title}</h4>
