@@ -158,4 +158,44 @@ class BatchFeedbackResponse(BaseModel):
     success_count: int
     failed_count: int
     failed_students: List[str]
-    feedbacks: dict  # {student_name: feedback} 
+    feedbacks: dict  # {student_name: feedback}
+
+# School Days Configuration Schemas
+class SchoolDaysConfigCreate(BaseModel):
+    grade: str = Field(..., description="Khối học (10, 11, 12)")
+    default_days_per_week: int = Field(..., ge=1, le=7, description="Số ngày học mặc định trong tuần")
+    temporary_days_per_week: Optional[int] = Field(None, ge=1, le=7, description="Số ngày học tạm thời cho tuần tiếp theo")
+
+class SchoolDaysConfigUpdate(BaseModel):
+    default_days_per_week: Optional[int] = Field(None, ge=1, le=7, description="Số ngày học mặc định trong tuần")
+    temporary_days_per_week: Optional[int] = Field(None, ge=1, le=7, description="Số ngày học tạm thời cho tuần tiếp theo")
+
+class SchoolDaysConfig(BaseModel):
+    id: int
+    grade: str
+    default_days_per_week: int
+    temporary_days_per_week: Optional[int]
+    current_week_days: int
+    created_at: datetime
+    updated_at: datetime
+
+class WeeklyAttendanceSummaryCreate(BaseModel):
+    week_start_date: date = Field(..., description="Ngày bắt đầu tuần (thứ 2)")
+    grade: str = Field(..., description="Khối học")
+    total_school_days_per_week: int = Field(..., description="Tổng số ngày học trong tuần")
+
+class WeeklyAttendanceSummary(BaseModel):
+    id: int
+    week_start_date: date
+    grade: str
+    total_school_days_per_week: int
+    total_students: int
+    total_present: int
+    total_absent: int
+    total_late: int
+    attendance_rate: float
+    created_at: datetime
+    updated_at: datetime
+
+class SchoolDaysConfigBatch(BaseModel):
+    configs: List[SchoolDaysConfigCreate] = Field(..., description="Cấu hình cho tất cả các khối") 
