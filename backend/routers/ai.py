@@ -13,6 +13,7 @@ import asyncio
 import time
 from typing import Dict, Set, List
 import json
+from datetime import datetime, date, timezone, timedelta
 
 from models.schemas import (
     FaceRecognitionRequest, FaceRecognitionResponse, 
@@ -20,6 +21,7 @@ from models.schemas import (
 )
 from database.connection import get_db
 from utils.logger import setup_logger
+from utils.timezone_helper import get_vietnam_time_string, get_vietnam_date_string, prepare_attendance_data, fix_database_response_timestamps
 
 # Import AI services với priority
 logger = setup_logger()
@@ -337,69 +339,78 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
         }
 
 async def create_auto_attendance(student_data: dict, db, confidence: float = 0.85):
-    """Tự động tạo attendance record"""
+    """Tự động tạo attendance record với Vietnam timezone - GỌI DATABASE FUNCTION"""
     try:
-        from datetime import datetime, date, timezone, timedelta
+        student_id = student_data["id"]
+        student_name = student_data["full_name"]
         
-        # Sử dụng timezone Việt Nam (UTC+7)
-        vietnam_tz = timezone(timedelta(hours=7))
-        today = date.today().isoformat()
-        now = datetime.now(vietnam_tz).isoformat()
+        # SỬ DỤNG DATABASE FUNCTION THAY VÀ MANUAL INSERT
+        # Function này sẽ tự động xử lý timezone và logic check-in/check-out
+        # Sử dụng actual recognition time thay vì NULL để đảm bảo cutoff logic đúng
+        current_vietnam_time = get_vietnam_time_string()
         
-        # Check if attendance already exists today
-        existing = db.table("attendance").select("*").eq("student_id", student_data["id"]).eq("date", today).execute()
+        function_result = db.rpc('process_attendance_checkin', {
+            'p_student_id': student_id,
+            'p_date': get_vietnam_date_string(),  # Pass date in Vietnam timezone
+            'p_checkin_time': current_vietnam_time,  # ACTUAL checkin time để check cutoff
+            'p_confidence_score': confidence,
+            'p_recognition_model': 'insightface',
+            'p_device_info': {
+                'source': 'ai_auto_checkin',
+                'confidence': confidence,
+                'model': 'InsightFace',
+                'timestamp': current_vietnam_time
+            }
+        }).execute()
         
-        if existing.data:
-            # Update existing attendance
-            attendance_id = existing.data[0]["id"]
-            update_data = {
-                "status": "present",
-                "check_in_time": now,
-                "updated_at": now,
-                "confidence_score": confidence,  # Store as decimal
-                "method": "auto",
-                "notes": f"Điểm danh tự động - Confidence: {confidence*100:.1f}%"
-            }
+        if function_result.data and len(function_result.data) > 0:
+            result = fix_database_response_timestamps(function_result.data[0])
+            attendance_id = result.get('attendance_id')
+            is_first_checkin = result.get('is_first_checkin')
+            final_status = result.get('final_status')
+            check_in_time = result.get('check_in_time')
+            check_out_time = result.get('check_out_time')
             
-            response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()
-            
-            return {
-                "type": "updated",
-                "message": f"Cập nhật điểm danh cho {student_data['full_name']}",
-                "data": response.data[0] if response.data else None
-            }
-        else:
-            # Create new attendance
-            attendance_data = {
-                "student_id": student_data["id"],
-                "date": today,
-                "status": "present",
-                "check_in_time": now,
-                "confidence_score": confidence,  # Store as decimal
-                "method": "auto",
-                "notes": f"Điểm danh tự động - Confidence: {confidence*100:.1f}%",
-                "created_at": now,
-                "updated_at": now
-            }
-            
-            response = db.table("attendance").insert(attendance_data).execute()
-            
-            if response.data:
-                logger.info(f"✅ Created attendance record for student {student_data['id']}: {response.data[0]}")
+            if is_first_checkin:
+                logger.info(f"✅ Created attendance record for {student_name} - Check-in: {check_in_time}")
                 return {
                     "type": "created",
-                    "message": f"Điểm danh thành công cho {student_data['full_name']}",
-                    "data": response.data[0]
+                    "message": f"Điểm danh thành công cho {student_name} - {final_status}",
+                    "data": {
+                        "id": attendance_id,
+                        "student_id": student_id,
+                        "check_in_time": check_in_time,
+                        "status": final_status,
+                        "confidence_score": confidence
+                    },
+                    "is_first_checkin": True
                 }
             else:
-                logger.error(f"❌ Failed to create attendance record for student {student_data['id']}")
+                logger.info(f"✅ Updated check-out time for {student_name} - Check-out: {check_out_time}")
                 return {
-                    "type": "error",
-                    "message": f"Lỗi tạo điểm danh cho {student_data['full_name']}"
+                    "type": "updated",
+                    "message": f"Cập nhật giờ ra cho {student_name}",
+                    "data": {
+                        "id": attendance_id,
+                        "student_id": student_id,
+                        "check_in_time": check_in_time,
+                        "check_out_time": check_out_time,
+                        "status": final_status,
+                        "confidence_score": confidence
+                    },
+                    "is_first_checkin": False
                 }
+        else:
+            logger.error(f"❌ Database function returned no data for {student_name}")
+            return {
+                "type": "error",
+                "message": f"Lỗi gọi database function cho {student_name}"
+            }
             
     except Exception as e:
-        logger.error(f"❌ Error creating auto-attendance: {e}")
+        logger.error(f"❌ Error calling database function for auto-attendance: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {
             "type": "error",
             "message": f"Lỗi tạo điểm danh: {str(e)}"

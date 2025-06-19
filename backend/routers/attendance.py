@@ -12,6 +12,7 @@ from models.schemas import (
 )
 from database.connection import get_db
 from utils.logger import setup_logger
+from utils.timezone_helper import get_vietnam_time_string, get_vietnam_date_string, prepare_attendance_data, update_attendance_checkout, fix_database_response_timestamps
 
 logger = setup_logger()
 router = APIRouter()
@@ -22,55 +23,83 @@ async def check_in_attendance(
     attendance: AttendanceCreate,
     db=Depends(get_db)
 ):
-    """Điểm danh vào cho học sinh"""
+    """Điểm danh vào cho học sinh với Vietnam timezone - SỬ DỤNG DATABASE FUNCTION"""
     try:
-        # Kiểm tra đã điểm danh hôm nay chưa
-        today = date.today()
-        vietnam_tz = timezone(timedelta(hours=7))
-        existing = db.table("attendance").select("*").eq("student_id", attendance.student_id).eq("date", today.isoformat()).execute()
+        # SỬ DỤNG DATABASE FUNCTION THAY VÀ MANUAL INSERT/UPDATE
+        # Function này tự động xử lý timezone và logic check-in/check-out
+        # Sử dụng actual manual checkin time thay vì NULL để đảm bảo cutoff logic đúng
+        current_vietnam_time = get_vietnam_time_string()
         
-        if existing.data:
-            # Update existing attendance
-            update_data = {
-                "check_in_time": datetime.now(vietnam_tz).isoformat(),
-                "status": attendance.status,
-                "notes": attendance.notes,
-                "confidence_score": attendance.confidence_score,
-                "updated_at": datetime.now(vietnam_tz).isoformat()
+        function_result = db.rpc('process_attendance_checkin', {
+            'p_student_id': attendance.student_id,
+            'p_date': get_vietnam_date_string(),
+            'p_checkin_time': current_vietnam_time,  # ACTUAL checkin time để check cutoff
+            'p_confidence_score': attendance.confidence_score,
+            'p_recognition_model': 'manual',
+            'p_device_info': {
+                'source': 'manual_checkin',
+                'notes': attendance.notes,
+                'status': attendance.status,
+                'timestamp': current_vietnam_time
             }
+        }).execute()
+        
+        if function_result.data and len(function_result.data) > 0:
+            result = fix_database_response_timestamps(function_result.data[0])
+            attendance_id = result.get('attendance_id')
+            is_first_checkin = result.get('is_first_checkin')
+            final_status = result.get('final_status')
+            check_in_time = result.get('check_in_time')
+            check_out_time = result.get('check_out_time')
             
-            response = db.table("attendance").update(update_data).eq("id", existing.data[0]["id"]).execute()
+            # Update status if provided
+            if attendance.status and attendance.status != final_status:
+                update_response = db.table("attendance").update({
+                    "status": attendance.status,
+                    "notes": attendance.notes,
+                    "method": "manual"
+                }).eq("id", attendance_id).execute()
+                final_status = attendance.status
             
-            return ResponseModel(
-                success=True,
-                message="Cập nhật điểm danh thành công",
-                data=response.data[0]
-            )
-        else:
-            # Create new attendance record
-            attendance_data = attendance.dict()
-            attendance_data.update({
-                "date": today.isoformat(),
-                "check_in_time": datetime.now(vietnam_tz).isoformat(),
-                "created_at": datetime.now(vietnam_tz).isoformat(),
-                "updated_at": datetime.now(vietnam_tz).isoformat()
-            })
-            
-            response = db.table("attendance").insert(attendance_data).execute()
-            
-            if response.data:
+            if is_first_checkin:
+                logger.info(f"✅ Manual check-in for student {attendance.student_id} - {check_in_time}")
                 return ResponseModel(
                     success=True,
                     message="Điểm danh thành công",
-                    data=response.data[0]
+                    data={
+                        "id": attendance_id,
+                        "student_id": attendance.student_id,
+                        "check_in_time": check_in_time,
+                        "status": final_status,
+                        "method": "manual",
+                        "notes": attendance.notes
+                    }
                 )
             else:
-                raise HTTPException(status_code=500, detail="Lỗi tạo điểm danh")
+                logger.info(f"✅ Manual check-out for student {attendance.student_id} - {check_out_time}")
+                return ResponseModel(
+                    success=True,
+                    message="Cập nhật giờ ra thành công",
+                    data={
+                        "id": attendance_id,
+                        "student_id": attendance.student_id,
+                        "check_in_time": check_in_time,
+                        "check_out_time": check_out_time,
+                        "status": final_status,
+                        "method": "manual",
+                        "notes": attendance.notes
+                    }
+                )
+        else:
+            logger.error(f"❌ Database function returned no data for student {attendance.student_id}")
+            raise HTTPException(status_code=500, detail="Lỗi gọi database function")
                 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error checking in: {str(e)}")
+        logger.error(f"❌ Error calling database function for manual check-in: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.post("/check-out/{attendance_id}", response_model=ResponseModel)
@@ -78,7 +107,7 @@ async def check_out_attendance(
     attendance_id: int,
     db=Depends(get_db)
 ):
-    """Điểm danh ra cho học sinh"""
+    """Điểm danh ra cho học sinh với Vietnam timezone"""
     try:
         # Kiểm tra attendance tồn tại
         existing = db.table("attendance").select("*").eq("id", attendance_id).execute()
@@ -86,12 +115,8 @@ async def check_out_attendance(
         if not existing.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi điểm danh")
         
-        # Update check out time
-        vietnam_tz = timezone(timedelta(hours=7))
-        update_data = {
-            "check_out_time": datetime.now(vietnam_tz).isoformat(),
-            "updated_at": datetime.now(vietnam_tz).isoformat()
-        }
+        # Update check out time với Vietnam timezone
+        update_data = update_attendance_checkout()
         
         response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()
         
@@ -99,7 +124,7 @@ async def check_out_attendance(
             return ResponseModel(
                 success=True,
                 message="Điểm danh ra thành công",
-                data=response.data[0]
+                data=fix_database_response_timestamps(response.data[0])
             )
         else:
             raise HTTPException(status_code=500, detail="Lỗi cập nhật điểm danh")
@@ -169,7 +194,7 @@ async def get_attendance_records(
         
         return ListResponse(
             success=True,
-            data=attendance_data,
+            data=fix_database_response_timestamps(attendance_data),
             total=total,
             page=page,
             page_size=page_size
@@ -208,7 +233,7 @@ async def get_student_attendance(
         
         return ListResponse(
             success=True,
-            data=response.data or [],
+            data=fix_database_response_timestamps(response.data or []),
             total=total,
             page=page,
             page_size=page_size
@@ -257,7 +282,7 @@ async def get_today_attendance(
         
         return ListResponse(
             success=True,
-            data=attendance_data,
+            data=fix_database_response_timestamps(attendance_data),
             total=len(attendance_data),
             page=1,
             page_size=len(attendance_data)
@@ -405,7 +430,7 @@ async def update_attendance(
     attendance_update: AttendanceUpdate,
     db=Depends(get_db)
 ):
-    """Cập nhật bản ghi điểm danh"""
+    """Cập nhật bản ghi điểm danh với Vietnam timezone"""
     try:
         # Kiểm tra attendance tồn tại
         existing = db.table("attendance").select("*").eq("id", attendance_id).execute()
@@ -413,10 +438,9 @@ async def update_attendance(
         if not existing.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi điểm danh")
         
-        # Prepare update data
-        vietnam_tz = timezone(timedelta(hours=7))
+        # Prepare update data với Vietnam timezone
         update_data = attendance_update.dict(exclude_unset=True)
-        update_data["updated_at"] = datetime.now(vietnam_tz).isoformat()
+        update_data["updated_at"] = get_vietnam_time_string()
         
         # Update database
         response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()
@@ -425,7 +449,7 @@ async def update_attendance(
             return ResponseModel(
                 success=True,
                 message="Cập nhật điểm danh thành công",
-                data=response.data[0]
+                data=fix_database_response_timestamps(response.data[0])
             )
         else:
             raise HTTPException(status_code=500, detail="Lỗi cập nhật điểm danh")
@@ -461,4 +485,234 @@ async def delete_attendance(
         raise
     except Exception as e:
         logger.error(f"❌ Error deleting attendance {attendance_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.post("/recalculate/{attendance_id}", response_model=ResponseModel)
+async def recalculate_attendance_status(
+    attendance_id: int,
+    db=Depends(get_db)
+):
+    """Tính lại status của attendance record dựa trên check_in_time"""
+    try:
+        # Gọi database function để recalculate
+        result = db.rpc('recalculate_single_attendance', {
+            'p_attendance_id': attendance_id
+        }).execute()
+        
+        if result.data and len(result.data) > 0:
+            recalc_result = result.data[0]
+            
+            return ResponseModel(
+                success=recalc_result.get('success', True),
+                message=recalc_result.get('message', 'Tính lại status thành công'),
+                data={
+                    "attendance_id": attendance_id,
+                    "old_status": recalc_result.get('old_status'),
+                    "new_status": recalc_result.get('new_status'),
+                    "changed": recalc_result.get('old_status') != recalc_result.get('new_status')
+                }
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Lỗi gọi database function")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error recalculating attendance {attendance_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.post("/recalculate/daily", response_model=ResponseModel)
+async def recalculate_daily_attendance(
+    target_date: Optional[date] = Query(None, description="Ngày cần tính lại, mặc định là hôm nay"),
+    db=Depends(get_db)
+):
+    """Tính lại status cho tất cả attendance records trong ngày"""
+    try:
+        if target_date is None:
+            target_date = date.today()
+        
+        # Gọi database function để recalculate toàn bộ ngày
+        result = db.rpc('recalculate_daily_attendance', {
+            'p_date': target_date.isoformat()
+        }).execute()
+        
+        if result.data and len(result.data) > 0:
+            daily_result = result.data[0]
+            
+            return ResponseModel(
+                success=True,
+                message=daily_result.get('message', 'Tính lại status hàng ngày thành công'),
+                data={
+                    "date": target_date.isoformat(),
+                    "total_checked": daily_result.get('total_checked', 0),
+                    "updated_count": daily_result.get('updated_count', 0),
+                    "no_changes": daily_result.get('updated_count', 0) == 0
+                }
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Lỗi gọi database function")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error recalculating daily attendance for {target_date}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.patch("/{attendance_id}/status", response_model=ResponseModel)
+async def update_attendance_status_and_notes(
+    attendance_id: int,
+    status: str = Query(..., description="Trạng thái mới: present, absent, late"),
+    notes: Optional[str] = Query(None, description="Ghi chú"),
+    db=Depends(get_db)
+):
+    """Cập nhật trạng thái và ghi chú cho attendance record"""
+    try:
+        # Validate status
+        valid_statuses = ["present", "absent", "late"]
+        if status not in valid_statuses:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Trạng thái không hợp lệ. Chỉ chấp nhận: {', '.join(valid_statuses)}"
+            )
+        
+        # Kiểm tra attendance tồn tại
+        existing = db.table("attendance").select("*").eq("id", attendance_id).execute()
+        
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi điểm danh")
+        
+        # Prepare update data
+        update_data = {
+            "status": status,
+            "updated_at": get_vietnam_time_string()
+        }
+        
+        if notes is not None:
+            update_data["notes"] = notes
+        
+        # Update database
+        response = db.table("attendance").update(update_data).eq("id", attendance_id).execute()
+        
+        if response.data:
+            updated_record = fix_database_response_timestamps(response.data[0])
+            return ResponseModel(
+                success=True,
+                message="Cập nhật trạng thái điểm danh thành công",
+                data=updated_record
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Lỗi cập nhật điểm danh")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error updating attendance status {attendance_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.get("/full-list", response_model=ListResponse)
+async def get_full_attendance_list(
+    target_date: Optional[date] = Query(None, description="Ngày cần xem, mặc định là hôm nay"),
+    class_name: Optional[str] = Query(None, description="Lớp cần xem"),
+    db=Depends(get_db)
+):
+    """Lấy danh sách điểm danh đầy đủ tất cả học sinh trong lớp - ai chưa điểm danh sẽ hiển thị là vắng"""
+    try:
+        if target_date is None:
+            target_date = date.today()
+        
+        # Lấy tất cả học sinh active
+        students_query = db.table("students").select(
+            "id, student_id, full_name, class_name, grade, profile_image"
+        ).eq("is_active", True)
+        
+        # Filter theo class nếu có
+        if class_name:
+            students_query = students_query.eq("class_name", class_name)
+        
+        students_response = students_query.order("class_name, student_id").execute()
+        all_students = students_response.data or []
+        
+        if not all_students:
+            return ListResponse(
+                success=True,
+                data=[],
+                total=0,
+                page=1,
+                page_size=0,
+                message="Không tìm thấy học sinh nào"
+            )
+        
+        # Lấy attendance records cho ngày này
+        student_ids = [student["id"] for student in all_students]
+        attendance_response = db.table("attendance").select("*").eq("date", target_date.isoformat()).in_("student_id", student_ids).execute()
+        attendance_records = attendance_response.data or []
+        
+        # Tạo lookup dict cho attendance
+        attendance_lookup = {record["student_id"]: record for record in attendance_records}
+        
+        # Kết hợp students với attendance data
+        full_list = []
+        for student in all_students:
+            student_id = student["id"]
+            attendance = attendance_lookup.get(student_id)
+            
+            if attendance:
+                # Có attendance record
+                record = {
+                    "id": attendance["id"],
+                    "student_id": student_id,
+                    "date": target_date.isoformat(),
+                    "check_in_time": attendance.get("check_in_time"),
+                    "check_out_time": attendance.get("check_out_time"),
+                    "status": attendance.get("status", "absent"),
+                    "method": attendance.get("method", "manual"),
+                    "confidence_score": attendance.get("confidence_score"),
+                    "recognition_model": attendance.get("recognition_model"),
+                    "recognition_time": attendance.get("recognition_time"),
+                    "notes": attendance.get("notes"),
+                    "device_info": attendance.get("device_info"),
+                    "location_info": attendance.get("location_info"),
+                    "created_by": attendance.get("created_by"),
+                    "created_at": attendance.get("created_at"),
+                    "updated_at": attendance.get("updated_at"),
+                    "students": student
+                }
+            else:
+                # Chưa có attendance record - tạo virtual record với status absent
+                record = {
+                    "id": None,  # Không có record thật
+                    "student_id": student_id,
+                    "date": target_date.isoformat(),
+                    "check_in_time": None,
+                    "check_out_time": None,
+                    "status": "absent",
+                    "method": None,
+                    "confidence_score": None,
+                    "recognition_model": None,
+                    "recognition_time": None,
+                    "notes": None,
+                    "device_info": None,
+                    "location_info": None,
+                    "created_by": None,
+                    "created_at": None,
+                    "updated_at": None,
+                    "students": student
+                }
+            
+            full_list.append(record)
+        
+        # Fix timezone cho records có attendance
+        fixed_list = fix_database_response_timestamps(full_list)
+        
+        return ListResponse(
+            success=True,
+            data=fixed_list,
+            total=len(fixed_list),
+            page=1,
+            page_size=len(fixed_list),
+            message=f"Danh sách điểm danh đầy đủ cho ngày {target_date.strftime('%d/%m/%Y')}"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting full attendance list: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
