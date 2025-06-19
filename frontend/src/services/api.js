@@ -182,6 +182,33 @@ class ApiService {
     });
   }
 
+  // Update attendance status and notes
+  async updateAttendanceStatus(attendanceId, status, notes = null) {
+    const params = new URLSearchParams();
+    params.append('status', status);
+    if (notes !== null) {
+      params.append('notes', notes);
+    }
+    
+    return this.request(`/attendance/${attendanceId}/status?${params.toString()}`, {
+      method: 'PATCH',
+    });
+  }
+
+  // Get full attendance list (all students with their attendance status)
+  async getFullAttendanceList(targetDate = null, className = null) {
+    const params = new URLSearchParams();
+    if (targetDate) {
+      params.append('target_date', targetDate);
+    }
+    if (className) {
+      params.append('class_name', className);
+    }
+    
+    const queryString = params.toString();
+    return this.request(`/attendance/full-list${queryString ? '?' + queryString : ''}`);
+  }
+
   // Dashboard stats
   async getDashboardStats() {
     try {
