@@ -9,6 +9,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
     { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
     { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
     { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+    { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
   ];
 
   const handleMenuClick = (viewId) => {

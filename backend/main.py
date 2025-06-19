@@ -11,9 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-from routers import students, attendance, auth, ai, feedback
+from routers import students, attendance, auth, ai, feedback, school_days_config
 from database.connection import init_db
 from utils.logger import setup_logger
+from services.scheduler_service import start_scheduler
 
 # Load environment variables
 load_dotenv()
@@ -54,6 +55,7 @@ app.include_router(students.router, prefix="/api/students", tags=["Students"])
 app.include_router(attendance.router, prefix="/api/attendance", tags=["Attendance"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI Computer Vision - InsightFace"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["AI Feedback - Gemini"])
+app.include_router(school_days_config.router, prefix="/api", tags=["School Days Configuration"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -80,6 +82,11 @@ async def startup_event():
             from ai.face_recognition_insightface import insightface_service
             await insightface_service.initialize()
             logger.info("✅ MediaPipe service initialized as fallback")
+        
+        # Initialize scheduler service
+        logger.info("Starting scheduler service...")
+        start_scheduler()
+        logger.info("✅ Scheduler service started - Auto reset configured for Sundays 00:00")
         
         logger.info("🚀 Smart School System API (InsightFace Edition) started successfully!")
         

@@ -10,6 +10,7 @@ import AICamera from './components/AICamera';
 import FaceManagement from './components/FaceManagement';
 import ContinuousRecognition from './components/ContinuousRecognition';
 import AIFeedback from './components/AIFeedback';
+import SchoolDaysConfig from './components/SchoolDaysConfig';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -49,6 +50,8 @@ function App() {
         return <FaceManagement />;
       case 'feedback':
         return <AIFeedback />;
+      case 'school-config':
+        return <SchoolDaysConfig />;
       default:
         return <Dashboard setCurrentView={setCurrentView} />;
     }

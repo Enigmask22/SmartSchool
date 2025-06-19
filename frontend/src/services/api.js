@@ -239,6 +239,75 @@ class ApiService {
       };
     }
   }
+
+  // School Days Configuration
+  async getSchoolDaysConfigs(grade = null) {
+    const queryParams = grade ? `?grade=${grade}` : '';
+    return this.request(`/school-days-config/${queryParams}`);
+  }
+
+  async initializeSchoolDaysConfigs() {
+    return this.request('/school-days-config/initialize', {
+      method: 'POST',
+    });
+  }
+
+  async createSchoolDaysConfig(config) {
+    return this.request('/school-days-config/', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async updateSchoolDaysConfig(configId, config) {
+    return this.request(`/school-days-config/${configId}`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async batchUpdateSchoolDaysConfigs(configs, grades) {
+    // Thêm grades vào query params
+    const queryParams = new URLSearchParams();
+    grades.forEach(grade => queryParams.append('grades', grade));
+    
+    return this.request(`/school-days-config/batch-update?${queryParams.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify(configs),
+    });
+  }
+
+  async applyTemporaryConfig(grade, temporaryDays = null) {
+    const queryParams = temporaryDays ? `?temporary_days=${temporaryDays}` : '';
+    return this.request(`/school-days-config/apply-temporary/${grade}${queryParams}`, {
+      method: 'POST',
+    });
+  }
+
+  async resetAllToDefault() {
+    return this.request('/school-days-config/reset-to-default', {
+      method: 'POST',
+    });
+  }
+
+  async getNextSundayReset() {
+    return this.request('/school-days-config/next-sunday-reset');
+  }
+
+  // AI Feedback
+  async getStudentFeedback(studentData) {
+    return this.request('/feedback/student', {
+      method: 'POST',
+      body: JSON.stringify(studentData),
+    });
+  }
+
+  async getBatchFeedback(studentsData) {
+    return this.request('/feedback/batch', {
+      method: 'POST',
+      body: JSON.stringify({ students: studentsData }),
+    });
+  }
 }
 
 // Create and export singleton instance
