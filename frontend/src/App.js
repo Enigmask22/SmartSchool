@@ -9,6 +9,7 @@ import AttendanceView from './components/AttendanceView';
 import AICamera from './components/AICamera';
 import FaceManagement from './components/FaceManagement';
 import ContinuousRecognition from './components/ContinuousRecognition';
+import AIFeedback from './components/AIFeedback';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -46,6 +47,8 @@ function App() {
         return <ContinuousRecognition />;
       case 'faces':
         return <FaceManagement />;
+      case 'feedback':
+        return <AIFeedback />;
       default:
         return <Dashboard setCurrentView={setCurrentView} />;
     }

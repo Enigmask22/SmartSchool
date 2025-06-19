@@ -134,4 +134,28 @@ class ListResponse(BaseModel):
     data: List[dict]
     total: int
     page: int
-    page_size: int 
+    page_size: int
+
+# AI Feedback Schemas
+class StudentFeedbackRequest(BaseModel):
+    student_name: str = Field(..., description="Tên học sinh")
+    score: float = Field(..., ge=0, le=10, description="Điểm số (0-10)")
+    score_trend: str = Field(..., description="Xu hướng điểm: 'tăng', 'giảm', 'ổn định'")
+    attendance_rate: int = Field(..., ge=0, le=100, description="Tỷ lệ chuyên cần (%)")
+    notes: Optional[str] = Field(default="", description="Ghi chú thêm từ giáo viên")
+
+class StudentFeedbackResponse(BaseModel):
+    success: bool
+    student_name: str
+    feedback: Optional[str] = None
+    error: Optional[str] = None
+
+class BatchFeedbackRequest(BaseModel):
+    students: List[StudentFeedbackRequest]
+
+class BatchFeedbackResponse(BaseModel):
+    success: bool
+    success_count: int
+    failed_count: int
+    failed_students: List[str]
+    feedbacks: dict  # {student_name: feedback} 

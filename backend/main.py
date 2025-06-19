@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-from routers import students, attendance, auth, ai
+from routers import students, attendance, auth, ai, feedback
 from database.connection import init_db
 from utils.logger import setup_logger
 
@@ -53,6 +53,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(students.router, prefix="/api/students", tags=["Students"])
 app.include_router(attendance.router, prefix="/api/attendance", tags=["Attendance"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI Computer Vision - InsightFace"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["AI Feedback - Gemini"])
 
 @app.on_event("startup")
 async def startup_event():

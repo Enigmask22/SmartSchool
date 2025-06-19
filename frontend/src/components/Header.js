@@ -8,6 +8,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
     // { id: 'camera', label: 'AI Camera', icon: '📷' },
     { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
     { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+    { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
   ];
 
   const handleMenuClick = (viewId) => {
@@ -15,14 +16,14 @@ const Header = ({ currentView, setCurrentView, user }) => {
   };
 
   return (
-    <header className="bg-blue-600 text-white shadow-lg">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
+    <header className="text-white bg-blue-600 shadow-lg">
+      <div className="container px-4 py-3 mx-auto">
+        <div className="flex justify-between items-center">
           <div className="flex items-center">
             <h1 className="text-xl font-bold">Smart School System</h1>
           </div>
           
-          <nav className="hidden md:flex space-x-6">
+          <nav className="hidden space-x-6 md:flex">
             {menuItems.map((item) => (
               <button
                 key={item.id}
@@ -43,12 +44,12 @@ const Header = ({ currentView, setCurrentView, user }) => {
             {user ? (
               <div className="flex items-center space-x-2">
                 <span className="text-sm">Xin chào, {user.full_name}</span>
-                <button className="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded text-sm">
+                <button className="px-3 py-1 text-sm bg-blue-700 rounded hover:bg-blue-800">
                   Đăng xuất
                 </button>
               </div>
             ) : (
-              <button className="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded text-sm">
+              <button className="px-3 py-1 text-sm bg-blue-700 rounded hover:bg-blue-800">
                 Đăng nhập
               </button>
             )}
@@ -56,7 +57,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
         </div>
 
         {/* Mobile menu */}
-        <nav className="md:hidden mt-3 flex space-x-2 overflow-x-auto">
+        <nav className="flex overflow-x-auto mt-3 space-x-2 md:hidden">
           {menuItems.map((item) => (
             <button
               key={item.id}
