@@ -39,9 +39,11 @@ insightface==0.7.3
 onnxruntime>=1.17.0
 onnx>=1.15.0
 
-# ===== FACE RECOGNITION - FALLBACK =====
-mediapipe==0.10.14
+# ===== MACHINE LEARNING UTILITIES =====
 scikit-learn==1.3.2
 
 # ===== WEBSOCKETS =====
-websockets==12.0 
+websockets==12.0
+
+# ===== AI/ML SERVICES =====
+google-generativeai==0.8.3 
