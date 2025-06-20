@@ -16,11 +16,38 @@ import AIFeedback from './components/AIFeedback';
 import SchoolDaysConfig from './components/SchoolDaysConfig';
 import Login from './components/Login';
 import GradeManagement from './components/GradeManagement';
+import HomeroomDashboard from './components/HomeroomDashboard';
 
 function AppContent() {
+  const { user, loading, isAuthenticated, isHomeroomTeacher, isSubjectTeacher, isAdmin } = useContext(AuthContext);
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { user, loading, isAuthenticated } = useContext(AuthContext);
+  const [hasRedirected, setHasRedirected] = useState(false);
+
+  // Reset view when user changes (login/logout)
+  React.useEffect(() => {
+    if (!user) {
+      // User logged out - reset to default
+      setCurrentView('dashboard');
+      setHasRedirected(false);
+    } else if (!hasRedirected) {
+      // User logged in - determine default view based on role (only once per login)
+      if (isSubjectTeacher()) {
+        console.log('🎯 Subject teacher detected, redirecting to grades page');
+        setCurrentView('grades');
+      } else if (isHomeroomTeacher()) {
+        console.log('🏠 Homeroom teacher detected, redirecting to dashboard');
+        setCurrentView('dashboard');
+      } else if (isAdmin()) {
+        console.log('👑 Admin detected, redirecting to dashboard');
+        setCurrentView('dashboard');
+      } else {
+        // Fallback
+        setCurrentView('dashboard');
+      }
+      setHasRedirected(true);
+    }
+  }, [user?.id, hasRedirected, isSubjectTeacher, isHomeroomTeacher, isAdmin]); // Include role functions as dependencies
 
   if (loading) {
     return (
@@ -35,38 +62,82 @@ function AppContent() {
   }
 
   const renderContent = () => {
-    // Nếu user là teacher (giáo viên bộ môn), chỉ cho phép truy cập Grade Management
-    if (user?.role === 'teacher') {
+    if (isHomeroomTeacher()) {
+      // Giáo viên chủ nhiệm - tất cả components được filter theo lớp chủ nhiệm
       switch (currentView) {
+        case 'dashboard':
+          return <HomeroomDashboard />;
+        case 'students':
+          return <StudentList isHomeroom={true} />;
+        case 'attendance':
+          return <AttendanceView isHomeroom={true} />;
+        case 'continuous':
+          return <ContinuousRecognition isHomeroom={true} />;
+        case 'faces':
+          return <FaceManagement isHomeroom={true} />;
+        case 'feedback':
+          return <AIFeedback isHomeroom={true} />;
+        case 'grades':
+          return <GradeManagement isHomeroom={true} />;
+        default:
+          return <HomeroomDashboard />;
+      }
+    } else if (isSubjectTeacher()) {
+      // Giáo viên bộ môn - mặc định vào trang Quản lý điểm
+      switch (currentView) {
+        case 'dashboard':
+          return <Dashboard setCurrentView={setCurrentView} />;
+        case 'students':
+          return <StudentList />;
+        case 'attendance':
+          return <AttendanceView />;
+        case 'camera':
+          return <AICamera />;
+        case 'continuous':
+          return <ContinuousRecognition />;
+        case 'faces':
+          return <FaceManagement />;
+        case 'feedback':
+          return <AIFeedback />;
+        case 'school-config':
+          return <SchoolDaysConfig />;
         case 'grades':
           return <GradeManagement />;
         default:
-          return <GradeManagement />;
+          return <GradeManagement />; // Default cho giáo viên bộ môn là Quản lý điểm
       }
-    }
-
-    // Admin có thể truy cập tất cả
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard setCurrentView={setCurrentView} />;
-      case 'students':
-        return <StudentList />;
-      case 'attendance':
-        return <AttendanceView />;
-      case 'camera':
-        return <AICamera />;
-      case 'continuous':
-        return <ContinuousRecognition />;
-      case 'faces':
-        return <FaceManagement />;
-      case 'feedback':
-        return <AIFeedback />;
-      case 'school-config':
-        return <SchoolDaysConfig />;
-      case 'grades':
-        return <GradeManagement />;
-      default:
-        return <Dashboard setCurrentView={setCurrentView} />;
+    } else if (isAdmin()) {
+      // Admin - có tất cả quyền truy cập
+      switch (currentView) {
+        case 'dashboard':
+          return <Dashboard setCurrentView={setCurrentView} />;
+        case 'students':
+          return <StudentList />;
+        case 'attendance':
+          return <AttendanceView />;
+        case 'camera':
+          return <AICamera />;
+        case 'continuous':
+          return <ContinuousRecognition />;
+        case 'faces':
+          return <FaceManagement />;
+        case 'feedback':
+          return <AIFeedback />;
+        case 'school-config':
+          return <SchoolDaysConfig />;
+        case 'grades':
+          return <GradeManagement />;
+        default:
+          return <Dashboard setCurrentView={setCurrentView} />;
+      }
+    } else {
+      // Default fallback
+      return (
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Chưa được phân quyền</h2>
+          <p className="text-gray-600">Vui lòng liên hệ quản trị viên để được cấp quyền truy cập</p>
+        </div>
+      );
     }
   };
 

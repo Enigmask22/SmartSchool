@@ -3,28 +3,50 @@ import { AuthContext } from '../contexts/AuthContext';
 import { Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
-  const { logout, isTeacher } = useContext(AuthContext);
+  const { logout, isTeacher, isHomeroomTeacher, isSubjectTeacher, isAdmin, hasRole } = useContext(AuthContext);
   
-  // Menu items based on user role
+  // Menu items based on user role (đồng bộ với Header)
   const getMenuItems = () => {
-    // Nếu user là teacher (giáo viên bộ môn), chỉ hiển thị menu quản lý điểm
-    if (user?.role === 'teacher') {
+    const baseItems = [
+      { id: 'dashboard', label: 'Trang chủ', icon: '🏠' }
+    ];
+
+    if (isAdmin()) {
+      // Admin có tất cả menu bao gồm cấu hình học tập
+      return [
+        ...baseItems,
+        { id: 'students', label: 'Học sinh', icon: '👥' },
+        { id: 'attendance', label: 'Điểm danh', icon: '📋' },
+        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
+        { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+        { id: 'grades', label: 'Quản lý điểm', icon: '📝' },
+        { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
+      ];
+    } else if (isHomeroomTeacher()) {
+      // Giáo viên chủ nhiệm - không có cấu hình học tập
+      const homeroomMenus = [
+        ...baseItems,
+        { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: '👥' },
+        { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
+        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
+        { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+      ];
+      
+      // Thêm quản lý điểm nếu họ cũng là subject teacher
+      homeroomMenus.push({ id: 'grades', label: 'Quản lý điểm', icon: '📝' });
+      
+      return homeroomMenus;
+    } else if (isSubjectTeacher()) {
+      // Giáo viên bộ môn - chỉ có menu Quản lý điểm
       return [
         { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
       ];
+    } else {
+      // Default fallback
+      return baseItems;
     }
-
-    // Admin có thể truy cập tất cả
-    return [
-      { id: 'dashboard', label: 'Trang chủ', icon: '🏠' },
-      { id: 'students', label: 'Học sinh', icon: '👥' },
-      { id: 'attendance', label: 'Điểm danh', icon: '📋' },
-      { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
-      { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
-      { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
-      { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
-      { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
-    ];
   };
 
   const menuItems = getMenuItems();
@@ -96,8 +118,13 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
                   {user.full_name}
                 </div>
                 <div className="text-xs text-gray-500">
-                  {user.role === 'admin' ? 'Quản trị viên' : 
-                   user.role === 'teacher' ? 'Giáo viên' : 'Nhân viên'}
+                  {user.role === 'admin' 
+                    ? 'Quản trị viên' 
+                    : user.role === 'homeroom_teacher' 
+                      ? 'Giáo viên chủ nhiệm' 
+                      : user.role === 'teacher' 
+                        ? 'Giáo viên bộ môn' 
+                        : 'Nhân viên'}
                 </div>
               </div>
             ) : (

@@ -206,6 +206,54 @@ async def get_students_by_class_subject(
 # GRADE CONFIG ENDPOINTS
 # ===============================================
 
+@router.post("/config/upsert", response_model=ResponseModel)
+async def upsert_grade_config(
+    config: GradeConfigCreate,
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Tạo mới hoặc cập nhật cấu hình cột điểm"""
+    try:
+        # Kiểm tra xem đã có config chưa
+        existing = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", config.subject_id).eq("academic_year", config.academic_year).eq("semester", config.semester).execute()
+        
+        if existing.data:
+            # Update existing config
+            update_data = {
+                "grade_column_config": config.grade_column_config,
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            response = db.table("grade_configs").update(update_data).eq("id", existing.data[0]["id"]).execute()
+            message = "Cập nhật cấu hình điểm thành công"
+        else:
+            # Create new config
+            config_data = {
+                "teacher_id": current_teacher["id"],
+                "subject_id": config.subject_id,
+                "academic_year": config.academic_year,
+                "semester": config.semester,
+                "grade_column_config": config.grade_column_config,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            response = db.table("grade_configs").insert(config_data).execute()
+            message = "Tạo cấu hình điểm thành công"
+        
+        return ResponseModel(
+            success=True,
+            message=message,
+            data=response.data[0]
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error upserting grade config: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
 @router.post("/config", response_model=ResponseModel)
 async def create_grade_config(
     config: GradeConfigCreate,

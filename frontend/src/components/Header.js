@@ -2,20 +2,55 @@ import React, { useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 
 const Header = ({ currentView, setCurrentView, user }) => {
-  const { logout, isTeacher } = useContext(AuthContext);
+  const { logout, isTeacher, isHomeroomTeacher, isSubjectTeacher, isAdmin, hasRole } = useContext(AuthContext);
   
-  const menuItems = [
-    { id: 'dashboard', label: 'Trang chủ', icon: '🏠' },
-    { id: 'students', label: 'Học sinh', icon: '👥' },
-    { id: 'attendance', label: 'Điểm danh', icon: '📋' },
-    // { id: 'camera', label: 'AI Camera', icon: '📷' },
-    { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
-    { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
-    { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
-    { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
-    // Show grades menu only for teachers
-    ...(isTeacher() ? [{ id: 'grades', label: 'Quản lý điểm', icon: '📝' }] : []),
-  ];
+  // Build menu items based on user role
+  const getMenuItems = () => {
+    const baseItems = [
+      { id: 'dashboard', label: 'Trang chủ', icon: '🏠' }
+    ];
+
+    if (isAdmin()) {
+      // Admin có tất cả menu
+      return [
+        ...baseItems,
+        { id: 'students', label: 'Học sinh', icon: '👥' },
+        { id: 'attendance', label: 'Điểm danh', icon: '📋' },
+        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
+        { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+        { id: 'grades', label: 'Quản lý điểm', icon: '📝' },
+        { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
+      ];
+    } else if (isHomeroomTeacher()) {
+      // Giáo viên chủ nhiệm - menu được filter theo lớp chủ nhiệm
+      const homeroomMenus = [
+        ...baseItems,
+        { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: '👥' },
+        { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
+        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
+        { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+      ];
+      
+      // TODO: Check if homeroom teacher is also subject teacher via API
+      // For now, assume they might have grades access
+      // This should be checked via homeroom info API
+      homeroomMenus.push({ id: 'grades', label: 'Quản lý điểm', icon: '📝' });
+      
+      return homeroomMenus;
+         } else if (isSubjectTeacher()) {
+       // Giáo viên bộ môn - chỉ có menu Quản lý điểm
+       return [
+         { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
+       ];
+    } else {
+      // Default fallback
+      return baseItems;
+    }
+  };
+
+  const menuItems = getMenuItems();
 
   const handleLogout = () => {
     if (window.confirm('Bạn có chắc muốn đăng xuất?')) {
@@ -57,7 +92,13 @@ const Header = ({ currentView, setCurrentView, user }) => {
               <div className="flex items-center space-x-2">
                 <span className="text-sm">Xin chào, {user.full_name}</span>
                 <span className="text-xs bg-blue-500 px-2 py-1 rounded">
-                  {user.role === 'admin' ? 'Quản trị' : user.role === 'teacher' ? 'Giáo viên' : 'Nhân viên'}
+                  {user.role === 'admin' 
+                    ? 'Quản trị' 
+                    : user.role === 'homeroom_teacher' 
+                      ? 'Giáo viên chủ nhiệm' 
+                      : user.role === 'teacher' 
+                        ? 'Giáo viên bộ môn' 
+                        : 'Nhân viên'}
                 </span>
                 <button 
                   onClick={handleLogout}

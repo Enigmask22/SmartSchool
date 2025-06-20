@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import ApiService from '../services/api';
+import { AuthContext } from '../contexts/AuthContext';
 
 const AttendanceView = () => {
+  const { user, isHomeroomTeacher } = useContext(AuthContext);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,19 +31,66 @@ const AttendanceView = () => {
   const [showFullList, setShowFullList] = useState(true);
 
   useEffect(() => {
-    loadClasses();
     loadAttendanceData();
     loadStats();
   }, [selectedDate, selectedClass, selectedStatus, page, showFullList]);
 
+  // Load classes when user changes (for role-based filtering)
+  useEffect(() => {
+    loadClasses();
+  }, [user]);
+
+  // Initial load
+  useEffect(() => {
+    loadClasses();
+  }, []);
+
   const loadClasses = async () => {
     try {
-      const response = await ApiService.getClasses();
-      if (response.success) {
-        setClasses(response.data || []);
+      console.log('📚 Loading classes for attendance filter...', {
+        user,
+        isHomeroomTeacher: isHomeroomTeacher(),
+        userRole: user?.role
+      });
+
+      let classesResponse;
+      
+      if (isHomeroomTeacher()) {
+        console.log('📚 Fetching homeroom classes for attendance...');
+        // If homeroom teacher, only get their homeroom classes
+        classesResponse = await ApiService.getHomeroomClasses();
+        
+        if (classesResponse.success && classesResponse.data) {
+          const classNames = classesResponse.data.map(cls => cls.class_name).sort();
+          console.log('📚 Setting homeroom classes:', classNames);
+          setClasses(classNames);
+        } else {
+          console.warn('📚 Invalid homeroom classes response:', classesResponse);
+          setClasses([]);
+        }
+      } else {
+        console.log('📚 Fetching all students to extract classes for admin...');
+        // If admin, get all students and extract unique class names
+        const studentsResponse = await ApiService.getStudents({});
+        
+        if (studentsResponse.success && studentsResponse.data) {
+          // Extract unique class names from students
+          const uniqueClasses = [...new Set(
+            studentsResponse.data
+              .map(student => student.class_name)
+              .filter(className => className) // Remove null/undefined
+          )].sort();
+          
+          console.log('📚 Extracted unique classes from students:', uniqueClasses);
+          setClasses(uniqueClasses);
+        } else {
+          console.warn('📚 Invalid students response for classes:', studentsResponse);
+          setClasses([]);
+        }
       }
     } catch (error) {
       console.error('Error loading classes:', error);
+      setClasses([]);
     }
   };
 
@@ -49,6 +98,15 @@ const AttendanceView = () => {
     setLoading(true);
     console.log('🔍 Loading attendance data...', { selectedDate, selectedClass, selectedStatus, page, showFullList });
     try {
+      // If homeroom teacher but no class selected, don't fetch
+      if (isHomeroomTeacher() && !selectedClass) {
+        console.log('🚫 No class selected for homeroom teacher, skipping attendance fetch');
+        setAttendanceRecords([]);
+        setStats({ total_students: 0, present_count: 0, absent_count: 0, late_count: 0 });
+        setLoading(false);
+        return;
+      }
+      
       if (showFullList) {
         // Use full list API - shows all students with their attendance status
         const response = await ApiService.getFullAttendanceList(selectedDate, selectedClass);
@@ -409,10 +467,15 @@ const AttendanceView = () => {
               onChange={(e) => setSelectedClass(e.target.value)}
               className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Tất cả lớp</option>
-              {classes.map(classItem => (
-                <option key={classItem.class_name} value={classItem.class_name}>
-                  {classItem.display_name}
+              {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
+              {isHomeroomTeacher() ? (
+                <option value="">Chọn lớp chủ nhiệm</option>
+              ) : (
+                <option value="">Tất cả lớp</option>
+              )}
+              {classes.map(className => (
+                <option key={className} value={className}>
+                  {className}
                 </option>
               ))}
             </select>

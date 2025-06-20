@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import ApiService from '../services/api';
 import MultipleFaceRegistration from './MultipleFaceRegistration';
+import { AuthContext } from '../contexts/AuthContext';
 
 const StudentList = () => {
+  const { user, isHomeroomTeacher } = useContext(AuthContext);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -81,22 +83,42 @@ const StudentList = () => {
     };
   }, [showFaceModal, registrationMode]);
 
+  // Initial load
   useEffect(() => {
-    fetchStudents();
+    fetchAvailableClasses();
   }, []);
   
   useEffect(() => {
     fetchStudents();
-  }, [showInactive]);
+  }, [showInactive, selectedClass]);
+
+  useEffect(() => {
+    fetchAvailableClasses();
+  }, [user]);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Add is_active parameter based on showInactive checkbox
-      const params = showInactive ? { is_active: null } : {};
-      const response = await ApiService.getStudents(params);
+      let response;
+      
+      if (isHomeroomTeacher()) {
+        // If homeroom teacher but no class selected, don't fetch
+        if (!selectedClass) {
+          console.log('🚫 No class selected for homeroom teacher, skipping fetch');
+          setStudents([]);
+          setLoading(false);
+          return;
+        }
+        // If homeroom teacher, get only their homeroom students
+        response = await ApiService.getHomeroomStudents(selectedClass);
+      } else {
+        // If admin or other roles, get all students
+        const params = showInactive ? { is_active: null } : {};
+        response = await ApiService.getStudents(params);
+      }
+      
       console.log('Students API response:', response);
       
       if (response.success && response.data) {
@@ -152,10 +174,66 @@ const StudentList = () => {
     return matchesSearch && matchesClass;
   }) : [];
 
-  // Get unique classes for filter - với safety check
-  const classes = Array.isArray(students) ? 
-    [...new Set(students.map(student => student.class_name).filter(Boolean))].sort() : 
-    [];
+  // State for available classes
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  // Fetch available classes based on user role
+  const fetchAvailableClasses = async () => {
+    try {
+      console.log('👤 User role check:', {
+        user,
+        isHomeroomTeacher: isHomeroomTeacher(),
+        userRole: user?.role
+      });
+
+      let classesResponse;
+      
+      if (isHomeroomTeacher()) {
+        console.log('📚 Fetching homeroom classes...');
+        // If homeroom teacher, only get their homeroom classes
+        classesResponse = await ApiService.getHomeroomClasses();
+        
+        if (classesResponse.success && classesResponse.data) {
+          const classNames = classesResponse.data.map(cls => cls.class_name).sort();
+          console.log('📚 Setting homeroom classes:', classNames);
+          setAvailableClasses(classNames);
+        } else {
+          console.warn('📚 Invalid homeroom classes response:', classesResponse);
+          setAvailableClasses([]);
+        }
+      } else {
+        console.log('📚 Fetching all students to extract classes for admin...');
+        // If admin, get all students and extract unique class names
+        const studentsResponse = await ApiService.getStudents({});
+        
+        if (studentsResponse.success && studentsResponse.data) {
+          // Extract unique class names from students
+          const uniqueClasses = [...new Set(
+            studentsResponse.data
+              .map(student => student.class_name)
+              .filter(className => className) // Remove null/undefined
+          )].sort();
+          
+          console.log('📚 Extracted unique classes from students:', uniqueClasses);
+          setAvailableClasses(uniqueClasses);
+        } else {
+          console.warn('📚 Invalid students response for classes:', studentsResponse);
+          setAvailableClasses([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching available classes:', error);
+      // Fallback: get unique classes from students data
+      const fallbackClasses = Array.isArray(students) ? 
+        [...new Set(students.map(student => student.class_name).filter(Boolean))].sort() : 
+        [];
+      console.log('📚 Using fallback classes:', fallbackClasses);
+      setAvailableClasses(fallbackClasses);
+    }
+  };
+
+  // Get classes for display
+  const classes = availableClasses;
 
   // Face registration functions
   const startFaceRegistration = async (student) => {
@@ -628,7 +706,7 @@ const StudentList = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="w-32 h-32 rounded-full border-b-2 border-blue-600 animate-spin"></div>
       </div>
     );
   }
@@ -636,20 +714,20 @@ const StudentList = () => {
   return (
     <div className="student-list">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">Danh sách học sinh</h2>
+        <h2 className="mb-2 text-3xl font-bold text-gray-800">Danh sách học sinh</h2>
         <p className="text-gray-600">Quản lý thông tin học sinh</p>
         {error && (
-          <div className="mt-2 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+          <div className="p-3 mt-2 text-yellow-700 bg-yellow-100 rounded border border-yellow-400">
             {error}
           </div>
         )}
       </div>
 
       {/* Search and Filter */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               Tìm kiếm
             </label>
             <input
@@ -657,28 +735,33 @@ const StudentList = () => {
               placeholder="Tên hoặc mã học sinh..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               Lớp
             </label>
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Tất cả lớp</option>
-              {classes.map(className => (
+              {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
+              {isHomeroomTeacher() ? (
+                <option value="">Chọn lớp chủ nhiệm</option>
+              ) : (
+                <option value="">Tất cả lớp</option>
+              )}
+              {availableClasses.map(className => (
                 <option key={className} value={className}>{className}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block mb-2 text-sm font-medium text-gray-700">
               Hiển thị
             </label>
             <div className="flex items-center space-x-4">
@@ -687,13 +770,13 @@ const StudentList = () => {
                   type="checkbox"
                   checked={showInactive}
                   onChange={(e) => setShowInactive(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm text-gray-600">Đã xóa</span>
               </label>
               <button
                 onClick={fetchStudents}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 text-white bg-blue-600 rounded-md transition-colors hover:bg-blue-700"
               >
                 Làm mới
               </button>
@@ -703,11 +786,11 @@ const StudentList = () => {
       </div>
 
       {/* Students Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredStudents.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">👥</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <div className="col-span-full py-12 text-center">
+            <div className="mb-4 text-6xl text-gray-400">👥</div>
+            <h3 className="mb-2 text-lg font-medium text-gray-900">
               {searchTerm || selectedClass ? 'Không tìm thấy học sinh nào' : 'Chưa có học sinh nào'}
             </h3>
             <p className="text-gray-500">
@@ -716,17 +799,17 @@ const StudentList = () => {
           </div>
         ) : (
           filteredStudents.map((student) => (
-            <div key={student.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden">
+            <div key={student.id} className="overflow-hidden bg-white rounded-xl border border-gray-100 shadow-lg transition-all duration-300 hover:shadow-xl">
               {/* Header with avatar and basic info */}
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
+              <div className="p-6 text-white bg-gradient-to-r from-blue-500 to-purple-600">
                 <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-2xl font-bold">
+                  <div className="flex justify-center items-center w-16 h-16 text-2xl font-bold rounded-full bg-white/20">
                     {student.full_name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold truncate">{student.full_name}</h3>
-                    <p className="text-blue-100 text-sm">{student.student_id}</p>
-                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-white/20 mt-1">
+                    <p className="text-sm text-blue-100">{student.student_id}</p>
+                    <div className="inline-flex items-center px-2 py-1 mt-1 text-xs rounded-full bg-white/20">
                       🎓 {student.class_name}
                     </div>
                   </div>
@@ -737,15 +820,15 @@ const StudentList = () => {
               <div className="p-6 space-y-3">
                 <div className="grid grid-cols-1 gap-3 text-sm">
                   <div className="flex items-center space-x-3">
-                    <span className="w-5 h-5 flex items-center justify-center text-gray-400">📧</span>
+                    <span className="flex justify-center items-center w-5 h-5 text-gray-400">📧</span>
                     <span className="text-gray-600 truncate">{student.email || 'Chưa có email'}</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="w-5 h-5 flex items-center justify-center text-gray-400">📱</span>
+                    <span className="flex justify-center items-center w-5 h-5 text-gray-400">📱</span>
                     <span className="text-gray-600">{student.phone || 'Chưa có SĐT'}</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="w-5 h-5 flex items-center justify-center text-gray-400">📚</span>
+                    <span className="flex justify-center items-center w-5 h-5 text-gray-400">📚</span>
                     <span className="text-gray-600">Khối {student.grade || 'N/A'}</span>
                   </div>
                 </div>
@@ -755,7 +838,7 @@ const StudentList = () => {
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     <button
                       onClick={() => startFaceRegistration(student)}
-                      className="flex items-center justify-center space-x-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg transition-colors hover:bg-blue-100"
                       title="Đăng ký khuôn mặt"
                     >
                       <span className="text-base">📷</span>
@@ -767,7 +850,7 @@ const StudentList = () => {
                         setSelectedStudentForMultiple(student);
                         setShowMultipleModal(true);
                       }}
-                      className="flex items-center justify-center space-x-1 bg-green-50 hover:bg-green-100 text-green-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-green-700 bg-green-50 rounded-lg transition-colors hover:bg-green-100"
                       title="Nhiều ảnh"
                     >
                       <span className="text-base">📸</span>
@@ -776,7 +859,7 @@ const StudentList = () => {
                     
                     <button
                       onClick={() => handleViewGrades(student)}
-                      className="flex items-center justify-center space-x-1 bg-purple-50 hover:bg-purple-100 text-purple-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg transition-colors hover:bg-purple-100"
                       title="Xem điểm số"
                     >
                       <span className="text-base">📊</span>
@@ -787,7 +870,7 @@ const StudentList = () => {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleEdit(student)}
-                      className="flex items-center justify-center space-x-1 bg-amber-50 hover:bg-amber-100 text-amber-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-amber-700 bg-amber-50 rounded-lg transition-colors hover:bg-amber-100"
                       title="Sửa thông tin"
                     >
                       <span className="text-base">✏️</span>
@@ -796,7 +879,7 @@ const StudentList = () => {
                     
                     <button
                       onClick={() => handleDelete(student.id)}
-                      className="flex items-center justify-center space-x-1 bg-red-50 hover:bg-red-100 text-red-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-red-700 bg-red-50 rounded-lg transition-colors hover:bg-red-100"
                       title="Xóa học sinh"
                     >
                       <span className="text-base">🗑️</span>
@@ -812,8 +895,8 @@ const StudentList = () => {
 
         {/* Face Registration Modal */}
         {showFaceModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+          <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+            <div className="p-6 mx-4 w-full max-w-2xl bg-white rounded-lg">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">
                   Đăng ký khuôn mặt - {selectedStudentForFace?.full_name}
@@ -828,7 +911,7 @@ const StudentList = () => {
 
               <div className="space-y-4">
                 {/* Mode Selection */}
-                <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+                <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
                   <button
                     onClick={() => setRegistrationMode('camera')}
                     className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -867,19 +950,19 @@ const StudentList = () => {
                     {!capturedImage ? (
                       <div className="text-center">
                         {cameraError ? (
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                            <div className="text-red-600 text-lg mb-2">❌</div>
-                            <p className="text-red-700 font-medium">{cameraError}</p>
+                          <div className="p-6 bg-red-50 rounded-lg border border-red-200">
+                            <div className="mb-2 text-lg text-red-600">❌</div>
+                            <p className="font-medium text-red-700">{cameraError}</p>
                             <div className="mt-3 space-x-2">
                               <button
                                 onClick={resetCamera}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                                className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
                               >
                                 🔄 Thử lại Camera
                               </button>
                               <button
                                 onClick={() => setRegistrationMode('upload')}
-                                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                                className="px-4 py-2 text-white bg-purple-600 rounded-md hover:bg-purple-700"
                               >
                                 📁 Chuyển sang Upload
                               </button>
@@ -893,12 +976,12 @@ const StudentList = () => {
                                 autoPlay
                                 playsInline
                                 muted
-                                className="w-full max-w-md mx-auto rounded-lg border"
+                                className="mx-auto w-full max-w-md rounded-lg border"
                               />
                               {!cameraReady && (
-                                <div className="absolute inset-0 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <div className="flex absolute inset-0 justify-center items-center bg-gray-200 rounded-lg">
                                   <div className="text-center">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                    <div className="mx-auto mb-2 w-8 h-8 rounded-full border-b-2 border-blue-600 animate-spin"></div>
                                     <p className="text-gray-600">Đang khởi động camera...</p>
                                   </div>
                                 </div>
@@ -910,14 +993,14 @@ const StudentList = () => {
                                 disabled={!cameraReady}
                                 className={`px-6 py-2 rounded-md transition-colors ${
                                   cameraReady 
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    ? 'text-white bg-blue-600 hover:bg-blue-700' 
+                                    : 'text-gray-500 bg-gray-300 cursor-not-allowed'
                                 }`}
                               >
                                 📸 Chụp ảnh
                               </button>
                             </div>
-                            <p className="text-sm text-gray-600 mt-2">
+                            <p className="mt-2 text-sm text-gray-600">
                               {cameraReady 
                                 ? 'Hãy nhìn thẳng vào camera và bấm "Chụp ảnh"'
                                 : 'Đang chuẩn bị camera, vui lòng đợi...'
@@ -931,19 +1014,19 @@ const StudentList = () => {
                         <img
                           src={capturedImage}
                           alt="Captured face"
-                          className="w-full max-w-md mx-auto rounded-lg border"
+                          className="mx-auto w-full max-w-md rounded-lg border"
                         />
                         <div className="mt-4 space-x-2">
                           <button
                             onClick={() => setCapturedImage(null)}
-                            className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                            className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
                           >
                             🔄 Chụp lại
                           </button>
                           <button
                             onClick={submitFaceRegistration}
                             disabled={faceRegistrationLoading}
-                            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                            className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
                           >
                             {faceRegistrationLoading ? '⏳ Đang xử lý...' : '✅ Đăng ký'}
                           </button>
@@ -958,7 +1041,7 @@ const StudentList = () => {
                   <>
                     {!uploadedImage ? (
                       <div className="text-center">
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
+                        <div className="p-8 rounded-lg border-2 border-gray-300 border-dashed">
                           <input
                             ref={fileInputRef}
                             type="file"
@@ -968,11 +1051,11 @@ const StudentList = () => {
                           />
                           <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700"
+                            className="px-6 py-3 text-white bg-purple-600 rounded-md hover:bg-purple-700"
                           >
                             📁 Chọn ảnh từ máy tính
                           </button>
-                          <p className="text-sm text-gray-600 mt-2">
+                          <p className="mt-2 text-sm text-gray-600">
                             Chọn ảnh khuôn mặt rõ ràng, đủ sáng
                           </p>
                         </div>
@@ -982,7 +1065,7 @@ const StudentList = () => {
                         <img
                           src={uploadedImage.previewUrl}
                           alt="Uploaded face"
-                          className="w-full max-w-md mx-auto rounded-lg border"
+                          className="mx-auto w-full max-w-md rounded-lg border"
                         />
                         <div className="mt-4 space-x-2">
                           <button
@@ -993,14 +1076,14 @@ const StudentList = () => {
                                 fileInputRef.current.value = '';
                               }
                             }}
-                            className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                            className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
                           >
                             🔄 Chọn lại
                           </button>
                           <button
                             onClick={submitFaceRegistration}
                             disabled={faceRegistrationLoading}
-                            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                            className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
                           >
                             {faceRegistrationLoading ? '⏳ Đang xử lý...' : '✅ Đăng ký'}
                           </button>
@@ -1013,12 +1096,12 @@ const StudentList = () => {
                 {/* Multiple Mode */}
                 {registrationMode === 'multiple' && (
                   <div className="space-y-4">
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-semibold text-blue-800 mb-2">📸 Đăng ký nhiều ảnh (Độ chính xác cao)</h4>
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <h4 className="mb-2 font-semibold text-blue-800">📸 Đăng ký nhiều ảnh (Độ chính xác cao)</h4>
                       <p className="text-sm text-blue-700">
                         Chụp 5-10 ảnh với góc độ khác nhau để đạt độ chính xác 90%+:
                       </p>
-                      <ul className="text-xs text-blue-600 mt-2 space-y-1">
+                      <ul className="mt-2 space-y-1 text-xs text-blue-600">
                         <li>• Nhìn thẳng, nghiêng trái/phải 15-30°</li>
                         <li>• Cười và không cười</li>
                         <li>• Ánh sáng tự nhiên và đèn</li>
@@ -1028,7 +1111,7 @@ const StudentList = () => {
 
                     {multipleFiles.length === 0 ? (
                       <div className="text-center">
-                        <div className="border-2 border-dashed border-green-300 rounded-lg p-8">
+                        <div className="p-8 rounded-lg border-2 border-green-300 border-dashed">
                           <input
                             ref={multipleFileInputRef}
                             type="file"
@@ -1039,11 +1122,11 @@ const StudentList = () => {
                           />
                           <button
                             onClick={() => multipleFileInputRef.current?.click()}
-                            className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700"
+                            className="px-6 py-3 text-white bg-green-600 rounded-md hover:bg-green-700"
                           >
                             📸 Chọn nhiều ảnh (tối đa 10)
                           </button>
-                          <p className="text-sm text-gray-600 mt-2">
+                          <p className="mt-2 text-sm text-gray-600">
                             Chọn 5-10 ảnh khuôn mặt với góc độ khác nhau
                           </p>
                         </div>
@@ -1054,23 +1137,23 @@ const StudentList = () => {
                           <h5 className="font-medium">Đã chọn {multipleFiles.length} ảnh:</h5>
                           <button
                             onClick={() => multipleFileInputRef.current?.click()}
-                            className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200"
+                            className="px-3 py-1 text-sm text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
                           >
                             + Thêm ảnh
                           </button>
                         </div>
                         
-                        <div className="grid grid-cols-3 gap-3 max-h-60 overflow-y-auto">
+                        <div className="grid overflow-y-auto grid-cols-3 gap-3 max-h-60">
                           {multipleFiles.map((fileObj) => (
                             <div key={fileObj.id} className="relative">
                               <img
                                 src={fileObj.previewUrl}
                                 alt={fileObj.name}
-                                className="w-full h-24 object-cover rounded border"
+                                className="object-cover w-full h-24 rounded border"
                               />
                               <button
                                 onClick={() => removeMultipleFile(fileObj.id)}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600"
+                                className="absolute -top-2 -right-2 w-6 h-6 text-xs text-white bg-red-500 rounded-full hover:bg-red-600"
                               >
                                 ×
                               </button>
@@ -1087,7 +1170,7 @@ const StudentList = () => {
                           ))}
                         </div>
                         
-                        <div className="mt-4 text-center space-x-2">
+                        <div className="mt-4 space-x-2 text-center">
                           <button
                             onClick={() => {
                               multipleFiles.forEach(file => URL.revokeObjectURL(file.previewUrl));
@@ -1097,22 +1180,22 @@ const StudentList = () => {
                                 multipleFileInputRef.current.value = '';
                               }
                             }}
-                            className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                            className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
                           >
                             🔄 Chọn lại
                           </button>
                           <button
                             onClick={submitMultipleFaceRegistration}
                             disabled={faceRegistrationLoading || multipleFiles.length === 0}
-                            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
+                            className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
                           >
                             {faceRegistrationLoading ? '⏳ Đang xử lý...' : `✅ Đăng ký ${multipleFiles.length} ảnh`}
                           </button>
                         </div>
                         
                         {multipleResults.length > 0 && (
-                          <div className="mt-4 bg-gray-50 p-3 rounded">
-                            <h6 className="font-medium mb-2">Kết quả:</h6>
+                          <div className="p-3 mt-4 bg-gray-50 rounded">
+                            <h6 className="mb-2 font-medium">Kết quả:</h6>
                             <div className="space-y-1 text-sm">
                               {multipleResults.map((result, index) => (
                                 <div key={index} className={`flex items-center gap-2 ${
@@ -1142,7 +1225,7 @@ const StudentList = () => {
         )}
 
       {/* Summary */}
-      <div className="mt-6 bg-gray-50 rounded-lg p-4">
+      <div className="p-4 mt-6 bg-gray-50 rounded-lg">
         <p className="text-sm text-gray-600">
           Hiển thị {filteredStudents.length} / {students.length} học sinh
           {selectedClass && ` trong lớp ${selectedClass}`}
@@ -1152,94 +1235,94 @@ const StudentList = () => {
 
       {/* Edit Student Modal */}
       {showEditModal && selectedStudentForEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="overflow-y-auto p-6 mx-4 w-full max-w-2xl max-h-screen bg-white rounded-lg">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-semibold text-gray-900">
                 Sửa thông tin học sinh
               </h3>
               <button
                 onClick={closeEditModal}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
+                className="text-2xl text-gray-400 hover:text-gray-600"
               >
                 ×
               </button>
             </div>
 
             <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Mã học sinh (Không thể thay đổi)
                   </label>
                   <input
                     type="text"
                     value={selectedStudentForEdit.student_id || ''}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                    className="px-3 py-2 w-full text-gray-500 bg-gray-50 rounded-lg border border-gray-300"
                     readOnly
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Họ và tên *
                   </label>
                   <input
                     type="text"
                     value={editForm.full_name || ''}
                     onChange={(e) => handleEditFormChange('full_name', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Nguyễn Văn An"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Email
                   </label>
                   <input
                     type="email"
                     value={editForm.email || ''}
                     onChange={(e) => handleEditFormChange('email', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: student@example.com"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Số điện thoại
                   </label>
                   <input
                     type="tel"
                     value={editForm.phone || ''}
                     onChange={(e) => handleEditFormChange('phone', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0123456789"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Lớp
                   </label>
                   <input
                     type="text"
                     value={editForm.class_name || ''}
                     onChange={(e) => handleEditFormChange('class_name', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 10A1"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Khối
                   </label>
                   <select
                     value={editForm.grade || ''}
                     onChange={(e) => handleEditFormChange('grade', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Chọn khối</option>
                     <option value="10">Khối 10</option>
@@ -1249,62 +1332,62 @@ const StudentList = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Ngày sinh
                   </label>
                   <input
                     type="date"
                     value={editForm.date_of_birth || ''}
                     onChange={(e) => handleEditFormChange('date_of_birth', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Tên phụ huynh
                   </label>
                   <input
                     type="text"
                     value={editForm.parent_name || ''}
                     onChange={(e) => handleEditFormChange('parent_name', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Nguyễn Văn Bình"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     SĐT phụ huynh
                   </label>
                   <input
                     type="tel"
                     value={editForm.parent_phone || ''}
                     onChange={(e) => handleEditFormChange('parent_phone', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0987654321"
                   />
                 </div>
               </div>
 
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Địa chỉ
                 </label>
                 <textarea
                   value={editForm.address || ''}
                   onChange={(e) => handleEditFormChange('address', e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
                 />
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+              <div className="flex justify-end pt-4 space-x-3 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={closeEditModal}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors hover:bg-gray-200"
                 >
                   Hủy
                 </button>
@@ -1312,7 +1395,7 @@ const StudentList = () => {
                   type="button"
                   onClick={submitEditForm}
                   disabled={editLoading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  className="px-6 py-2 font-medium text-white bg-blue-600 rounded-lg transition-colors hover:bg-blue-700 disabled:opacity-50"
                 >
                   {editLoading ? '⏳ Đang lưu...' : '💾 Lưu thay đổi'}
                 </button>
@@ -1338,23 +1421,23 @@ const StudentList = () => {
 
       {/* Student Grades Modal */}
       {showGradesModal && selectedStudentForGrades && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-screen overflow-y-auto">
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="overflow-y-auto mx-4 w-full max-w-6xl max-h-screen bg-white rounded-lg">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-t-lg">
+            <div className="p-6 text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold">📊 Bảng điểm</h3>
-                  <p className="text-purple-100 mt-1">
+                  <p className="mt-1 text-purple-100">
                     {selectedStudentForGrades.full_name} - {selectedStudentForGrades.student_id}
                   </p>
-                  <p className="text-purple-100 text-sm">
+                  <p className="text-sm text-purple-100">
                     Lớp {selectedStudentForGrades.class_name} - Khối {selectedStudentForGrades.grade}
                   </p>
                 </div>
                 <button
                   onClick={closeGradesModal}
-                  className="text-white hover:text-purple-200 text-3xl font-bold"
+                  className="text-3xl font-bold text-white hover:text-purple-200"
                 >
                   ×
                 </button>
@@ -1365,13 +1448,13 @@ const StudentList = () => {
             <div className="p-6">
               {gradesLoading ? (
                 <div className="flex justify-center items-center h-64">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600"></div>
-                  <span className="ml-4 text-gray-600 text-lg">Đang tải điểm số...</span>
+                  <div className="w-16 h-16 rounded-full border-b-2 border-purple-600 animate-spin"></div>
+                  <span className="ml-4 text-lg text-gray-600">Đang tải điểm số...</span>
                 </div>
               ) : studentGrades.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-gray-400 text-6xl mb-4">📝</div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">
+                <div className="py-12 text-center">
+                  <div className="mb-4 text-6xl text-gray-400">📝</div>
+                  <h4 className="mb-2 text-lg font-medium text-gray-900">
                     Chưa có điểm số
                   </h4>
                   <p className="text-gray-500">
@@ -1381,8 +1464,8 @@ const StudentList = () => {
               ) : (
                 <div className="space-y-6">
                   {/* Academic Year & Semester Filter */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between items-center">
                       <div>
                         <h4 className="font-medium text-gray-900">Năm học: 2024-2025</h4>
                         <p className="text-sm text-gray-600">Học kỳ: HK1</p>
@@ -1396,19 +1479,19 @@ const StudentList = () => {
 
                   {/* Grades Table */}
                   <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <table className="min-w-full bg-white rounded-lg border border-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                          <th className="px-6 py-4 text-sm font-medium tracking-wider text-left text-gray-500 uppercase border-b">
                             Môn học
                           </th>
-                          <th className="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                          <th className="px-6 py-4 text-sm font-medium tracking-wider text-left text-gray-500 uppercase border-b">
                             Giáo viên
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                          <th className="px-6 py-4 text-sm font-medium tracking-wider text-center text-gray-500 uppercase border-b">
                             Chi tiết điểm
                           </th>
-                          <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                          <th className="px-6 py-4 text-sm font-medium tracking-wider text-center text-gray-500 uppercase border-b">
                             Điểm TB
                           </th>
                         </tr>
@@ -1418,7 +1501,7 @@ const StudentList = () => {
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="flex items-center">
-                                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                <div className="flex justify-center items-center w-10 h-10 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-full">
                                   {gradeRecord.subject_name?.charAt(0)?.toUpperCase() || '?'}
                                 </div>
                                 <div className="ml-4">
@@ -1446,13 +1529,13 @@ const StudentList = () => {
                                 {gradeRecord.grade_data && Object.keys(gradeRecord.grade_data).filter(key => 
                                   key !== 'Mon_hoc' && gradeRecord.grade_data[key]?.Diem
                                 ).map(columnName => (
-                                  <div key={columnName} className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1">
-                                    <div className="text-xs text-blue-600 font-medium">
+                                  <div key={columnName} className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-200">
+                                    <div className="text-xs font-medium text-blue-600">
                                       {columnName.replace(/_/g, ' ').replace(/Diem/g, 'Điểm')}
                                     </div>
                                     <div className="text-sm font-bold text-blue-800">
                                       {gradeRecord.grade_data[columnName]?.Diem}
-                                      <span className="text-xs text-blue-600 ml-1">
+                                      <span className="ml-1 text-xs text-blue-600">
                                         (HS: {gradeRecord.grade_data[columnName]?.He_so})
                                       </span>
                                     </div>
@@ -1481,9 +1564,9 @@ const StudentList = () => {
                   </div>
 
                   {/* Summary */}
-                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6">
-                    <h4 className="font-medium text-gray-900 mb-3">📈 Tổng kết</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+                    <h4 className="mb-3 font-medium text-gray-900">📈 Tổng kết</h4>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Điểm trung bình chung</p>
                         <p className="text-2xl font-bold text-purple-600">
@@ -1512,11 +1595,11 @@ const StudentList = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-gray-50 px-6 py-4 rounded-b-lg">
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
               <div className="flex justify-end">
                 <button
                   onClick={closeGradesModal}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors"
+                  className="px-6 py-2 font-medium text-white bg-gray-600 rounded-lg transition-colors hover:bg-gray-700"
                 >
                   Đóng
                 </button>

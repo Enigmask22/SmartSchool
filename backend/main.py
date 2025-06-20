@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-from routers import students, attendance, auth, ai, feedback, school_days_config, grades
+from routers import students, attendance, auth, ai, feedback, school_days_config, grades, homeroom
 from database.connection import init_db
 from utils.logger import setup_logger
 from services.scheduler_service import start_scheduler
@@ -57,6 +57,7 @@ app.include_router(ai.router, prefix="/api/ai", tags=["AI Computer Vision - Insi
 app.include_router(feedback.router, prefix="/api/feedback", tags=["AI Feedback - Gemini"])
 app.include_router(school_days_config.router, prefix="/api", tags=["School Days Configuration"])
 app.include_router(grades.router, prefix="/api/grades", tags=["Grades Management"])
+app.include_router(homeroom.router, prefix="/api/homeroom", tags=["Homeroom Teachers"])
 
 @app.on_event("startup")
 async def startup_event():
