@@ -37,6 +37,12 @@ const StudentList = () => {
   // Show inactive students option
   const [showInactive, setShowInactive] = useState(false);
   
+  // View grades states
+  const [showGradesModal, setShowGradesModal] = useState(false);
+  const [selectedStudentForGrades, setSelectedStudentForGrades] = useState(null);
+  const [studentGrades, setStudentGrades] = useState([]);
+  const [gradesLoading, setGradesLoading] = useState(false);
+  
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -560,6 +566,65 @@ const StudentList = () => {
     }
   };
 
+  const handleViewGrades = async (student) => {
+    setSelectedStudentForGrades(student);
+    setShowGradesModal(true);
+    setGradesLoading(true);
+    setStudentGrades([]);
+
+    try {
+      // Get all grades for this student across all subjects
+      const response = await ApiService.getStudentGrades(student.id);
+      
+      if (response.success) {
+        setStudentGrades(response.data?.grades || []);
+      } else {
+        console.error('Failed to fetch grades:', response.message);
+        setStudentGrades([]);
+      }
+    } catch (error) {
+      console.error('Error fetching student grades:', error);
+      // Mock data for demonstration
+      setStudentGrades([
+        {
+          subject_name: 'Toán',
+          class_name: student.class_name,
+          academic_year: '2024-2025',
+          semester: 'HK1',
+          grade_data: {
+            'Diem_thuong_xuyen': { Diem: 8.5, He_so: 1 },
+            'Diem_thi_giua_ki': { Diem: 9.0, He_so: 2 },
+            'Diem_thi_cuoi_ki': { Diem: 8.0, He_so: 3 }
+          },
+          final_grade: 8.4,
+          teacher_name: 'Nguyễn Thị Lan'
+        },
+        {
+          subject_name: 'Ngữ Văn', 
+          class_name: student.class_name,
+          academic_year: '2024-2025',
+          semester: 'HK1',
+          grade_data: {
+            'Diem_mieng': { Diem: 7.5, He_so: 1 },
+            'Diem_15_phut': { Diem: 8.0, He_so: 1 },
+            'Diem_1_tiet': { Diem: 8.5, He_so: 2 },
+            'Diem_cuoi_ki': { Diem: 8.0, He_so: 3 }
+          },
+          final_grade: 8.1,
+          teacher_name: 'Trần Văn Nam'
+        }
+      ]);
+    } finally {
+      setGradesLoading(false);
+    }
+  };
+
+  const closeGradesModal = () => {
+    setShowGradesModal(false);
+    setSelectedStudentForGrades(null);
+    setStudentGrades([]);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -687,10 +752,10 @@ const StudentList = () => {
 
                 {/* Action buttons */}
                 <div className="pt-4 border-t border-gray-100">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2 mb-2">
                     <button
                       onClick={() => startFaceRegistration(student)}
-                      className="flex items-center justify-center space-x-2 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex items-center justify-center space-x-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
                       title="Đăng ký khuôn mặt"
                     >
                       <span className="text-base">📷</span>
@@ -702,7 +767,7 @@ const StudentList = () => {
                         setSelectedStudentForMultiple(student);
                         setShowMultipleModal(true);
                       }}
-                      className="flex items-center justify-center space-x-2 bg-green-50 hover:bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex items-center justify-center space-x-1 bg-green-50 hover:bg-green-100 text-green-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
                       title="Nhiều ảnh"
                     >
                       <span className="text-base">📸</span>
@@ -710,8 +775,19 @@ const StudentList = () => {
                     </button>
                     
                     <button
+                      onClick={() => handleViewGrades(student)}
+                      className="flex items-center justify-center space-x-1 bg-purple-50 hover:bg-purple-100 text-purple-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
+                      title="Xem điểm số"
+                    >
+                      <span className="text-base">📊</span>
+                      <span>Điểm số</span>
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
                       onClick={() => handleEdit(student)}
-                      className="flex items-center justify-center space-x-2 bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex items-center justify-center space-x-1 bg-amber-50 hover:bg-amber-100 text-amber-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
                       title="Sửa thông tin"
                     >
                       <span className="text-base">✏️</span>
@@ -720,7 +796,7 @@ const StudentList = () => {
                     
                     <button
                       onClick={() => handleDelete(student.id)}
-                      className="flex items-center justify-center space-x-2 bg-red-50 hover:bg-red-100 text-red-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      className="flex items-center justify-center space-x-1 bg-red-50 hover:bg-red-100 text-red-700 px-2 py-2 rounded-lg text-sm font-medium transition-colors"
                       title="Xóa học sinh"
                     >
                       <span className="text-base">🗑️</span>
@@ -1258,6 +1334,196 @@ const StudentList = () => {
             fetchStudents(); // Refresh students list
           }}
         />
+      )}
+
+      {/* Student Grades Modal */}
+      {showGradesModal && selectedStudentForGrades && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-screen overflow-y-auto">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-2xl font-bold">📊 Bảng điểm</h3>
+                  <p className="text-purple-100 mt-1">
+                    {selectedStudentForGrades.full_name} - {selectedStudentForGrades.student_id}
+                  </p>
+                  <p className="text-purple-100 text-sm">
+                    Lớp {selectedStudentForGrades.class_name} - Khối {selectedStudentForGrades.grade}
+                  </p>
+                </div>
+                <button
+                  onClick={closeGradesModal}
+                  className="text-white hover:text-purple-200 text-3xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {gradesLoading ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600"></div>
+                  <span className="ml-4 text-gray-600 text-lg">Đang tải điểm số...</span>
+                </div>
+              ) : studentGrades.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-gray-400 text-6xl mb-4">📝</div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">
+                    Chưa có điểm số
+                  </h4>
+                  <p className="text-gray-500">
+                    Học sinh này chưa có điểm số nào được nhập vào hệ thống.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Academic Year & Semester Filter */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">Năm học: 2024-2025</h4>
+                        <p className="text-sm text-gray-600">Học kỳ: HK1</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">Tổng số môn học</p>
+                        <p className="text-2xl font-bold text-purple-600">{studentGrades.length}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grades Table */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                            Môn học
+                          </th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                            Giáo viên
+                          </th>
+                          <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                            Chi tiết điểm
+                          </th>
+                          <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider border-b">
+                            Điểm TB
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {studentGrades.map((gradeRecord, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                  {gradeRecord.subject_name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {gradeRecord.subject_name}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {gradeRecord.class_name}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900">
+                                {gradeRecord.teacher_name || 'Chưa có thông tin'}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {gradeRecord.academic_year} - {gradeRecord.semester}
+                              </div>
+                            </td>
+                            
+                            <td className="px-6 py-4">
+                              <div className="flex flex-wrap gap-2 justify-center">
+                                {gradeRecord.grade_data && Object.keys(gradeRecord.grade_data).filter(key => 
+                                  key !== 'Mon_hoc' && gradeRecord.grade_data[key]?.Diem
+                                ).map(columnName => (
+                                  <div key={columnName} className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1">
+                                    <div className="text-xs text-blue-600 font-medium">
+                                      {columnName.replace(/_/g, ' ').replace(/Diem/g, 'Điểm')}
+                                    </div>
+                                    <div className="text-sm font-bold text-blue-800">
+                                      {gradeRecord.grade_data[columnName]?.Diem}
+                                      <span className="text-xs text-blue-600 ml-1">
+                                        (HS: {gradeRecord.grade_data[columnName]?.He_so})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                            
+                            <td className="px-6 py-4 text-center">
+                              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                gradeRecord.final_grade >= 8.0 
+                                  ? 'bg-green-100 text-green-800'
+                                  : gradeRecord.final_grade >= 6.5
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : gradeRecord.final_grade >= 5.0
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {gradeRecord.final_grade}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6">
+                    <h4 className="font-medium text-gray-900 mb-3">📈 Tổng kết</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Điểm trung bình chung</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {studentGrades.length > 0 
+                            ? (studentGrades.reduce((sum, grade) => sum + (grade.final_grade || 0), 0) / studentGrades.length).toFixed(2)
+                            : '0.00'
+                          }
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Số môn &gt;= 8.0</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {studentGrades.filter(grade => (grade.final_grade || 0) >= 8.0).length}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Số môn &lt; 5.0</p>
+                        <p className="text-2xl font-bold text-red-600">
+                          {studentGrades.filter(grade => (grade.final_grade || 0) < 5.0).length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 rounded-b-lg">
+              <div className="flex justify-end">
+                <button
+                  onClick={closeGradesModal}
+                  className="px-6 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

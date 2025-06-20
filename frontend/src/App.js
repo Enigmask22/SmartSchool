@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import './App.css';
 
+// Context
+import { AuthProvider, AuthContext } from './contexts/AuthContext';
+
 // Components
-import Header from './components/Header';
+import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import StudentList from './components/StudentList';
 import AttendanceView from './components/AttendanceView';
@@ -11,30 +14,38 @@ import FaceManagement from './components/FaceManagement';
 import ContinuousRecognition from './components/ContinuousRecognition';
 import AIFeedback from './components/AIFeedback';
 import SchoolDaysConfig from './components/SchoolDaysConfig';
+import Login from './components/Login';
+import GradeManagement from './components/GradeManagement';
 
-function App() {
+function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard');
-  const [user, setUser] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { user, loading, isAuthenticated } = useContext(AuthContext);
 
-  useEffect(() => {
-    // Kiểm tra authentication
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          // Verify token với backend
-          // setUser(userData);
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-      }
-    };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
-    checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  if (!isAuthenticated()) {
+    return <Login />;
+  }
 
   const renderContent = () => {
+    // Nếu user là teacher (giáo viên bộ môn), chỉ cho phép truy cập Grade Management
+    if (user?.role === 'teacher') {
+      switch (currentView) {
+        case 'grades':
+          return <GradeManagement />;
+        default:
+          return <GradeManagement />;
+      }
+    }
+
+    // Admin có thể truy cập tất cả
     switch (currentView) {
       case 'dashboard':
         return <Dashboard setCurrentView={setCurrentView} />;
@@ -52,22 +63,40 @@ function App() {
         return <AIFeedback />;
       case 'school-config':
         return <SchoolDaysConfig />;
+      case 'grades':
+        return <GradeManagement />;
       default:
         return <Dashboard setCurrentView={setCurrentView} />;
     }
   };
 
   return (
-    <div className="App">
-      <Header 
+    <div className="App flex h-screen bg-gray-50">
+      <Sidebar 
         currentView={currentView}
         setCurrentView={setCurrentView}
         user={user}
+        isOpen={sidebarOpen}
+        setIsOpen={setSidebarOpen}
       />
-      <main className="main-content">
-        {renderContent()}
+      <main className={`
+        flex-1 transition-all duration-300 overflow-auto
+        ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'}
+        ml-0
+      `}>
+        <div className="p-4 lg:p-6">
+          {renderContent()}
+        </div>
       </main>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

@@ -197,5 +197,56 @@ class WeeklyAttendanceSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+# Grades Management Schemas
+class SubjectBase(BaseModel):
+    subject_code: str = Field(..., description="Mã môn học")
+    subject_name: str = Field(..., description="Tên môn học")
+    description: Optional[str] = None
+
+class Subject(SubjectBase):
+    id: int
+    is_active: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+class TeacherBase(BaseModel):
+    teacher_code: str = Field(..., description="Mã giáo viên")
+    full_name: str = Field(..., description="Họ tên giáo viên")
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    user_id: Optional[int] = None
+
+class Teacher(TeacherBase):
+    id: int
+    is_active: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+class GradeConfigBase(BaseModel):
+    subject_id: int
+    academic_year: str = Field(..., description="Năm học (2024-2025)")
+    semester: str = Field(..., description="Học kỳ (HK1, HK2, HK3)")
+    grade_column_config: dict = Field(..., description="Cấu hình cột điểm JSON")
+
+class GradeConfig(GradeConfigBase):
+    id: int
+    teacher_id: int
+    created_at: datetime
+    updated_at: datetime
+
+class GradeBase(BaseModel):
+    student_id: int
+    class_subject_id: int
+    academic_year: str = Field(..., description="Năm học")
+    semester: str = Field(..., description="Học kỳ")
+    grade_data: dict = Field(..., description="Dữ liệu điểm JSON")
+
+class Grade(GradeBase):
+    id: int
+    final_grade: Optional[float] = None
+    created_by: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
 class SchoolDaysConfigBatch(BaseModel):
     configs: List[SchoolDaysConfigCreate] = Field(..., description="Cấu hình cho tất cả các khối") 

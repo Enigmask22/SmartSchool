@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 
 const Header = ({ currentView, setCurrentView, user }) => {
+  const { logout, isTeacher } = useContext(AuthContext);
+  
   const menuItems = [
     { id: 'dashboard', label: 'Trang chủ', icon: '🏠' },
     { id: 'students', label: 'Học sinh', icon: '👥' },
@@ -10,7 +13,15 @@ const Header = ({ currentView, setCurrentView, user }) => {
     { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
     { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
     { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
+    // Show grades menu only for teachers
+    ...(isTeacher() ? [{ id: 'grades', label: 'Quản lý điểm', icon: '📝' }] : []),
   ];
+
+  const handleLogout = () => {
+    if (window.confirm('Bạn có chắc muốn đăng xuất?')) {
+      logout();
+    }
+  };
 
   const handleMenuClick = (viewId) => {
     setCurrentView(viewId);
@@ -45,7 +56,13 @@ const Header = ({ currentView, setCurrentView, user }) => {
             {user ? (
               <div className="flex items-center space-x-2">
                 <span className="text-sm">Xin chào, {user.full_name}</span>
-                <button className="px-3 py-1 text-sm bg-blue-700 rounded hover:bg-blue-800">
+                <span className="text-xs bg-blue-500 px-2 py-1 rounded">
+                  {user.role === 'admin' ? 'Quản trị' : user.role === 'teacher' ? 'Giáo viên' : 'Nhân viên'}
+                </span>
+                <button 
+                  onClick={handleLogout}
+                  className="px-3 py-1 text-sm bg-blue-700 rounded hover:bg-blue-800"
+                >
                   Đăng xuất
                 </button>
               </div>

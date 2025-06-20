@@ -16,6 +16,7 @@ from models.schemas import (
 from database.connection import get_db
 from utils.logger import setup_logger
 from ai.face_recognition_insightface import insightface_service
+from routers.auth import get_current_user
 
 logger = setup_logger()
 router = APIRouter()
@@ -69,12 +70,67 @@ async def get_students(
     class_name: Optional[str] = Query(None),
     grade: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(True),
+    current_user=Depends(get_current_user),
     db=Depends(get_db)
 ):
     """Lấy danh sách học sinh với phân trang và filter"""
     try:
         # Build query
         query = db.table("students").select("*")
+        
+        # Filter theo giáo viên nếu role là teacher
+        if current_user.get("role") == "teacher":
+            # Lấy teacher_id từ user_id
+            teacher_response = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+            if teacher_response.data:
+                teacher_id = teacher_response.data[0]["id"]
+                
+                # Lấy các class_id mà giáo viên này dạy
+                class_subjects_response = db.table("class_subjects")\
+                    .select("class_id")\
+                    .eq("teacher_id", teacher_id)\
+                    .eq("academic_year", "2024-2025")\
+                    .execute()
+                
+                if class_subjects_response.data:
+                    class_ids = [cs["class_id"] for cs in class_subjects_response.data]
+                    
+                    # Lấy class_name từ class_ids
+                    classes_response = db.table("classes")\
+                        .select("class_name")\
+                        .in_("id", class_ids)\
+                        .execute()
+                    
+                    if classes_response.data:
+                        allowed_classes = [cls["class_name"] for cls in classes_response.data]
+                        query = query.in_("class_name", allowed_classes)
+                    else:
+                        # Nếu không có lớp nào, trả về empty
+                        return ListResponse(
+                            success=True,
+                            data=[],
+                            total=0,
+                            page=page,
+                            page_size=page_size
+                        )
+                else:
+                    # Nếu không dạy lớp nào, trả về empty
+                    return ListResponse(
+                        success=True,
+                        data=[],
+                        total=0,
+                        page=page,
+                        page_size=page_size
+                    )
+            else:
+                # Nếu không tìm thấy teacher record, trả về empty
+                return ListResponse(
+                    success=True,
+                    data=[],
+                    total=0,
+                    page=page,
+                    page_size=page_size
+                )
         
         # Apply filters
         if search:
