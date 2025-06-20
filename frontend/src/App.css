@@ -1,19 +1,45 @@
 .App {
-  text-align: center;
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
 }
 
+/* Sidebar animations */
+.sidebar-transition {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Main content responsiveness */
 .main-content {
   flex: 1;
-  padding: 20px;
   background-color: #f5f5f5;
+  overflow-y: auto;
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .main-content {
-    padding: 10px;
+@media (max-width: 1024px) {
+  .sidebar-mobile {
+    transform: translateX(-100%);
   }
+  
+  .sidebar-mobile.open {
+    transform: translateX(0);
+  }
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 2px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 } 

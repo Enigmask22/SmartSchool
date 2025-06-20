@@ -74,8 +74,6 @@ python install_insightface_production.py
 # Cài Visual C++ Build Tools từ:
 # https://visualstudio.microsoft.com/visual-cpp-build-tools/
 
-# Hoặc sử dụng fallback (MediaPipe only)
-# System sẽ tự động fallback nếu InsightFace không khả dụng
 ```
 
 #### 2.3 Environment Configuration

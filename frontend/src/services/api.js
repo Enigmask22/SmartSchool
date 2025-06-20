@@ -308,6 +308,102 @@ class ApiService {
       body: JSON.stringify({ students: studentsData }),
     });
   }
+
+  // Grades Management
+  async getGrades(filters = {}) {
+    const queryParams = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+        queryParams.append(key, filters[key]);
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return this.request(`/grades/${queryString ? '?' + queryString : ''}`);
+  }
+
+  async updateGrade(gradeId, gradeData) {
+    return this.request(`/grades/${gradeId}`, {
+      method: 'PUT',
+      body: JSON.stringify(gradeData),
+    });
+  }
+
+  async createGrade(gradeData) {
+    return this.request('/grades/', {
+      method: 'POST',
+      body: JSON.stringify(gradeData),
+    });
+  }
+
+  async getSubjects() {
+    return this.request('/grades/subjects');
+  }
+
+  async getClassSubjects(filters = {}) {
+    const queryParams = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+      if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+        queryParams.append(key, filters[key]);
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return this.request(`/grades/class-subjects${queryString ? '?' + queryString : ''}`);
+  }
+
+  async getGradeConfig(teacherId, subjectId, academicYear, semester) {
+    return this.request(`/grades/config/${teacherId}/${subjectId}/${academicYear}/${semester}`);
+  }
+
+  async updateGradeConfig(teacherId, subjectId, academicYear, semester, config) {
+    return this.request(`/grades/config/${teacherId}/${subjectId}/${academicYear}/${semester}`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async getStudentsByClassSubject(classSubjectId, academicYear = '2024-2025', semester = 'HK1') {
+    return this.request(`/grades/teacher/students/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`);
+  }
+
+  // Teacher-specific Grades Management API
+  async getTeacherInfo() {
+    return this.request('/grades/teacher/info');
+  }
+
+  async createGradeConfig(config) {
+    return this.request('/grades/config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async updateGradeConfigById(configId, config) {
+    return this.request(`/grades/config/${configId}`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async createOrUpdateGrade(gradeData) {
+    return this.request('/grades/grade', {
+      method: 'POST',
+      body: JSON.stringify(gradeData),
+    });
+  }
+
+  async getGradeConfigBySubject(subjectId, academicYear, semester) {
+    return this.request(`/grades/config/${subjectId}?academic_year=${academicYear}&semester=${semester}`);
+  }
+
+  async getStudentGrade(studentId, classSubjectId, academicYear, semester) {
+    return this.request(`/grades/grade/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`);
+  }
+
+  async getStudentGrades(studentId, academicYear = '2024-2025', semester = 'HK1') {
+    return this.request(`/grades/student/${studentId}?academic_year=${academicYear}&semester=${semester}`);
+  }
 }
 
 // Create and export singleton instance
