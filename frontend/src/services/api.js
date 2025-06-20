@@ -74,6 +74,17 @@ class ApiService {
     return this.request('/students/classes/list');
   }
 
+  // Homeroom classes - for homeroom teachers only
+  async getHomeroomClasses() {
+    return this.request('/homeroom/classes');
+  }
+
+  // Homeroom students - for homeroom teachers only
+  async getHomeroomStudents(className = null) {
+    const params = className ? `?class_name=${className}` : '';
+    return this.request(`/homeroom/students${params}`);
+  }
+
   // Attendance
   async getAttendanceRecords(params = {}) {
     const queryParams = new URLSearchParams();
@@ -403,6 +414,15 @@ class ApiService {
 
   async getStudentGrades(studentId, academicYear = '2024-2025', semester = 'HK1') {
     return this.request(`/grades/student/${studentId}?academic_year=${academicYear}&semester=${semester}`);
+  }
+
+  // Upsert grade config - create if not exists, update if exists
+  async upsertGradeConfig(configId, config) {
+    // Use backend upsert endpoint that handles both create and update automatically
+    return this.request('/grades/config/upsert', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
   }
 }
 

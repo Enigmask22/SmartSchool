@@ -1,52 +1,148 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import ApiService from '../services/api';
+import { AuthContext } from '../contexts/AuthContext';
 
 const FaceManagement = () => {
+  const { user, isHomeroomTeacher } = useContext(AuthContext);
   const [aiStatus, setAiStatus] = useState(null);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Filter states
+  const [selectedClass, setSelectedClass] = useState('');
+  const [availableClasses, setAvailableClasses] = useState([]);
 
   useEffect(() => {
-    fetchData();
+    fetchAvailableClasses();
   }, []);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    fetchStudentsData();
+  }, [selectedClass]);
+
+  useEffect(() => {
+    fetchAvailableClasses();
+  }, [user]);
+
+  // Fetch available classes based on user role
+  const fetchAvailableClasses = async () => {
+    try {
+      console.log('👤 Face Management - User role check:', {
+        user,
+        isHomeroomTeacher: isHomeroomTeacher(),
+        userRole: user?.role
+      });
+
+      let classesResponse;
+      
+      if (isHomeroomTeacher()) {
+        console.log('📚 Fetching homeroom classes for face management...');
+        // If homeroom teacher, only get their homeroom classes
+        classesResponse = await ApiService.getHomeroomClasses();
+        
+        if (classesResponse.success && classesResponse.data) {
+          // For homeroom classes, extract class_name from objects
+          const classNames = classesResponse.data.map(cls => cls.class_name).sort();
+          console.log('📚 Setting homeroom classes:', classNames);
+          setAvailableClasses(classNames);
+        } else {
+          console.warn('📚 Invalid homeroom classes response:', classesResponse);
+          setAvailableClasses([]);
+        }
+      } else {
+        console.log('📚 Fetching all students to extract classes for admin...');
+        // If admin, get all students and extract unique class names
+        const studentsResponse = await ApiService.getStudents({});
+        
+        if (studentsResponse.success && studentsResponse.data) {
+          // Extract unique class names from students
+          const uniqueClasses = [...new Set(
+            studentsResponse.data
+              .map(student => student.class_name)
+              .filter(className => className) // Remove null/undefined
+          )].sort();
+          
+          console.log('📚 Extracted unique classes from students:', uniqueClasses);
+          setAvailableClasses(uniqueClasses);
+        } else {
+          console.warn('📚 Invalid students response for classes:', studentsResponse);
+          setAvailableClasses([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching available classes:', error);
+      setAvailableClasses([]);
+    }
+  };
+
+  const fetchStudentsData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Fetch AI status and students data in parallel
-      const [statusResponse, studentsResponse] = await Promise.all([
-        fetch('http://localhost:8000/api/ai/status'),
-        ApiService.getStudents({})
-      ]);
+      // If homeroom teacher but no class selected, don't fetch
+      if (isHomeroomTeacher() && !selectedClass) {
+        console.log('🚫 No class selected for homeroom teacher, skipping face management students fetch');
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
       
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
-        setAiStatus(statusData.data);
+      let studentsResponse;
+      
+      if (isHomeroomTeacher()) {
+        // If homeroom teacher, get only their homeroom students
+        studentsResponse = await ApiService.getHomeroomStudents(selectedClass);
+      } else {
+        // If admin or other roles, get all students
+        studentsResponse = await ApiService.getStudents({});
       }
       
       // Handle students response properly
       if (studentsResponse.success && studentsResponse.data) {
-        setStudents(Array.isArray(studentsResponse.data) ? studentsResponse.data : []);
+        let studentsData = Array.isArray(studentsResponse.data) ? studentsResponse.data : [];
+        
+        // Apply class filter for non-homeroom users
+        if (!isHomeroomTeacher() && selectedClass) {
+          studentsData = studentsData.filter(student => student.class_name === selectedClass);
+        }
+        
+        setStudents(studentsData);
       } else {
         setStudents([]);
       }
       
       // Log để debug
-      console.log('Students data:', studentsResponse);
-      if (studentsResponse && studentsResponse.length > 0) {
-        console.log('Sample student:', studentsResponse[0]);
-        console.log('Has insightface_encoding:', !!studentsResponse[0].insightface_encoding);
-      }
+      console.log('Face Management Students data:', studentsResponse);
       
     } catch (error) {
-      console.error('Error fetching data:', error);
-      setError('Không thể tải thông tin AI system');
+      console.error('Error fetching students data:', error);
+      setError('Không thể tải thông tin học sinh');
+      setStudents([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchAIStatus = async () => {
+    try {
+      const statusResponse = await fetch('http://localhost:8000/api/ai/status');
+      
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        setAiStatus(statusData.data);
+      }
+    } catch (error) {
+      console.error('Error fetching AI status:', error);
+    }
+  };
+
+  const fetchData = async () => {
+    await Promise.all([
+      fetchAIStatus(),
+      fetchStudentsData()
+    ]);
   };
 
   const deleteFaceEncoding = async (studentId, studentName) => {
@@ -96,7 +192,7 @@ const FaceManagement = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="w-32 h-32 rounded-full border-b-2 border-blue-600 animate-spin"></div>
       </div>
     );
   }
@@ -104,53 +200,53 @@ const FaceManagement = () => {
   return (
     <div className="face-management">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">Quản lý khuôn mặt AI</h2>
+        <h2 className="mb-2 text-3xl font-bold text-gray-800">Quản lý khuôn mặt AI</h2>
         <p className="text-gray-600">Theo dõi và quản lý dữ liệu khuôn mặt đã đăng ký</p>
         {error && (
-          <div className="mt-2 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="p-3 mt-2 text-red-700 bg-red-100 rounded border border-red-400">
             {error}
           </div>
         )}
       </div>
 
       {/* AI Status Card */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h3 className="text-xl font-semibold mb-4">Trạng thái hệ thống AI</h3>
+      <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
+        <h3 className="mb-4 text-xl font-semibold">Trạng thái hệ thống AI</h3>
         
         {aiStatus ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-green-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="p-4 bg-green-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
                 {aiStatus.service_status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
               </div>
               <div className="text-sm text-gray-600">Trạng thái service</div>
-              <div className="text-xs text-gray-500 mt-1">{aiStatus.service_name}</div>
+              <div className="mt-1 text-xs text-gray-500">{aiStatus.service_name}</div>
             </div>
             
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
                 {aiStatus.database_encodings || 0}
               </div>
               <div className="text-sm text-gray-600">Khuôn mặt đã đăng ký</div>
-              <div className="text-xs text-gray-500 mt-1">Database: {aiStatus.database_encodings}, Local: {aiStatus.local_ai_encodings}</div>
+              <div className="mt-1 text-xs text-gray-500">Database: {aiStatus.database_encodings}, Local: {aiStatus.local_ai_encodings}</div>
             </div>
             
-            <div className="bg-purple-50 p-4 rounded-lg">
+            <div className="p-4 bg-purple-50 rounded-lg">
               <div className="text-2xl font-bold text-purple-600">
                 {aiStatus.accuracy || 'N/A'}
               </div>
               <div className="text-sm text-gray-600">Độ chính xác</div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="mt-1 text-xs text-gray-500">
                 {aiStatus.similarity_threshold ? `Threshold: ${aiStatus.similarity_threshold}` : 'Advanced AI'}
               </div>
             </div>
             
-            <div className="bg-orange-50 p-4 rounded-lg">
+            <div className="p-4 bg-orange-50 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
                 {aiStatus.sync_status === 'synced' ? '✅' : '⚠️'}
               </div>
               <div className="text-sm text-gray-600">Trạng thái đồng bộ</div>
-              <div className="text-xs text-gray-500 mt-1 capitalize">{aiStatus.sync_status?.replace('_', ' ')}</div>
+              <div className="mt-1 text-xs text-gray-500 capitalize">{aiStatus.sync_status?.replace('_', ' ')}</div>
             </div>
           </div>
         ) : (
@@ -160,30 +256,71 @@ const FaceManagement = () => {
         <div className="mt-4">
           <button
             onClick={reloadModels}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 mr-3"
+            className="px-4 py-2 mr-3 text-white bg-blue-600 rounded-md hover:bg-blue-700"
           >
             Reload Models
           </button>
           <button
             onClick={fetchData}
-            className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+            className="px-4 py-2 text-white bg-gray-600 rounded-md hover:bg-gray-700"
           >
             Làm mới
           </button>
         </div>
       </div>
 
+      {/* Filter Section */}
+      <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <label className="block mb-2 text-sm font-medium text-gray-700">
+              Lớp
+            </label>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
+              {isHomeroomTeacher() ? (
+                <option value="">Chọn lớp chủ nhiệm</option>
+              ) : (
+                <option value="">Tất cả lớp</option>
+              )}
+              {availableClasses.map(className => (
+                <option key={className} value={className}>
+                  {className}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                fetchAIStatus();
+                fetchStudentsData();
+              }}
+              className="px-4 py-2 text-white bg-blue-600 rounded-md transition-colors hover:bg-blue-700"
+            >
+              Làm mới dữ liệu
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Students with Face Registration */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="overflow-hidden bg-white rounded-lg shadow-md">
         <div className="p-6 border-b">
           <h3 className="text-xl font-semibold">Học sinh đã đăng ký khuôn mặt</h3>
-          <p className="text-gray-600 mt-1">
+          <p className="mt-1 text-gray-600">
             Danh sách học sinh có thể được nhận diện bằng AI
+            {selectedClass && ` - Lớp ${selectedClass}`}
           </p>
         </div>
 
         {/* Header */}
-        <div className="bg-gray-50 grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b items-center">
+        <div className="grid grid-cols-12 gap-4 items-center px-4 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase bg-gray-50 border-b">
           <div className="col-span-2">Mã SV</div>
           <div className="col-span-3">Họ tên</div>
           <div className="col-span-1">Lớp</div>
@@ -195,11 +332,23 @@ const FaceManagement = () => {
         <div className="divide-y divide-gray-200">
           {students.length === 0 ? (
             <div className="px-4 py-8 text-center text-gray-500">
-              Chưa có học sinh nào đăng ký khuôn mặt
+              {isHomeroomTeacher() && !selectedClass ? (
+                <div>
+                  <div className="mb-4 text-6xl text-gray-400">🎯</div>
+                  <h3 className="mb-2 text-lg font-medium text-gray-900">Chọn lớp chủ nhiệm để xem dữ liệu</h3>
+                  <p className="text-gray-500">Vui lòng chọn lớp từ dropdown phía trên</p>
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-4 text-6xl text-gray-400">👤</div>
+                  <h3 className="mb-2 text-lg font-medium text-gray-900">Chưa có học sinh nào đăng ký khuôn mặt</h3>
+                  <p className="text-gray-500">Hãy vào tab "Học sinh" để đăng ký khuôn mặt cho học sinh</p>
+                </div>
+              )}
             </div>
           ) : (
             students.map((student) => (
-              <div key={student.id} className="grid grid-cols-12 gap-4 px-4 py-4 hover:bg-gray-50 items-center">
+              <div key={student.id} className="grid grid-cols-12 gap-4 items-center px-4 py-4 hover:bg-gray-50">
                 <div className="col-span-2 text-sm font-medium text-gray-900 truncate">
                   {student.student_id}
                 </div>
@@ -207,32 +356,32 @@ const FaceManagement = () => {
                   <div className="font-medium">{student.full_name}</div>
                 </div>
                 <div className="col-span-1 text-sm text-gray-900">
-                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                  <span className="px-2 py-1 text-xs text-blue-800 bg-blue-100 rounded-full">
                     {student.class_name}
                   </span>
                 </div>
                 <div className="col-span-4 text-sm text-gray-900">
                   {(student.face_encoding || student.insightface_encoding) ? (
-                    <span className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full inline-flex items-center">
+                    <span className="inline-flex items-center px-3 py-1 text-xs text-green-800 bg-green-100 rounded-full">
                       ✅ Đã đăng ký {student.insightface_encoding ? '(InsightFace)' : '(MediaPipe)'}
                     </span>
                   ) : (
-                    <span className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded-full inline-flex items-center">
+                    <span className="inline-flex items-center px-3 py-1 text-xs text-red-800 bg-red-100 rounded-full">
                       ❌ Chưa đăng ký
                     </span>
                   )}
                 </div>
-                <div className="col-span-2 text-sm font-medium flex justify-center">
+                <div className="flex col-span-2 justify-center text-sm font-medium">
                   {(student.face_encoding || student.insightface_encoding) ? (
                     <button 
                       onClick={() => deleteFaceEncoding(student.id, student.full_name)}
-                      className="px-3 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded transition-colors inline-flex items-center gap-1"
+                      className="inline-flex gap-1 items-center px-3 py-1 text-xs text-red-700 bg-red-100 rounded transition-colors hover:bg-red-200"
                       title="Xóa khuôn mặt đã đăng ký"
                     >
                       🗑️ Xóa
                     </button>
                   ) : (
-                    <span className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded">
+                    <span className="px-3 py-1 text-xs text-gray-500 bg-gray-100 rounded">
                       Không có dữ liệu
                     </span>
                   )}
@@ -244,9 +393,9 @@ const FaceManagement = () => {
       </div>
 
       {/* Instructions */}
-      <div className="mt-6 bg-blue-50 rounded-lg p-6">
-        <h4 className="text-lg font-semibold text-blue-800 mb-2">Hướng dẫn sử dụng</h4>
-        <div className="text-blue-700 space-y-1">
+      <div className="p-6 mt-6 bg-blue-50 rounded-lg">
+        <h4 className="mb-2 text-lg font-semibold text-blue-800">Hướng dẫn sử dụng</h4>
+        <div className="space-y-1 text-blue-700">
           <p>• Để đăng ký khuôn mặt cho học sinh, vào tab "Học sinh" và bấm nút "Đăng ký mặt"</p>
           <p>• Hệ thống sẽ mở camera để chụp ảnh khuôn mặt và lưu vào database</p>
           <p>• Sau khi đăng ký, học sinh có thể được nhận diện tự động trong chức năng điểm danh</p>

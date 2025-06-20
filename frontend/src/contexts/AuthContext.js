@@ -81,8 +81,21 @@ export const AuthProvider = ({ children }) => {
     return user && (user.role === 'teacher' || user.role === 'admin');
   };
 
+  const isHomeroomTeacher = () => {
+    return user && user.role === 'homeroom_teacher';
+  };
+
+  const isSubjectTeacher = () => {
+    return user && user.role === 'teacher';
+  };
+
   const isAdmin = () => {
     return user && user.role === 'admin';
+  };
+
+  const hasRole = (roles) => {
+    if (!user) return false;
+    return Array.isArray(roles) ? roles.includes(user.role) : user.role === roles;
   };
 
   const value = {
@@ -93,7 +106,10 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAuthenticated,
     isTeacher,
-    isAdmin
+    isHomeroomTeacher,
+    isSubjectTeacher,
+    isAdmin,
+    hasRole
   };
 
   return (
