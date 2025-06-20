@@ -1,0 +1,51 @@
+# ===== REQUIREMENTS FOR RENDER DEPLOYMENT =====
+# Optimized for cloud deployment without heavy ML dependencies
+
+# ===== BUILD TOOLS =====
+setuptools>=68.0.0,<70.0.0
+wheel>=0.40.0,<1.0.0
+
+# ===== CORE WEB FRAMEWORK =====
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# ===== AUTHENTICATION & SECURITY =====
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# ===== DATABASE =====
+supabase==2.15.3
+
+# ===== UTILITIES =====
+python-dotenv==1.0.0
+python-multipart==0.0.6
+requests==2.31.0
+aiofiles==23.2.1
+email-validator==2.1.0
+python-dateutil==2.8.2
+typing-extensions>=4.8.0
+
+# ===== DATA PROCESSING =====
+numpy>=1.21.0,<2.0.0
+
+# ===== IMAGE PROCESSING =====
+Pillow>=9.5.0,<11.0.0
+
+# ===== COMPUTER VISION (HEADLESS FOR SERVER) =====
+opencv-python-headless==4.8.1.78
+
+# ===== FACE RECOGNITION (LIGHTWEIGHT ALTERNATIVE) =====
+face-recognition==1.3.0
+
+# ===== MACHINE LEARNING =====
+scikit-learn>=1.2.0,<2.0.0
+
+# ===== WEBSOCKETS =====
+websockets==12.0
+
+# ===== AI/ML SERVICES =====
+google-generativeai==0.8.3
+
+# ===== SCHEDULER =====
+schedule==1.2.0 
