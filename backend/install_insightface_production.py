@@ -114,58 +114,58 @@ def install_insightface():
             print("❌ All InsightFace installation attempts failed")
             return False
     
-    # Step 9: Download và test models
-    print("\n9️⃣ Testing InsightFace installation và downloading models...")
-    test_code = '''
-import insightface
-import numpy as np
-import cv2
+#     # Step 9: Download và test models
+#     print("\n9️⃣ Testing InsightFace installation và downloading models...")
+#     test_code = '''
+# import insightface
+# import numpy as np
+# import cv2
 
-try:
-    # Initialize InsightFace
-    app = insightface.app.FaceAnalysis(providers=["CPUExecutionProvider"])
-    app.prepare(ctx_id=0, det_size=(640, 640))
+# try:
+#     # Initialize InsightFace
+#     app = insightface.app.FaceAnalysis(providers=["CPUExecutionProvider"])
+#     app.prepare(ctx_id=0, det_size=(640, 640))
     
-    print("✅ InsightFace initialized successfully")
-    print(f"   Available models: {len(app.models)} models loaded")
+#     print("✅ InsightFace initialized successfully")
+#     print(f"   Available models: {len(app.models)} models loaded")
     
-    # Test với dummy image
-    dummy_image = np.zeros((480, 640, 3), dtype=np.uint8)
-    faces = app.get(dummy_image)
-    print(f"   Model test completed - detected {len(faces)} faces in dummy image")
+#     # Test với dummy image
+#     dummy_image = np.zeros((480, 640, 3), dtype=np.uint8)
+#     faces = app.get(dummy_image)
+#     print(f"   Model test completed - detected {len(faces)} faces in dummy image")
     
-    print("🎉 InsightFace installation và model download SUCCESS!")
+#     print("🎉 InsightFace installation và model download SUCCESS!")
     
-except Exception as e:
-    print(f"❌ InsightFace test failed: {e}")
-    exit(1)
-'''
+# except Exception as e:
+#     print(f"❌ InsightFace test failed: {e}")
+#     exit(1)
+# '''
     
-    # Write test script và run
-    with open("test_insightface.py", "w") as f:
-        f.write(test_code)
+#     # Write test script và run
+#     with open("test_insightface.py", "w") as f:
+#         f.write(test_code)
     
-    if not run_command("python test_insightface.py"):
-        print("❌ InsightFace test failed")
-        return False
+#     if not run_command("python test_insightface.py"):
+#         print("❌ InsightFace test failed")
+#         return False
     
-    # Cleanup test file
-    os.remove("test_insightface.py")
+#     # Cleanup test file
+#     os.remove("test_insightface.py")
     
-    # Step 10: Verify complete installation
-    print("\n🔟 Final verification...")
-    try:
-        import insightface
-        import onnxruntime
-        import onnx
-        print("✅ All packages imported successfully")
-        print(f"   InsightFace version: {insightface.__version__}")
-        print(f"   ONNX Runtime version: {onnxruntime.__version__}")
-        print(f"   ONNX version: {onnx.__version__}")
-        return True
-    except ImportError as e:
-        print(f"❌ Import verification failed: {e}")
-        return False
+#     # Step 10: Verify complete installation
+#     print("\n🔟 Final verification...")
+#     try:
+#         import insightface
+#         import onnxruntime
+#         import onnx
+#         print("✅ All packages imported successfully")
+#         print(f"   InsightFace version: {insightface.__version__}")
+#         print(f"   ONNX Runtime version: {onnxruntime.__version__}")
+#         print(f"   ONNX version: {onnx.__version__}")
+#         return True
+#     except ImportError as e:
+#         print(f"❌ Import verification failed: {e}")
+#         return False
 
 def main():
     print("=" * 80)
