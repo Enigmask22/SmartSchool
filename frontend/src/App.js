@@ -17,6 +17,7 @@ import SchoolDaysConfig from './components/SchoolDaysConfig';
 import Login from './components/Login';
 import GradeManagement from './components/GradeManagement';
 import HomeroomDashboard from './components/HomeroomDashboard';
+import AdminManagement from './components/AdminManagement';
 
 function AppContent() {
   const { user, loading, isAuthenticated, isHomeroomTeacher, isSubjectTeacher, isAdmin } = useContext(AuthContext);
@@ -127,6 +128,8 @@ function AppContent() {
           return <SchoolDaysConfig />;
         case 'grades':
           return <GradeManagement />;
+        case 'admin-management':
+          return <AdminManagement />;
         default:
           return <Dashboard setCurrentView={setCurrentView} />;
       }
