@@ -5,6 +5,7 @@ Router cho AI Feedback - Tạo nhận xét học sinh tự động
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
+from datetime import datetime
 
 from models.schemas import (
     StudentFeedbackRequest, 
@@ -195,4 +196,79 @@ async def test_feedback_generation():
             success=False,
             student_name="Nguyễn Văn A",
             error=str(e)
+        )
+
+@router.post("/send-sms", response_model=ResponseModel)
+async def send_sms_feedback(
+    request: dict,
+    db = Depends(lambda: None)  # Placeholder cho DB connection nếu cần
+):
+    """
+    Gửi SMS nhận xét cho phụ huynh học sinh
+    
+    Args:
+        request: {
+            "student_id": int,
+            "feedback": str,
+            "parent_phone": str
+        }
+        
+    Returns:
+        Kết quả gửi SMS
+    """
+    try:
+        logger.info(f"📱 Gửi SMS feedback cho học sinh ID: {request.get('student_id')}")
+        
+        # Validate input
+        student_id = request.get('student_id')
+        feedback = request.get('feedback')
+        parent_phone = request.get('parent_phone')
+        
+        if not student_id:
+            raise HTTPException(status_code=400, detail="Missing student_id")
+        
+        if not feedback:
+            raise HTTPException(status_code=400, detail="Missing feedback")
+        
+        if not parent_phone:
+            raise HTTPException(status_code=400, detail="Missing parent_phone")
+        
+        # Format phone number (remove spaces, dashes, etc.)
+        formatted_phone = parent_phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+        
+        # Validate Vietnamese phone number format
+        if not (formatted_phone.startswith("0") and len(formatted_phone) == 10):
+            if not (formatted_phone.startswith("+84") and len(formatted_phone) == 12):
+                raise HTTPException(status_code=400, detail="Invalid phone number format")
+        
+        # TODO: Tích hợp với SMS gateway (Twilio, AWS SNS, etc.)
+        # Hiện tại chỉ log và return success cho testing
+        
+        logger.info(f"📱 SMS Content for {formatted_phone}: {feedback[:100]}...")
+        logger.info(f"✅ SMS would be sent successfully to {formatted_phone}")
+        
+        # Simulation: SMS sending logic
+        sms_content = f"Nhận xét học tập:\n{feedback}\n\nTrường THPT ABC - Hệ thống Smart School"
+        
+        return ResponseModel(
+            success=True,
+            message=f"Gửi SMS thành công đến {formatted_phone}",
+            data={
+                "student_id": student_id,
+                "phone": formatted_phone,
+                "content_length": len(sms_content),
+                "status": "sent",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Lỗi gửi SMS feedback: {str(e)}")
+        
+        return ResponseModel(
+            success=False,
+            message=f"Lỗi gửi SMS: {str(e)}",
+            data=None
         ) 

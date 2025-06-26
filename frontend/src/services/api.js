@@ -578,6 +578,14 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // SMS Feedback
+  async sendSMSFeedback(feedbackData) {
+    return this.request('/feedback/send-sms', {
+      method: 'POST',
+      body: JSON.stringify(feedbackData),
+    });
+  }
 }
 
 // Create and export singleton instance

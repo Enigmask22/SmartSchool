@@ -45,6 +45,22 @@ const StudentList = () => {
   const [studentGrades, setStudentGrades] = useState([]);
   const [gradesLoading, setGradesLoading] = useState(false);
   
+  // Feedback states
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [selectedStudentForFeedback, setSelectedStudentForFeedback] = useState(null);
+  const [feedbackForm, setFeedbackForm] = useState({
+    student_name: '',
+    score: '',
+    score_trend: '',
+    attendance_rate: '',
+    notes: ''
+  });
+  const [generatedFeedback, setGeneratedFeedback] = useState('');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [smsLoading, setSmsLoading] = useState(false);
+  
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -703,6 +719,186 @@ const StudentList = () => {
     setStudentGrades([]);
   };
 
+  // Feedback functions
+  const handleFeedbackClick = async (student) => {
+    setSelectedStudentForFeedback(student);
+    setGeneratedFeedback('');
+    setFeedbackError('');
+    setFeedbackSuccess(false);
+    
+    // Initialize form with student name first
+    let initialForm = {
+      student_name: student.full_name,
+      score: '',
+      score_trend: '',
+      attendance_rate: '',
+      notes: ''
+    };
+    
+    // Fetch student's average grade (use same calculation as in grades modal)
+    try {
+      console.log('🎯 Fetching grades for feedback form for student:', student);
+      const gradesResponse = await ApiService.getStudentGrades(student.id);
+      console.log('📊 Grades response for feedback:', gradesResponse);
+      
+      if (gradesResponse.success && gradesResponse.data) {
+        const responseData = gradesResponse.data;
+        const grades = responseData.grades; // Access the grades array from the response object
+        console.log('📋 Full response data:', responseData);
+        console.log('📋 Grades array:', grades);
+        console.log('📏 Grades array length:', grades?.length);
+        console.log('🔍 First grade object:', grades?.[0]);
+        
+        if (Array.isArray(grades) && grades.length > 0) {
+          // Use final_grade (điểm trung bình môn) instead of individual scores
+          const validGrades = grades.filter(grade => grade.final_grade !== null && grade.final_grade !== undefined);
+          console.log('✅ Valid grades with final_grade:', validGrades);
+          
+          if (validGrades.length > 0) {
+            const avgScore = (validGrades.reduce((sum, grade) => sum + (grade.final_grade || 0), 0) / validGrades.length).toFixed(1);
+            console.log('📊 Calculated average score for feedback:', avgScore);
+            
+            initialForm.score = avgScore;
+          } else {
+            console.log('⚠️ No valid final_grade found in grades');
+          }
+        } else {
+          console.log('⚠️ No grades found for student - not an array or empty');
+          console.log('📋 Grades type:', typeof grades);
+          console.log('📋 Is array:', Array.isArray(grades));
+        }
+      } else {
+        console.log('❌ Failed to fetch grades:', gradesResponse);
+      }
+    } catch (error) {
+      console.error('Error fetching student grades:', error);
+    }
+    
+    // Set form with calculated score
+    console.log('📝 Setting feedback form:', initialForm);
+    setFeedbackForm(initialForm);
+    setShowFeedbackModal(true);
+  };
+
+  const closeFeedbackModal = () => {
+    setShowFeedbackModal(false);
+    setSelectedStudentForFeedback(null);
+    setFeedbackForm({
+      student_name: '',
+      score: '',
+      score_trend: '',
+      attendance_rate: '',
+      notes: ''
+    });
+    setGeneratedFeedback('');
+    setFeedbackError('');
+    setFeedbackSuccess(false);
+  };
+
+  const handleFeedbackFormChange = (field, value) => {
+    setFeedbackForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setFeedbackError('');
+    setFeedbackSuccess(false);
+  };
+
+  const validateFeedbackForm = () => {
+    const { student_name, score, score_trend, attendance_rate } = feedbackForm;
+    
+    if (!student_name.trim()) {
+      setFeedbackError('Vui lòng nhập tên học sinh');
+      return false;
+    }
+    
+    const scoreNum = parseFloat(score);
+    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
+      setFeedbackError('Điểm số phải từ 0 đến 10');
+      return false;
+    }
+    
+    if (!score_trend) {
+      setFeedbackError('Vui lòng chọn xu hướng điểm số');
+      return false;
+    }
+    
+    const attendanceNum = parseInt(attendance_rate);
+    if (isNaN(attendanceNum) || attendanceNum < 0 || attendanceNum > 100) {
+      setFeedbackError('Tỷ lệ chuyên cần phải từ 0 đến 100%');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const generateFeedback = async () => {
+    if (!validateFeedbackForm()) return;
+
+    setFeedbackLoading(true);
+    setFeedbackError('');
+    setGeneratedFeedback('');
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/feedback/generate-feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          student_name: feedbackForm.student_name,
+          score: parseFloat(feedbackForm.score),
+          score_trend: feedbackForm.score_trend,
+          attendance_rate: parseInt(feedbackForm.attendance_rate),
+          notes: feedbackForm.notes
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setGeneratedFeedback(result.feedback);
+        setFeedbackSuccess(true);
+      } else {
+        setFeedbackError(result.error || 'Không thể tạo nhận xét');
+      }
+    } catch (err) {
+      console.error('Error generating feedback:', err);
+      setFeedbackError('Lỗi kết nối server. Vui lòng thử lại.');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const sendSMS = async () => {
+    if (!generatedFeedback || !selectedStudentForFeedback) {
+      setFeedbackError('Không có nhận xét để gửi');
+      return;
+    }
+
+    setSmsLoading(true);
+    setFeedbackError('');
+
+    try {
+      const response = await ApiService.sendSMSFeedback({
+        student_id: selectedStudentForFeedback.id,
+        feedback: generatedFeedback,
+        parent_phone: selectedStudentForFeedback.parent_phone || selectedStudentForFeedback.phone
+      });
+
+      if (response.success) {
+        alert('Gửi SMS thành công!');
+      } else {
+        setFeedbackError(response.error || 'Không thể gửi SMS');
+      }
+    } catch (error) {
+      console.error('Error sending SMS:', error);
+      setFeedbackError('Lỗi kết nối server khi gửi SMS');
+    } finally {
+      setSmsLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -837,12 +1033,12 @@ const StudentList = () => {
                 <div className="pt-4 border-t border-gray-100">
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     <button
-                      onClick={() => startFaceRegistration(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg transition-colors hover:bg-blue-100"
-                      title="Đăng ký khuôn mặt"
+                      onClick={() => handleFeedbackClick(student)}
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-lg transition-colors hover:bg-indigo-100"
+                      title="Tạo nhận xét"
                     >
-                      <span className="text-base">📷</span>
-                      <span>Đăng ký</span>
+                      <span className="text-base">💬</span>
+                      <span>Nhận xét</span>
                     </button>
                     
                     <button
@@ -1599,6 +1795,240 @@ const StudentList = () => {
               <div className="flex justify-end">
                 <button
                   onClick={closeGradesModal}
+                  className="px-6 py-2 font-medium text-white bg-gray-600 rounded-lg transition-colors hover:bg-gray-700"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && selectedStudentForFeedback && (
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
+            {/* Modal Header */}
+            <div className="p-6 text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-2xl font-bold">💬 Tạo nhận xét học sinh</h3>
+                  <p className="mt-1 text-indigo-100">
+                    {selectedStudentForFeedback.full_name} - {selectedStudentForFeedback.student_id}
+                  </p>
+                  <p className="text-sm text-indigo-100">
+                    Lớp {selectedStudentForFeedback.class_name} - Khối {selectedStudentForFeedback.grade}
+                  </p>
+                </div>
+                <button
+                  onClick={closeFeedbackModal}
+                  className="text-3xl font-bold text-white hover:text-indigo-200"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Error Alert */}
+              {feedbackError && (
+                <div className="p-4 mb-4 bg-red-50 rounded-md border border-red-200">
+                  <div className="flex">
+                    <div className="w-5 h-5 text-red-400">⚠️</div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-800">{feedbackError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Success Alert */}
+              {feedbackSuccess && (
+                <div className="p-4 mb-4 bg-green-50 rounded-md border border-green-200">
+                  <div className="flex">
+                    <div className="w-5 h-5 text-green-400">✅</div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-800">Tạo nhận xét thành công!</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Input Form */}
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900">Thông Tin Học Sinh</h3>
+                  </div>
+                  <div className="px-6 py-4 space-y-4">
+                    {/* Student Name */}
+                    <div>
+                      <label htmlFor="student_name" className="block mb-1 text-sm font-medium text-gray-700">
+                        Tên Học Sinh
+                      </label>
+                      <input
+                        id="student_name"
+                        type="text"
+                        value={feedbackForm.student_name}
+                        onChange={(e) => handleFeedbackFormChange('student_name', e.target.value)}
+                        placeholder="Nhập tên học sinh"
+                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        readOnly
+                      />
+                    </div>
+
+                    {/* Score */}
+                    <div>
+                      <label htmlFor="score" className="block mb-1 text-sm font-medium text-gray-700">
+                        Điểm Số (0-10)
+                      </label>
+                      <input
+                        id="score"
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.1"
+                        value={feedbackForm.score}
+                        onChange={(e) => handleFeedbackFormChange('score', e.target.value)}
+                        placeholder="8.5"
+                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Score Trend */}
+                    <div>
+                      <label htmlFor="score_trend" className="block mb-1 text-sm font-medium text-gray-700">
+                        Xu Hướng Điểm Số
+                      </label>
+                      <select
+                        id="score_trend"
+                        value={feedbackForm.score_trend}
+                        onChange={(e) => handleFeedbackFormChange('score_trend', e.target.value)}
+                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">Chọn xu hướng</option>
+                        <option value="tăng">Tăng</option>
+                        <option value="giảm">Giảm</option>
+                        <option value="ổn định">Ổn định</option>
+                      </select>
+                    </div>
+
+                    {/* Attendance Rate */}
+                    <div>
+                      <label htmlFor="attendance_rate" className="block mb-1 text-sm font-medium text-gray-700">
+                        Tỷ Lệ Chuyên Cần (%)
+                      </label>
+                      <input
+                        id="attendance_rate"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={feedbackForm.attendance_rate}
+                        onChange={(e) => handleFeedbackFormChange('attendance_rate', e.target.value)}
+                        placeholder="95"
+                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label htmlFor="notes" className="block mb-1 text-sm font-medium text-gray-700">
+                        Ghi Chú Thêm (Tùy chọn)
+                      </label>
+                      <textarea
+                        id="notes"
+                        value={feedbackForm.notes}
+                        onChange={(e) => handleFeedbackFormChange('notes', e.target.value)}
+                        placeholder="Ví dụ: Học sinh rất tích cực tham gia hoạt động lớp..."
+                        rows={3}
+                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Generate Button */}
+                    <button 
+                      onClick={generateFeedback} 
+                      disabled={feedbackLoading}
+                      className="flex justify-center items-center px-4 py-2 w-full font-medium text-white bg-indigo-600 rounded-md transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+                    >
+                      {feedbackLoading ? (
+                        <>
+                          <svg className="mr-2 -ml-1 w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Đang tạo...
+                        </>
+                      ) : (
+                        <>
+                          💬 Tạo Nhận Xét
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Result Display */}
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900">Nhận Xét Được Tạo</h3>
+                  </div>
+                  <div className="px-6 py-4">
+                    {generatedFeedback ? (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                          <div className="flex gap-3 items-start">
+                            <div className="flex-shrink-0 mt-1 w-5 h-5 text-indigo-600">💬</div>
+                            <div>
+                              <h4 className="mb-2 font-medium text-indigo-900">
+                                Nhận xét cho {feedbackForm.student_name}:
+                              </h4>
+                              <div className="text-sm text-indigo-800 whitespace-pre-wrap">
+                                {generatedFeedback}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* SMS Button */}
+                        <button 
+                          onClick={sendSMS}
+                          disabled={smsLoading}
+                          className="flex justify-center items-center px-4 py-2 w-full font-medium text-white bg-green-600 rounded-md transition-colors hover:bg-green-700 disabled:bg-gray-400"
+                        >
+                          {smsLoading ? (
+                            <>
+                              <svg className="mr-2 -ml-1 w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Đang gửi...
+                            </>
+                          ) : (
+                            <>
+                              📱 Gửi SMS cho phụ huynh
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center text-gray-500">
+                        <div className="mb-4 text-6xl">💬</div>
+                        <p>Nhấn "Tạo nhận xét" để AI tự động tạo nhận xét cho học sinh</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
+              <div className="flex justify-end">
+                <button
+                  onClick={closeFeedbackModal}
                   className="px-6 py-2 font-medium text-white bg-gray-600 rounded-lg transition-colors hover:bg-gray-700"
                 >
                   Đóng
