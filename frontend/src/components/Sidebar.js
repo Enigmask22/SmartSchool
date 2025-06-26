@@ -22,6 +22,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
         { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
         { id: 'grades', label: 'Quản lý điểm', icon: '📝' },
         { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
+        { id: 'admin-management', label: 'Quản trị hệ thống', icon: '🛠️' },
       ];
     } else if (isHomeroomTeacher()) {
       // Giáo viên chủ nhiệm - không có cấu hình học tập

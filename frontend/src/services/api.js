@@ -424,6 +424,160 @@ class ApiService {
       body: JSON.stringify(config),
     });
   }
+
+  // ===============================================
+  // ADMIN MANAGEMENT METHODS
+  // ===============================================
+
+  // Users Management
+  async getUsers() {
+    return this.request('/admin/users');
+  }
+
+  async createUser(userData) {
+    return this.request('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async updateUser(userId, userData) {
+    return this.request(`/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async deleteUser(userId) {
+    return this.request(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Teachers Management
+  async getTeachers() {
+    return this.request('/admin/teachers');
+  }
+
+  async createTeacher(teacherData) {
+    return this.request('/admin/teachers', {
+      method: 'POST',
+      body: JSON.stringify(teacherData),
+    });
+  }
+
+  async updateTeacher(teacherId, teacherData) {
+    return this.request(`/admin/teachers/${teacherId}`, {
+      method: 'PUT',
+      body: JSON.stringify(teacherData),
+    });
+  }
+
+  async deleteTeacher(teacherId) {
+    return this.request(`/admin/teachers/${teacherId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Subjects Management
+  async getSubjectsAdmin() {
+    return this.request('/admin/subjects');
+  }
+
+  async createSubject(subjectData) {
+    return this.request('/admin/subjects', {
+      method: 'POST',
+      body: JSON.stringify(subjectData),
+    });
+  }
+
+  async updateSubject(subjectId, subjectData) {
+    return this.request(`/admin/subjects/${subjectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(subjectData),
+    });
+  }
+
+  async deleteSubject(subjectId) {
+    return this.request(`/admin/subjects/${subjectId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Classes Management
+  async getClassesAdmin() {
+    return this.request('/admin/classes');
+  }
+
+  async createClass(classData) {
+    return this.request('/admin/classes', {
+      method: 'POST',
+      body: JSON.stringify(classData),
+    });
+  }
+
+  async updateClass(classId, classData) {
+    return this.request(`/admin/classes/${classId}`, {
+      method: 'PUT',
+      body: JSON.stringify(classData),
+    });
+  }
+
+  async deleteClass(classId) {
+    return this.request(`/admin/classes/${classId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Subject Teachers Management
+  async getSubjectTeachers() {
+    return this.request('/admin/subject-teachers');
+  }
+
+  async createSubjectTeacher(subjectTeacherData) {
+    return this.request('/admin/subject-teachers', {
+      method: 'POST',
+      body: JSON.stringify(subjectTeacherData),
+    });
+  }
+
+  async updateSubjectTeacher(subjectTeacherId, subjectTeacherData) {
+    return this.request(`/admin/subject-teachers/${subjectTeacherId}`, {
+      method: 'PUT',
+      body: JSON.stringify(subjectTeacherData),
+    });
+  }
+
+  async deleteSubjectTeacher(subjectTeacherId) {
+    return this.request(`/admin/subject-teachers/${subjectTeacherId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Class Subjects Management
+  async getClassSubjectsAdmin() {
+    return this.request('/admin/class-subjects');
+  }
+
+  async createClassSubject(classSubjectData) {
+    return this.request('/admin/class-subjects', {
+      method: 'POST',
+      body: JSON.stringify(classSubjectData),
+    });
+  }
+
+  async updateClassSubject(classSubjectId, classSubjectData) {
+    return this.request(`/admin/class-subjects/${classSubjectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(classSubjectData),
+    });
+  }
+
+  async deleteClassSubject(classSubjectId) {
+    return this.request(`/admin/class-subjects/${classSubjectId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // Create and export singleton instance

@@ -539,7 +539,7 @@ const AttendanceView = () => {
           <div className="col-span-1">Trạng thái</div>
           <div className="col-span-1">Độ chính xác</div>
           <div className="col-span-2">Ghi chú</div>
-          <div className="col-span-2">Thao tác</div>
+          <div className="col-span-2 text-center">Thao tác</div>
         </div>
 
         {/* Table Body */}
