@@ -4,11 +4,113 @@ const API_BASE_URL = 'http://localhost:8000/api';
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
+    this.isRefreshing = false;
+    this.failedQueue = [];
   }
 
-  // Helper method để thực hiện HTTP requests
+  // Helper method để xử lý hàng đợi các request bị failed
+  processQueue(error, token = null) {
+    this.failedQueue.forEach(({ resolve, reject }) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(token);
+      }
+    });
+    
+    this.failedQueue = [];
+  }
+
+  // Kiểm tra xem token có hết hạn không
+  isTokenExpired(token) {
+    if (!token) return true;
+    
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentTime = Date.now() / 1000;
+      // Kiểm tra hết hạn với buffer 60 giây (1 phút)
+      return payload.exp < (currentTime + 60);
+    } catch (error) {
+      return true;
+    }
+  }
+
+  // Refresh access token
+  async refreshAccessToken() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    
+    if (!refreshToken) {
+      throw new Error('Không có refresh token');
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Refresh token failed');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data.access_token) {
+        // Lưu access token mới
+        localStorage.setItem('access_token', result.data.access_token);
+        return result.data.access_token;
+      } else {
+        throw new Error('Invalid refresh response');
+      }
+    } catch (error) {
+      // Nếu refresh thất bại, xóa tất cả tokens và redirect đến login
+      this.clearTokens();
+      window.location.href = '/login';
+      throw error;
+    }
+  }
+
+  // Xóa tất cả tokens
+  clearTokens() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+  }
+
+  // Helper method để thực hiện HTTP requests với auto-refresh
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    
+    // Lấy access token
+    let accessToken = localStorage.getItem('access_token');
+    
+    // Kiểm tra và refresh token nếu cần
+    if (accessToken && this.isTokenExpired(accessToken)) {
+      if (this.isRefreshing) {
+        // Nếu đang refresh, đợi trong hàng đợi
+        return new Promise((resolve, reject) => {
+          this.failedQueue.push({ resolve, reject });
+        }).then(token => {
+          return this.request(endpoint, options);
+        });
+      }
+
+      this.isRefreshing = true;
+      
+      try {
+        accessToken = await this.refreshAccessToken();
+        this.processQueue(null, accessToken);
+      } catch (error) {
+        this.processQueue(error, null);
+        throw error;
+      } finally {
+        this.isRefreshing = false;
+      }
+    }
+
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -18,13 +120,46 @@ class ApiService {
     };
 
     // Thêm JWT token nếu có
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
     try {
       const response = await fetch(url, config);
+      
+      // Nếu gặp lỗi 401 và chưa thử refresh
+      if (response.status === 401 && accessToken && !this.isRefreshing) {
+        if (this.isRefreshing) {
+          // Nếu đang refresh, đợi trong hàng đợi
+          return new Promise((resolve, reject) => {
+            this.failedQueue.push({ resolve, reject });
+          }).then(token => {
+            return this.request(endpoint, options);
+          });
+        }
+
+        this.isRefreshing = true;
+        
+        try {
+          const newToken = await this.refreshAccessToken();
+          this.processQueue(null, newToken);
+          
+          // Thử lại request với token mới
+          config.headers.Authorization = `Bearer ${newToken}`;
+          const retryResponse = await fetch(url, config);
+          
+          if (!retryResponse.ok) {
+            throw new Error(`HTTP error! status: ${retryResponse.status}`);
+          }
+          
+          return await retryResponse.json();
+        } catch (error) {
+          this.processQueue(error, null);
+          throw error;
+        } finally {
+          this.isRefreshing = false;
+        }
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -54,6 +189,21 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(userData),
     });
+  }
+
+  // Logout - xóa tokens và gọi backend logout
+  async logout() {
+    try {
+      // Gọi backend logout endpoint
+      await this.request('/auth/logout', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('Backend logout failed:', error);
+    } finally {
+      // Luôn xóa tokens local dù backend logout có thành công hay không
+      this.clearTokens();
+    }
   }
 
   // Students
@@ -579,12 +729,99 @@ class ApiService {
     });
   }
 
-  // SMS Feedback
+  // SMS Feedback - Using eSMS.vn API directly
   async sendSMSFeedback(feedbackData) {
-    return this.request('/feedback/send-sms', {
-      method: 'POST',
-      body: JSON.stringify(feedbackData),
-    });
+    // eSMS.vn API configuration
+    const ESMS_API_KEY = '12C55681BDAB5AD58F921858700530';
+    const ESMS_SECRET_KEY = '0F749EB8CFC6279C0259F019C797B5';
+    const ESMS_API_URL = 'https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/';
+    
+    try {
+      // Chuẩn bị dữ liệu cho eSMS API
+      const { student_id, feedback, parent_phone } = feedbackData;
+      
+      // Kiểm tra số điện thoại phụ huynh
+      if (!parent_phone) {
+        throw new Error('Không có số điện thoại phụ huynh để gửi SMS');
+      }
+      
+      // Định dạng nội dung SMS
+      const smsContent = `Thong bao hoc tap: ${feedback}`;
+      
+      // Dữ liệu gửi đến eSMS API
+      const esmsData = {
+        ApiKey: ESMS_API_KEY,
+        Content: smsContent,
+        Phone: parent_phone,
+        SecretKey: ESMS_SECRET_KEY,
+        Brandname: "Baotrixemay",
+        SmsType: "2", // Đầu số cố định (như trong docs)
+        IsUnicode: "1", // Hỗ trợ tiếng Việt
+        Sandbox: "1", // Gửi thật (1 = test mode)
+        RequestId: `FEEDBACK_${student_id}_${Date.now()}`, // ID duy nhất
+        campaignid: "school_feedback" // Tên chiến dịch
+      };
+
+      console.log('🚀 Gửi SMS qua eSMS.vn với dữ liệu:', {
+        phone: parent_phone,
+        content: smsContent.substring(0, 50) + '...',
+        requestId: esmsData.RequestId
+      });
+
+      // Gọi API eSMS.vn
+      const response = await fetch(ESMS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(esmsData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('📱 Kết quả từ eSMS.vn:', result);
+
+      // Xử lý kết quả từ eSMS
+      if (result.CodeResult === "100") {
+        return {
+          success: true,
+          message: 'Gửi SMS thành công!',
+          data: {
+            smsId: result.SMSID,
+            phone: parent_phone,
+            content: smsContent
+          }
+        };
+      } else {
+        // Xử lý các mã lỗi từ eSMS.vn
+        const errorMessages = {
+          "101": "Đăng nhập thất bại (API key hoặc Secret key không đúng)",
+          "102": "Tài khoản đã bị khóa",
+          "103": "Số dư tài khoản không đủ để gửi tin",
+          "104": "Mã Brandname không đúng",
+          "118": "Loại tin nhắn không hợp lệ",
+          "99": "Lỗi không xác định, thử lại sau"
+        };
+        
+        const errorMessage = errorMessages[result.CodeResult] || `Lỗi không xác định: ${result.CodeResult}`;
+        
+        return {
+          success: false,
+          error: errorMessage,
+          data: result
+        };
+      }
+    } catch (error) {
+      console.error('❌ Lỗi khi gửi SMS qua eSMS.vn:', error);
+      return {
+        success: false,
+        error: `Lỗi kết nối eSMS.vn: ${error.message}`,
+        data: null
+      };
+    }
   }
 }
 
