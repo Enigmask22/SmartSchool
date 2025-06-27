@@ -20,7 +20,8 @@ router = APIRouter()
 # Security configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))  # Mặc định 15 phút
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))      # Mặc định 30 ngày
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -44,7 +45,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "access"})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Tạo JWT refresh token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    
+    to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -62,8 +75,49 @@ async def get_current_user(
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        
         if email is None:
             raise credentials_exception
+            
+        # Chỉ chấp nhận access token cho authentication
+        if token_type != "access":
+            raise credentials_exception
+            
+    except JWTError:
+        raise credentials_exception
+    
+    # Get user from database
+    user_response = db.table("users").select("*").eq("email", email).execute()
+    
+    if not user_response.data:
+        raise credentials_exception
+    
+    return user_response.data[0]
+
+async def get_current_user_from_refresh_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db=Depends(get_db)
+):
+    """Lấy user hiện tại từ refresh token"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        
+        if email is None:
+            raise credentials_exception
+            
+        # Chỉ chấp nhận refresh token
+        if token_type != "refresh":
+            raise credentials_exception
+            
     except JWTError:
         raise credentials_exception
     
@@ -174,11 +228,18 @@ async def login(
                 detail="Tài khoản đã bị vô hiệu hóa"
             )
         
-        # Tạo access token
+        # Tạo access token và refresh token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        
         access_token = create_access_token(
             data={"sub": user["email"]},
             expires_delta=access_token_expires
+        )
+        
+        refresh_token = create_refresh_token(
+            data={"sub": user["email"]},
+            expires_delta=refresh_token_expires
         )
         
         # Remove password hash from user data
@@ -188,7 +249,9 @@ async def login(
             "success": True,
             "data": {
                 "access_token": access_token,
+                "refresh_token": refresh_token,
                 "token_type": "bearer",
+                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
                 "user": user
             }
         }
@@ -213,24 +276,32 @@ async def get_current_user_info(
         data=current_user
     )
 
-@router.post("/refresh", response_model=Token)
+@router.post("/refresh")
 async def refresh_token(
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user_from_refresh_token)
 ):
-    """Refresh access token"""
+    """Refresh access token sử dụng refresh token"""
     try:
-        # Tạo token mới
+        # Tạo access token mới
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": current_user["email"]},
             expires_delta=access_token_expires
         )
         
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=current_user
-        )
+        # Remove password hash from user data
+        user_data = current_user.copy()
+        user_data.pop("password_hash", None)
+        
+        return {
+            "success": True,
+            "data": {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
+                "user": user_data
+            }
+        }
         
     except Exception as e:
         logger.error(f"❌ Error refreshing token: {str(e)}")
