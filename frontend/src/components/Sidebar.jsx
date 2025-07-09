@@ -19,7 +19,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
         { id: 'attendance', label: 'Điểm danh', icon: '📋' },
         { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
         { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
-        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+        // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
         { id: 'grades', label: 'Quản lý điểm', icon: '📝' },
         { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
         { id: 'admin-management', label: 'Quản trị hệ thống', icon: '🛠️' },
@@ -32,7 +32,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
         { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
         { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
         { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
-        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+        // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
       ];
       
       // Thêm quản lý điểm nếu họ cũng là subject teacher

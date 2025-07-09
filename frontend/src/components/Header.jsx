@@ -18,7 +18,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
         { id: 'attendance', label: 'Điểm danh', icon: '📋' },
         { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
         { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
-        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+        // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
         { id: 'grades', label: 'Quản lý điểm', icon: '📝' },
         { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
       ];
@@ -30,7 +30,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
         { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
         { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
         { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
-        { id: 'feedback', label: 'AI Nhận xét', icon: '💬' },
+        // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
       ];
       
       // TODO: Check if homeroom teacher is also subject teacher via API

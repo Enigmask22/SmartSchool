@@ -96,6 +96,11 @@ const AttendanceView = () => {
 
   const loadAttendanceData = async () => {
     setLoading(true);
+    // Clear previous data và error state để tránh duplicate
+    setAttendanceRecords([]);
+    setError(null);
+    setSuccessMessage(null);
+    
     console.log('🔍 Loading attendance data...', { selectedDate, selectedClass, selectedStatus, page, showFullList });
     try {
       // If homeroom teacher but no class selected, don't fetch
@@ -250,10 +255,22 @@ const AttendanceView = () => {
   };
 
   const resetFilters = () => {
+    // Clear tất cả filters và data để tránh duplicate
     setSelectedDate(new Date().toISOString().split('T')[0]);
     setSelectedClass('');
     setSelectedStatus('');
     setPage(1);
+    
+    // Clear data states
+    setAttendanceRecords([]);
+    setStats(null);
+    setError(null);
+    setSuccessMessage(null);
+    
+    // Clear editing states
+    setEditingRecord(null);
+    setEditStatus('');
+    setEditNotes('');
   };
 
   const calculateStatsFromData = (data) => {
@@ -269,6 +286,77 @@ const AttendanceView = () => {
       absent_count: absentCount,
       attendance_rate: totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100 * 10) / 10 : 0
     };
+  };
+
+  // Handler cho việc thay đổi ngày để tránh duplicate data
+  const handleDateChange = (newDate) => {
+    // Clear data ngay lập tức để tránh hiển thị data cũ
+    setAttendanceRecords([]);
+    setStats(null);
+    setError(null);
+    setSuccessMessage(null);
+    
+    // Reset về trang đầu tiên
+    setPage(1);
+    
+    // Clear editing states
+    setEditingRecord(null);
+    setEditStatus('');
+    setEditNotes('');
+    
+    // Set ngày mới
+    setSelectedDate(newDate);
+  };
+
+  // Handler cho việc thay đổi lớp
+  const handleClassChange = (newClass) => {
+    // Clear data và reset page
+    setAttendanceRecords([]);
+    setStats(null);
+    setError(null);
+    setSuccessMessage(null);
+    setPage(1);
+    
+    // Clear editing states
+    setEditingRecord(null);
+    setEditStatus('');
+    setEditNotes('');
+    
+    // Set lớp mới
+    setSelectedClass(newClass);
+  };
+
+  // Handler cho việc thay đổi trạng thái
+  const handleStatusChange = (newStatus) => {
+    // Clear data và reset page
+    setAttendanceRecords([]);
+    setPage(1);
+    
+    // Clear editing states
+    setEditingRecord(null);
+    setEditStatus('');
+    setEditNotes('');
+    
+    // Set trạng thái mới
+    setSelectedStatus(newStatus);
+  };
+
+  // Handler cho việc thay đổi chế độ xem
+  const handleViewModeChange = (showFullListMode) => {
+    // Clear data khi thay đổi chế độ xem
+    setAttendanceRecords([]);
+    setStats(null);
+    setError(null);
+    setSuccessMessage(null);
+    setPage(1);
+    
+    // Clear editing states
+    setEditingRecord(null);
+    setEditStatus('');
+    setEditNotes('');
+    
+    // Set chế độ xem mới
+    setShowFullList(showFullListMode);
   };
 
   const handleEditRecord = (record) => {
@@ -436,7 +524,7 @@ const AttendanceView = () => {
               <input
                 type="checkbox"
                 checked={showFullList}
-                onChange={(e) => setShowFullList(e.target.checked)}
+                onChange={(e) => handleViewModeChange(e.target.checked)}
                 className="w-4 h-4 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500"
               />
               <span className="text-sm font-medium text-gray-700">
@@ -453,7 +541,7 @@ const AttendanceView = () => {
             <input
               type="date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
               className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -464,7 +552,7 @@ const AttendanceView = () => {
             </label>
             <select
               value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
+              onChange={(e) => handleClassChange(e.target.value)}
               className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
@@ -487,7 +575,7 @@ const AttendanceView = () => {
             </label>
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => handleStatusChange(e.target.value)}
               className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Tất cả trạng thái</option>

@@ -91,7 +91,7 @@ async def get_homeroom_teacher_id(user_id: int, db) -> Optional[int]:
                 return teacher_data["id"]
         return None
     except Exception as e:
-        logger.error(f"❌ Error getting teacher_id for user_id {user_id}: {str(e)}")
+        logger.error(f"ERROR: Error getting teacher_id for user_id {user_id}: {str(e)}")
         return None
 
 # ===============================================
@@ -124,12 +124,12 @@ async def get_homeroom_classes(
             "classes(id, class_name, grade)"
         ).eq("teacher_id", teacher_id).execute()
         
-        logger.info(f"📋 Homeroom classes response for teacher_id {teacher_id}: {response.data}")
+        logger.info(f"Homeroom classes response for teacher_id {teacher_id}: {response.data}")
         
         classes = []
         if response.data:
             for item in response.data:
-                logger.info(f"📋 Processing item: {item}")
+                logger.info(f"Processing item: {item}")
                 try:
                     if isinstance(item, dict) and item.get("classes"):
                         classes_data = item["classes"]
@@ -157,10 +157,10 @@ async def get_homeroom_classes(
                             "grade": item.get("grade")
                         })
                 except Exception as e:
-                    logger.error(f"❌ Error processing class item {item}: {str(e)}")
+                    logger.error(f"ERROR: Error processing class item {item}: {str(e)}")
                     continue
 
-        logger.info(f"📋 Final classes to return: {classes}")
+        logger.info(f"Final classes to return: {classes}")
         
         return {
             "success": True,
@@ -171,7 +171,7 @@ async def get_homeroom_classes(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting homeroom classes: {str(e)}")
+        logger.error(f"ERROR: Error getting homeroom classes: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -210,7 +210,7 @@ async def get_homeroom_info(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting homeroom info: {str(e)}")
+        logger.error(f"ERROR: Error getting homeroom info: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -286,7 +286,13 @@ async def get_homeroom_students(
             profile_image,
             is_active,
             class_name,
-            grade
+            grade,
+            face_encoding,
+            insightface_encoding,
+            face_samples_count,
+            encoding_version,
+            recognition_enabled,
+            last_recognized
         """).in_("class_name", managed_classes)
 
         # Nếu có filter theo lớp cụ thể
@@ -311,7 +317,13 @@ async def get_homeroom_students(
                     "profile_image": student["profile_image"],
                     "is_active": student["is_active"],
                     "class_name": student["class_name"],
-                    "grade": student["grade"]
+                    "grade": student["grade"],
+                    "face_encoding": student["face_encoding"],
+                    "insightface_encoding": student["insightface_encoding"],
+                    "face_samples_count": student["face_samples_count"],
+                    "encoding_version": student["encoding_version"],
+                    "recognition_enabled": student["recognition_enabled"],
+                    "last_recognized": student["last_recognized"]
                 })
 
         return {
@@ -323,7 +335,7 @@ async def get_homeroom_students(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting homeroom students: {str(e)}")
+        logger.error(f"ERROR: Error getting homeroom students: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -378,7 +390,7 @@ async def update_student_face_encoding(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error updating face encoding: {str(e)}")
+        logger.error(f"ERROR: Error updating face encoding: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -432,7 +444,7 @@ async def get_homeroom_attendance_stats(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting attendance stats: {str(e)}")
+        logger.error(f"ERROR: Error getting attendance stats: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -493,7 +505,7 @@ async def get_homeroom_attendance_records(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting attendance records: {str(e)}")
+        logger.error(f"ERROR: Error getting attendance records: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -571,7 +583,7 @@ async def create_manual_attendance(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating manual attendance: {str(e)}")
+        logger.error(f"ERROR: Error creating manual attendance: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -632,7 +644,7 @@ async def get_homeroom_recognition_logs(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting recognition logs: {str(e)}")
+        logger.error(f"ERROR: Error getting recognition logs: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"

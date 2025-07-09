@@ -77,24 +77,24 @@ async def startup_event():
         
         if insightface_service and insightface_service.app:
             await insightface_service.initialize()
-            logger.info("✅ InsightFace service initialized successfully!")
-            logger.info("🎯 Face recognition ready with 95-99% accuracy")
+            logger.info("InsightFace service initialized successfully!")
+            logger.info("Face recognition ready with 95-99% accuracy")
         else:
-            logger.warning("⚠️ InsightFace not available - falling back to MediaPipe")
+            logger.warning("WARNING: InsightFace not available - falling back to MediaPipe")
             # Fallback to MediaPipe if InsightFace not available
             from ai.face_recognition_insightface import insightface_service
             await insightface_service.initialize()
-            logger.info("✅ MediaPipe service initialized as fallback")
+            logger.info("MediaPipe service initialized as fallback")
         
         # Initialize scheduler service
         logger.info("Starting scheduler service...")
         start_scheduler()
-        logger.info("✅ Scheduler service started - Auto reset configured for Sundays 00:00")
+        logger.info("Scheduler service started - Auto reset configured for Sundays 00:00")
         
-        logger.info("🚀 Smart School System API (InsightFace Edition) started successfully!")
+        logger.info("Smart School System API (InsightFace Edition) started successfully!")
         
     except Exception as e:
-        logger.error(f"❌ Startup failed: {str(e)}")
+        logger.error(f"ERROR: Startup failed: {str(e)}")
         logger.info("Server started with limited functionality")
 
 @app.get("/")
@@ -139,8 +139,8 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     debug = os.getenv("DEBUG", "False").lower() == "true"
     
-    logger.info(f"🚀 InsightFace Server starting on {host}:{port}")
-    logger.info("🎯 Expected accuracy: 95-99% (vs MediaPipe 75-80%)")
+    logger.info(f"InsightFace Server starting on {host}:{port}")
+    logger.info("Expected accuracy: 95-99% (vs MediaPipe 75-80%)")
     
     uvicorn.run(
         "main:app",
