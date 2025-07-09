@@ -181,7 +181,7 @@ async def register(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error registering user: {str(e)}")
+        logger.error(f"ERROR: Error registering user: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -259,7 +259,7 @@ async def login(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error logging in: {str(e)}")
+        logger.error(f"ERROR: Error logging in: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -304,7 +304,7 @@ async def refresh_token(
         }
         
     except Exception as e:
-        logger.error(f"❌ Error refreshing token: {str(e)}")
+        logger.error(f"ERROR: Error refreshing token: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi refresh token: {str(e)}"
@@ -372,7 +372,7 @@ async def change_password(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error changing password: {str(e)}")
+        logger.error(f"ERROR: Error changing password: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"

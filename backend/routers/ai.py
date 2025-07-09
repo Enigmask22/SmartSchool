@@ -33,24 +33,24 @@ try:
     PRIMARY_SERVICE = insightface_service
     PRIMARY_SERVICE_NAME = "InsightFace (ArcFace)"
     PRIMARY_ACCURACY = "95-99%"
-    logger.info(f"✅ Primary AI Service: {PRIMARY_SERVICE_NAME}")
+    logger.info(f"Primary AI Service: {PRIMARY_SERVICE_NAME}")
 except ImportError:
     PRIMARY_SERVICE = None
     PRIMARY_SERVICE_NAME = "Not Available"
     PRIMARY_ACCURACY = "0%"
-    logger.warning("⚠️ InsightFace not available")
+    logger.warning("WARNING: InsightFace not available")
 
 try:
     from ai.face_recognition_insightface import insightface_service
     FALLBACK_SERVICE = insightface_service
     FALLBACK_SERVICE_NAME = "InsightFace (ArcFace)"
     FALLBACK_ACCURACY = "95-99%"
-    logger.info(f"✅ AI Service loaded: {FALLBACK_SERVICE_NAME}")
+    logger.info(f"AI Service loaded: {FALLBACK_SERVICE_NAME}")
 except ImportError:
     FALLBACK_SERVICE = None
     FALLBACK_SERVICE_NAME = "Not Available"
     FALLBACK_ACCURACY = "0%"
-    logger.error("❌ No AI services available")
+    logger.error("ERROR: No AI services available")
 
 # Select active service - Simplified logic
 if FALLBACK_SERVICE:
@@ -60,21 +60,21 @@ if FALLBACK_SERVICE:
     
     # Check if service is properly initialized
     if hasattr(ACTIVE_SERVICE, 'app') and ACTIVE_SERVICE.app is not None:
-        logger.info(f"🎯 Active Service: {ACTIVE_SERVICE_NAME} ({ACTIVE_ACCURACY}) - Ready")
+        logger.info(f"Active Service: {ACTIVE_SERVICE_NAME} ({ACTIVE_ACCURACY}) - Ready")
     else:
-        logger.warning(f"⚠️ Service loaded but not initialized: {ACTIVE_SERVICE_NAME}")
+        logger.warning(f"WARNING: Service loaded but not initialized: {ACTIVE_SERVICE_NAME}")
         # Try to initialize
         if hasattr(ACTIVE_SERVICE, '_initialize_sync'):
             success = ACTIVE_SERVICE._initialize_sync()
             if success:
-                logger.info(f"✅ Service initialized successfully: {ACTIVE_SERVICE_NAME}")
+                logger.info(f"Service initialized successfully: {ACTIVE_SERVICE_NAME}")
             else:
-                logger.error(f"❌ Failed to initialize service: {ACTIVE_SERVICE_NAME}")
+                logger.error(f"ERROR: Failed to initialize service: {ACTIVE_SERVICE_NAME}")
 else:
     ACTIVE_SERVICE = None
     ACTIVE_SERVICE_NAME = "No Service Available"
     ACTIVE_ACCURACY = "0%"
-    logger.error("❌ No face recognition service available")
+    logger.error("ERROR: No face recognition service available")
 
 # Global state cho continuous recognition
 continuous_recognition_state = {
@@ -160,7 +160,7 @@ async def continuous_recognition_stream(websocket: WebSocket):
     continuous_recognition_state["active_connections"].add(websocket)
     
     try:
-        logger.info(f"🔗 Client connected to {ACTIVE_SERVICE_NAME} recognition stream")
+        logger.info(f"Client connected to {ACTIVE_SERVICE_NAME} recognition stream")
         
         while True:
             try:
@@ -190,7 +190,7 @@ async def continuous_recognition_stream(websocket: WebSocket):
                         continuous_recognition_state["is_running"] = True
                         await websocket.send_text(json.dumps({
                             "type": "status",
-                            "message": f"🎥 {ACTIVE_SERVICE_NAME} recognition started",
+                            "message": f"Recognition started with {ACTIVE_SERVICE_NAME}",
                             "is_running": True,
                             "service": ACTIVE_SERVICE_NAME,
                             "accuracy": ACTIVE_ACCURACY
@@ -427,7 +427,7 @@ async def control_continuous_recognition(request: dict):
         if action == "start":
             continuous_recognition_state["is_running"] = True
             continuous_recognition_state["last_recognition"] = {}  # Reset cooldowns
-            message = "🎥 Continuous recognition started"
+            message = "Continuous recognition started"
         elif action == "stop":
             continuous_recognition_state["is_running"] = False
             message = "⏹️ Continuous recognition stopped"

@@ -53,7 +53,7 @@ def convert_utc_to_vietnam(utc_timestamp_str: str) -> str:
         return vietnam_dt.isoformat()
         
     except Exception as e:
-        print(f"❌ Error converting timestamp {utc_timestamp_str}: {e}")
+        print(f"ERROR: Error converting timestamp {utc_timestamp_str}: {e}")
         return utc_timestamp_str
 
 def fix_attendance_timestamps(attendance_record: Dict[str, Any]) -> Dict[str, Any]:

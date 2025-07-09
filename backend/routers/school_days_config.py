@@ -24,13 +24,13 @@ router = APIRouter(prefix="/school-days-config", tags=["School Days Configuratio
 async def initialize_configs(db: Client = Depends(get_db)):
     """Khởi tạo cấu hình mặc định cho 3 khối nếu chưa có"""
     try:
-        logger.info("🚀 Initializing school days configs...")
+        logger.info("Initializing school days configs...")
         
         # Kiểm tra xem đã có config chưa
         existing_response = db.table("school_days_config").select("*").execute()
         
         if existing_response.data:
-            logger.info(f"✅ Found {len(existing_response.data)} existing configs")
+            logger.info(f"Found {len(existing_response.data)} existing configs")
             return ResponseModel(
                 success=True,
                 message=f"Đã có {len(existing_response.data)} cấu hình",
@@ -54,7 +54,7 @@ async def initialize_configs(db: Client = Depends(get_db)):
             response = db.table("school_days_config").insert(config_data).execute()
             if response.data:
                 created_configs.extend(response.data)
-                logger.info(f"✅ Created config for grade {config_data['grade']}")
+                logger.info(f"Created config for grade {config_data['grade']}")
         
         return ResponseModel(
             success=True,
@@ -63,7 +63,7 @@ async def initialize_configs(db: Client = Depends(get_db)):
         )
         
     except Exception as e:
-        logger.error(f"❌ Error initializing configs: {str(e)}")
+        logger.error(f"ERROR: Error initializing configs: {str(e)}")
         # If table doesn't exist, provide helpful message
         if "relation" in str(e) and "does not exist" in str(e):
             return ResponseModel(
@@ -96,7 +96,7 @@ async def get_school_days_configs(
         )
         
     except Exception as e:
-        logger.error(f"❌ Error getting school days configs: {str(e)}")
+        logger.error(f"ERROR: Error getting school days configs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.post("/", response_model=ResponseModel)
@@ -136,7 +136,7 @@ async def create_school_days_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating school days config: {str(e)}")
+        logger.error(f"ERROR: Error creating school days config: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.put("/{config_id}", response_model=ResponseModel)
@@ -172,7 +172,7 @@ async def update_school_days_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error updating school days config: {str(e)}")
+        logger.error(f"ERROR: Error updating school days config: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.post("/batch-update", response_model=ResponseModel)
@@ -183,7 +183,7 @@ async def batch_update_configs(
 ):
     """Cập nhật cấu hình hàng loạt cho các khối"""
     try:
-        logger.info(f"📥 Batch update request: {len(configs)} configs for grades: {grades}")
+        logger.info(f"Batch update request: {len(configs)} configs for grades: {grades}")
         
         if len(configs) != len(grades):
             raise HTTPException(status_code=400, detail=f"Số lượng config ({len(configs)}) và grades ({len(grades)}) không khớp")
@@ -198,7 +198,7 @@ async def batch_update_configs(
         
         for i, grade in enumerate(grades):
             config = configs[i]
-            logger.info(f"🔄 Processing grade {grade}: {config.dict()}")
+            logger.info(f"Processing grade {grade}: {config.dict()}")
             
             # Validate config
             if config.default_days_per_week is not None and (config.default_days_per_week < 1 or config.default_days_per_week > 7):
@@ -225,9 +225,9 @@ async def batch_update_configs(
                 response = db.table("school_days_config").update(update_data).eq("id", config_id).execute()
                 if response.data:
                     results.append(response.data[0])
-                    logger.info(f"✅ Updated grade {grade}")
+                    logger.info(f"Updated grade {grade}")
                 else:
-                    logger.error(f"❌ Failed to update grade {grade}")
+                    logger.error(f"ERROR: Failed to update grade {grade}")
             else:
                 # Tạo mới
                 if config.default_days_per_week is None:
@@ -245,9 +245,9 @@ async def batch_update_configs(
                 response = db.table("school_days_config").insert(config_data).execute()
                 if response.data:
                     results.append(response.data[0])
-                    logger.info(f"✅ Created grade {grade}")
+                    logger.info(f"Created grade {grade}")
                 else:
-                    logger.error(f"❌ Failed to create grade {grade}")
+                    logger.error(f"ERROR: Failed to create grade {grade}")
         
         return ResponseModel(
             success=True,
@@ -258,7 +258,7 @@ async def batch_update_configs(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error batch updating configs: {str(e)}")
+        logger.error(f"ERROR: Error batch updating configs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.post("/apply-temporary/{grade}", response_model=ResponseModel)
@@ -306,7 +306,7 @@ async def apply_temporary_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error applying temporary config: {str(e)}")
+        logger.error(f"ERROR: Error applying temporary config: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.post("/reset-to-default", response_model=ResponseModel)
@@ -342,7 +342,7 @@ async def reset_all_to_default(db: Client = Depends(get_db)):
         )
         
     except Exception as e:
-        logger.error(f"❌ Error resetting to default: {str(e)}")
+        logger.error(f"ERROR: Error resetting to default: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/next-sunday-reset", response_model=ResponseModel)
@@ -370,5 +370,5 @@ async def get_next_sunday_reset():
         )
         
     except Exception as e:
-        logger.error(f"❌ Error getting next sunday reset: {str(e)}")
+        logger.error(f"ERROR: Error getting next sunday reset: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}") 

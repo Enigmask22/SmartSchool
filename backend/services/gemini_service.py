@@ -66,10 +66,10 @@ class GeminiFeedbackService:
                 temperature=0.7,
             )
             
-            self.logger.info(f"✅ Đã kết nối thành công với {self.model_name}")
+            self.logger.info(f"Đã kết nối thành công với {self.model_name}")
             
         except Exception as e:
-            self.logger.error(f"❌ Lỗi khi khởi tạo Gemini model: {e}")
+            self.logger.error(f"ERROR: Lỗi khi khởi tạo Gemini model: {e}")
             raise
     
     def create_feedback_prompt(self, student_name: str, score: float, score_trend: str, 
@@ -144,13 +144,13 @@ Dựa vào các dữ liệu trên, hãy viết một đoạn nhận xét.
             
             if response and response.text:
                 feedback = response.text.strip()
-                self.logger.info(f"✅ Đã tạo nhận xét thành công cho {student_name}")
+                self.logger.info(f"Đã tạo nhận xét thành công cho {student_name}")
                 return feedback
             else:
                 raise Exception("Không nhận được phản hồi từ Gemini API")
                 
         except Exception as e:
-            self.logger.error(f"❌ Lỗi khi tạo nhận xét cho {student_name}: {e}")
+            self.logger.error(f"ERROR: Lỗi khi tạo nhận xét cho {student_name}: {e}")
             raise Exception(f"Không thể tạo nhận xét: {str(e)}")
     
     async def generate_batch_feedback(self, students_data: list) -> dict:

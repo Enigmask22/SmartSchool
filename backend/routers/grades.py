@@ -117,7 +117,7 @@ async def get_teacher_info(
         )
         
     except Exception as e:
-        logger.error(f"❌ Error getting teacher info: {str(e)}")
+        logger.error(f"ERROR: Error getting teacher info: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -196,7 +196,7 @@ async def get_students_by_class_subject(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting students: {str(e)}")
+        logger.error(f"ERROR: Error getting students: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -248,7 +248,7 @@ async def upsert_grade_config(
         )
         
     except Exception as e:
-        logger.error(f"❌ Error upserting grade config: {str(e)}")
+        logger.error(f"ERROR: Error upserting grade config: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -292,7 +292,7 @@ async def create_grade_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating grade config: {str(e)}")
+        logger.error(f"ERROR: Error creating grade config: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -337,7 +337,7 @@ async def get_grade_config(
         )
         
     except Exception as e:
-        logger.error(f"❌ Error getting grade config: {str(e)}")
+        logger.error(f"ERROR: Error getting grade config: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -377,7 +377,7 @@ async def update_grade_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error updating grade config: {str(e)}")
+        logger.error(f"ERROR: Error updating grade config: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -453,7 +453,7 @@ async def create_or_update_grade(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating/updating grade: {str(e)}")
+        logger.error(f"ERROR: Error creating/updating grade: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -497,7 +497,7 @@ async def get_student_grade(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting grade: {str(e)}")
+        logger.error(f"ERROR: Error getting grade: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -531,7 +531,7 @@ async def delete_grade(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error deleting grade: {str(e)}")
+        logger.error(f"ERROR: Error deleting grade: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -554,7 +554,7 @@ async def get_all_subjects(db=Depends(get_db)):
         )
         
     except Exception as e:
-        logger.error(f"❌ Error getting subjects: {str(e)}")
+        logger.error(f"ERROR: Error getting subjects: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
@@ -625,7 +625,7 @@ async def get_student_grades(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting student grades: {str(e)}")
+        logger.error(f"ERROR: Error getting student grades: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"

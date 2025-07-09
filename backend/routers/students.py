@@ -59,7 +59,7 @@ async def create_student(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating student: {str(e)}")
+        logger.error(f"ERROR: Error creating student: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/", response_model=ListResponse)
@@ -166,7 +166,7 @@ async def get_students(
         )
         
     except Exception as e:
-        logger.error(f"❌ Error getting students: {str(e)}")
+        logger.error(f"ERROR: Error getting students: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/{student_id}", response_model=ResponseModel)
@@ -190,7 +190,7 @@ async def get_student(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting student {student_id}: {str(e)}")
+        logger.error(f"ERROR: Error getting student {student_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.put("/{student_id}", response_model=ResponseModel)
@@ -231,7 +231,7 @@ async def update_student(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error updating student {student_id}: {str(e)}")
+        logger.error(f"ERROR: Error updating student {student_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.delete("/{student_id}", response_model=ResponseModel)
@@ -264,7 +264,7 @@ async def delete_student(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error deleting student {student_id}: {str(e)}")
+        logger.error(f"ERROR: Error deleting student {student_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.post("/{student_id}/upload-image", response_model=ResponseModel)
@@ -322,7 +322,7 @@ async def upload_student_image(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error uploading image for student {student_id}: {str(e)}")
+        logger.error(f"ERROR: Error uploading image for student {student_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/classes/list")
@@ -365,7 +365,7 @@ async def get_classes(db=Depends(get_db)):
             )
             
     except Exception as e:
-        logger.error(f"❌ Error getting classes: {str(e)}")
+        logger.error(f"ERROR: Error getting classes: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/stats/summary")
@@ -402,5 +402,5 @@ async def get_student_stats(db=Depends(get_db)):
         )
         
     except Exception as e:
-        logger.error(f"❌ Error getting student stats: {str(e)}")
+        logger.error(f"ERROR: Error getting student stats: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}") 

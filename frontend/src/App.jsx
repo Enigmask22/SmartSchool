@@ -76,8 +76,8 @@ function AppContent() {
           return <ContinuousRecognition isHomeroom={true} />;
         case 'faces':
           return <FaceManagement isHomeroom={true} />;
-        case 'feedback':
-          return <AIFeedback isHomeroom={true} />;
+        // case 'feedback': // Tạm ẩn AI Nhận xét
+        //   return <AIFeedback isHomeroom={true} />;
         case 'grades':
           return <GradeManagement isHomeroom={true} />;
         default:
@@ -98,8 +98,8 @@ function AppContent() {
           return <ContinuousRecognition />;
         case 'faces':
           return <FaceManagement />;
-        case 'feedback':
-          return <AIFeedback />;
+        // case 'feedback': // Tạm ẩn AI Nhận xét
+        //   return <AIFeedback />;
         case 'school-config':
           return <SchoolDaysConfig />;
         case 'grades':
@@ -122,8 +122,8 @@ function AppContent() {
           return <ContinuousRecognition />;
         case 'faces':
           return <FaceManagement />;
-        case 'feedback':
-          return <AIFeedback />;
+        // case 'feedback': // Tạm ẩn AI Nhận xét
+        //   return <AIFeedback />;
         case 'school-config':
           return <SchoolDaysConfig />;
         case 'grades':

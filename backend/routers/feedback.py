@@ -54,7 +54,7 @@ async def generate_student_feedback(
             notes=request.notes
         )
         
-        logger.info(f"✅ Tạo nhận xét thành công cho {request.student_name}")
+        logger.info(f"Đã tạo nhận xét thành công cho {request.student_name}")
         
         return StudentFeedbackResponse(
             success=True,
@@ -63,7 +63,7 @@ async def generate_student_feedback(
         )
         
     except Exception as e:
-        logger.error(f"❌ Lỗi tạo nhận xét cho {request.student_name}: {str(e)}")
+        logger.error(f"ERROR: Lỗi tạo nhận xét cho {request.student_name}: {str(e)}")
         
         return StudentFeedbackResponse(
             success=False,
@@ -124,7 +124,7 @@ async def generate_batch_feedback(
         # Tạo nhận xét hàng loạt
         result = await gemini_service.generate_batch_feedback(students_data)
         
-        logger.info(f"✅ Tạo nhận xét hàng loạt hoàn tất: {result['success_count']}/{len(request.students)} thành công")
+        logger.info(f"Tạo nhận xét hàng loạt hoàn tất: {result['success_count']}/{len(request.students)} thành công")
         
         return BatchFeedbackResponse(
             success=True,
@@ -137,7 +137,7 @@ async def generate_batch_feedback(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Lỗi tạo nhận xét hàng loạt: {str(e)}")
+        logger.error(f"ERROR: Lỗi tạo nhận xét hàng loạt: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Lỗi server: {str(e)}"
@@ -161,7 +161,7 @@ async def feedback_health_check():
         )
         
     except Exception as e:
-        logger.error(f"❌ AI Feedback service không khả dụng: {str(e)}")
+        logger.error(f"ERROR: AI Feedback service không khả dụng: {str(e)}")
         return ResponseModel(
             success=False,
             message=f"AI Feedback service lỗi: {str(e)}"
@@ -191,7 +191,7 @@ async def test_feedback_generation():
         )
         
     except Exception as e:
-        logger.error(f"❌ Test feedback generation thất bại: {str(e)}")
+        logger.error(f"ERROR: Test feedback generation thất bại: {str(e)}")
         return StudentFeedbackResponse(
             success=False,
             student_name="Nguyễn Văn A",
@@ -217,7 +217,7 @@ async def send_sms_feedback(
         Kết quả gửi SMS
     """
     try:
-        logger.info(f"📱 Gửi SMS feedback cho học sinh ID: {request.get('student_id')}")
+        logger.info(f"Gửi SMS feedback cho học sinh ID: {request.get('student_id')}")
         
         # Validate input
         student_id = request.get('student_id')
@@ -244,8 +244,8 @@ async def send_sms_feedback(
         # TODO: Tích hợp với SMS gateway (Twilio, AWS SNS, etc.)
         # Hiện tại chỉ log và return success cho testing
         
-        logger.info(f"📱 SMS Content for {formatted_phone}: {feedback[:100]}...")
-        logger.info(f"✅ SMS would be sent successfully to {formatted_phone}")
+        logger.info(f"SMS Content for {formatted_phone}: {feedback[:100]}...")
+        logger.info(f"SMS would be sent successfully to {formatted_phone}")
         
         # Simulation: SMS sending logic
         sms_content = f"Nhận xét học tập:\n{feedback}\n\nTrường THPT ABC - Hệ thống Smart School"
@@ -265,7 +265,7 @@ async def send_sms_feedback(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Lỗi gửi SMS feedback: {str(e)}")
+        logger.error(f"ERROR: Lỗi gửi SMS feedback: {str(e)}")
         
         return ResponseModel(
             success=False,
