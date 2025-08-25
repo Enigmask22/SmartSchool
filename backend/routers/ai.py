@@ -701,17 +701,17 @@ async def reload_models(db=Depends(get_db)):
     """Reload AI models từ database và xóa cache local (admin function)"""
     try:
         # Xóa local files để force reload từ database
-        model_path = "./ai_models"
+        # model_path = "./ai_models"
         
-        if os.path.exists(model_path):
-            try:
-                shutil.rmtree(model_path)
-                logger.info("🗑️ Deleted old local model files")
-            except Exception as delete_error:
-                logger.warning(f"⚠️ Could not delete old files: {delete_error}")
+        # if os.path.exists(model_path):
+        #     try:
+        #         shutil.rmtree(model_path)
+        #         logger.info("🗑️ Deleted old local model files")
+        #     except Exception as delete_error:
+        #         logger.warning(f"⚠️ Could not delete old files: {delete_error}")
         
         # Recreate directory
-        os.makedirs(model_path, exist_ok=True)
+        # os.makedirs(model_path, exist_ok=True)
         
         # Force reload từ database (không fallback về file)
         ACTIVE_SERVICE.face_database = {}
@@ -761,7 +761,7 @@ async def get_ai_status(db=Depends(get_db)):
             "service_status": "active",
             "local_ai_encodings": local_count,
             "database_encodings": database_count,
-            "model_path": ACTIVE_SERVICE.model_path,
+            # "model_path": ACTIVE_SERVICE.model_path,
             "registered_students": list(ACTIVE_SERVICE.face_database.keys()) if local_count > 0 else []
         }
         

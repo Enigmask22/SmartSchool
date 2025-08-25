@@ -48,7 +48,7 @@ class InsightFaceRecognitionService:
     """
     
     def __init__(self):
-        self.model_path = "./ai_models"
+        # self.model_path = "./ai_models"
         self.app = None
         
         # Parameters optimized for ULTRA-HIGH ACCURACY (95%+)
@@ -80,7 +80,7 @@ class InsightFaceRecognitionService:
         }
         
         # Tạo thư mục models nếu chưa có
-        os.makedirs(self.model_path, exist_ok=True)
+        # os.makedirs(self.model_path, exist_ok=True)
         
         # Initialize
         self._initialize_sync()
@@ -97,7 +97,8 @@ class InsightFaceRecognitionService:
             
             # Initialize FaceAnalysis với optimized settings
             self.app = FaceAnalysis(
-                providers=['CPUExecutionProvider'],  # Hoặc ['CUDAExecutionProvider'] nếu có GPU
+                #providers=['CPUExecutionProvider'],  # Hoặc ['CUDAExecutionProvider'] nếu có GPU
+                providers=['CUDAExecutionProvider'],
                 allowed_modules=['detection', 'recognition']
             )
             
@@ -319,22 +320,22 @@ class InsightFaceRecognitionService:
             logger.error(f"❌ Error in angle-robust ultra-high accuracy matching: {str(e)}")
             return None, 0.0
 
-    def save_face_database(self):
-        """Save face database to file"""
-        try:
-            db_path = Path(self.model_path) / "insightface_database.pkl"
-            metadata_path = Path(self.model_path) / "insightface_metadata.json"
+    # def save_face_database(self):
+    #     """Save face database to file"""
+    #     try:
+    #         db_path = Path(self.model_path) / "insightface_database.pkl"
+    #         metadata_path = Path(self.model_path) / "insightface_metadata.json"
             
-            with open(db_path, 'wb') as f:
-                pickle.dump(self.face_database, f)
+    #         with open(db_path, 'wb') as f:
+    #             pickle.dump(self.face_database, f)
             
-            with open(metadata_path, 'w') as f:
-                json.dump(self.face_metadata, f, indent=2)
+    #         with open(metadata_path, 'w') as f:
+    #             json.dump(self.face_metadata, f, indent=2)
             
-            logger.info(f"💾 Saved InsightFace database with {len(self.face_database)} students")
+    #         logger.info(f"💾 Saved InsightFace database with {len(self.face_database)} students")
             
-        except Exception as e:
-            logger.error(f"❌ Error saving face database: {str(e)}")
+    #     except Exception as e:
+    #         logger.error(f"❌ Error saving face database: {str(e)}")
 
     async def load_known_faces(self, db=None):
         """Load face embeddings từ database"""
@@ -503,7 +504,7 @@ class InsightFaceRecognitionService:
                 logger.info(f"📊 Maintained {len(self.face_database[student_id_str])} ULTRA-HIGH QUALITY embeddings")
             
             # Save to file
-            self.save_face_database()
+            # self.save_face_database()
             
             # Update known arrays
             self.known_student_ids = list(self.face_database.keys())
@@ -631,7 +632,7 @@ class InsightFaceRecognitionService:
                 if student_id_str in self.face_metadata:
                     del self.face_metadata[student_id_str]
                 
-                self.save_face_database()
+                # self.save_face_database()
                 
                 # Update known arrays
                 self.known_student_ids = list(self.face_database.keys())
