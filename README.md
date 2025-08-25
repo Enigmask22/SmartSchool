@@ -1,451 +1,479 @@
-# 🎓 Smart School System - Hệ thống Trường học Thông minh
+# 🎓 Smart School System - AI-Powered School Management
 
-Hệ thống quản lý trường học hiện đại với tính năng điểm danh tự động bằng AI Computer Vision, tích hợp hoàn toàn với Supabase và giao diện React responsive.
+<div align="center">
 
-## 🌟 Tính năng nổi bật
+![Smart School](https://img.shields.io/badge/Smart_School-v2.0.0-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![AI Engine](https://img.shields.io/badge/AI_Engine-InsightFace_ArcFace-red?style=for-the-badge)
+![LLM](https://img.shields.io/badge/LLM-Google_Gemini_2.0-4285F4?style=for-the-badge&logo=google)
 
-### 🤖 AI Computer Vision
-- **Nhận dạng khuôn mặt** với độ chính xác cao
-- **Điểm danh tự động** thời gian thực
-- **Training model** tự động khi có học sinh mới
-- **Confidence scoring** để đảm bảo độ tin cậy
+**Hệ thống quản lý trường học thông minh với AI nhận dạng khuôn mặt tiên tiến**
 
-### 👥 Quản lý học sinh
-- **CRUD operations** đầy đủ cho học sinh
-- **Upload ảnh** và đăng ký khuôn mặt
-- **Thông tin chi tiết** học sinh và phụ huynh
-- **Phân lớp** và quản lý theo khối
+[🚀 Bắt đầu](#-bắt-đầu-nhanh) • [📖 Tài liệu](#-tài-liệu-api) • [🛠️ Công nghệ](#️-công-nghệ) • [🤝 Đóng góp](#-đóng-góp)
 
-### 📊 Báo cáo và thống kê
-- **Dashboard** hiển thị số liệu thời gian thực
-- **Biểu đồ** attendance theo ngày/tuần/tháng
-- **Export** báo cáo Excel/PDF
-- **Thống kê** theo lớp và cá nhân
+</div>
 
-### 🔐 Bảo mật và Authentication
-- **JWT Authentication** với Supabase
-- **Role-based access** (Admin, Teacher, Staff)
-- **Row Level Security** trên database
-- **API rate limiting** và validation
+## 🌟 Tính năng chính
+
+### 🤖 AI Computer Vision - InsightFace (ArcFace)
+- **Độ chính xác 95-99%** - State-of-the-art face recognition
+- **Điểm danh tự động** thời gian thực với WebSocket
+- **Multiple face registration** - Đăng ký nhiều góc khuôn mặt
+- **Continuous recognition** - Nhận dạng liên tục không gián đoạn
+- **Face quality assessment** - Đánh giá chất lượng ảnh tự động
+ 
+### 🧠 AI Feedback System - Google Gemini LLM
+- **Nhận xét tự động** cho học sinh sử dụng Gemini 2.0 Flash
+- **Phân tích thông minh** dựa trên điểm số, xu hướng, chuyên cần
+- **Văn phong chuyên nghiệp** phù hợp gửi phụ huynh
+- **Batch processing** - Tạo nhận xét hàng loạt cho cả lớp
+- **Adaptive tone** - Khích lệ hoặc phê bình khi cần thiết
+
+### 👥 Quản lý toàn diện
+- **👨‍🎓 Students**: CRUD đầy đủ, upload ảnh, đăng ký khuôn mặt
+- **📚 Grades**: Quản lý điểm số, transcript, academic performance
+- **🏠 Homeroom**: Dashboard riêng cho giáo viên chủ nhiệm
+- **👨‍💼 Admin**: Quản lý user, permissions, system configuration
+- **📅 School Days**: Cấu hình ngày học, lịch nghỉ
+
+### 📊 Analytics & Reporting
+- **Real-time Dashboard** với live updates
+- **Attendance Analytics** - Thống kê chi tiết theo ngày/tuần/tháng
+- **Performance Reports** - Báo cáo học lực tự động
+- **AI-Generated Insights** - Nhận xét thông minh từ Google Gemini
+- **Export capabilities** - Excel, PDF reports with AI feedback
+
+### 🔐 Bảo mật Enterprise
+- **JWT Authentication** với refresh token
+- **Role-based Access Control** (Admin, Teacher, Staff)
+- **API Rate Limiting** và request validation
+- **Secure file upload** với virus scanning
+- **Audit logs** cho mọi thao tác quan trọng
 
 ## 🏗️ Kiến trúc hệ thống
 
 ```
 smart_school/
-├── 🐍 backend/                 # FastAPI Backend
-│   ├── ai/                     # AI Services
-│   │   └── face_recognition_service.py
-│   ├── routers/                # API Endpoints
-│   │   ├── auth.py            # Authentication
-│   │   ├── students.py        # Student Management
-│   │   ├── attendance.py      # Attendance System
-│   │   └── ai.py              # AI API
-│   ├── models/                # Pydantic Models
-│   ├── database/              # Database Connection
-│   └── utils/                 # Utilities
-├── ⚛️ frontend/                # React Frontend
+├── 🔙 backend/                    # FastAPI Backend
+│   ├── 🤖 ai/                     # AI Services
+│   │   └── face_recognition_insightface.py  # InsightFace Engine
+│   ├── 🗄️ database/               # Database Layer
+│   │   └── connection.py
+│   ├── 📊 models/                 # Pydantic Schemas
+│   │   └── schemas.py
+│   ├── 🛣️ routers/                # API Endpoints
+│   │   ├── ai.py                  # AI Computer Vision API
+│   │   ├── students.py            # Student Management
+│   │   ├── attendance.py          # Attendance System
+│   │   ├── grades.py              # Grade Management
+│   │   ├── homeroom.py            # Homeroom Dashboard
+│   │   ├── admin.py               # Admin Operations
+│   │   ├── auth.py                # Authentication
+│   │   ├── feedback.py            # AI Feedback System
+│   │   └── school_days_config.py  # School Calendar
+│   ├── 🔧 services/               # Business Logic
+│   │   ├── gemini_service.py      # Google Gemini LLM Service
+│   │   └── scheduler_service.py   # Background Tasks
+│   ├── 🛠️ utils/                  # Utilities
+│   │   ├── logger.py              # Logging System
+│   │   └── timezone_helper.py     # Timezone Handling
+│   └── 📁 uploads/                # File Storage
+├── ⚛️ frontend/                   # React Frontend
 │   ├── src/
-│   │   ├── components/        # React Components
-│   │   ├── pages/             # Page Components
-│   │   ├── contexts/          # React Contexts
-│   │   ├── hooks/             # Custom Hooks
-│   │   └── utils/             # Utilities
-│   └── public/                # Static Assets
-├── 🗄️ database/               # Database Schema
-│   └── schema.sql             # Supabase Schema
-├── 📁 ai_models/              # AI Models Storage
-├── 📁 uploads/                # File Uploads
-└── 📋 setup.py                # Auto Setup Script
+│   │   ├── 🧩 components/         # React Components
+│   │   │   ├── Dashboard.jsx      # Main Dashboard
+│   │   │   ├── StudentList.jsx    # Student Management
+│   │   │   ├── AttendanceView.jsx # Attendance Interface
+│   │   │   ├── ContinuousRecognition.jsx # AI Camera
+│   │   │   ├── GradeManagement.jsx # Grade System
+│   │   │   ├── HomeroomDashboard.jsx # Teacher Dashboard
+│   │   │   ├── AdminManagement.jsx # Admin Panel
+│   │   │   ├── AIFeedback.jsx     # AI Analytics
+│   │   │   └── FaceManagement.jsx # Face Registration
+│   │   ├── 🎯 contexts/           # React Contexts
+│   │   │   └── AuthContext.jsx    # Authentication State
+│   │   └── 🔌 services/           # API Layer
+│   │       └── api.jsx            # API Client
+│   └── 📱 Mobile-responsive Design
+└── 🔧 setup/                      # Installation Scripts
 ```
 
-## 🛠️ Tech Stack
+## 🛠️ Công nghệ
 
-### Backend
-- **FastAPI** - Modern Python web framework
-- **OpenCV** - Computer vision library
-- **face_recognition** - Face recognition library
-- **Supabase Python Client** - Database client
-- **JWT** - Authentication
-- **Uvicorn** - ASGI server
+### 🔙 Backend Stack
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
+![InsightFace](https://img.shields.io/badge/InsightFace-FF6B6B?style=flat&logo=opencv&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat&logo=supabase&logoColor=white)
 
-### Frontend
-- **React 18** - UI framework
-- **Tailwind CSS** - Utility-first CSS
-- **React Router** - Navigation
-- **React Query** - Data fetching
-- **Chart.js** - Data visualization
+- **FastAPI** - Modern Python web framework với async support
+- **InsightFace (ArcFace)** - State-of-the-art face recognition (95-99% accuracy)
+- **Google Gemini 2.0 Flash** - Large Language Model cho AI feedback
+- **OpenCV** - Computer vision và image processing
+- **Supabase** - PostgreSQL database với real-time features
+- **JWT** - Secure authentication
+- **Uvicorn** - High-performance ASGI server
+- **APScheduler** - Background task scheduling
+
+### ⚛️ Frontend Stack
+![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black)
+![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat&logo=tailwind-css&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
+
+- **React 18** - Modern UI framework với hooks
+- **Tailwind CSS** - Utility-first CSS framework
+- **React Router** - Client-side routing
+- **WebSocket** - Real-time communication
+- **Chart.js** - Interactive data visualization
 - **React Webcam** - Camera integration
-- **React Hook Form** - Form management
+- **Responsive Design** - Mobile-friendly interface
 
-### Database & Infrastructure
-- **Supabase** - Backend as a Service
-- **PostgreSQL** - Primary database
-- **Supabase Storage** - File storage
-- **Supabase Auth** - Authentication
+### 🤖 AI & Computer Vision
+![AI](https://img.shields.io/badge/AI_Engine-InsightFace-red?style=flat&logo=ai&logoColor=white)
+![LLM](https://img.shields.io/badge/LLM-Google_Gemini-blue?style=flat&logo=google&logoColor=white)
+![Accuracy](https://img.shields.io/badge/Accuracy-95--99%25-green?style=flat&logo=target&logoColor=white)
 
-### AI & Computer Vision
-- **OpenCV** - Image processing
-- **dlib** - Face detection
-- **face_recognition** - Face encoding
-- **NumPy** - Numerical computing
+**Computer Vision:**
+- **InsightFace (ArcFace)** - Deep learning face recognition
+- **512-dimensional embeddings** - High-quality face features  
+- **Real-time processing** - < 2s recognition time
+- **Multiple face support** - Batch processing
+- **Quality assessment** - Automatic image validation
 
-## 📋 Yêu cầu hệ thống
+**AI Feedback System:**
+- **Google Gemini 2.0 Flash** - Advanced Large Language Model
+- **Intelligent analysis** - Điểm số, xu hướng, chuyên cần
+- **Professional tone** - Văn phong phù hợp giáo dục
+- **Batch generation** - Xử lý hàng loạt học sinh
 
-### Phần mềm
-- **Python 3.8+** 
-- **Node.js 16+** 
-- **npm 8+**
-- **Git** (tùy chọn)
+## 🚀 Bắt đầu nhanh
 
-### Phần cứng
-- **Webcam** hoặc camera IP
-- **RAM**: 4GB+ (khuyến nghị 8GB+)
-- **Storage**: 2GB+ free space
-- **CPU**: Dual-core+ (khuyến nghị có GPU cho AI)
+### 📋 Yêu cầu hệ thống
 
-### Dịch vụ
-- **Supabase Account** (miễn phí)
-- **Internet connection** cho API calls
+- **Python 3.8+** với pip
+- **Node.js 16+** với npm
+- **Webcam** hoặc camera device
+- **Internet connection** (cho Supabase)
+- **4GB+ RAM** (khuyến nghị 8GB+ cho AI)
 
-## 🚀 Cài đặt nhanh
+### ⚡ Cài đặt tự động
 
-### Tự động (Khuyến nghị)
 ```bash
-# Clone repository
+# 1. Clone repository
 git clone <repository-url>
 cd smart_school
 
-# Chạy script setup tự động
-python setup.py
-```
-
-### Manual Setup
-
-#### 1. Backend Setup
-```bash
+# 2. Setup backend
 cd backend
-
-# Tạo virtual environment
 python -m venv venv
 
-# Kích hoạt virtual environment
-# Windows:
+# Windows
 venv\Scripts\activate
-# macOS/Linux:
+# macOS/Linux  
 source venv/bin/activate
 
-# Cài đặt dependencies
 pip install -r requirements.txt
 
-# Tạo .env file
-cp .env.example .env
-# Chỉnh sửa .env với thông tin Supabase
-
-# Chạy server
-python main.py
-```
-
-#### 2. Frontend Setup
-```bash
-cd frontend
-
-# Cài đặt dependencies
+# 3. Setup frontend
+cd ../frontend
 npm install
 
-# Tạo .env file
-cp .env.example .env
-# Chỉnh sửa .env với API URL
-
-# Chạy development server
-npm start
+# 4. Cấu hình environment
+# Tạo .env files theo hướng dẫn bên dưới
 ```
 
-#### 3. Database Setup
+### 🔧 Cấu hình
 
-### Cách 1: Sử dụng Schema Đơn giản (Khuyến nghị)
-```sql
--- Trong Supabase SQL Editor, chạy file: database/simple_schema.sql
--- File này không sử dụng RLS policies để tránh infinite recursion
-```
-
-### Cách 2: Manual Setup
-1. Vào [Supabase Dashboard](https://supabase.com/dashboard)
-2. Tạo project mới hoặc sử dụng project có sẵn
-3. Vào **SQL Editor** và chạy script từ `database/simple_schema.sql`
-4. Lấy URL và Key từ **Settings > API**
-
-### Environment Variables
-Tạo file `.env` trong thư mục `backend/`:
+#### Backend (.env)
 ```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_anon_key
-SECRET_KEY=your_secret_key_for_jwt
-DEBUG=True
-```
-
-## 🔧 Cấu hình
-
-### Backend Environment (.env)
-```env
-# Supabase
+# Supabase Configuration
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
 SUPABASE_SERVICE_KEY=your-service-role-key
 
-# API Security
-SECRET_KEY=your-secret-key-change-this
+# JWT Security
+SECRET_KEY=your-super-secret-key-change-this
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # AI Configuration
 FACE_RECOGNITION_TOLERANCE=0.6
 MIN_FACE_SIZE=50
+DETECTION_CONFIDENCE=0.6
+
+# Google Gemini LLM
+GEMINI_API_KEY=your-gemini-api-key-from-google-ai-studio
+
+# Environment
+DEBUG=True
+HOST=0.0.0.0
+PORT=8000
 ```
 
-### Frontend Environment (.env)
+#### Frontend (.env)
 ```env
 REACT_APP_API_URL=http://localhost:8000
-REACT_APP_API_BASE_URL=http://localhost:8000/api
+REACT_APP_WS_URL=ws://localhost:8000
 ```
 
-## 📖 Hướng dẫn sử dụng
+### 🏃‍♂️ Chạy ứng dụng
 
-### 1. Khởi chạy hệ thống
 ```bash
-# Sử dụng script (Windows)
-start.bat
+# Terminal 1 - Backend
+cd backend
+python main.py
 
-# Sử dụng script (macOS/Linux)
-./start.sh
-
-# Manual
-cd backend && python main.py
-cd frontend && npm start
+# Terminal 2 - Frontend  
+cd frontend
+npm start
 ```
 
-### 2. Truy cập hệ thống
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+**Truy cập:**
+- 🌐 **Frontend**: http://localhost:3000
+- 🔗 **API**: http://localhost:8000
+- 📚 **API Docs**: http://localhost:8000/docs
 
-### 3. Đăng nhập
-- **Admin**: admin@smartschool.edu.vn / admin123
-- **Teacher**: teacher@smartschool.edu.vn / teacher123
 
-### 4. Quy trình sử dụng
+## 📖 Tài liệu API
 
-#### Quản lý học sinh
-1. Vào **Students** → **Add Student**
-2. Nhập thông tin học sinh
-3. Upload ảnh đại diện
-4. **Register Face** để đăng ký khuôn mặt
-
-#### Điểm danh
-1. Vào **Attendance** → **Camera**
-2. Cho phép quyền truy cập camera
-3. Hướng camera về phía học sinh
-4. Hệ thống tự động nhận dạng và điểm danh
-
-#### Xem báo cáo
-1. Vào **Dashboard** để xem tổng quan
-2. Vào **Reports** để xem báo cáo chi tiết
-3. Lọc theo ngày, lớp, học sinh
-4. Export báo cáo nếu cần
-
-## 🔌 API Documentation
-
-### Authentication
-```bash
-POST /api/auth/login
-POST /api/auth/register
-GET  /api/auth/me
-POST /api/auth/refresh
+### 🔐 Authentication
+```http
+POST /api/auth/login          # Đăng nhập
+POST /api/auth/register       # Đăng ký user mới
+GET  /api/auth/me            # Thông tin user hiện tại
+POST /api/auth/refresh       # Refresh token
+POST /api/auth/logout        # Đăng xuất
 ```
 
-### Students
-```bash
-GET    /api/students          # Danh sách học sinh
-POST   /api/students          # Tạo học sinh mới
-GET    /api/students/{id}     # Chi tiết học sinh
-PUT    /api/students/{id}     # Cập nhật học sinh
-DELETE /api/students/{id}     # Xóa học sinh
+### 👨‍🎓 Student Management
+```http
+GET    /api/students           # Danh sách học sinh
+POST   /api/students           # Tạo học sinh mới
+GET    /api/students/{id}      # Chi tiết học sinh
+PUT    /api/students/{id}      # Cập nhật thông tin
+DELETE /api/students/{id}      # Xóa học sinh
 ```
 
-### Attendance
-```bash
-GET  /api/attendance          # Danh sách điểm danh
-POST /api/attendance/check-in # Điểm danh vào
-POST /api/attendance/check-out/{id} # Điểm danh ra
-GET  /api/attendance/today    # Điểm danh hôm nay
-GET  /api/attendance/stats/today # Thống kê hôm nay
+### 📚 Grade Management
+```http
+GET    /api/grades/student/{id}     # Điểm của học sinh
+POST   /api/grades                  # Nhập điểm mới
+PUT    /api/grades/{id}            # Cập nhật điểm
+GET    /api/grades/transcript/{id}  # Bảng điểm tổng hợp
 ```
 
-### AI Computer Vision
-```bash
+### 📊 Attendance System
+```http
+GET    /api/attendance                    # Danh sách điểm danh
+POST   /api/attendance/check-in          # Điểm danh vào
+POST   /api/attendance/check-out/{id}    # Điểm danh ra
+GET    /api/attendance/today             # Điểm danh hôm nay
+GET    /api/attendance/stats/today       # Thống kê real-time
+WebSocket /api/attendance/stream         # Live attendance updates
+```
+
+### 🤖 AI Computer Vision
+```http
 POST /api/ai/recognize                    # Nhận dạng khuôn mặt
 POST /api/ai/register/{student_id}        # Đăng ký khuôn mặt
-POST /api/ai/count-faces                  # Đếm khuôn mặt
-GET  /api/ai/status                       # Trạng thái AI
+POST /api/ai/register-multiple/{id}       # Đăng ký nhiều ảnh
+POST /api/ai/count-faces                  # Đếm số khuôn mặt
+GET  /api/ai/status                       # Trạng thái AI engine
+DELETE /api/ai/student/{id}/encoding      # Xóa face data
+WebSocket /api/ai/recognition/stream      # Continuous recognition
 ```
 
-## 🎨 Components chính
-
-### Frontend Components
-```
-components/
-├── Layout/
-│   ├── Layout.jsx              # Main layout
-│   ├── Header.jsx              # Top navigation
-│   └── Sidebar.jsx             # Side navigation
-├── Students/
-│   ├── StudentList.jsx         # Danh sách học sinh
-│   ├── StudentForm.jsx         # Form thêm/sửa
-│   └── StudentCard.jsx         # Card học sinh
-├── Attendance/
-│   ├── AttendanceTable.jsx     # Bảng điểm danh
-│   ├── CameraCapture.jsx       # Camera component
-│   └── AttendanceStats.jsx     # Thống kê
-└── Common/
-    ├── Button.jsx              # Button component
-    ├── Modal.jsx               # Modal component
-    └── LoadingSpinner.jsx      # Loading spinner
+### 🏠 Homeroom Dashboard
+```http
+GET /api/homeroom/dashboard              # Dashboard chủ nhiệm
+GET /api/homeroom/class/{id}/attendance  # Điểm danh lớp học
+GET /api/homeroom/class/{id}/grades      # Điểm số lớp học
 ```
 
-## 🚢 Deployment
-
-### Backend (FastAPI)
-```bash
-# Sử dụng Docker
-docker build -t smart-school-backend .
-docker run -p 8000:8000 smart-school-backend
-
-# Hoặc deploy lên Heroku/Railway
+### 👨‍💼 Admin Operations
+```http
+GET    /api/admin/users                  # Quản lý users
+POST   /api/admin/users                  # Tạo user mới
+PUT    /api/admin/users/{id}/role        # Phân quyền
+GET    /api/admin/system/stats           # Thống kê hệ thống
+POST   /api/admin/backup                 # Backup database
 ```
 
-### Frontend (React)
-```bash
-# Build production
-npm run build
-
-# Deploy lên Vercel/Netlify
-npm install -g vercel
-vercel
-
-# Hoặc Netlify
-npm install -g netlify-cli
-netlify deploy
+### 🧠 AI Feedback System
+```http
+POST /api/feedback/generate-feedback        # Tạo nhận xét cho 1 học sinh
+POST /api/feedback/generate-batch-feedback  # Tạo nhận xét hàng loạt
+GET  /api/feedback/health                   # Kiểm tra Gemini service
+GET  /api/feedback/test                     # Test feedback generation
+POST /api/feedback/send-sms                 # Gửi nhận xét qua SMS
 ```
+
+## 🎯 Tính năng nổi bật
+
+### 🤖 AI Computer Vision
+- **Ultra-high accuracy**: 95-99% với InsightFace ArcFace
+- **Real-time processing**: Nhận dạng < 2 giây
+- **Multiple angle support**: Đăng ký 15 góc/học sinh
+- **Lighting adaptive**: Hoạt động tốt trong nhiều điều kiện ánh sáng
+- **Quality assessment**: Tự động đánh giá và filter ảnh chất lượng
+
+### 🧠 AI Feedback Intelligence
+- **Automated comments**: Google Gemini 2.0 Flash tạo nhận xét chuyên nghiệp
+- **Smart analysis**: Phân tích điểm số, xu hướng, tỷ lệ chuyên cần
+- **Contextual tone**: Khích lệ khi tốt, phê bình xây dựng khi cần
+- **Batch processing**: Tạo nhận xét cho cả lớp học chỉ trong vài giây
+- **Teacher integration**: Kết hợp ghi chú giáo viên để cá nhân hóa
+
+### 📊 Analytics Dashboard
+- **Live attendance tracking**: Cập nhật real-time
+- **Interactive charts**: Biểu đồ tương tác với Chart.js
+- **Performance insights**: Phân tích xu hướng học tập
+- **Exportable reports**: Xuất PDF, Excel
+- **Mobile responsive**: Hoạt động mượt trên mobile
+
+### 🔒 Security Features
+- **JWT with refresh tokens**: Bảo mật session
+- **Role-based permissions**: Phân quyền chi tiết
+- **API rate limiting**: Chống spam và abuse
+- **Input validation**: Kiểm tra dữ liệu đầu vào
+- **Secure file upload**: Kiểm tra malware
+
+## 🚀 Performance
+
+### ⚡ Benchmarks
+- **Face Recognition**: < 2s per image
+- **API Response Time**: < 100ms average
+- **Database Queries**: < 50ms average
+- **Frontend Load**: < 3s initial load
+- **WebSocket Latency**: < 50ms real-time updates
+
+### 🔧 Optimization
+- **GPU acceleration**: Hỗ trợ CUDA cho AI processing
+- **Caching strategy**: Redis cache cho frequent queries
+- **Database indexing**: Optimized PostgreSQL indexes
+- **CDN integration**: Static asset optimization
+- **Lazy loading**: Component-based code splitting
 
 ## 🐛 Troubleshooting
 
-### Lỗi thường gặp
+<details>
+<summary><strong>🎥 Camera Issues</strong></summary>
 
-#### Camera không hoạt động
 ```bash
-# Kiểm tra quyền camera trong browser
-# Chrome: Settings → Privacy and security → Site settings → Camera
-```
+# Kiểm tra camera permissions
+# Chrome: Settings → Privacy → Site settings → Camera
 
-#### Face recognition không chính xác
-```bash
-# Tăng số lượng ảnh training
-# Chỉnh sửa FACE_RECOGNITION_TOLERANCE trong .env
+# Test camera trong browser console
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => console.log('Camera OK'))
+  .catch(err => console.error('Camera Error:', err));
 ```
+</details>
 
-#### Database connection error
-```bash
-# Kiểm tra Supabase URL và keys trong .env
-# Verify network connection
-```
+<details>
+<summary><strong>🤖 AI Recognition Issues</strong></summary>
 
-#### Import error với Python packages
 ```bash
-# Reinstall requirements
-pip uninstall -r requirements.txt -y
-pip install -r requirements.txt
+# Kiểm tra InsightFace installation
+pip list | grep insightface
+
+# Reinstall AI dependencies
+pip uninstall insightface -y
+pip install insightface
+
+# Kiểm tra model files
+ls -la ai_models/
 ```
+</details>
+
+<details>
+<summary><strong>🗄️ Database Connection</strong></summary>
+
+```bash
+# Test Supabase connection
+curl -H "apikey: YOUR_ANON_KEY" https://your-project.supabase.co/rest/v1/
+
+# Verify environment variables
+echo $SUPABASE_URL
+echo $SUPABASE_KEY
+```
+</details>
 
 ## 🧪 Testing
 
-### Backend Tests
 ```bash
+# Backend tests
 cd backend
-pytest tests/
-```
+pytest tests/ -v
 
-### Frontend Tests
-```bash
+# Frontend tests  
 cd frontend
 npm test
-```
 
-### E2E Tests
-```bash
+# E2E tests
 npm run test:e2e
+
+# AI model tests
+python -m pytest tests/test_ai.py -v
 ```
 
-## 📊 Performance
+## 📦 Deployment
 
-### Benchmarks
-- **Face Recognition**: < 2s per image
-- **API Response**: < 100ms average
-- **Database Queries**: < 50ms average
-- **Frontend Load**: < 3s initial load
+### 🐳 Docker Deployment
+```dockerfile
+# Backend Dockerfile
+FROM python:3.9-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
 
-### Optimization Tips
-- Sử dụng GPU để tăng tốc AI processing
-- Enable browser camera hardware acceleration  
-- Optimize database indexes
-- Use CDN cho static assets
+### ☁️ Cloud Deployment
+- **Backend**: Heroku, Railway, DigitalOcean
+- **Frontend**: Vercel, Netlify, AWS S3
+- **Database**: Supabase (managed PostgreSQL)
+- **AI Models**: Dedicated GPU instances
 
-## 🤝 Contributing
+## 🤝 Đóng góp
 
-### Quy trình đóng góp
+Chúng tôi hoan nghênh mọi đóng góp! Xem [CONTRIBUTING.md](CONTRIBUTING.md) để biết chi tiết.
+
+### 📝 Development Workflow
 1. Fork repository
-2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
+2. Tạo feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push branch: `git push origin feature/amazing-feature`
 5. Tạo Pull Request
 
-### Code Standards
-- **Python**: Follow PEP 8
-- **JavaScript**: Use ESLint + Prettier
-- **Commits**: Conventional Commits format
-- **Documentation**: Update README cho mọi thay đổi
+### 🎨 Code Standards
+- **Python**: PEP 8 + Black formatter
+- **JavaScript**: ESLint + Prettier
+- **Commits**: Conventional Commits
+- **Documentation**: Docstrings cho mọi function
 
-## 📞 Support
+## 📄 License
 
-### Liên hệ
-- **Email**: support@smartschool.edu.vn
-- **Documentation**: [Wiki](link-to-wiki)
-- **Issues**: [GitHub Issues](link-to-issues)
-- **Discussions**: [GitHub Discussions](link-to-discussions)
-
-### FAQ
-**Q: Hệ thống có hoạt động offline không?**
-A: Hiện tại cần internet để kết nối Supabase, nhưng có thể cấu hình local database.
-
-**Q: Có thể tích hợp với hệ thống trường học hiện tại?**
-A: Có, qua API endpoints và có thể customize theo yêu cầu.
-
-**Q: Độ chính xác của face recognition?**
-A: > 95% trong điều kiện ánh sáng tốt và ảnh chất lượng cao.
-
-## 📝 License
-
-MIT License - xem [LICENSE](LICENSE) file để biết chi tiết.
+MIT License - xem [LICENSE](LICENSE) để biết chi tiết.
 
 ## 🙏 Acknowledgments
 
-- [OpenCV](https://opencv.org/) cho computer vision
-- [Supabase](https://supabase.com/) cho backend infrastructure
-- [React](https://reactjs.org/) cho frontend framework
-- [Tailwind CSS](https://tailwindcss.com/) cho styling
-- Face Recognition community cho algorithms
+- [InsightFace](https://github.com/deepinsight/insightface) - State-of-the-art face recognition
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework  
+- [React](https://reactjs.org/) - A JavaScript library for building user interfaces
+- [Supabase](https://supabase.com/) - The open source Firebase alternative
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
 
 ---
 
 <div align="center">
-  <p>Được phát triển với ❤️ bởi Smart School Team</p>
-  <p>🌟 Nếu project hữu ích, hãy star repository!</p>
+
+**Được phát triển với ❤️ bởi Smart School Team**
+
+[![GitHub Stars](https://img.shields.io/github/stars/your-repo/smart-school?style=social)](https://github.com/your-repo/smart-school)
+[![GitHub Forks](https://img.shields.io/github/forks/your-repo/smart-school?style=social)](https://github.com/your-repo/smart-school/fork)
+
+[⭐ Star repo này nếu nó hữu ích!](https://github.com/your-repo/smart-school)
+
 </div> 
