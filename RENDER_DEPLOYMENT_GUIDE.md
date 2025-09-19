@@ -53,19 +53,29 @@ if is_production or is_render:
 3. **INSIGHTFACE_CACHE_PATH** = `/opt/render/project/insightface_cache` (optional)
 4. **INSIGHTFACE_MODEL_PATH** = `/opt/render/project/ai_models` (optional)
 
-### Bước 1: Chuẩn Bị Wheels (Local)
+### Bước 1: Cross-Platform Dependencies Strategy
 
-**Vấn đề:** Một số packages như `opencv-python`, `insightface`, `scikit-learn` cần Microsoft Build Tools để compile.
+**Vấn đề:** Windows wheels không compatible với Linux (Render).
 
-**Giải pháp:** Build wheels trước trên Windows với Build Tools, sau đó deploy với wheels.
+**Current Solution:** Fallback to PyPI installation với optimized packages:
 
 ```bash
-# Trên Windows với Microsoft Build Tools
-cd backend
-python build_wheels.py
+# requirements-wheels.txt đã được optimize:
+opencv-python-headless==4.8.1.78  # Headless version cho production
+insightface==0.7.3                # Will build on Render (may take time)
+onnxruntime>=1.17.0               # Usually has pre-built Linux wheels
+# ... other packages
 ```
 
-**Output:** Tạo thư mục `wheels/` chứa pre-built wheel files.
+**Optional - Linux Wheels (Advanced):**
+```bash
+# Build trên Linux hoặc Docker với Linux base image
+docker run --rm -v $(pwd):/work python:3.12-slim bash -c "
+  cd /work/backend && 
+  pip install build wheel &&
+  python build_wheels.py
+"
+```
 
 ### Bước 2: Tạo Service Trên Render
 
@@ -73,17 +83,19 @@ python build_wheels.py
 2. Chọn **Web Service**
 3. **QUAN TRỌNG:** Cấu hình build settings với wheels:
 
-#### Option A: Sử dụng Install Script (Recommended)
+#### Option A: Cross-Platform Install Script (Recommended)
 ```
 Build Command: cd backend && bash install_with_wheels.sh
 Start Command: cd backend && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
-#### Option B: Manual Pip Command
+#### Option B: Direct PyPI Installation (Simple)
 ```
-Build Command: cd backend && pip install -r requirements-wheels.txt --find-links wheels
+Build Command: cd backend && pip install -r requirements-wheels.txt
 Start Command: cd backend && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
+
+**Note:** Script tự động detect Linux và skip incompatible Windows wheels.
 
 ### Bước 3: Set Environment Variables
 
