@@ -7,18 +7,18 @@
 # 2. Install remaining packages from PyPI
 # =============================================================================
 
-# LINUX-COMPATIBLE PACKAGES (có pre-built wheels cho Linux)
-# Các packages này sẽ hoạt động tốt trên Render Linux
-opencv-python-headless==4.8.1.78
-insightface==0.7.3
+# PACKAGES COMPATIBLE WITH PYTHON 3.13 (Render default)
+# Sử dụng pre-built wheels từ PyPI thay vì tự build
+opencv-python-headless>=4.8.1
+insightface>=0.7.3
 onnxruntime>=1.17.0
 onnx>=1.15.0
-scikit-learn==1.3.2
-numpy>=1.21.0
+scikit-learn>=1.4.0
+numpy>=1.24.0
 pandas>=2.0.0
-python-jose[cryptography]==3.3.0
-bcrypt==4.1.2
-Pillow==10.0.1
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.1.2
+Pillow>=10.0.1
 
 # PURE PYTHON PACKAGES (không cần build)
 fastapi==0.104.1
