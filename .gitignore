@@ -196,7 +196,7 @@ build/
 # AI & ML MODELS
 # ================
 
-# Large model files
+# Large model files (but allow insightface_cache)
 *.h5
 *.hdf5
 *.pkl
@@ -211,6 +211,12 @@ build/
 *.pt
 *.pth
 *.bin
+
+# Exception: Allow insightface_cache models (tracked by Git LFS)
+!backend/insightface_cache/
+!backend/insightface_cache/**
+!insightface_cache/
+!insightface_cache/**
 
 # AI training data
 */datasets/
@@ -412,12 +418,16 @@ $RECYCLE.BIN/
 *.old
 *.orig
 
-# Archive files
+# Archive files (but allow insightface model archives)
 *.zip
 *.tar
 *.tar.gz
 *.rar
 *.7z
+
+# Exception: Allow insightface model archives (tracked by Git LFS)
+!backend/insightface_cache/**/*.zip
+!insightface_cache/**/*.zip
 
 # Test files
 test_output/
