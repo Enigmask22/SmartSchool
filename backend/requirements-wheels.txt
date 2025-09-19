@@ -7,8 +7,8 @@
 # 2. Install remaining packages from PyPI
 # =============================================================================
 
-# PROBLEMATIC PACKAGES (install from PyPI - wheels not Linux compatible)
-# Fallback to PyPI installation since Windows wheels don't work on Render Linux
+# LINUX-COMPATIBLE PACKAGES (có pre-built wheels cho Linux)
+# Các packages này sẽ hoạt động tốt trên Render Linux
 opencv-python-headless==4.8.1.78
 insightface==0.7.3
 onnxruntime>=1.17.0
@@ -20,7 +20,7 @@ python-jose[cryptography]==3.3.0
 bcrypt==4.1.2
 Pillow==10.0.1
 
-# SAFE PACKAGES (install from PyPI)
+# PURE PYTHON PACKAGES (không cần build)
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 passlib[bcrypt]==1.7.4
