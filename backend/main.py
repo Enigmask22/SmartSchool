@@ -11,13 +11,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-from routers import students, attendance, auth, ai, feedback, school_days_config, grades, homeroom, admin
+# Các imports cơ bản trước
 from database.connection import init_db
 from utils.logger import setup_logger
 from services.scheduler_service import start_scheduler
 
 # Load environment variables
 load_dotenv()
+
+# CRITICAL: Apply InsightFace monkey patch TRƯỚC KHI import bất kỳ module nào có InsightFace
+from utils.insightface_monkey_patch import ensure_insightface_patch
+
+# Apply monkey patch solution (working solution)
+ensure_insightface_patch("./insightface_cache")
+
+# Import routers SAU KHI đã setup InsightFace environment
+from routers import students, attendance, auth, ai, feedback, school_days_config, grades, homeroom, admin
 
 # Initialize logger
 logger = setup_logger()

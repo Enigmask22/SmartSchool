@@ -17,15 +17,20 @@ import logging
 from pathlib import Path
 import time
 
-# InsightFace imports
+# Cache path for InsightFace (monkey patch đã được apply trong main.py)
+CACHE_PATH = os.getenv("INSIGHTFACE_CACHE_PATH", "./insightface_cache")
+
+# InsightFace imports (SAU KHI đã set environment)
 try:
     import insightface
     from insightface.app import FaceAnalysis
     INSIGHTFACE_AVAILABLE = True
+    print(f"✅ InsightFace imported with cache path: {os.environ.get('INSIGHTFACE_HOME', 'default')}")
 except ImportError:
     INSIGHTFACE_AVAILABLE = False
     insightface = None
     FaceAnalysis = None
+    print("❌ InsightFace not available")
 
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
@@ -48,7 +53,13 @@ class InsightFaceRecognitionService:
     """
     
     def __init__(self):
-        # self.model_path = "./ai_models"
+        # Sử dụng cache path đã được setup trước khi import
+        self.cache_path = CACHE_PATH
+        self.model_path = os.getenv("INSIGHTFACE_MODEL_PATH", "./ai_models")
+        
+        # Tạo thư mục model nếu chưa có (cache đã được tạo trong setup function)
+        os.makedirs(self.model_path, exist_ok=True)
+        
         self.app = None
         
         # Parameters optimized for ULTRA-HIGH ACCURACY (95%+)
@@ -86,7 +97,7 @@ class InsightFaceRecognitionService:
         self._initialize_sync()
     
     def _initialize_sync(self):
-        """Khởi tạo InsightFace model"""
+        """Khởi tạo InsightFace model với production deployment support"""
         if not INSIGHTFACE_AVAILABLE:
             logger.error("❌ InsightFace not installed. Run: pip install insightface")
             logger.error("   To install: python install_insightface_production.py")
@@ -95,18 +106,46 @@ class InsightFaceRecognitionService:
         try:
             logger.info("🚀 Initializing InsightFace (ArcFace) - State-of-the-Art Face Recognition")
             
+            # Kiểm tra environment để chọn provider phù hợp
+            is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+            is_render = os.getenv("RENDER", "false").lower() == "true"
+            
+            # Chọn execution provider
+            if is_production or is_render:
+                providers = ['CPUExecutionProvider']
+                logger.info("🖥️ Using CPU provider for production deployment")
+            else:
+                # Thử CUDA trước, fallback về CPU nếu không có
+                try:
+                    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                    logger.info("🚀 Attempting CUDA provider for development")
+                except:
+                    providers = ['CPUExecutionProvider']
+                    logger.info("🖥️ Fallback to CPU provider")
+            
+            # Cache path đã được set trước khi import InsightFace
+            logger.info(f"📁 Using InsightFace cache path: {self.cache_path}")
+            logger.info(f"🔧 INSIGHTFACE_HOME environment: {os.environ.get('INSIGHTFACE_HOME', 'not set')}")
+            
             # Initialize FaceAnalysis với optimized settings
             self.app = FaceAnalysis(
-                #providers=['CPUExecutionProvider'],  # Hoặc ['CUDAExecutionProvider'] nếu có GPU
-                providers=['CUDAExecutionProvider'],
+                providers=providers,
                 allowed_modules=['detection', 'recognition']
             )
             
             # Prepare model với detection size
+            # Giảm detection size cho production để tiết kiệm memory
+            if is_production or is_render:
+                production_det_size = (640, 640)  # Smaller size for production
+                self.det_size = production_det_size
+                logger.info(f"⚡ Using optimized detection size for production: {production_det_size}")
+            
             self.app.prepare(ctx_id=0, det_size=self.det_size)
             
             logger.info(f"✅ InsightFace initialized successfully")
             logger.info(f"   Detection size: {self.det_size}")
+            logger.info(f"   Providers: {providers}")
+            logger.info(f"   Cache path: {self.cache_path}")
             logger.info(f"   Models loaded: {len(self.app.models)} models")
             logger.info(f"   Similarity threshold: {self.similarity_threshold}")
             logger.info("🎯 Expected accuracy: 95-99% (vs MediaPipe 75-80%)")
