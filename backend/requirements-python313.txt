@@ -1,0 +1,42 @@
+# Python 3.13 Compatible Requirements for Render
+# Sử dụng pre-built wheels từ PyPI
+
+# Core ML & CV packages với Python 3.13 support
+opencv-python-headless>=4.9.0
+insightface>=0.7.3
+onnxruntime>=1.18.0
+onnx>=1.16.0
+scikit-learn>=1.4.0
+numpy>=1.26.0
+pandas>=2.1.0
+
+# Cryptography packages
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.1.2
+cryptography>=41.0.0
+PyJWT>=2.8.0
+
+# Image processing
+Pillow>=10.2.0
+
+# FastAPI ecosystem
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.7
+email-validator>=2.1.1
+
+# Database & external services
+supabase>=2.4.0
+requests>=2.31.0
+aiofiles>=23.2.1
+
+# Utilities
+python-dotenv>=1.0.1
+python-dateutil>=2.8.2
+typing-extensions>=4.9.0
+websockets>=12.0
+google-generativeai>=0.8.3
+schedule>=1.2.2
+setuptools>=69.0.0
+wheel>=0.42.0

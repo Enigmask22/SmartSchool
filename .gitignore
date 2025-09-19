@@ -16,6 +16,9 @@ venv/
 env/
 .venv/
 .env/
+myenv/
+backend/myenv/
+.myenv/
 
 # Python compiled files
 __pycache__/
