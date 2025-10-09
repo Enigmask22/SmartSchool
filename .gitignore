@@ -2,7 +2,7 @@
 # SMART SCHOOL SYSTEM
 # .gitignore for Full-Stack Application
 # =======================
-
+.cursor
 # ================
 # PYTHON BACKEND
 # ================
