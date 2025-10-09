@@ -997,15 +997,15 @@ const StudentList = () => {
           filteredStudents.map((student) => (
             <div key={student.id} className="overflow-hidden bg-white rounded-xl border border-gray-100 shadow-lg transition-all duration-300 hover:shadow-xl">
               {/* Header with avatar and basic info */}
-              <div className="p-6 text-white bg-gradient-to-r from-blue-500 to-purple-600">
-                <div className="flex items-center space-x-4">
-                  <div className="flex justify-center items-center w-16 h-16 text-2xl font-bold rounded-full bg-white/20">
+              <div className="p-5 text-white bg-blue-600">
+                <div className="flex items-center space-x-3">
+                  <div className="flex justify-center items-center w-14 h-14 text-xl font-bold rounded-lg bg-white/20">
                     {student.full_name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold truncate">{student.full_name}</h3>
+                    <h3 className="text-base font-semibold truncate">{student.full_name}</h3>
                     <p className="text-sm text-blue-100">{student.student_id}</p>
-                    <div className="inline-flex items-center px-2 py-1 mt-1 text-xs rounded-full bg-white/20">
+                    <div className="inline-flex items-center px-2 py-0.5 mt-1 text-xs rounded-md bg-white/20">
                       🎓 {student.class_name}
                     </div>
                   </div>
@@ -1030,14 +1030,14 @@ const StudentList = () => {
                 </div>
 
                 {/* Action buttons */}
-                <div className="pt-4 border-t border-gray-100">
+                <div className="pt-3 border-t border-gray-100">
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     <button
                       onClick={() => handleFeedbackClick(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-lg transition-colors hover:bg-indigo-100"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
                       title="Tạo nhận xét"
                     >
-                      <span className="text-base">💬</span>
+                      <span className="text-sm">💬</span>
                       <span>Nhận xét</span>
                     </button>
                     
@@ -1046,19 +1046,19 @@ const StudentList = () => {
                         setSelectedStudentForMultiple(student);
                         setShowMultipleModal(true);
                       }}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-green-700 bg-green-50 rounded-lg transition-colors hover:bg-green-100"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-green-700 bg-green-50 rounded-md transition-colors hover:bg-green-100"
                       title="Nhiều ảnh"
                     >
-                      <span className="text-base">📸</span>
+                      <span className="text-sm">📸</span>
                       <span>Nhiều ảnh</span>
                     </button>
                     
                     <button
                       onClick={() => handleViewGrades(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg transition-colors hover:bg-purple-100"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
                       title="Xem điểm số"
                     >
-                      <span className="text-base">📊</span>
+                      <span className="text-sm">📊</span>
                       <span>Điểm số</span>
                     </button>
                   </div>
@@ -1066,19 +1066,19 @@ const StudentList = () => {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleEdit(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-amber-700 bg-amber-50 rounded-lg transition-colors hover:bg-amber-100"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md transition-colors hover:bg-gray-200"
                       title="Sửa thông tin"
                     >
-                      <span className="text-base">✏️</span>
+                      <span className="text-sm">✏️</span>
                       <span>Sửa</span>
                     </button>
                     
                     <button
                       onClick={() => handleDelete(student.id)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-sm font-medium text-red-700 bg-red-50 rounded-lg transition-colors hover:bg-red-100"
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-red-700 bg-red-50 rounded-md transition-colors hover:bg-red-100"
                       title="Xóa học sinh"
                     >
-                      <span className="text-base">🗑️</span>
+                      <span className="text-sm">🗑️</span>
                       <span>Xóa</span>
                     </button>
                   </div>
