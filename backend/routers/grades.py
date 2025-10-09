@@ -5,7 +5,10 @@ API Router cho quản lý điểm số học sinh
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import io
+import xlsxwriter
 
 from database.connection import get_db
 from routers.auth import get_current_user
@@ -48,6 +51,12 @@ class TeacherSubjectInfo(BaseModel):
     class_name: str
     academic_year: str
     semester: str
+
+class BulkGradeImport(BaseModel):
+    class_subject_id: int
+    academic_year: str
+    semester: str
+    grades: List[dict]  # List of {student_id, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki}
 
 # ===============================================
 # HELPER FUNCTIONS
@@ -626,6 +635,222 @@ async def get_student_grades(
         raise
     except Exception as e:
         logger.error(f"ERROR: Error getting student grades: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+# ===============================================
+# BULK IMPORT & EXPORT ENDPOINTS
+# ===============================================
+
+@router.get("/template/download/{class_subject_id}")
+async def download_grade_template(
+    class_subject_id: int,
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Download template Excel để nhập điểm hàng loạt"""
+    try:
+        # Kiểm tra quyền truy cập
+        class_subject = db.table("class_subjects").select("""
+            *,
+            classes:class_id(id, class_name, grade),
+            subjects:subject_id(id, subject_code, subject_name)
+        """).eq("id", class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
+        
+        if not class_subject.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền truy cập lớp này"
+            )
+        
+        class_subject_info = class_subject.data[0]
+        class_info = class_subject_info["classes"]
+        
+        # Lấy danh sách học sinh
+        students = db.table("students").select("*").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).order("student_id").execute()
+        
+        # Tạo file Excel
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet('Bảng điểm')
+        
+        # Định dạng
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#4472C4',
+            'font_color': 'white',
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        cell_format = workbook.add_format({
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        # Header
+        headers = ['id', 'ho_va_ten', 'diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        # Dữ liệu học sinh
+        for row, student in enumerate(students.data, start=1):
+            worksheet.write(row, 0, student['student_id'], cell_format)
+            worksheet.write(row, 1, student['full_name'], cell_format)
+            worksheet.write(row, 2, '', cell_format)  # Điểm thường xuyên
+            worksheet.write(row, 3, '', cell_format)  # Điểm giữa kỳ
+            worksheet.write(row, 4, '', cell_format)  # Điểm cuối kỳ
+        
+        # Điều chỉnh độ rộng cột
+        worksheet.set_column('A:A', 12)  # id
+        worksheet.set_column('B:B', 25)  # họ và tên
+        worksheet.set_column('C:E', 20)  # các cột điểm
+        
+        workbook.close()
+        output.seek(0)
+        
+        # Tên file
+        filename = f"Template_Diem_{class_info['class_name']}_{class_subject_info['subjects']['subject_name']}.xlsx"
+        
+        return StreamingResponse(
+            output,
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error generating template: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.post("/bulk-import", response_model=ResponseModel)
+async def bulk_import_grades(
+    import_data: BulkGradeImport,
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Nhập điểm hàng loạt từ file Excel/CSV"""
+    try:
+        # Kiểm tra quyền truy cập
+        class_subject = db.table("class_subjects").select("*").eq("id", import_data.class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
+        
+        if not class_subject.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền nhập điểm cho lớp này"
+            )
+        
+        subject_id = class_subject.data[0]["subject_id"]
+        
+        # Lấy cấu hình điểm
+        config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", import_data.academic_year).eq("semester", import_data.semester).execute()
+        
+        grade_config = config.data[0]["grade_column_config"] if config.data else None
+        
+        if not grade_config:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Chưa có cấu hình cột điểm cho môn này"
+            )
+        
+        # Xử lý từng bản ghi điểm
+        success_count = 0
+        error_count = 0
+        errors = []
+        
+        for grade_record in import_data.grades:
+            try:
+                student_id = grade_record.get('student_id')
+                
+                # Kiểm tra học sinh tồn tại
+                student = db.table("students").select("*").eq("student_id", student_id).execute()
+                
+                if not student.data:
+                    errors.append(f"Không tìm thấy học sinh với ID: {student_id}")
+                    error_count += 1
+                    continue
+                
+                student_db_id = student.data[0]['id']
+                
+                # Tạo grade_data từ config và điểm nhập vào
+                grade_data = {}
+                
+                # Map các cột từ import vào grade_config
+                column_mapping = {
+                    'diem_thuong_xuyen': 'Diem_thuong_xuyen',
+                    'diem_thi_giua_ki': 'Diem_thi_giua_ki',
+                    'diem_thi_cuoi_ki': 'Diem_thi_cuoi_ki'
+                }
+                
+                for import_col, config_col in column_mapping.items():
+                    if config_col in grade_config:
+                        score = grade_record.get(import_col)
+                        if score is not None and score != '':
+                            grade_data[config_col] = {
+                                'He_so': grade_config[config_col]['he_so'],
+                                'Diem': float(score)
+                            }
+                
+                # Tính điểm trung bình
+                final_grade = calculate_final_grade(grade_data, grade_config)
+                
+                # Kiểm tra xem đã có điểm chưa
+                existing = db.table("grades").select("*").eq("student_id", student_db_id).eq("class_subject_id", import_data.class_subject_id).eq("academic_year", import_data.academic_year).eq("semester", import_data.semester).execute()
+                
+                if existing.data:
+                    # Update
+                    update_payload = {
+                        "grade_data": grade_data,
+                        "final_grade": final_grade,
+                        "updated_at": datetime.now().isoformat()
+                    }
+                    db.table("grades").update(update_payload).eq("id", existing.data[0]["id"]).execute()
+                else:
+                    # Insert
+                    insert_payload = {
+                        "student_id": student_db_id,
+                        "class_subject_id": import_data.class_subject_id,
+                        "academic_year": import_data.academic_year,
+                        "semester": import_data.semester,
+                        "grade_data": grade_data,
+                        "final_grade": final_grade,
+                        "created_by": current_teacher["user_id"],
+                        "created_at": datetime.now().isoformat(),
+                        "updated_at": datetime.now().isoformat()
+                    }
+                    db.table("grades").insert(insert_payload).execute()
+                
+                success_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Lỗi khi xử lý học sinh {grade_record.get('student_id', 'N/A')}: {str(e)}")
+                logger.error(f"ERROR: Error processing grade for student {grade_record.get('student_id')}: {str(e)}")
+        
+        return ResponseModel(
+            success=True,
+            message=f"Nhập điểm thành công: {success_count} bản ghi, {error_count} lỗi",
+            data={
+                "success_count": success_count,
+                "error_count": error_count,
+                "errors": errors
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error in bulk import: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"

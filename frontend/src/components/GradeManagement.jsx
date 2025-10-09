@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
+import * as XLSX from 'xlsx';
 
 const GradeManagement = () => {
   const { user } = useContext(AuthContext);
@@ -17,6 +18,9 @@ const GradeManagement = () => {
   const [configForm, setConfigForm] = useState({});
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
   const [newColumnForm, setNewColumnForm] = useState({ name: '', label: '', he_so: 1 });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importedData, setImportedData] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
 
   useEffect(() => {
     fetchTeacherInfo();
@@ -275,6 +279,150 @@ const GradeManagement = () => {
     }
   };
 
+  // Import điểm từ file
+  const handleDownloadTemplate = async () => {
+    try {
+      await api.downloadGradeTemplate(selectedClassSubject.id);
+      alert('✅ Tải template thành công!');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      alert('❌ Lỗi khi tải template!');
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        // Validate format
+        const errors = [];
+        const validData = [];
+
+        if (jsonData.length === 0) {
+          alert('❌ File không có dữ liệu!');
+          return;
+        }
+
+        // Kiểm tra cột bắt buộc
+        const requiredColumns = ['id', 'ho_va_ten', 'diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki'];
+        const firstRow = jsonData[0];
+        const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+
+        if (missingColumns.length > 0) {
+          alert(`❌ File thiếu các cột: ${missingColumns.join(', ')}\n\nVui lòng tải template để có đúng định dạng!`);
+          return;
+        }
+
+        // Validate từng dòng
+        jsonData.forEach((row, index) => {
+          const rowNum = index + 2; // +2 vì dòng 1 là header, index bắt đầu từ 0
+          
+          // Kiểm tra ID
+          if (!row.id) {
+            errors.push(`Dòng ${rowNum}: Thiếu ID học sinh`);
+            return;
+          }
+
+          // Validate điểm số
+          const scores = {
+            diem_thuong_xuyen: row.diem_thuong_xuyen,
+            diem_thi_giua_ki: row.diem_thi_giua_ki,
+            diem_thi_cuoi_ki: row.diem_thi_cuoi_ki
+          };
+
+          let hasInvalidScore = false;
+          Object.entries(scores).forEach(([key, value]) => {
+            if (value !== '' && value !== null && value !== undefined) {
+              const score = parseFloat(value);
+              if (isNaN(score) || score < 0 || score > 10) {
+                errors.push(`Dòng ${rowNum} - ${row.ho_va_ten || row.id}: Điểm ${key} không hợp lệ (${value}). Điểm phải từ 0-10.`);
+                hasInvalidScore = true;
+              }
+            }
+          });
+
+          if (!hasInvalidScore) {
+            validData.push({
+              student_id: row.id,
+              ho_va_ten: row.ho_va_ten,
+              diem_thuong_xuyen: scores.diem_thuong_xuyen === '' || scores.diem_thuong_xuyen === null || scores.diem_thuong_xuyen === undefined ? null : parseFloat(scores.diem_thuong_xuyen),
+              diem_thi_giua_ki: scores.diem_thi_giua_ki === '' || scores.diem_thi_giua_ki === null || scores.diem_thi_giua_ki === undefined ? null : parseFloat(scores.diem_thi_giua_ki),
+              diem_thi_cuoi_ki: scores.diem_thi_cuoi_ki === '' || scores.diem_thi_cuoi_ki === null || scores.diem_thi_cuoi_ki === undefined ? null : parseFloat(scores.diem_thi_cuoi_ki),
+            });
+          }
+        });
+
+        if (errors.length > 0) {
+          setImportErrors(errors);
+          alert(`❌ File có ${errors.length} lỗi. Vui lòng kiểm tra!`);
+          return;
+        }
+
+        setImportedData(validData);
+        setImportErrors([]);
+        setShowImportModal(true);
+
+      } catch (error) {
+        console.error('Error parsing file:', error);
+        alert('❌ Lỗi khi đọc file! Vui lòng kiểm tra định dạng file.');
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+    // Reset input để có thể upload lại cùng file
+    event.target.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (importedData.length === 0) {
+      alert('Không có dữ liệu để import!');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const importPayload = {
+        class_subject_id: selectedClassSubject.id,
+        academic_year: academicYear,
+        semester: semester,
+        grades: importedData
+      };
+
+      const response = await api.bulkImportGrades(importPayload);
+
+      if (response.success) {
+        alert(`✅ ${response.message}\n\nThành công: ${response.data.success_count} bản ghi${response.data.error_count > 0 ? `\nLỗi: ${response.data.error_count} bản ghi` : ''}`);
+        
+        if (response.data.errors && response.data.errors.length > 0) {
+          console.log('Import errors:', response.data.errors);
+        }
+
+        // Refresh data
+        handleClassSubjectSelect(selectedClassSubject);
+        setShowImportModal(false);
+        setImportedData([]);
+        setImportErrors([]);
+      } else {
+        alert('❌ Lỗi khi import điểm: ' + response.message);
+      }
+    } catch (error) {
+      console.error('Error importing grades:', error);
+      alert('❌ Lỗi khi import điểm!');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -363,31 +511,61 @@ const GradeManagement = () => {
           <div className="space-y-6">
             {/* Navigation and Header */}
             <div className="bg-white rounded-lg shadow-md p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => setSelectedClassSubject(null)}
-                    className="flex items-center space-x-2 px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors font-medium"
-                  >
-                    <span>←</span>
-                    <span>Quay lại</span>
-                  </button>
-                  <div className="h-8 w-px bg-gray-300"></div>
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-800">
-                      {selectedClassSubject.classes.class_name} - {selectedClassSubject.subjects.subject_name}
-                    </h2>
-                    <p className="text-sm text-gray-500">Khối {selectedClassSubject.classes.grade}</p>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => setSelectedClassSubject(null)}
+                      className="flex items-center space-x-2 px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                    >
+                      <span>←</span>
+                      <span>Quay lại</span>
+                    </button>
+                    <div className="h-8 w-px bg-gray-300"></div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-800">
+                        {selectedClassSubject.classes.class_name} - {selectedClassSubject.subjects.subject_name}
+                      </h2>
+                      <p className="text-sm text-gray-500">Khối {selectedClassSubject.classes.grade}</p>
+                    </div>
                   </div>
+                  
+                  <button
+                    onClick={handleShowConfigEditor}
+                    className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
+                  >
+                    <span>⚙️</span>
+                    <span>Cấu hình cột điểm</span>
+                  </button>
                 </div>
-                
-                <button
-                  onClick={handleShowConfigEditor}
-                  className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
-                >
-                  <span>⚙️</span>
-                  <span>Cấu hình cột điểm</span>
-                </button>
+
+                {/* Import/Export Buttons */}
+                {gradeConfig && (
+                  <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200">
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm hover:shadow-md"
+                    >
+                      <span>📥</span>
+                      <span>Tải template</span>
+                    </button>
+                    
+                    <label className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-sm hover:shadow-md cursor-pointer">
+                      <span>📤</span>
+                      <span>Nhập điểm từ file</span>
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <div className="text-sm text-gray-500 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                      <span className="font-medium">💡 Hỗ trợ:</span> Excel (.xlsx, .xls) và CSV
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -806,6 +984,143 @@ const GradeManagement = () => {
                 >
                   💾 Lưu điểm
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Import Preview Modal */}
+        {showImportModal && (
+          <div 
+            className="fixed top-0 left-0 right-0 bottom-0 z-50 flex items-center justify-center p-4"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(4px)',
+              margin: 0,
+              zIndex: 9999
+            }}
+            onClick={(e) => e.target === e.currentTarget && setShowImportModal(false)}
+          >
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-purple-600 p-6 text-white border-b border-purple-700">
+                <h3 className="text-xl font-bold flex items-center space-x-2">
+                  <span>📋</span>
+                  <span>Xem trước dữ liệu import</span>
+                </h3>
+                <p className="text-purple-100 mt-1 text-sm">
+                  Kiểm tra kỹ thông tin trước khi cập nhật điểm • {importedData.length} học sinh
+                </p>
+              </div>
+              
+              <div className="p-6 max-h-[60vh] overflow-y-auto">
+                {importErrors.length > 0 && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h4 className="font-bold text-red-800 mb-2">⚠️ Có {importErrors.length} lỗi:</h4>
+                    <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                      {importErrors.slice(0, 10).map((error, idx) => (
+                        <li key={idx}>{error}</li>
+                      ))}
+                      {importErrors.length > 10 && (
+                        <li className="text-red-600 font-medium">... và {importErrors.length - 10} lỗi khác</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase border-b">STT</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase border-b">Mã HS</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase border-b">Họ và tên</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase border-b">Điểm TX</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase border-b">Điểm GK</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase border-b">Điểm CK</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {importedData.map((row, index) => (
+                        <tr key={index} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-blue-600">{row.student_id}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{row.ho_va_ten}</td>
+                          <td className="px-4 py-3 text-center">
+                            {row.diem_thuong_xuyen !== null && row.diem_thuong_xuyen !== undefined ? (
+                              <span className="inline-block bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
+                                {row.diem_thuong_xuyen}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {row.diem_thi_giua_ki !== null && row.diem_thi_giua_ki !== undefined ? (
+                              <span className="inline-block bg-blue-100 text-blue-700 px-2.5 py-1 rounded-md text-sm font-medium">
+                                {row.diem_thi_giua_ki}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {row.diem_thi_cuoi_ki !== null && row.diem_thi_cuoi_ki !== undefined ? (
+                              <span className="inline-block bg-purple-100 text-purple-700 px-2.5 py-1 rounded-md text-sm font-medium">
+                                {row.diem_thi_cuoi_ki}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {importedData.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-3xl">📄</span>
+                    </div>
+                    <p className="text-gray-500">Không có dữ liệu hợp lệ</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between p-6 bg-gray-50 border-t">
+                <div className="text-sm text-gray-600">
+                  <span className="font-semibold">{importedData.length}</span> bản ghi sẽ được cập nhật
+                  {importErrors.length > 0 && (
+                    <span className="ml-2 text-red-600">• <span className="font-semibold">{importErrors.length}</span> lỗi</span>
+                  )}
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setImportedData([]);
+                      setImportErrors([]);
+                    }}
+                    className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleConfirmImport}
+                    disabled={importedData.length === 0 || importErrors.length > 0}
+                    className="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ✅ Cập nhật điểm
+                  </button>
+                </div>
               </div>
             </div>
           </div>
