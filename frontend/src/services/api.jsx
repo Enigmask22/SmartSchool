@@ -575,6 +575,62 @@ class ApiService {
     });
   }
 
+  // Download grade template
+  async downloadGradeTemplate(classSubjectId) {
+    const accessToken = localStorage.getItem('access_token');
+    const url = `${this.baseURL}/grades/template/download/${classSubjectId}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // Get filename from Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'template_diem.xlsx';
+      if (contentDisposition) {
+        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+        if (matches != null && matches[1]) {
+          filename = matches[1].replace(/['"]/g, '');
+        }
+      }
+      
+      // Download file
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      return {
+        success: true,
+        message: 'Tải template thành công'
+      };
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      throw error;
+    }
+  }
+
+  // Bulk import grades
+  async bulkImportGrades(importData) {
+    return this.request('/grades/bulk-import', {
+      method: 'POST',
+      body: JSON.stringify(importData),
+    });
+  }
+
   // ===============================================
   // ADMIN MANAGEMENT METHODS
   // ===============================================
