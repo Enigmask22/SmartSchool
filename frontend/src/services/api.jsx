@@ -631,6 +631,11 @@ class ApiService {
     });
   }
 
+  // Teacher Dashboard Analytics
+  async getTeacherDashboardAnalytics(academicYear = '2024-2025', semester = 'HK1') {
+    return this.request(`/grades/teacher/dashboard/analytics?academic_year=${academicYear}&semester=${semester}`);
+  }
+
   // ===============================================
   // ADMIN MANAGEMENT METHODS
   // ===============================================
