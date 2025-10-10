@@ -641,6 +641,234 @@ async def get_student_grades(
         )
 
 # ===============================================
+# TEACHER DASHBOARD ANALYTICS ENDPOINTS
+# ===============================================
+
+@router.get("/teacher/dashboard/analytics", response_model=ResponseModel)
+async def get_teacher_dashboard_analytics(
+    academic_year: str = "2024-2025",
+    semester: str = "HK1",
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """
+    Lấy dữ liệu phân tích tổng hợp cho dashboard giáo viên bộ môn
+    Bao gồm: tổng quan, phân nhóm học lực, xu hướng, top students, etc.
+    """
+    try:
+        # Lấy các lớp-môn mà giáo viên dạy
+        class_subjects = db.table("class_subjects").select("""
+            *,
+            classes:class_id(id, class_name, grade),
+            subjects:subject_id(id, subject_code, subject_name)
+        """).eq("teacher_id", current_teacher["id"]).eq("is_active", True).eq("academic_year", academic_year).eq("semester", semester).execute()
+        
+        if not class_subjects.data:
+            return ResponseModel(
+                success=True,
+                message="Chưa có lớp-môn được phân công",
+                data={
+                    "total_classes": 0,
+                    "total_students": 0,
+                    "overview": {},
+                    "performance_groups": {},
+                    "class_comparison": [],
+                    "students_need_attention": [],
+                    "top_students": []
+                }
+            )
+        
+        # Thu thập tất cả điểm số
+        class_subject_ids = [cs["id"] for cs in class_subjects.data]
+        
+        all_grades = db.table("grades").select("""
+            *,
+            students:student_id(id, student_id, full_name, class_name, grade),
+            class_subjects!inner(
+                id,
+                classes:class_id(class_name, grade),
+                subjects:subject_id(subject_name)
+            )
+        """).in_("class_subject_id", class_subject_ids).eq("academic_year", academic_year).eq("semester", semester).execute()
+        
+        grades_data = all_grades.data if all_grades.data else []
+        
+        # === TỔNG QUAN ===
+        total_students_with_grades = len(grades_data)
+        average_score = sum([g["final_grade"] for g in grades_data if g.get("final_grade")]) / total_students_with_grades if total_students_with_grades > 0 else 0
+        
+        # Lấy tổng số học sinh trong các lớp dạy
+        total_students_count = 0
+        for cs in class_subjects.data:
+            students_in_class = db.table("students").select("id").eq("class_name", cs["classes"]["class_name"]).eq("grade", cs["classes"]["grade"]).eq("is_active", True).execute()
+            total_students_count += len(students_in_class.data) if students_in_class.data else 0
+        
+        # === PHÂN NHÓM HỌC LỰC (theo tiêu chuẩn giáo dục VN) ===
+        excellent = []  # Giỏi: 8.0 - 10
+        good = []       # Khá: 6.5 - 7.9
+        average = []    # Trung bình: 5.0 - 6.4
+        weak = []       # Yếu: 3.5 - 4.9
+        poor = []       # Kém: < 3.5
+        
+        for grade in grades_data:
+            final_grade = grade.get("final_grade", 0)
+            if final_grade >= 8.0:
+                excellent.append(grade)
+            elif final_grade >= 6.5:
+                good.append(grade)
+            elif final_grade >= 5.0:
+                average.append(grade)
+            elif final_grade >= 3.5:
+                weak.append(grade)
+            else:
+                poor.append(grade)
+        
+        performance_groups = {
+            "excellent": {
+                "count": len(excellent),
+                "percentage": round(len(excellent) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "label": "Giỏi (8.0 - 10)",
+                "color": "#059669"  # Emerald-600 - Professional green
+            },
+            "good": {
+                "count": len(good),
+                "percentage": round(len(good) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "label": "Khá (6.5 - 7.9)",
+                "color": "#2563EB"  # Blue-600 - Match theme
+            },
+            "average": {
+                "count": len(average),
+                "percentage": round(len(average) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "label": "Trung bình (5.0 - 6.4)",
+                "color": "#D97706"  # Amber-600 - Softer yellow
+            },
+            "weak": {
+                "count": len(weak),
+                "percentage": round(len(weak) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "label": "Yếu (3.5 - 4.9)",
+                "color": "#EA580C"  # Orange-600 - Warning color
+            },
+            "poor": {
+                "count": len(poor),
+                "percentage": round(len(poor) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "label": "Kém (< 3.5)",
+                "color": "#DC2626"  # Red-600 - Not too dark
+            }
+        }
+        
+        # === SO SÁNH GIỮA CÁC LỚP ===
+        class_comparison = []
+        class_grades_map = {}
+        
+        for grade in grades_data:
+            class_name = grade["class_subjects"]["classes"]["class_name"]
+            if class_name not in class_grades_map:
+                class_grades_map[class_name] = []
+            class_grades_map[class_name].append(grade["final_grade"])
+        
+        for class_name, grades_list in class_grades_map.items():
+            valid_grades = [g for g in grades_list if g is not None]
+            if valid_grades:
+                avg = sum(valid_grades) / len(valid_grades)
+                highest = max(valid_grades)
+                lowest = min(valid_grades)
+                
+                class_comparison.append({
+                    "class_name": class_name,
+                    "student_count": len(valid_grades),
+                    "average_score": round(avg, 2),
+                    "highest_score": round(highest, 2),
+                    "lowest_score": round(lowest, 2),
+                    "pass_rate": round(sum(1 for g in valid_grades if g >= 5.0) * 100 / len(valid_grades), 2)
+                })
+        
+        # Sắp xếp theo điểm trung bình giảm dần
+        class_comparison.sort(key=lambda x: x["average_score"], reverse=True)
+        
+        # === HỌC SINH CẦN QUAN TÂM (điểm yếu và kém) ===
+        students_need_attention = []
+        for grade in weak + poor:
+            student_info = grade.get("students", {})
+            class_info = grade.get("class_subjects", {}).get("classes", {})
+            
+            students_need_attention.append({
+                "student_id": student_info.get("student_id"),
+                "student_name": student_info.get("full_name"),
+                "class_name": class_info.get("class_name"),
+                "final_grade": grade.get("final_grade"),
+                "category": "Kém" if grade.get("final_grade", 0) < 3.5 else "Yếu",
+                "grade_data": grade.get("grade_data", {})
+            })
+        
+        # Sắp xếp theo điểm tăng dần (yếu nhất lên đầu)
+        students_need_attention.sort(key=lambda x: x["final_grade"] if x["final_grade"] else 0)
+        
+        # === TOP HỌC SINH XUẤT SẮC ===
+        top_students = []
+        for grade in sorted(excellent, key=lambda x: x.get("final_grade", 0), reverse=True)[:10]:
+            student_info = grade.get("students", {})
+            class_info = grade.get("class_subjects", {}).get("classes", {})
+            
+            top_students.append({
+                "student_id": student_info.get("student_id"),
+                "student_name": student_info.get("full_name"),
+                "class_name": class_info.get("class_name"),
+                "final_grade": grade.get("final_grade"),
+                "grade_data": grade.get("grade_data", {})
+            })
+        
+        # === PHÂN BỐ ĐIỂM SỐ (Distribution) ===
+        score_distribution = {
+            "9-10": len([g for g in grades_data if g.get("final_grade", 0) >= 9]),
+            "8-9": len([g for g in grades_data if 8 <= g.get("final_grade", 0) < 9]),
+            "7-8": len([g for g in grades_data if 7 <= g.get("final_grade", 0) < 8]),
+            "6-7": len([g for g in grades_data if 6 <= g.get("final_grade", 0) < 7]),
+            "5-6": len([g for g in grades_data if 5 <= g.get("final_grade", 0) < 6]),
+            "4-5": len([g for g in grades_data if 4 <= g.get("final_grade", 0) < 5]),
+            "0-4": len([g for g in grades_data if g.get("final_grade", 0) < 4])
+        }
+        
+        # === THỐNG KÊ ĐẠT/KHÔNG ĐẠT ===
+        pass_count = len([g for g in grades_data if g.get("final_grade", 0) >= 5.0])
+        fail_count = total_students_with_grades - pass_count
+        
+        analytics_data = {
+            "academic_year": academic_year,
+            "semester": semester,
+            "total_classes": len(class_subjects.data),
+            "total_students": total_students_count,
+            "students_with_grades": total_students_with_grades,
+            "students_without_grades": total_students_count - total_students_with_grades,
+            "overview": {
+                "average_score": round(average_score, 2),
+                "highest_score": round(max([g.get("final_grade", 0) for g in grades_data]), 2) if grades_data else 0,
+                "lowest_score": round(min([g.get("final_grade", 0) for g in grades_data if g.get("final_grade", 0) > 0]), 2) if grades_data else 0,
+                "pass_count": pass_count,
+                "fail_count": fail_count,
+                "pass_rate": round(pass_count * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0
+            },
+            "performance_groups": performance_groups,
+            "score_distribution": score_distribution,
+            "class_comparison": class_comparison,
+            "students_need_attention": students_need_attention[:20],  # Top 20
+            "top_students": top_students,
+            "subjects": list(set([cs["subjects"]["subject_name"] for cs in class_subjects.data]))
+        }
+        
+        return ResponseModel(
+            success=True,
+            message="Lấy dữ liệu phân tích thành công",
+            data=analytics_data
+        )
+        
+    except Exception as e:
+        logger.error(f"ERROR: Error getting teacher dashboard analytics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+# ===============================================
 # BULK IMPORT & EXPORT ENDPOINTS
 # ===============================================
 

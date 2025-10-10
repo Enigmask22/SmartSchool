@@ -1,10 +1,50 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import { Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import api from '../services/api';
 
-const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
+const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selectedDashboardType, onDashboardSwitch }) => {
   const { logout, isTeacher, isHomeroomTeacher, isSubjectTeacher, isAdmin, hasRole } = useContext(AuthContext);
+  const [hasBothRoles, setHasBothRoles] = useState(false);
   
+  // Check if user has both roles
+  useEffect(() => {
+    checkBothRoles();
+  }, [user]);
+
+  const checkBothRoles = async () => {
+    if (!user) return;
+    
+    try {
+      let hasHomeroom = false;
+      let hasSubject = false;
+
+      // Check homeroom role
+      try {
+        const homeroomResponse = await api.getHomeroomClasses();
+        if (homeroomResponse.success && homeroomResponse.data && homeroomResponse.data.length > 0) {
+          hasHomeroom = true;
+        }
+      } catch (error) {
+        // Not a homeroom teacher
+      }
+
+      // Check subject teacher role
+      try {
+        const teacherResponse = await api.getTeacherInfo();
+        if (teacherResponse.success && teacherResponse.data) {
+          hasSubject = true;
+        }
+      } catch (error) {
+        // Not a subject teacher
+      }
+
+      setHasBothRoles(hasHomeroom && hasSubject);
+    } catch (error) {
+      console.error('Error checking roles:', error);
+    }
+  };
+
   // Menu items based on user role (đồng bộ với Header)
   const getMenuItems = () => {
     const baseItems = [
@@ -40,8 +80,9 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
       
       return homeroomMenus;
     } else if (isSubjectTeacher()) {
-      // Giáo viên bộ môn - chỉ có menu Quản lý điểm
+      // Giáo viên bộ môn - Dashboard và Quản lý điểm
       return [
+        { id: 'dashboard', label: 'Dashboard Phân Tích', icon: '📊' },
         { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
       ];
     } else {
@@ -160,6 +201,33 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen }) => {
               )}
             </button>
           ))}
+
+          {/* Dashboard Switch Button - Only show if user has both roles */}
+          {hasBothRoles && onDashboardSwitch && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  onDashboardSwitch();
+                  if (window.innerWidth < 1024) {
+                    setIsOpen(false);
+                  }
+                }}
+                className={`
+                  w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
+                  bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 hover:from-purple-200 hover:to-pink-200
+                  ${!isOpen && 'justify-center px-2'}
+                `}
+                title={!isOpen ? 'Đổi Dashboard' : ''}
+              >
+                <span className="text-lg">🔄</span>
+                {isOpen && (
+                  <span className="ml-3 truncate">
+                    {selectedDashboardType === 'homeroom' ? 'Chuyển sang Bộ môn' : 'Chuyển sang Chủ nhiệm'}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
         </nav>
 
         {/* Logout */}

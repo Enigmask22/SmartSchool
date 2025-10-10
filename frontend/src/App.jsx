@@ -18,12 +18,16 @@ import Login from './components/Login';
 import GradeManagement from './components/GradeManagement';
 import HomeroomDashboard from './components/HomeroomDashboard';
 import AdminManagement from './components/AdminManagement';
+import SubjectTeacherDashboard from './components/SubjectTeacherDashboard';
+import DashboardSelector from './components/DashboardSelector';
 
 function AppContent() {
   const { user, loading, isAuthenticated, isHomeroomTeacher, isSubjectTeacher, isAdmin } = useContext(AuthContext);
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hasRedirected, setHasRedirected] = useState(false);
+  const [selectedDashboardType, setSelectedDashboardType] = useState(null); // 'homeroom' or 'subject'
+  const [showDashboardSelector, setShowDashboardSelector] = useState(false);
 
   // Reset view when user changes (login/logout)
   React.useEffect(() => {
@@ -31,24 +35,26 @@ function AppContent() {
       // User logged out - reset to default
       setCurrentView('dashboard');
       setHasRedirected(false);
+      setSelectedDashboardType(null);
+      setShowDashboardSelector(false);
     } else if (!hasRedirected) {
-      // User logged in - determine default view based on role (only once per login)
-      if (isSubjectTeacher()) {
-        console.log('🎯 Subject teacher detected, redirecting to grades page');
-        setCurrentView('grades');
-      } else if (isHomeroomTeacher()) {
-        console.log('🏠 Homeroom teacher detected, redirecting to dashboard');
-        setCurrentView('dashboard');
-      } else if (isAdmin()) {
-        console.log('👑 Admin detected, redirecting to dashboard');
-        setCurrentView('dashboard');
-      } else {
-        // Fallback
-        setCurrentView('dashboard');
+      // User logged in - check if need to show dashboard selector
+      // Nếu chưa chọn dashboard type, hiển thị selector
+      if (!selectedDashboardType) {
+        console.log('🎯 Showing dashboard selector');
+        setShowDashboardSelector(true);
       }
       setHasRedirected(true);
     }
-  }, [user?.id, hasRedirected, isSubjectTeacher, isHomeroomTeacher, isAdmin]); // Include role functions as dependencies
+  }, [user?.id, hasRedirected, selectedDashboardType]); // Include role functions as dependencies
+
+  // Handle dashboard selection
+  const handleDashboardSelect = (type) => {
+    console.log(`📊 Dashboard type selected: ${type}`);
+    setSelectedDashboardType(type);
+    setShowDashboardSelector(false);
+    setCurrentView('dashboard');
+  };
 
   if (loading) {
     return (
@@ -62,7 +68,44 @@ function AppContent() {
     return <Login />;
   }
 
+  // Nếu cần hiển thị dashboard selector
+  if (showDashboardSelector) {
+    return <DashboardSelector onSelectDashboard={handleDashboardSelect} />;
+  }
+
   const renderContent = () => {
+    // Nếu user đã chọn dashboard type, ưu tiên theo lựa chọn đó
+    if (selectedDashboardType === 'homeroom') {
+      // Homeroom dashboard view
+      switch (currentView) {
+        case 'dashboard':
+          return <HomeroomDashboard />;
+        case 'students':
+          return <StudentList isHomeroom={true} />;
+        case 'attendance':
+          return <AttendanceView isHomeroom={true} />;
+        case 'continuous':
+          return <ContinuousRecognition isHomeroom={true} />;
+        case 'faces':
+          return <FaceManagement isHomeroom={true} />;
+        case 'grades':
+          return <GradeManagement isHomeroom={true} />;
+        default:
+          return <HomeroomDashboard />;
+      }
+    } else if (selectedDashboardType === 'subject') {
+      // Subject teacher dashboard view
+      switch (currentView) {
+        case 'dashboard':
+          return <SubjectTeacherDashboard />;
+        case 'grades':
+          return <GradeManagement />;
+        default:
+          return <SubjectTeacherDashboard />;
+      }
+    }
+    
+    // Fallback to role-based rendering nếu chưa chọn
     if (isHomeroomTeacher()) {
       // Giáo viên chủ nhiệm - tất cả components được filter theo lớp chủ nhiệm
       switch (currentView) {
@@ -84,28 +127,14 @@ function AppContent() {
           return <HomeroomDashboard />;
       }
     } else if (isSubjectTeacher()) {
-      // Giáo viên bộ môn - mặc định vào trang Quản lý điểm
+      // Giáo viên bộ môn - mặc định vào trang Dashboard Analytics
       switch (currentView) {
         case 'dashboard':
-          return <Dashboard setCurrentView={setCurrentView} />;
-        case 'students':
-          return <StudentList />;
-        case 'attendance':
-          return <AttendanceView />;
-        case 'camera':
-          return <AICamera />;
-        case 'continuous':
-          return <ContinuousRecognition />;
-        case 'faces':
-          return <FaceManagement />;
-        // case 'feedback': // Tạm ẩn AI Nhận xét
-        //   return <AIFeedback />;
-        case 'school-config':
-          return <SchoolDaysConfig />;
+          return <SubjectTeacherDashboard />;
         case 'grades':
           return <GradeManagement />;
         default:
-          return <GradeManagement />; // Default cho giáo viên bộ môn là Quản lý điểm
+          return <SubjectTeacherDashboard />; // Default cho giáo viên bộ môn là Dashboard
       }
     } else if (isAdmin()) {
       // Admin - có tất cả quyền truy cập
@@ -144,6 +173,14 @@ function AppContent() {
     }
   };
 
+  // Handle dashboard switch
+  const handleDashboardSwitch = () => {
+    const newType = selectedDashboardType === 'homeroom' ? 'subject' : 'homeroom';
+    console.log(`🔄 Switching dashboard from ${selectedDashboardType} to ${newType}`);
+    setSelectedDashboardType(newType);
+    setCurrentView('dashboard'); // Reset to dashboard view
+  };
+
   return (
     <div className="App flex h-screen bg-gray-50">
       <Sidebar 
@@ -152,6 +189,8 @@ function AppContent() {
         user={user}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
+        selectedDashboardType={selectedDashboardType}
+        onDashboardSwitch={handleDashboardSwitch}
       />
       <main className={`
         flex-1 transition-all duration-300 overflow-auto
