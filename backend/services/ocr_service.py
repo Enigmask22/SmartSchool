@@ -191,6 +191,11 @@ class GradeSheetOCRService:
             # Bước 3: Sắp xếp text theo vị trí (top to bottom, left to right)
             sorted_texts = self._sort_by_position(extracted_texts)
             
+            # Log OCR detected items
+            logger.info(f"OCR detected {len(extracted_texts)} items:")
+            for idx, item in enumerate(sorted_texts[:20]):  # Log first 20
+                logger.info(f"  [{idx}] '{item['text']}' at x={item.get('x', 0):.0f}, y={item.get('y', 0):.0f}")
+            
             # Bước 4: Nhận dạng header và rows
             parsed_data = self._parse_table_structure(sorted_texts)
             
@@ -396,42 +401,80 @@ class GradeSheetOCRService:
         all_grades = []
         for item in row:
             text = item['text'].strip()
+            x = item.get('x', 0)
             
             # Skip student ID (contains SV)
             if 'SV' in text.upper():
                 continue
             
-            # Fix OCR errors trước khi check regex
-            text_cleaned = text.upper()
-            if text_cleaned in ['OV', '0V', 'O']:
-                text = '10' if text_cleaned in ['OV', '0V'] else '0'
-                
+            # Skip số có leading zeros (001, 002, 003, /001) - Student ID
+            if re.match(r'^/?0\d+', text):
+                continue
+            
             # Skip text có nhiều chữ cái (họ tên) - ít nhất 3 chữ cái liên tiếp
             if re.search(r'[a-zA-ZÀ-ỹ]{3,}', text):
                 continue
-                
-            # Điểm số chỉ chứa số và dấu . hoặc ,
-            if re.match(r'^[\d\.,\s]+$', text):
-                grade = self._extract_grade(text)
-                if grade is not None:
-                    all_grades.append({
-                        'value': grade,
-                        'x': item.get('x', 0),
-                        'text': item['text']  # Keep original for logging
-                    })
+            
+            # FILTER: Chỉ lấy số ở vùng điểm (x > 1200)
+            # Tránh nhầm số trong tên hoặc gần cột tên
+            if x < 1200:
+                logger.debug(f"Skipping grade '{text}' at x={x} (too far left, likely in name column)")
+                continue
+            
+            # Thử extract grade từ text
+            # Điểm số có thể chứa số, chữ cái bị nhầm (A→1), và dấu . hoặc ,
+            grade = self._extract_grade(text)
+            if grade is not None:
+                all_grades.append({
+                    'value': grade,
+                    'x': item.get('x', 0),
+                    'text': item['text'],  # Keep original for logging
+                    'confidence': item.get('confidence', 1.0)
+                })
         
         # Sort grades theo X coordinate (left to right)
         all_grades.sort(key=lambda g: g['x'])
         
-        # Filter: Nếu có > 3 số, lấy 3 số cuối (bỏ số lạ)
+        # Log để debug
+        grades_info = [(g['text'], g['value'], f"x={g['x']:.0f}") for g in all_grades]
+        logger.info(f"Student {parsed.get('student_id', 'Unknown')}: Found {len(all_grades)} grades: {grades_info}")
+        
+        # Lấy tối đa 3 grades đầu tiên (đã filter theo x > 1200)
         if len(all_grades) > 3:
-            all_grades = all_grades[-3:]
+            logger.warning(f"Student {parsed.get('student_id')}: Found {len(all_grades)} grades, taking first 3")
+            all_grades = all_grades[:3]
         
         # Map grades vào các cột theo thứ tự: DTX, ĐGK, ĐCK
         grade_columns = ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
         for idx, col in enumerate(grade_columns):
             if idx < len(all_grades):
                 parsed[col] = all_grades[idx]['value']
+        
+        # Log final mapping
+        logger.info(f"Student {parsed.get('student_id')}: Final mapping = "
+                   f"DTX={parsed.get('diem_thuong_xuyen')}, "
+                   f"ĐGK={parsed.get('diem_thi_giua_ki')}, "
+                   f"ĐCK={parsed.get('diem_thi_cuoi_ki')}")
+        
+        # SMART CORRECTION: Phát hiện và sửa số 2 bị lặp (có thể là 3 bị đọc nhầm)
+        # Pattern: nếu có 2 số 2 liên tiếp ở cột 2 và 3, tự động sửa cột 3 thành 3
+        if (len(all_grades) >= 2 and 
+            parsed.get('diem_thi_giua_ki') == 2.0 and 
+            parsed.get('diem_thi_cuoi_ki') == 2.0):
+            
+            # Kiểm tra confidence: nếu số cuối có confidence thấp hơn hoặc < 0.9
+            if (len(all_grades) >= 3):
+                last_conf = all_grades[2].get('confidence', 1.0)
+                prev_conf = all_grades[1].get('confidence', 1.0)
+                
+                # Tự động sửa nếu confidence thấp hoặc thấp hơn số trước
+                if last_conf < 0.9 or last_conf < prev_conf:
+                    parsed['diem_thi_cuoi_ki'] = 3.0
+                    logger.info(f"Student {parsed.get('student_id')}: AUTO-CORRECTED duplicate '2' → '3' "
+                              f"(original conf={last_conf:.2f}, likely OCR confusion between 2 and 3)")
+                else:
+                    logger.warning(f"Student {parsed.get('student_id')}: Detected duplicate '2' scores but "
+                                 f"confidence is high ({last_conf:.2f}). Keeping as '2'. Please verify!")
         
         # Validate: phải có student_id
         if 'student_id' not in parsed:
@@ -463,21 +506,41 @@ class GradeSheetOCRService:
     
     def _extract_grade(self, text: str) -> Optional[float]:
         """
-        Trích xuất điểm số từ text
+        Trích xuất điểm số từ text với OCR error correction
         Format: 9.5, 10, 8,5 (comma or dot as decimal)
         Hỗ trợ: 0-10 với bước nhảy 0.25
         """
         text = text.strip()
+        original_text = text  # Giữ để log
         
         # Fix common OCR errors BEFORE replacing comma
-        text = text.replace('l', '1').replace('I', '1')
+        # Chữ cái thường bị nhầm với số
+        text = text.replace('l', '1').replace('I', '1').replace('i', '1')
+        text = text.replace('O', '0').replace('o', '0')
         text = text.replace('S', '5').replace('s', '5')
+        text = text.replace('Z', '2').replace('z', '2')
+        text = text.replace('B', '8').replace('b', '8')
+        text = text.replace('G', '6').replace('g', '6')
         
-        # Fix specific errors
-        if text.upper() == 'OV' or text.upper() == '0V':
+        # Fix: A → 1 (số 1 viết tay thường bị đọc thành A)
+        text_upper = text.strip().upper()
+        if text_upper == 'A':
+            text = '1'
+            logger.debug(f"OCR correction: 'A' → '1'")
+        
+        # Fix: + hoặc / hoặc T → 7 (số 7 viết tay)
+        elif text_upper in ['+', '/', 'T']:
+            text = '7'
+            logger.debug(f"OCR correction: '{text_upper}' → '7'")
+        
+        # Fix: | hoặc ! → 1 (số 1 viết thẳng)
+        elif text_upper in ['|', '!']:
+            text = '1'
+            logger.debug(f"OCR correction: '{text_upper}' → '1'")
+        
+        # Fix specific number patterns
+        if text.upper() in ['OV', '0V', 'IO', 'I0']:
             text = '10'
-        if text.upper() == 'O':
-            text = '0'
         
         # Replace comma với dot cho decimal
         text = text.replace(',', '.')
@@ -493,6 +556,11 @@ class GradeSheetOCRService:
                     # Round về bước 0.25 gần nhất
                     grade = round(grade * 4) / 4  # 0, 0.25, 0.5, 0.75, 1.0, ...
                     grade = min(10.0, max(0.0, grade))  # Clamp 0-10
+                    
+                    # Log nếu có correction
+                    if original_text != text:
+                        logger.info(f"OCR correction: '{original_text}' → '{text}' → {grade}")
+                    
                     return grade
             except ValueError:
                 pass

@@ -28,8 +28,9 @@ ensure_insightface_patch("./insightface_cache")
 # Import routers SAU KHI đã setup InsightFace environment
 from routers import students, attendance, auth, ai, feedback, school_days_config, grades, homeroom, admin
 
-# Initialize logger
-logger = setup_logger()
+# Initialize logger with environment-based level
+LOG_LEVEL = os.getenv("LOG_LEVEL", "WARNING")  # WARNING for production, INFO for dev
+logger = setup_logger(level=LOG_LEVEL)
 
 # Create FastAPI app
 app = FastAPI(
@@ -37,7 +38,9 @@ app = FastAPI(
     description="API cho hệ thống trường học thông minh với InsightFace AI điểm danh (95-99% accuracy)",
     version="2.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    # Tối ưu cho production
+    openapi_url="/openapi.json" if os.getenv("ENV") == "development" else None,  # Tắt OpenAPI docs trong production
 )
 
 # CORS middleware - Cập nhật để support WebSocket
@@ -53,6 +56,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Performance monitoring middleware
+import time
+from fastapi import Request
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """Đo thời gian xử lý request và thêm vào response header"""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = f"{process_time:.3f}"
+    
+    # Log chỉ khi process time > 1s (có vấn đề)
+    if process_time > 1.0 and LOG_LEVEL != "WARNING":
+        logger.warning(f"Slow request: {request.url.path} took {process_time:.3f}s")
+    
+    return response
 
 # Static files
 os.makedirs("uploads", exist_ok=True)
