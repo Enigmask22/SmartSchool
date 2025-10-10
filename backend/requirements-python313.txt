@@ -12,7 +12,7 @@ pandas>=2.1.0
 
 # Cryptography packages
 python-jose[cryptography]>=3.3.0
-bcrypt>=4.1.2
+bcrypt>=4.0,<5.0  # Lock
 cryptography>=41.0.0
 PyJWT>=2.8.0
 
