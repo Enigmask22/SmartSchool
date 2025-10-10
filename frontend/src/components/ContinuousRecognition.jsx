@@ -15,6 +15,10 @@ import {
   Info
 } from 'lucide-react';
 
+// API Configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const WS_BASE_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/api';
+
 const ContinuousRecognition = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -44,7 +48,7 @@ const ContinuousRecognition = () => {
   // Load current settings from backend
   const loadSettings = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/ai/recognition/status');
+      const response = await fetch(`${API_BASE_URL}/ai/recognition/status`);
       const result = await response.json();
       
       if (result.success && result.data.cooldown_period) {
@@ -60,7 +64,7 @@ const ContinuousRecognition = () => {
   const connectWebSocket = useCallback(() => {
     try {
       // Fix WebSocket URL để match với backend route
-      wsRef.current = new WebSocket('ws://localhost:8000/api/ai/recognition/stream');
+      wsRef.current = new WebSocket(`${WS_BASE_URL}/ai/recognition/stream`);
       
       wsRef.current.onopen = () => {
         console.log('🔗 Connected to recognition stream');
@@ -396,7 +400,7 @@ const ContinuousRecognition = () => {
 
   const handleStart = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/ai/recognition/control', {
+      const response = await fetch(`${API_BASE_URL}/ai/recognition/control`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'start' })
@@ -416,7 +420,7 @@ const ContinuousRecognition = () => {
 
   const handleStop = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/ai/recognition/control', {
+      const response = await fetch(`${API_BASE_URL}/ai/recognition/control`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'stop' })
@@ -799,7 +803,7 @@ const ContinuousRecognition = () => {
                   onClick={async () => {
                     try {
                       // Call API to update settings
-                      const response = await fetch('http://localhost:8000/api/ai/recognition/settings', {
+                      const response = await fetch(`${API_BASE_URL}/ai/recognition/settings`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ cooldown_period: cooldownPeriod })

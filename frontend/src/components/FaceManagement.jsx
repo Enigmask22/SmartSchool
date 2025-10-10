@@ -2,6 +2,9 @@ import React, { useState, useEffect, useContext } from 'react';
 import ApiService from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
 
+// API Configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const FaceManagement = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
   const [aiStatus, setAiStatus] = useState(null);
@@ -127,7 +130,7 @@ const FaceManagement = () => {
 
   const fetchAIStatus = async () => {
     try {
-      const statusResponse = await fetch('http://localhost:8000/api/ai/status');
+      const statusResponse = await fetch(`${API_BASE_URL}/ai/status`);
       
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
@@ -151,7 +154,7 @@ const FaceManagement = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/ai/student/${studentId}/encoding`, {
+      const response = await fetch(`${API_BASE_URL}/ai/student/${studentId}/encoding`, {
         method: 'DELETE'
       });
       
@@ -171,7 +174,7 @@ const FaceManagement = () => {
 
   const reloadModels = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/ai/reload-models', {
+      const response = await fetch(`${API_BASE_URL}/ai/reload-models`, {
         method: 'POST'
       });
       
