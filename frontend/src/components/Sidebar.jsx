@@ -202,8 +202,8 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
             </button>
           ))}
 
-          {/* Dashboard Switch Button - Only show if user has both roles */}
-          {hasBothRoles && onDashboardSwitch && (
+          {/* Dashboard Switch Button - Only show if user has both roles AND not admin */}
+          {hasBothRoles && onDashboardSwitch && !isAdmin() && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <button
                 onClick={() => {

@@ -31,10 +31,20 @@ security = HTTPBearer()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Xác thực password"""
+    # Bcrypt chỉ hỗ trợ password tối đa 72 bytes
+    # Truncate password nếu quá dài
+    password_bytes = plain_password.encode('utf-8')
+    if len(password_bytes) > 72:
+        plain_password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     """Hash password"""
+    # Bcrypt chỉ hỗ trợ password tối đa 72 bytes
+    # Truncate password nếu quá dài
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -205,15 +215,8 @@ async def login(
         
         user = user_response.data[0]
         
-        # Kiểm tra password - TEMPORARY FIX FOR BCRYPT ISSUE
-        # Override password hash with correct one for "password"
-        correct_hash = "$2b$12$evHhnCQeX5yFZRwj87QWfuqvYIsn5R/q08Dp6i1E0AUjFjShZjYoC"
-        
-        # Use correct hash instead of database hash (temporary fix)
-        password_valid = verify_password(user_credentials.password, correct_hash)
-        
-        # Original code (commented due to wrong hash in database):
-        # password_valid = verify_password(user_credentials.password, user["password_hash"])
+        # Kiểm tra password
+        password_valid = verify_password(user_credentials.password, user["password_hash"])
         
         if not password_valid:
             raise HTTPException(

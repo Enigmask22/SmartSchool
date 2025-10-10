@@ -39,14 +39,25 @@ function AppContent() {
       setShowDashboardSelector(false);
     } else if (!hasRedirected) {
       // User logged in - check if need to show dashboard selector
-      // Nếu chưa chọn dashboard type, hiển thị selector
+      
+      // Admin không cần chọn dashboard - bypass trực tiếp
+      if (isAdmin()) {
+        console.log('👑 Admin logged in - bypassing dashboard selector');
+        setShowDashboardSelector(false);
+        setSelectedDashboardType('admin'); // Set special type for admin
+        setCurrentView('dashboard');
+        setHasRedirected(true);
+        return;
+      }
+      
+      // Nếu chưa chọn dashboard type, hiển thị selector cho giáo viên
       if (!selectedDashboardType) {
         console.log('🎯 Showing dashboard selector');
         setShowDashboardSelector(true);
       }
       setHasRedirected(true);
     }
-  }, [user?.id, hasRedirected, selectedDashboardType]); // Include role functions as dependencies
+  }, [user?.id, hasRedirected, selectedDashboardType, isAdmin]); // Include role functions as dependencies
 
   // Handle dashboard selection
   const handleDashboardSelect = (type) => {
@@ -74,6 +85,32 @@ function AppContent() {
   }
 
   const renderContent = () => {
+    // Admin có dashboard riêng - không cần chọn
+    if (selectedDashboardType === 'admin' || isAdmin()) {
+      switch (currentView) {
+        case 'dashboard':
+          return <Dashboard setCurrentView={setCurrentView} />;
+        case 'students':
+          return <StudentList />;
+        case 'attendance':
+          return <AttendanceView />;
+        case 'camera':
+          return <AICamera />;
+        case 'continuous':
+          return <ContinuousRecognition />;
+        case 'faces':
+          return <FaceManagement />;
+        case 'school-config':
+          return <SchoolDaysConfig />;
+        case 'grades':
+          return <GradeManagement />;
+        case 'admin-management':
+          return <AdminManagement />;
+        default:
+          return <Dashboard setCurrentView={setCurrentView} />;
+      }
+    }
+    
     // Nếu user đã chọn dashboard type, ưu tiên theo lựa chọn đó
     if (selectedDashboardType === 'homeroom') {
       // Homeroom dashboard view
@@ -136,32 +173,6 @@ function AppContent() {
         default:
           return <SubjectTeacherDashboard />; // Default cho giáo viên bộ môn là Dashboard
       }
-    } else if (isAdmin()) {
-      // Admin - có tất cả quyền truy cập
-      switch (currentView) {
-        case 'dashboard':
-          return <Dashboard setCurrentView={setCurrentView} />;
-        case 'students':
-          return <StudentList />;
-        case 'attendance':
-          return <AttendanceView />;
-        case 'camera':
-          return <AICamera />;
-        case 'continuous':
-          return <ContinuousRecognition />;
-        case 'faces':
-          return <FaceManagement />;
-        // case 'feedback': // Tạm ẩn AI Nhận xét
-        //   return <AIFeedback />;
-        case 'school-config':
-          return <SchoolDaysConfig />;
-        case 'grades':
-          return <GradeManagement />;
-        case 'admin-management':
-          return <AdminManagement />;
-        default:
-          return <Dashboard setCurrentView={setCurrentView} />;
-      }
     } else {
       // Default fallback
       return (
@@ -175,6 +186,12 @@ function AppContent() {
 
   // Handle dashboard switch
   const handleDashboardSwitch = () => {
+    // Admin không có dashboard switch
+    if (isAdmin()) {
+      console.log('⚠️ Admin không thể switch dashboard');
+      return;
+    }
+    
     const newType = selectedDashboardType === 'homeroom' ? 'subject' : 'homeroom';
     console.log(`🔄 Switching dashboard from ${selectedDashboardType} to ${newType}`);
     setSelectedDashboardType(newType);
