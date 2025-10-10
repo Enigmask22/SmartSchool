@@ -1,5 +1,6 @@
 // API Service để giao tiếp với backend
-const API_BASE_URL = 'http://localhost:8000/api';
+// Sử dụng environment variable hoặc fallback về localhost
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 class ApiService {
   constructor() {

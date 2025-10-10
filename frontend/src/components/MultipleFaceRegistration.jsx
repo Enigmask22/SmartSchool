@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
 
+// API Configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const MultipleFaceRegistration = ({ student, onClose, onSuccess }) => {
   const [files, setFiles] = useState([]);
   const [results, setResults] = useState([]);
@@ -47,7 +50,7 @@ const MultipleFaceRegistration = ({ student, onClose, onSuccess }) => {
         formData.append('files', fileObj.file);
       });
       
-      const response = await fetch(`http://localhost:8000/api/ai/register-multiple/${student.id}`, {
+      const response = await fetch(`${API_BASE_URL}/ai/register-multiple/${student.id}`, {
         method: 'POST',
         body: formData
       });

@@ -3,6 +3,9 @@ import ApiService from '../services/api';
 import MultipleFaceRegistration from './MultipleFaceRegistration';
 import { AuthContext } from '../contexts/AuthContext';
 
+// API Configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const StudentList = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
   const [students, setStudents] = useState([]);
@@ -404,7 +407,7 @@ const StudentList = () => {
         const formData = new FormData();
         formData.append('file', uploadedImage.file);
         
-        response = await fetch(`http://localhost:8000/api/ai/register/${selectedStudentForFace.id}`, {
+        response = await fetch(`${API_BASE_URL}/ai/register/${selectedStudentForFace.id}`, {
           method: 'POST',
           body: formData
         });
@@ -412,7 +415,7 @@ const StudentList = () => {
         // Use base64 for camera capture
         const base64Image = capturedImage.split(',')[1];
         
-        response = await fetch(`http://localhost:8000/api/ai/register-base64/${selectedStudentForFace.id}`, {
+        response = await fetch(`${API_BASE_URL}/ai/register-base64/${selectedStudentForFace.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -532,7 +535,7 @@ const StudentList = () => {
         formData.append('files', fileObj.file);
       });
       
-      const response = await fetch(`http://localhost:8000/api/ai/register-multiple/${selectedStudentForFace.id}`, {
+      const response = await fetch(`${API_BASE_URL}/ai/register-multiple/${selectedStudentForFace.id}`, {
         method: 'POST',
         body: formData
       });
@@ -607,7 +610,7 @@ const StudentList = () => {
 
     setEditLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/students/${selectedStudentForEdit.id}`, {
+      const response = await fetch(`${API_BASE_URL}/students/${selectedStudentForEdit.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
