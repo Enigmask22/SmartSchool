@@ -174,30 +174,14 @@ class VinternOCRService:
         Returns:
             Prompt đã được định dạng (với <image> tag)
         """
-        # Vintern cần prompt NGẮN GỌN, TRỰC TIẾP
+        # Vintern: Prompt SIÊU NGẮN để tránh vượt quá 1700 tokens
         prompt = """<image>
-Đọc bảng điểm trong ảnh. Trích xuất CHÍNH XÁC thông tin từng dòng (KHÔNG BỊA RA).
+Đọc bảng điểm. Trích xuất CHÍNH XÁC (KHÔNG BỊA).
 
-Cấu trúc bảng: id | ho_va_ten | diem_thuong_xuyen | diem_thi_giua_ki | diem_thi_cuoi_ki
+Bảng: id | ho_va_ten | diem_thuong_xuyen | diem_thi_giua_ki | diem_thi_cuoi_ki
 
-Quy tắc:
-- ID: SV001, SV002, SV003... (hoặc 001, 002, 003...)
-- Tên: Đọc ĐÚNG từ ảnh (có thể tiếng Việt hoặc tiếng Anh)
-- Điểm: Số thập phân 0-10, dấu phẩy → dấu chấm
-- Đọc TẤT CẢ các dòng trong bảng
-
-Trả về JSON (CHỈ JSON, KHÔNG THÊM GÌ KHÁC):
-```json
-{
-  "success": true,
-  "headers": ["id", "ho_va_ten", "diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"],
-  "rows": [
-    {"student_id": "SV001", "ho_va_ten": "...", "diem_thuong_xuyen": 7.25, "diem_thi_giua_ki": 8.5, "diem_thi_cuoi_ki": 9.75}
-  ],
-  "total_rows": 1,
-  "errors": []
-}
-```"""
+Trả về JSON:
+{"success":true,"headers":["id","ho_va_ten","diem_thuong_xuyen","diem_thi_giua_ki","diem_thi_cuoi_ki"],"rows":[{"student_id":"SV001","ho_va_ten":"...","diem_thuong_xuyen":7.25,"diem_thi_giua_ki":8.5,"diem_thi_cuoi_ki":9.75}],"total_rows":1,"errors":[]}"""
         return prompt
     
     def parse_grade_sheet(self, image_path: str) -> Dict:
@@ -290,8 +274,8 @@ Trả về JSON (CHỈ JSON, KHÔNG THÊM GÌ KHÁC):
         """
         try:
             # Preprocess image theo Vintern format
-            # max_num=12 để model nhìn rõ hơn (tăng từ 6)
-            pixel_values = load_image_for_vintern(image, max_num=12)
+            # max_num=9: Balance giữa quality và token limit (1700 tokens max)
+            pixel_values = load_image_for_vintern(image, max_num=9)
             
             # Move to device
             if self.device == "cuda":
@@ -300,12 +284,12 @@ Trả về JSON (CHỈ JSON, KHÔNG THÊM GÌ KHÁC):
                 pixel_values = pixel_values.to(torch.float32)
             
             # Generation config - tối ưu cho accuracy
+            # Note: Vintern KHÔNG support temperature parameter!
             generation_config = dict(
                 max_new_tokens=4096,  # Tăng để có thể return nhiều rows
-                do_sample=False,  # Deterministic cho accuracy
+                do_sample=False,  # Deterministic cho accuracy (thay cho temperature)
                 num_beams=5,  # Tăng từ 3 lên 5 cho chính xác hơn
-                repetition_penalty=3.0,  # Tăng để giảm lặp lại
-                temperature=0.1  # Low temperature cho factual output
+                repetition_penalty=3.0  # Tăng để giảm lặp lại
             )
             
             # Generate response using Vintern's chat API
