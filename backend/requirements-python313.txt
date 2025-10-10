@@ -43,3 +43,7 @@ wheel>=0.42.0
 
 #XLSX
 xlsxwriter>=3.1.0
+
+# OCR for handwriting grade sheet
+paddleocr>=2.7.0
+paddlepaddle>=2.6.0
