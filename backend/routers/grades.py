@@ -16,7 +16,8 @@ from database.connection import get_db
 from routers.auth import get_current_user
 from models.schemas import ResponseModel
 from utils.logger import setup_logger
-from services.ocr_service import get_ocr_service
+from services.ocr_factory import get_ocr_service  # Support multiple OCR models (Gemini, VinternVL)
+from config.ocr_config import OCRConfig
 
 logger = setup_logger()
 router = APIRouter()
