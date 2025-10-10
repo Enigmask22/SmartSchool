@@ -58,7 +58,10 @@ class OCRConfig:
     VINTERN_MODEL_PATH = os.getenv('VINTERN_MODEL_PATH', '5CD-AI/Vintern-1B-v3_5')
     
     # Device: 'cuda', 'cpu', hoặc None (auto-detect)
-    VINTERN_DEVICE = os.getenv('VINTERN_DEVICE', None)
+    # Auto-detect: Sẽ dùng CUDA nếu có GPU, fallback về CPU nếu không
+    # Force CPU: set VINTERN_DEVICE='cpu' (cho testing)
+    # Force GPU: set VINTERN_DEVICE='cuda' (recommended nếu có GPU)
+    VINTERN_DEVICE = os.getenv('VINTERN_DEVICE', 'cuda')  # Default: dùng GPU
     
     # ============================================
     # GENERAL OCR CONFIG
