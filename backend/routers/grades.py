@@ -4,16 +4,19 @@ API Router cho quản lý điểm số học sinh
 
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import io
+import os
 import xlsxwriter
+from pathlib import Path
 
 from database.connection import get_db
 from routers.auth import get_current_user
 from models.schemas import ResponseModel
 from utils.logger import setup_logger
+from services.ocr_service import get_ocr_service
 
 logger = setup_logger()
 router = APIRouter()
@@ -1082,4 +1085,215 @@ async def bulk_import_grades(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
+        )
+
+# ===============================================
+# OCR GRADE SHEET - HANDWRITING RECOGNITION
+# ===============================================
+
+@router.post("/ocr/parse-grade-sheet", response_model=ResponseModel)
+async def parse_grade_sheet_from_image(
+    file: UploadFile = File(...),
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """
+    Upload và phân tích ảnh bảng điểm viết tay sử dụng OCR
+    
+    Returns: Parsed data để review trước khi import
+    """
+    try:
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File phải là ảnh (jpg, png, etc.)"
+            )
+        
+        # Tạo thư mục uploads nếu chưa có
+        upload_dir = Path("uploads/grade_sheets")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Lưu file tạm thời
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        temp_filename = f"grade_sheet_{current_teacher['id']}_{timestamp}_{file.filename}"
+        temp_path = upload_dir / temp_filename
+        
+        # Save uploaded file
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        logger.info(f"Saved uploaded grade sheet to {temp_path}")
+        
+        # Parse ảnh bằng OCR service
+        ocr_service = get_ocr_service()
+        parsed_result = ocr_service.parse_grade_sheet(str(temp_path))
+        
+        # Convert to Excel format
+        excel_data = ocr_service.export_to_excel_format(parsed_result)
+        
+        # Cleanup: xóa file tạm sau khi xử lý
+        try:
+            os.remove(temp_path)
+            logger.info(f"Removed temporary file {temp_path}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temp file: {str(e)}")
+        
+        # Validate students exist in database
+        validated_data = []
+        validation_errors = []
+        
+        for idx, row in enumerate(excel_data, start=1):
+            student_id = row.get('student_id')
+            if not student_id:
+                validation_errors.append({
+                    'row': idx,
+                    'error': 'Không tìm thấy ID học sinh',
+                    'data': row
+                })
+                continue
+            
+            # Check if student exists
+            student = db.table("students").select("id, student_id, full_name, class_name").eq("student_id", student_id).execute()
+            
+            if not student.data:
+                validation_errors.append({
+                    'row': idx,
+                    'student_id': student_id,
+                    'error': f'Không tìm thấy học sinh với ID {student_id} trong hệ thống',
+                    'data': row
+                })
+            else:
+                # Add student info to validated data
+                student_info = student.data[0]
+                validated_data.append({
+                    'student_id': student_id,
+                    'student_db_id': student_info['id'],
+                    'full_name': student_info['full_name'],
+                    'class_name': student_info['class_name'],
+                    'ocr_name': row.get('ho_va_ten', ''),
+                    'diem_thuong_xuyen': row.get('diem_thuong_xuyen'),
+                    'diem_thi_giua_ki': row.get('diem_thi_giua_ki'),
+                    'diem_thi_cuoi_ki': row.get('diem_thi_cuoi_ki')
+                })
+        
+        return ResponseModel(
+            success=parsed_result.get('success', False),
+            message=f"Phân tích bảng điểm thành công. Tìm thấy {len(validated_data)} học sinh hợp lệ.",
+            data={
+                'parsed_rows': validated_data,
+                'validation_errors': validation_errors,
+                'total_parsed': len(excel_data),
+                'total_valid': len(validated_data),
+                'total_errors': len(validation_errors),
+                'ocr_errors': parsed_result.get('errors', [])
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error parsing grade sheet image: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi xử lý ảnh: {str(e)}"
+        )
+
+
+@router.post("/ocr/import-from-parsed", response_model=ResponseModel)
+async def import_grades_from_parsed_ocr(
+    import_data: BulkGradeImport,
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """
+    Import điểm từ dữ liệu đã parse bởi OCR (sau khi review)
+    Tái sử dụng logic bulk_import_grades
+    """
+    # Sử dụng lại hàm bulk_import_grades đã có
+    return await bulk_import_grades(import_data, current_teacher, db)
+
+
+@router.post("/ocr/export-parsed-to-excel")
+async def export_parsed_ocr_to_excel(
+    data: dict,
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """
+    Export dữ liệu đã parse từ OCR ra file Excel để người dùng tải về
+    """
+    try:
+        parsed_rows = data.get('parsed_rows', [])
+        
+        if not parsed_rows:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không có dữ liệu để export"
+            )
+        
+        # Tạo file Excel
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet('Bảng điểm OCR')
+        
+        # Định dạng
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#4472C4',
+            'font_color': 'white',
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        cell_format = workbook.add_format({
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        # Header
+        headers = ['id', 'ho_va_ten', 'lop', 'diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        # Dữ liệu
+        for row_idx, row in enumerate(parsed_rows, start=1):
+            worksheet.write(row_idx, 0, row.get('student_id', ''), cell_format)
+            worksheet.write(row_idx, 1, row.get('full_name', ''), cell_format)
+            worksheet.write(row_idx, 2, row.get('class_name', ''), cell_format)
+            worksheet.write(row_idx, 3, row.get('diem_thuong_xuyen', ''), cell_format)
+            worksheet.write(row_idx, 4, row.get('diem_thi_giua_ki', ''), cell_format)
+            worksheet.write(row_idx, 5, row.get('diem_thi_cuoi_ki', ''), cell_format)
+        
+        # Điều chỉnh độ rộng cột
+        worksheet.set_column('A:A', 12)
+        worksheet.set_column('B:B', 25)
+        worksheet.set_column('C:C', 15)
+        worksheet.set_column('D:F', 20)
+        
+        workbook.close()
+        output.seek(0)
+        
+        # Tên file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Bang_diem_OCR_{timestamp}.xlsx"
+        
+        return StreamingResponse(
+            output,
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error exporting parsed OCR data: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi export file: {str(e)}"
         ) 

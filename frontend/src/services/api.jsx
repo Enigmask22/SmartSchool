@@ -884,6 +884,85 @@ class ApiService {
       };
     }
   }
+
+  // ===============================================
+  // OCR GRADE SHEET APIs
+  // ===============================================
+
+  /**
+   * Upload và parse ảnh bảng điểm viết tay sử dụng OCR
+   */
+  async parseGradeSheetOCR(formData) {
+    try {
+      const token = localStorage.getItem('access_token');
+      
+      const response = await fetch(`${this.baseURL}/grades/ocr/parse-grade-sheet`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Không set Content-Type để browser tự động set với boundary cho multipart/form-data
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Lỗi khi phân tích ảnh');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error parsing OCR grade sheet:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export dữ liệu đã parse từ OCR ra Excel
+   */
+  async exportParsedOCRToExcel(data) {
+    try {
+      const token = localStorage.getItem('access_token');
+      
+      const response = await fetch(`${this.baseURL}/grades/ocr/export-parsed-to-excel`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error('Lỗi khi export file');
+      }
+
+      // Download file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get filename from header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'Bang_diem_OCR.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error exporting OCR data to Excel:', error);
+      throw error;
+    }
+  }
 }
 
 // Create and export singleton instance

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
 import * as XLSX from 'xlsx';
+import OCRGradeSheet from './OCRGradeSheet';
 
 const GradeManagement = () => {
   const { user } = useContext(AuthContext);
@@ -561,8 +562,15 @@ const GradeManagement = () => {
                       />
                     </label>
 
+                    <OCRGradeSheet 
+                      selectedClassSubject={selectedClassSubject}
+                      academicYear={academicYear}
+                      semester={semester}
+                      onImportSuccess={() => handleClassSubjectSelect(selectedClassSubject)}
+                    />
+
                     <div className="text-sm text-gray-500 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-                      <span className="font-medium">💡 Hỗ trợ:</span> Excel (.xlsx, .xls) và CSV
+                      <span className="font-medium">💡 Hỗ trợ:</span> Excel (.xlsx, .xls), CSV, và ảnh bảng điểm
                     </div>
                   </div>
                 )}
