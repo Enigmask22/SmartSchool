@@ -15,8 +15,8 @@ logger = setup_logger()
 class OCRModel(Enum):
     """Enum định nghĩa các OCR model có sẵn"""
     GEMINI = "gemini"
-    VINTERN = "vintern"
-    # Có thể thêm model khác: PADDLE, TESSERACT, etc.
+    QWEN = "qwen"
+    # Có thể thêm model khác nếu cần
 
 
 class OCRFactory:
@@ -66,8 +66,9 @@ class OCRFactory:
             service = OCRFactory.get_ocr_service(OCRModel.GEMINI)
             service = OCRFactory.get_ocr_service("gemini")
             
-            # Switch sang VinternVL
-            service = OCRFactory.get_ocr_service(OCRModel.VINTERN)
+            # Switch sang Qwen2.5-VL
+            service = OCRFactory.get_ocr_service(OCRModel.QWEN)
+            service = OCRFactory.get_ocr_service("qwen")
         """
         # Xử lý model parameter
         if model is None:
@@ -92,12 +93,12 @@ class OCRFactory:
         if model == OCRModel.GEMINI:
             from services.ocr_service import GradeSheetOCRService
             service = GradeSheetOCRService()
-        elif model == OCRModel.VINTERN:
-            from services.vintern_ocr_service import VinternOCRService
+        elif model == OCRModel.QWEN:
+            from services.qwen_ocr_service import QwenOCRService
             from config.ocr_config import OCRConfig
             # Đọc device từ config
-            device = OCRConfig.VINTERN_DEVICE
-            service = VinternOCRService(device=device)
+            device = OCRConfig.QWEN_DEVICE
+            service = QwenOCRService(device=device)
         else:
             raise ValueError(f"Unsupported OCR model: {model}")
         
@@ -157,7 +158,8 @@ def get_ocr_service(model: Optional[Union[OCRModel, str]] = None):
         service = get_ocr_service()
         
         # Hoặc chỉ định model
-        service = get_ocr_service("vintern")
+        service = get_ocr_service("qwen")
+        service = get_ocr_service("gemini")
     """
     return OCRFactory.get_ocr_service(model)
 
@@ -171,10 +173,10 @@ if __name__ == "__main__":
     gemini_service = OCRFactory.get_ocr_service(OCRModel.GEMINI)
     print(f"Service type: {type(gemini_service).__name__}")
     
-    # Test VinternVL
-    print("\n=== Testing VinternVL OCR ===")
-    vintern_service = OCRFactory.get_ocr_service(OCRModel.VINTERN)
-    print(f"Service type: {type(vintern_service).__name__}")
+    # Test Qwen2.5-VL
+    print("\n=== Testing Qwen2.5-VL OCR ===")
+    qwen_service = OCRFactory.get_ocr_service(OCRModel.QWEN)
+    print(f"Service type: {type(qwen_service).__name__}")
     
     # Test default
     print("\n=== Testing Default OCR ===")

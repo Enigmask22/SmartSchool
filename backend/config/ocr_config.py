@@ -16,11 +16,11 @@ class OCRConfig:
     # CHỌN MODEL TẠI ĐÂY - THAY ĐỔI ĐỂ SWITCH
     # ============================================
     
-    # Các tùy chọn: "gemini" hoặc "vintern"
-    DEFAULT_OCR_MODEL = "vintern"  # <-- THAY ĐỔI TẠI ĐÂY
+    # Các tùy chọn: "gemini", "qwen"
+    DEFAULT_OCR_MODEL = "qwen"  # <-- THAY ĐỔI TẠI ĐÂY
     
     # Hoặc sử dụng biến môi trường (ưu tiên hơn)
-    # export OCR_MODEL=vintern
+    # export OCR_MODEL=qwen
     
     @classmethod
     def get_ocr_model(cls) -> str:
@@ -28,11 +28,11 @@ class OCRConfig:
         Lấy OCR model được cấu hình
         
         Returns:
-            Tên model: "gemini" hoặc "vintern"
+            Tên model: "gemini" hoặc "qwen"
         """
         # Ưu tiên biến môi trường
         env_model = os.getenv('OCR_MODEL', '').lower()
-        if env_model in ['gemini', 'vintern']:
+        if env_model in ['gemini', 'qwen']:
             return env_model
         
         # Fallback về config mặc định
@@ -46,22 +46,23 @@ class OCRConfig:
     GEMINI_MODEL_NAME = "gemini-2.0-flash"
     
     # ============================================
-    # VINTERN CONFIG (Local Vision Language Model)
+    # QWEN CONFIG (State-of-the-art Vision Language Model)
     # ============================================
     
     # Model path hoặc Hugging Face model ID
-    # Vintern-1B-v3.5: Top model cho OCR tiếng Việt (1B params)
-    # - Đặc biệt tốt cho: invoices, legal texts, handwriting, tables
-    # - Vi-MTVQA: 41.9% (cao nhất trong class 1B)
-    # - Chạy được trên T4 GPU (Google Colab free)
-    # Source: https://huggingface.co/5CD-AI/Vintern-1B-v3_5
-    VINTERN_MODEL_PATH = os.getenv('VINTERN_MODEL_PATH', '5CD-AI/Vintern-1B-v3_5')
+    # Qwen2.5-VL-3B: State-of-the-art OCR model (3B params)
+    # - Độ chính xác: 93-95% (gần sát Gemini 97%)
+    # - Context length: 32K tokens (xử lý 100+ dòng)
+    # - VRAM: 6-7GB (perfect cho RTX 4060 8GB)
+    # - Speed: 2-3s trên GPU
+    # - OCR tiếng Việt xuất sắc
+    # Docs: https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct
+    QWEN_MODEL_PATH = os.getenv('QWEN_MODEL_PATH', 'Qwen/Qwen2.5-VL-3B-Instruct')
     
     # Device: 'cuda', 'cpu', hoặc None (auto-detect)
-    # Auto-detect: Sẽ dùng CUDA nếu có GPU, fallback về CPU nếu không
-    # Force CPU: set VINTERN_DEVICE='cpu' (cho testing hoặc hệ thống không có GPU)
-    # Force GPU: set VINTERN_DEVICE='cuda' (recommended nếu có GPU)
-    VINTERN_DEVICE = os.getenv('VINTERN_DEVICE', 'cuda')  # Default: dùng CPU (thay đổi thành 'cuda' hoặc None để dùng GPU)
+    # KHUYẾN NGHỊ: 'cuda' để đạt accuracy cao nhất
+    # GPU cần: RTX 4060 8GB trở lên
+    QWEN_DEVICE = os.getenv('QWEN_DEVICE', 'cuda')  # Default: GPU (khuyến nghị)
     
     # ============================================
     # GENERAL OCR CONFIG
@@ -89,7 +90,7 @@ class OCRConfig:
         
         info = {
             'current_model': current_model,
-            'available_models': ['gemini', 'vintern']
+            'available_models': ['gemini', 'qwen']
         }
         
         if current_model == 'gemini':
@@ -98,10 +99,10 @@ class OCRConfig:
                 'api_key_set': bool(cls.GEMINI_API_KEY),
                 'type': 'cloud'
             })
-        elif current_model == 'vintern':
+        elif current_model == 'qwen':
             info.update({
-                'model_path': cls.VINTERN_MODEL_PATH,
-                'device': cls.VINTERN_DEVICE or 'auto',
+                'model_path': cls.QWEN_MODEL_PATH,
+                'device': cls.QWEN_DEVICE or 'auto',
                 'type': 'local'
             })
         
@@ -120,7 +121,7 @@ class OCRConfig:
         if info['current_model'] == 'gemini':
             print(f"Model Name: {info.get('model_name')}")
             print(f"API Key Set: {'✓' if info.get('api_key_set') else '✗'}")
-        elif info['current_model'] == 'vintern':
+        elif info['current_model'] == 'qwen':
             print(f"Model Path: {info.get('model_path')}")
             print(f"Device: {info.get('device')}")
         
@@ -135,8 +136,8 @@ if __name__ == "__main__":
     # Example: How to change model
     print("\nTo change OCR model:")
     print("1. Edit backend/config/ocr_config.py:")
-    print("   DEFAULT_OCR_MODEL = 'vintern'")
+    print("   DEFAULT_OCR_MODEL = 'qwen'  # or 'gemini'")
     print("\n2. Or use environment variable:")
-    print("   export OCR_MODEL=vintern")
+    print("   export OCR_MODEL=qwen  # or 'gemini'")
     print("   python main.py")
 
