@@ -70,7 +70,7 @@ class GradeSheetOCRService:
             # Cấu hình generation
             self.generation_config = genai.types.GenerationConfig(
                 candidate_count=1,
-                max_output_tokens=4096,
+                max_output_tokens=7200,
                 temperature=0.1,  # Low temperature for accuracy
             )
             
