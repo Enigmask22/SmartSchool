@@ -891,7 +891,7 @@ class ApiService {
   // ===============================================
 
   /**
-   * Upload và parse ảnh bảng điểm viết tay sử dụng OCR
+   * Upload và parse ảnh bảng điểm viết tay sử dụng OCR (Async với Queue)
    */
   async parseGradeSheetOCR(formData) {
     try {
@@ -907,6 +907,14 @@ class ApiService {
       });
 
       if (!response.ok) {
+        // Handle specific error codes
+        if (response.status === 503) {
+          const errorData = await response.json();
+          const error = new Error(errorData.detail || 'Hệ thống đang quá tải');
+          error.response = { status: 503 };
+          throw error;
+        }
+        
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Lỗi khi phân tích ảnh');
       }
@@ -916,6 +924,24 @@ class ApiService {
       console.error('Error parsing OCR grade sheet:', error);
       throw error;
     }
+  }
+
+  /**
+   * Kiểm tra status của OCR request
+   */
+  async getOCRStatus(requestId) {
+    return this.request(`/grades/ocr/status/${requestId}`, {
+      method: 'GET'
+    });
+  }
+
+  /**
+   * Lấy thống kê queue
+   */
+  async getOCRQueueStats() {
+    return this.request('/grades/ocr/queue-stats', {
+      method: 'GET'
+    });
   }
 
   /**

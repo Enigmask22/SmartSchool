@@ -4,23 +4,30 @@ API Router cho quản lý điểm số học sinh
 
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import io
 import os
 import xlsxwriter
 from pathlib import Path
+import uuid
+import asyncio
 
 from database.connection import get_db
 from routers.auth import get_current_user
 from models.schemas import ResponseModel
 from utils.logger import setup_logger
-from services.ocr_factory import get_ocr_service  # Support multiple OCR models (Gemini, VinternVL)
+from services.ocr_factory import get_ocr_service  # Support multiple OCR models (Gemini, Qwen)
+from services.qwen_queue_manager import get_queue_manager
 from config.ocr_config import OCRConfig
 
 logger = setup_logger()
 router = APIRouter()
+
+# Global dict to store OCR results (in-memory storage)
+# In production, use Redis or database
+ocr_results = {}
 
 # ===============================================
 # PYDANTIC MODELS
@@ -1092,54 +1099,51 @@ async def bulk_import_grades(
 # OCR GRADE SHEET - HANDWRITING RECOGNITION
 # ===============================================
 
-@router.post("/ocr/parse-grade-sheet", response_model=ResponseModel)
-async def parse_grade_sheet_from_image(
-    file: UploadFile = File(...),
-    current_teacher=Depends(get_current_teacher),
-    db=Depends(get_db)
+async def process_ocr_in_background(
+    request_id: str,
+    image_path: str,
+    teacher_id: int,
+    db
 ):
     """
-    Upload và phân tích ảnh bảng điểm viết tay sử dụng OCR
+    Background task để xử lý OCR request
     
-    Returns: Parsed data để review trước khi import
+    Args:
+        request_id: Unique request ID
+        image_path: Path to uploaded image
+        teacher_id: Teacher ID
+        db: Database connection
     """
     try:
-        # Validate file type
-        if not file.content_type or not file.content_type.startswith('image/'):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="File phải là ảnh (jpg, png, etc.)"
-            )
+        logger.info(f"🔄 Starting OCR processing for request {request_id}")
         
-        # Tạo thư mục uploads nếu chưa có
-        upload_dir = Path("uploads/grade_sheets")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Lưu file tạm thời
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_filename = f"grade_sheet_{current_teacher['id']}_{timestamp}_{file.filename}"
-        temp_path = upload_dir / temp_filename
-        
-        # Save uploaded file
-        with open(temp_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        logger.info(f"Saved uploaded grade sheet to {temp_path}")
+        # Update status: processing
+        ocr_results[request_id] = {
+            'status': 'processing',
+            'message': 'Đang xử lý OCR...',
+            'progress': 0,
+            'timestamp': datetime.now().isoformat()
+        }
         
         # Parse ảnh bằng OCR service
         ocr_service = get_ocr_service()
-        parsed_result = ocr_service.parse_grade_sheet(str(temp_path))
+        
+        # Update progress: 30%
+        ocr_results[request_id]['progress'] = 30
+        ocr_results[request_id]['message'] = 'Đang nhận diện văn bản...'
+        
+        parsed_result = ocr_service.parse_grade_sheet(image_path)
+        
+        # Update progress: 60%
+        ocr_results[request_id]['progress'] = 60
+        ocr_results[request_id]['message'] = 'Đang chuyển đổi dữ liệu...'
         
         # Convert to Excel format
         excel_data = ocr_service.export_to_excel_format(parsed_result)
         
-        # Cleanup: xóa file tạm sau khi xử lý
-        try:
-            os.remove(temp_path)
-            logger.info(f"Removed temporary file {temp_path}")
-        except Exception as e:
-            logger.warning(f"Failed to remove temp file: {str(e)}")
+        # Update progress: 80%
+        ocr_results[request_id]['progress'] = 80
+        ocr_results[request_id]['message'] = 'Đang xác thực học sinh...'
         
         # Validate students exist in database
         validated_data = []
@@ -1179,10 +1183,20 @@ async def parse_grade_sheet_from_image(
                     'diem_thi_cuoi_ki': row.get('diem_thi_cuoi_ki')
                 })
         
-        return ResponseModel(
-            success=parsed_result.get('success', False),
-            message=f"Phân tích bảng điểm thành công. Tìm thấy {len(validated_data)} học sinh hợp lệ.",
-            data={
+        # Cleanup: xóa file tạm sau khi xử lý
+        try:
+            os.remove(image_path)
+            logger.info(f"Removed temporary file {image_path}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temp file: {str(e)}")
+        
+        # Update status: completed
+        ocr_results[request_id] = {
+            'status': 'completed',
+            'message': f'Hoàn thành! Tìm thấy {len(validated_data)} học sinh hợp lệ.',
+            'progress': 100,
+            'timestamp': datetime.now().isoformat(),
+            'data': {
                 'parsed_rows': validated_data,
                 'validation_errors': validation_errors,
                 'total_parsed': len(excel_data),
@@ -1190,15 +1204,274 @@ async def parse_grade_sheet_from_image(
                 'total_errors': len(validation_errors),
                 'ocr_errors': parsed_result.get('errors', [])
             }
+        }
+        
+        logger.info(f"✅ OCR processing completed for request {request_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ ERROR: OCR processing failed for request {request_id}: {str(e)}")
+        
+        # Update status: failed
+        ocr_results[request_id] = {
+            'status': 'failed',
+            'message': f'Lỗi xử lý: {str(e)}',
+            'progress': 0,
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }
+
+
+@router.post("/ocr/parse-grade-sheet", response_model=ResponseModel)
+async def parse_grade_sheet_from_image(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """
+    Upload và phân tích ảnh bảng điểm viết tay sử dụng OCR với Queue Manager
+    
+    Returns: Request ID để track progress
+    """
+    try:
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File phải là ảnh (jpg, png, etc.)"
+            )
+        
+        # Tạo thư mục uploads nếu chưa có
+        upload_dir = Path("uploads/grade_sheets")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Lưu file tạm thời
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        temp_filename = f"grade_sheet_{current_teacher['id']}_{timestamp}_{file.filename}"
+        temp_path = upload_dir / temp_filename
+        
+        # Save uploaded file
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        logger.info(f"Saved uploaded grade sheet to {temp_path}")
+        
+        # Generate unique request ID
+        request_id = str(uuid.uuid4())
+        
+        # Get queue manager
+        queue_manager = get_queue_manager(
+            max_concurrent=OCRConfig.QWEN_MAX_CONCURRENT,
+            max_queue_size=OCRConfig.QWEN_MAX_QUEUE_SIZE
+        )
+        
+        # Get queue stats
+        stats = queue_manager.get_stats()
+        
+        # Check if queue is full
+        if stats['in_queue'] >= OCRConfig.QWEN_MAX_QUEUE_SIZE:
+            # Cleanup uploaded file
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Hệ thống đang quá tải. Queue đã đầy ({stats['in_queue']}/{OCRConfig.QWEN_MAX_QUEUE_SIZE}). Vui lòng thử lại sau."
+            )
+        
+        # Add to queue (background processing)
+        ocr_results[request_id] = {
+            'status': 'queued',
+            'message': 'Request đã được thêm vào hàng chờ',
+            'progress': 0,
+            'position_in_queue': stats['in_queue'] + 1,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Start background task
+        background_tasks.add_task(
+            process_ocr_in_background,
+            request_id=request_id,
+            image_path=str(temp_path),
+            teacher_id=current_teacher['id'],
+            db=db
+        )
+        
+        # Estimate wait time (assuming 10 minutes per request)
+        estimated_wait_seconds = stats['in_queue'] * 600  # 10 minutes = 600 seconds
+        
+        return ResponseModel(
+            success=True,
+            message="Request đã được thêm vào hàng chờ. Sử dụng request_id để kiểm tra tiến trình.",
+            data={
+                'request_id': request_id,
+                'status': 'queued',
+                'position_in_queue': stats['in_queue'] + 1,
+                'estimated_wait_seconds': estimated_wait_seconds,
+                'estimated_wait_minutes': round(estimated_wait_seconds / 60, 1),
+                'queue_info': {
+                    'in_queue': stats['in_queue'],
+                    'processing': stats['processing'],
+                    'max_concurrent': OCRConfig.QWEN_MAX_CONCURRENT
+                }
+            }
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"ERROR: Error parsing grade sheet image: {str(e)}")
+        logger.error(f"ERROR: Error uploading grade sheet image: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi xử lý ảnh: {str(e)}"
+            detail=f"Lỗi upload ảnh: {str(e)}"
+        )
+
+
+@router.get("/ocr/status/{request_id}", response_model=ResponseModel)
+async def get_ocr_status(
+    request_id: str,
+    current_teacher=Depends(get_current_teacher)
+):
+    """
+    Kiểm tra status của OCR request
+    
+    Args:
+        request_id: Unique request ID từ endpoint upload
+        
+    Returns:
+        Status và data nếu đã hoàn thành
+    """
+    try:
+        # Check if request exists
+        if request_id not in ocr_results:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Không tìm thấy request {request_id}"
+            )
+        
+        result = ocr_results[request_id]
+        status_value = result['status']
+        
+        # Get queue manager for stats
+        queue_manager = get_queue_manager(
+            max_concurrent=OCRConfig.QWEN_MAX_CONCURRENT,
+            max_queue_size=OCRConfig.QWEN_MAX_QUEUE_SIZE
+        )
+        stats = queue_manager.get_stats()
+        
+        if status_value == 'queued':
+            return ResponseModel(
+                success=True,
+                message="Request đang trong hàng chờ",
+                data={
+                    'request_id': request_id,
+                    'status': status_value,
+                    'progress': result.get('progress', 0),
+                    'message': result.get('message', ''),
+                    'position_in_queue': result.get('position_in_queue', 0),
+                    'queue_info': {
+                        'in_queue': stats['in_queue'],
+                        'processing': stats['processing']
+                    },
+                    'timestamp': result.get('timestamp')
+                }
+            )
+        
+        elif status_value == 'processing':
+            return ResponseModel(
+                success=True,
+                message="Đang xử lý OCR",
+                data={
+                    'request_id': request_id,
+                    'status': status_value,
+                    'progress': result.get('progress', 0),
+                    'message': result.get('message', ''),
+                    'timestamp': result.get('timestamp')
+                }
+            )
+        
+        elif status_value == 'completed':
+            return ResponseModel(
+                success=True,
+                message="OCR hoàn thành",
+                data={
+                    'request_id': request_id,
+                    'status': status_value,
+                    'progress': 100,
+                    'message': result.get('message', ''),
+                    'result': result.get('data', {}),
+                    'timestamp': result.get('timestamp')
+                }
+            )
+        
+        elif status_value == 'failed':
+            return ResponseModel(
+                success=False,
+                message=f"OCR thất bại: {result.get('message', 'Unknown error')}",
+                data={
+                    'request_id': request_id,
+                    'status': status_value,
+                    'error': result.get('error', 'Unknown error'),
+                    'timestamp': result.get('timestamp')
+                }
+            )
+        
+        else:
+            return ResponseModel(
+                success=False,
+                message=f"Unknown status: {status_value}",
+                data=result
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error getting OCR status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi lấy status: {str(e)}"
+        )
+
+
+@router.get("/ocr/queue-stats", response_model=ResponseModel)
+async def get_queue_stats(
+    current_teacher=Depends(get_current_teacher)
+):
+    """
+    Lấy thống kê queue
+    
+    Returns:
+        Queue statistics
+    """
+    try:
+        queue_manager = get_queue_manager(
+            max_concurrent=OCRConfig.QWEN_MAX_CONCURRENT,
+            max_queue_size=OCRConfig.QWEN_MAX_QUEUE_SIZE
+        )
+        
+        stats = queue_manager.get_stats()
+        
+        return ResponseModel(
+            success=True,
+            message="Lấy thống kê queue thành công",
+            data={
+                'queue_stats': stats,
+                'config': {
+                    'max_concurrent': OCRConfig.QWEN_MAX_CONCURRENT,
+                    'max_queue_size': OCRConfig.QWEN_MAX_QUEUE_SIZE,
+                    'request_timeout': OCRConfig.QWEN_REQUEST_TIMEOUT
+                }
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"ERROR: Error getting queue stats: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi lấy stats: {str(e)}"
         )
 
 
