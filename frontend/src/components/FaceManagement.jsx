@@ -15,6 +15,10 @@ const FaceManagement = () => {
   // Filter states
   const [selectedClass, setSelectedClass] = useState('');
   const [availableClasses, setAvailableClasses] = useState([]);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     fetchAvailableClasses();
@@ -22,6 +26,7 @@ const FaceManagement = () => {
 
   useEffect(() => {
     fetchStudentsData();
+    setCurrentPage(1); // Reset to page 1 when class changes
   }, [selectedClass]);
 
   useEffect(() => {
@@ -315,11 +320,33 @@ const FaceManagement = () => {
       {/* Students with Face Registration */}
       <div className="overflow-hidden bg-white rounded-lg shadow-md">
         <div className="p-6 border-b">
-          <h3 className="text-xl font-semibold">Học sinh đã đăng ký khuôn mặt</h3>
-          <p className="mt-1 text-gray-600">
-            Danh sách học sinh có thể được nhận diện bằng AI
-            {selectedClass && ` - Lớp ${selectedClass}`}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-semibold">Học sinh đã đăng ký khuôn mặt</h3>
+              <p className="mt-1 text-gray-600">
+                Danh sách học sinh có thể được nhận diện bằng AI
+                {selectedClass && ` - Lớp ${selectedClass}`}
+              </p>
+            </div>
+            {students.length > pageSize && (
+              <div className="flex items-center space-x-2">
+                <label className="text-sm text-gray-700">Số lượng/trang:</label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Header */}
@@ -350,7 +377,13 @@ const FaceManagement = () => {
               )}
             </div>
           ) : (
-            students.map((student) => (
+            (() => {
+              // Apply pagination
+              const startIndex = (currentPage - 1) * pageSize;
+              const endIndex = startIndex + pageSize;
+              const paginatedStudents = students.slice(startIndex, endIndex);
+              
+              return paginatedStudents.map((student) => (
               <div key={student.id} className="grid grid-cols-12 gap-4 items-center px-4 py-4 hover:bg-gray-50">
                 <div className="col-span-2 text-sm font-medium text-gray-900 truncate">
                   {student.student_id}
@@ -390,9 +423,76 @@ const FaceManagement = () => {
                   )}
                 </div>
               </div>
-            ))
+            ));
+            })()
           )}
         </div>
+        
+        {/* Pagination Controls */}
+        {(() => {
+          const totalStudents = students.length;
+          const totalPages = Math.ceil(totalStudents / pageSize);
+          
+          if (totalPages <= 1) return null;
+          
+          return (
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-gray-700">
+                  Hiển thị <span className="font-semibold">{((currentPage - 1) * pageSize) + 1}</span> đến <span className="font-semibold">{Math.min(currentPage * pageSize, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← Trước
+                  </button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                      const showPage = 
+                        pageNum === 1 || 
+                        pageNum === totalPages || 
+                        (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+                      
+                      if (!showPage) {
+                        if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                          return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+                        }
+                        return null;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Sau →
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Instructions */}

@@ -17,7 +17,7 @@ const AttendanceView = () => {
   
   // Pagination
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
   
   // Edit states
@@ -643,7 +643,13 @@ const AttendanceView = () => {
               )}
             </div>
           ) : (
-            attendanceRecords.map((record) => (
+            (() => {
+              // Apply frontend pagination
+              const startIndex = (page - 1) * pageSize;
+              const endIndex = startIndex + pageSize;
+              const paginatedRecords = attendanceRecords.slice(startIndex, endIndex);
+              
+              return paginatedRecords.map((record) => (
               <div key={record.id} className="grid grid-cols-12 gap-2 px-6 py-4 hover:bg-gray-50">
                 <div className="col-span-1 text-sm font-medium text-gray-900">
                   {record.students?.student_id || 'N/A'}
@@ -726,37 +732,94 @@ const AttendanceView = () => {
                   )}
                 </div>
               </div>
-            ))
+            ));
+            })()
           )}
         </div>
 
         {/* Pagination */}
-        {total > pageSize && (
-          <div className="flex justify-between items-center px-6 py-4 border-t border-gray-200">
-            <div className="text-sm text-gray-700">
-              Hiển thị {((page - 1) * pageSize) + 1} đến {Math.min(page * pageSize, total)} trong tổng số {total} bản ghi
+        {(() => {
+          const totalRecords = attendanceRecords.length;
+          const totalPages = Math.ceil(totalRecords / pageSize);
+          
+          if (totalPages <= 1) return null;
+          
+          return (
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-gray-700">
+                    Hiển thị <span className="font-semibold">{((page - 1) * pageSize) + 1}</span> đến <span className="font-semibold">{Math.min(page * pageSize, totalRecords)}</span> trong tổng số <span className="font-semibold">{totalRecords}</span> bản ghi
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-700">Số lượng/trang:</label>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setPage(1);
+                      }}
+                      className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={30}>30</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← Trước
+                  </button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                      const showPage = 
+                        pageNum === 1 || 
+                        pageNum === totalPages || 
+                        (pageNum >= page - 1 && pageNum <= page + 1);
+                      
+                      if (!showPage) {
+                        if (pageNum === page - 2 || pageNum === page + 2) {
+                          return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+                        }
+                        return null;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setPage(pageNum)}
+                          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            page === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page === totalPages}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Sau →
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setPage(Math.max(1, page - 1))}
-                disabled={page === 1}
-                className="px-3 py-2 text-sm bg-white rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Trước
-              </button>
-              <span className="px-3 py-2 text-sm text-white bg-blue-600 rounded-md">
-                {page}
-              </span>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page * pageSize >= total}
-                className="px-3 py-2 text-sm bg-white rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Sau
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Summary */}

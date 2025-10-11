@@ -22,10 +22,19 @@ const GradeManagement = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importedData, setImportedData] = useState([]);
   const [importErrors, setImportErrors] = useState([]);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20); // 20 students per page
 
   useEffect(() => {
     fetchTeacherInfo();
   }, [user]);
+
+  // Reset page when selectedClassSubject changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClassSubject]);
 
   const fetchTeacherInfo = async () => {
     try {
@@ -140,6 +149,38 @@ const GradeManagement = () => {
       console.error('Error saving grade:', error);
       alert('Lỗi khi lưu điểm!');
     }
+  };
+
+  // Helper function to sort grade columns in desired order
+  const getSortedColumnNames = (gradeColumnConfig) => {
+    if (!gradeColumnConfig) return [];
+    
+    const columnNames = Object.keys(gradeColumnConfig);
+    
+    // Define desired order: Điểm thường xuyên -> Điểm giữa kì -> Điểm cuối kì -> Others
+    const orderPriority = {
+      'diem_thuong_xuyen': 1,
+      'Diem_thuong_xuyen': 1,
+      'diem_tx': 1,
+      'diem_thi_giua_ki': 2,
+      'Diem_thi_giua_ki': 2,
+      'diem_gk': 2,
+      'diem_thi_cuoi_ki': 3,
+      'Diem_thi_cuoi_ki': 3,
+      'diem_ck': 3
+    };
+    
+    return columnNames.sort((a, b) => {
+      const priorityA = orderPriority[a] || 999;
+      const priorityB = orderPriority[b] || 999;
+      
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // If same priority or no priority, maintain original order
+      return 0;
+    });
   };
 
   const calculateFinalGrade = (gradeData) => {
@@ -616,7 +657,7 @@ const GradeManagement = () => {
                           <p className="text-gray-400">Hãy thêm cột điểm đầu tiên để bắt đầu</p>
                         </div>
                       ) : (
-                        Object.keys(configForm).map((columnName, index) => (
+                        getSortedColumnNames(configForm).map((columnName, index) => (
                           <div key={columnName} className="bg-gray-50 border border-gray-200 rounded-lg p-5 transition-all hover:shadow-md">
                             <div className="flex items-center space-x-4">
                               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-base">
@@ -809,12 +850,30 @@ const GradeManagement = () => {
             {gradeConfig ? (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xl">👥</span>
-                    <h3 className="text-lg font-bold text-gray-800">Danh sách học sinh</h3>
-                    <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                      {students.length} học sinh
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl">👥</span>
+                      <h3 className="text-lg font-bold text-gray-800">Danh sách học sinh</h3>
+                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                        {students.length} học sinh
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm text-gray-700">Số lượng/trang:</label>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={30}>30</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
                 
@@ -828,7 +887,7 @@ const GradeManagement = () => {
                             <span>Học sinh</span>
                           </span>
                         </th>
-                        {Object.keys(gradeConfig.grade_column_config).map(columnName => (
+                        {getSortedColumnNames(gradeConfig.grade_column_config).map(columnName => (
                           <th key={columnName} className="px-5 py-3 text-left">
                             <div className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                               <div>{gradeConfig.grade_column_config[columnName].label}</div>
@@ -853,12 +912,20 @@ const GradeManagement = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {students.map((studentData, index) => (
+                      {(() => {
+                        // Calculate pagination
+                        const totalStudents = students.length;
+                        const totalPages = Math.ceil(totalStudents / pageSize);
+                        const startIndex = (currentPage - 1) * pageSize;
+                        const endIndex = startIndex + pageSize;
+                        const paginatedStudents = students.slice(startIndex, endIndex);
+                        
+                        return paginatedStudents.map((studentData, index) => (
                         <tr key={studentData.student.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-5 py-3">
                             <div className="flex items-center space-x-2.5">
                               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                                {index + 1}
+                                {startIndex + index + 1}
                               </div>
                               <div>
                                 <div className="text-sm font-medium text-gray-900">
@@ -870,7 +937,7 @@ const GradeManagement = () => {
                               </div>
                             </div>
                           </td>
-                          {Object.keys(gradeConfig.grade_column_config).map(columnName => (
+                          {getSortedColumnNames(gradeConfig.grade_column_config).map(columnName => (
                             <td key={columnName} className="px-5 py-3">
                               <span className="text-sm font-medium text-gray-900">
                                 {studentData.grade?.grade_data?.[columnName]?.Diem ? (
@@ -902,10 +969,79 @@ const GradeManagement = () => {
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ));
+                      })()}
                     </tbody>
                   </table>
                 </div>
+                
+                {/* Pagination Controls */}
+                {(() => {
+                  const totalStudents = students.length;
+                  const totalPages = Math.ceil(totalStudents / pageSize);
+                  const startIndex = (currentPage - 1) * pageSize;
+                  const endIndex = startIndex + pageSize;
+                  
+                  if (totalPages <= 1) return null;
+                  
+                  return (
+                    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-sm text-gray-700">
+                          Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            ← Trước
+                          </button>
+                          
+                          <div className="flex items-center space-x-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                              const showPage = 
+                                pageNum === 1 || 
+                                pageNum === totalPages || 
+                                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+                              
+                              if (!showPage) {
+                                if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                                  return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+                                }
+                                return null;
+                              }
+                              
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => setCurrentPage(pageNum)}
+                                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                    currentPage === pageNum
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Sau →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div className="text-center py-12 bg-white rounded-lg shadow-md">
@@ -955,7 +1091,7 @@ const GradeManagement = () => {
               </div>
               
               <div className="p-5 space-y-4">
-                {Object.keys(gradeConfig.grade_column_config).map(columnName => (
+                {getSortedColumnNames(gradeConfig.grade_column_config).map(columnName => (
                   <div key={columnName} className="bg-gray-50 rounded-lg p-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <span className="flex items-center justify-between">
