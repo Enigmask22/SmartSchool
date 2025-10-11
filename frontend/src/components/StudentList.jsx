@@ -42,6 +42,10 @@ const StudentList = () => {
   // Show inactive students option
   const [showInactive, setShowInactive] = useState(false);
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12); // 12 students per page (3x4 grid)
+  
   // View grades states
   const [showGradesModal, setShowGradesModal] = useState(false);
   const [selectedStudentForGrades, setSelectedStudentForGrades] = useState(null);
@@ -192,6 +196,18 @@ const StudentList = () => {
     const matchesClass = selectedClass === '' || student.class_name === selectedClass;
     return matchesSearch && matchesClass;
   }) : [];
+
+  // Calculate pagination
+  const totalStudents = filteredStudents.length;
+  const totalPages = Math.ceil(totalStudents / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedClass, showInactive]);
 
   // State for available classes
   const [availableClasses, setAvailableClasses] = useState([]);
@@ -984,6 +1000,33 @@ const StudentList = () => {
         </div>
       </div>
 
+      {/* Pagination Summary */}
+      {totalStudents > 0 && (
+        <div className="mb-4 p-4 bg-white rounded-lg shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-gray-700">
+              Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-700">Số lượng/trang:</label>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="pl-3 pr-8 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value={6}>6</option>
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+                <option value={48}>48</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Students Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredStudents.length === 0 ? (
@@ -997,7 +1040,7 @@ const StudentList = () => {
             </p>
           </div>
         ) : (
-          filteredStudents.map((student) => (
+          paginatedStudents.map((student) => (
             <div key={student.id} className="overflow-hidden bg-white rounded-xl border border-gray-100 shadow-lg transition-all duration-300 hover:shadow-xl">
               {/* Header with avatar and basic info */}
               <div className="p-5 text-white bg-blue-600">
@@ -1091,6 +1134,59 @@ const StudentList = () => {
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center items-center space-x-2">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Trước
+          </button>
+          
+          <div className="flex items-center space-x-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+              // Show first page, last page, current page, and pages around current
+              const showPage = 
+                pageNum === 1 || 
+                pageNum === totalPages || 
+                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+              
+              if (!showPage) {
+                // Show ellipsis for skipped pages
+                if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                  return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+                }
+                return null;
+              }
+              
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+          
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Sau →
+          </button>
+        </div>
+      )}
 
         {/* Face Registration Modal */}
         {showFaceModal && (

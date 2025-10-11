@@ -20,6 +20,15 @@ const OCRGradeSheet = ({
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [queuePosition, setQueuePosition] = useState(null);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20); // 20 rows per page
+
+  // Reset page when parsedData changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [parsedData]);
 
   const handleImageSelect = (event) => {
     const file = event.target.files[0];
@@ -438,6 +447,43 @@ const OCRGradeSheet = ({
                     </div>
                   )}
 
+                  {/* Pagination Summary */}
+                  {(() => {
+                    const totalRows = parsedData.parsed_rows.length;
+                    const totalPages = Math.ceil(totalRows / pageSize);
+                    const startIndex = (currentPage - 1) * pageSize;
+                    const endIndex = startIndex + pageSize;
+                    
+                    if (totalRows > pageSize) {
+                      return (
+                        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-sm text-gray-700">
+                              Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalRows)}</span> trong tổng số <span className="font-semibold">{totalRows}</span> bản ghi
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm text-gray-700">Số lượng/trang:</label>
+                              <select
+                                value={pageSize}
+                                onChange={(e) => {
+                                  setPageSize(Number(e.target.value));
+                                  setCurrentPage(1);
+                                }}
+                                className="pl-3 pr-8 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              >
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                                <option value={30}>30</option>
+                                <option value={50}>50</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   {/* Data Table */}
                   <div className="overflow-hidden rounded-lg border border-gray-200">
                     <div className="overflow-x-auto max-h-96">
@@ -454,9 +500,15 @@ const OCRGradeSheet = ({
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {parsedData.parsed_rows.map((row, idx) => (
+                          {(() => {
+                            const totalRows = parsedData.parsed_rows.length;
+                            const startIndex = (currentPage - 1) * pageSize;
+                            const endIndex = startIndex + pageSize;
+                            const paginatedRows = parsedData.parsed_rows.slice(startIndex, endIndex);
+                            
+                            return paginatedRows.map((row, idx) => (
                             <tr key={idx} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900">{idx + 1}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{startIndex + idx + 1}</td>
                               <td className="px-4 py-3 text-sm font-medium text-indigo-600">{row.student_id}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">
                                 {row.full_name}
@@ -487,11 +539,72 @@ const OCRGradeSheet = ({
                                 )}
                               </td>
                             </tr>
-                          ))}
+                          ));
+                          })()}
                         </tbody>
                       </table>
                     </div>
                   </div>
+
+                  {/* Pagination Controls */}
+                  {(() => {
+                    const totalRows = parsedData.parsed_rows.length;
+                    const totalPages = Math.ceil(totalRows / pageSize);
+                    const startIndex = (currentPage - 1) * pageSize;
+                    const endIndex = startIndex + pageSize;
+                    
+                    if (totalPages <= 1) return null;
+                    
+                    return (
+                      <div className="mt-4 flex justify-center items-center space-x-2">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          ← Trước
+                        </button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                            const showPage = 
+                              pageNum === 1 || 
+                              pageNum === totalPages || 
+                              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+                            
+                            if (!showPage) {
+                              if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                                return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+                              }
+                              return null;
+                            }
+                            
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                  currentPage === pageNum
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Sau →
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* Action Buttons */}
                   <div className="flex justify-between items-center pt-4 border-t border-gray-200">
