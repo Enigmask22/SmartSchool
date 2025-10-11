@@ -65,6 +65,25 @@ class OCRConfig:
     QWEN_DEVICE = os.getenv('QWEN_DEVICE', 'cuda')  # Default: GPU (khuyến nghị)
     
     # ============================================
+    # QWEN QUEUE MANAGER CONFIG (Concurrent Requests)
+    # ============================================
+    
+    # Maximum concurrent OCR requests được xử lý đồng thời
+    # Tùy thuộc vào GPU VRAM:
+    # - RTX 4060 8GB: max_concurrent=1 (1 request / lần)
+    # - H200 141GB (Hugging Face Pro): max_concurrent=10 (10 requests đồng thời)
+    # - A100 80GB: max_concurrent=6-8
+    QWEN_MAX_CONCURRENT = int(os.getenv('QWEN_MAX_CONCURRENT', '1'))  # Default: 10 (cho H200)
+    
+    # Maximum queue size (số requests tối đa trong hàng chờ)
+    # Nếu queue full → reject request với HTTP 503
+    QWEN_MAX_QUEUE_SIZE = int(os.getenv('QWEN_MAX_QUEUE_SIZE', '50'))
+    
+    # Timeout cho mỗi OCR request (seconds)
+    # 50 dòng ~ 10 phút + queue wait ~ 5 phút = 15 phút
+    QWEN_REQUEST_TIMEOUT = int(os.getenv('QWEN_REQUEST_TIMEOUT', '1200'))  # 20 phút
+    
+    # ============================================
     # GENERAL OCR CONFIG
     # ============================================
     

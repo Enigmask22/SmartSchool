@@ -13,6 +13,13 @@ const OCRGradeSheet = ({
   const [parsedData, setParsedData] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  
+  // Queue management states
+  const [requestId, setRequestId] = useState(null);
+  const [ocrStatus, setOcrStatus] = useState(null); // 'queued', 'processing', 'completed', 'failed'
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [queuePosition, setQueuePosition] = useState(null);
 
   const handleImageSelect = (event) => {
     const file = event.target.files[0];
@@ -43,6 +50,62 @@ const OCRGradeSheet = ({
     event.target.value = ''; // Reset input
   };
 
+  // Poll status của OCR request
+  const pollOCRStatus = async (reqId) => {
+    try {
+      const response = await api.getOCRStatus(reqId);
+      
+      if (response.success) {
+        const status = response.data.status;
+        setOcrStatus(status);
+        setProgress(response.data.progress || 0);
+        setStatusMessage(response.data.message || '');
+        
+        if (status === 'queued') {
+          setQueuePosition(response.data.position_in_queue);
+          // Continue polling
+          setTimeout(() => pollOCRStatus(reqId), 3000); // Poll every 3 seconds
+        } else if (status === 'processing') {
+          setQueuePosition(null);
+          // Continue polling
+          setTimeout(() => pollOCRStatus(reqId), 2000); // Poll every 2 seconds when processing
+        } else if (status === 'completed') {
+          // Parse completed!
+          const result = response.data.result;
+          setParsedData(result);
+          setParsing(false);
+          setUploading(false);
+          
+          if (result.total_valid === 0) {
+            alert('⚠️ Không tìm thấy dữ liệu hợp lệ trong ảnh!\n\n' + 
+                  'Vui lòng kiểm tra:\n' +
+                  '- Ảnh có đủ sáng và rõ nét\n' +
+                  '- Bảng điểm có đúng format (id, họ và tên, điểm)');
+          } else if (result.total_errors > 0) {
+            alert(`⚠️ Phân tích thành công nhưng có ${result.total_errors} lỗi!\n\n` +
+                  `✅ Tìm thấy: ${result.total_valid} học sinh hợp lệ\n` +
+                  `❌ Lỗi: ${result.total_errors} dòng`);
+          } else {
+            alert(`✅ Phân tích bảng điểm thành công!\n\n` +
+                  `Tìm thấy ${result.total_valid} học sinh.`);
+          }
+        } else if (status === 'failed') {
+          // Failed
+          setParsing(false);
+          setUploading(false);
+          alert('❌ Lỗi khi xử lý ảnh: ' + (response.data.error || 'Unknown error'));
+        }
+      } else {
+        throw new Error(response.message || 'Failed to get status');
+      }
+    } catch (error) {
+      console.error('Error polling OCR status:', error);
+      setParsing(false);
+      setUploading(false);
+      alert('❌ Lỗi khi kiểm tra trạng thái OCR!');
+    }
+  };
+
   const handleUploadAndParse = async () => {
     if (!selectedImage) {
       alert('❌ Vui lòng chọn ảnh bảng điểm!');
@@ -52,6 +115,9 @@ const OCRGradeSheet = ({
     try {
       setUploading(true);
       setParsing(true);
+      setOcrStatus('uploading');
+      setProgress(0);
+      setStatusMessage('Đang upload ảnh...');
 
       const formData = new FormData();
       formData.append('file', selectedImage);
@@ -59,36 +125,38 @@ const OCRGradeSheet = ({
       const response = await api.parseGradeSheetOCR(formData);
 
       if (response.success) {
-        setParsedData(response.data);
+        // Get request_id and start polling
+        const reqId = response.data.request_id;
+        setRequestId(reqId);
+        setOcrStatus(response.data.status); // Should be 'queued'
+        setQueuePosition(response.data.position_in_queue);
+        setStatusMessage('Đã thêm vào hàng chờ...');
         
-        if (response.data.total_valid === 0) {
-          alert('⚠️ Không tìm thấy dữ liệu hợp lệ trong ảnh!\n\n' + 
-                'Vui lòng kiểm tra:\n' +
-                '- Ảnh có đủ sáng và rõ nét\n' +
-                '- Bảng điểm có đúng format (id, họ và tên, điểm)');
-        } else if (response.data.total_errors > 0) {
-          alert(`⚠️ Phân tích thành công nhưng có ${response.data.total_errors} lỗi!\n\n` +
-                `✅ Tìm thấy: ${response.data.total_valid} học sinh hợp lệ\n` +
-                `❌ Lỗi: ${response.data.total_errors} dòng`);
-        } else {
-          alert(`✅ Phân tích bảng điểm thành công!\n\n` +
-                `Tìm thấy ${response.data.total_valid} học sinh.`);
-        }
+        // Start polling status
+        setTimeout(() => pollOCRStatus(reqId), 2000); // Start polling after 2s
       } else {
-        alert('❌ Lỗi khi phân tích ảnh: ' + response.message);
+        alert('❌ Lỗi khi upload ảnh: ' + response.message);
+        setUploading(false);
+        setParsing(false);
       }
 
     } catch (error) {
-      console.error('Error parsing OCR:', error);
-      alert('❌ Lỗi khi xử lý ảnh! Vui lòng thử lại.');
-    } finally {
+      console.error('Error uploading OCR:', error);
+      
+      // Check if queue is full (HTTP 503)
+      if (error.response && error.response.status === 503) {
+        alert('⚠️ Hệ thống đang quá tải!\n\nHàng chờ đã đầy. Vui lòng thử lại sau vài phút.');
+      } else {
+        alert('❌ Lỗi khi xử lý ảnh! Vui lòng thử lại.');
+      }
+      
       setUploading(false);
       setParsing(false);
     }
   };
 
   const handleConfirmImport = async () => {
-    if (!parsedData || parsedData.parsed_rows.length === 0) {
+    if (!parsedData || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0) {
       alert('❌ Không có dữ liệu để import!');
       return;
     }
@@ -138,7 +206,7 @@ const OCRGradeSheet = ({
   };
 
   const handleExportToExcel = async () => {
-    if (!parsedData || parsedData.parsed_rows.length === 0) {
+    if (!parsedData || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0) {
       alert('❌ Không có dữ liệu để export!');
       return;
     }
@@ -157,6 +225,13 @@ const OCRGradeSheet = ({
     setParsedData(null);
     setSelectedImage(null);
     setImagePreview(null);
+    
+    // Reset queue states
+    setRequestId(null);
+    setOcrStatus(null);
+    setProgress(0);
+    setStatusMessage('');
+    setQueuePosition(null);
   };
 
   return (
@@ -164,7 +239,7 @@ const OCRGradeSheet = ({
       {/* OCR Button */}
       <button
         onClick={() => setShowOCRModal(true)}
-        className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-medium shadow-sm hover:shadow-md"
+        className="flex items-center px-4 py-2 space-x-2 font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-sm transition-all hover:from-indigo-700 hover:to-purple-700 hover:shadow-md"
         title="Upload ảnh bảng điểm viết tay để tự động nhận dạng"
       >
         <span>📸</span>
@@ -173,19 +248,19 @@ const OCRGradeSheet = ({
 
       {/* OCR Modal */}
       {showOCRModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="flex fixed inset-0 z-50 justify-center items-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 flex justify-between items-center">
+            <div className="flex justify-between items-center px-6 py-4 text-white bg-gradient-to-r from-indigo-600 to-purple-600">
               <div>
                 <h3 className="text-xl font-bold">📸 OCR - Nhận dạng bảng điểm viết tay</h3>
-                <p className="text-sm text-indigo-100 mt-1">
+                <p className="mt-1 text-sm text-indigo-100">
                   Upload ảnh chụp bảng điểm để tự động nhận dạng và nhập điểm
                 </p>
               </div>
               <button
                 onClick={handleCloseModal}
-                className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"
+                className="p-2 text-white rounded-full transition-colors hover:bg-white hover:bg-opacity-20"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -194,14 +269,14 @@ const OCRGradeSheet = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="overflow-y-auto flex-1 p-6">
               {!parsedData ? (
                 // Upload Section
                 <div className="space-y-6">
                   {/* Instructions */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-900 mb-2">📋 Hướng dẫn:</h4>
-                    <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="mb-2 font-semibold text-blue-900">📋 Hướng dẫn:</h4>
+                    <ul className="space-y-1 text-sm list-disc list-inside text-blue-800">
                       <li>Chụp ảnh bảng điểm rõ nét, đủ sáng</li>
                       <li>Bảng điểm phải có các cột: <strong>id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki</strong></li>
                       <li>Viết tay hoặc in đều được hỗ trợ</li>
@@ -211,14 +286,14 @@ const OCRGradeSheet = ({
 
                   {/* Image Preview */}
                   {imagePreview && (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Ảnh đã chọn:</p>
+                    <div className="p-4 rounded-lg border-2 border-gray-300 border-dashed">
+                      <p className="mb-2 text-sm font-medium text-gray-700">Ảnh đã chọn:</p>
                       <img 
                         src={imagePreview} 
                         alt="Preview" 
-                        className="max-w-full max-h-96 mx-auto rounded-lg shadow-md"
+                        className="mx-auto max-w-full max-h-96 rounded-lg shadow-md"
                       />
-                      <p className="text-xs text-gray-500 mt-2 text-center">
+                      <p className="mt-2 text-xs text-center text-gray-500">
                         {selectedImage.name} ({(selectedImage.size / 1024 / 1024).toFixed(2)} MB)
                       </p>
                     </div>
@@ -226,7 +301,7 @@ const OCRGradeSheet = ({
 
                   {/* Upload Button */}
                   <div className="flex flex-col items-center space-y-4">
-                    <label className="flex items-center justify-center space-x-3 px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-md hover:shadow-lg cursor-pointer w-full max-w-md">
+                    <label className="flex justify-center items-center px-6 py-4 space-x-3 w-full max-w-md font-medium text-white bg-indigo-600 rounded-lg shadow-md transition-colors cursor-pointer hover:bg-indigo-700 hover:shadow-lg">
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -239,31 +314,74 @@ const OCRGradeSheet = ({
                       />
                     </label>
 
-                    {selectedImage && (
+                    {selectedImage && !parsing && (
                       <button
                         onClick={handleUploadAndParse}
                         disabled={uploading}
                         className={`flex items-center space-x-3 px-8 py-4 rounded-lg font-bold text-lg shadow-lg transition-all w-full max-w-md justify-center ${
                           uploading 
                             ? 'bg-gray-400 cursor-not-allowed' 
-                            : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white hover:shadow-xl'
+                            : 'text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl'
                         }`}
                       >
-                        {parsing ? (
-                          <>
-                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>Đang phân tích...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>🚀</span>
-                            <span>Phân tích bảng điểm</span>
-                          </>
-                        )}
+                        <span>🚀</span>
+                        <span>Phân tích bảng điểm</span>
                       </button>
+                    )}
+
+                    {/* Progress Display */}
+                    {parsing && (
+                      <div className="mt-6 space-y-4 w-full max-w-md">
+                        {/* Status Card */}
+                        <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border-2 border-indigo-200 shadow-md">
+                          {/* Status Header */}
+                          <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center space-x-3">
+                              {ocrStatus === 'queued' && (
+                                <>
+                                  <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                                  <span className="font-semibold text-yellow-700">⏳ Đang trong hàng chờ</span>
+                                </>
+                              )}
+                              {ocrStatus === 'processing' && (
+                                <>
+                                  <svg className="w-5 h-5 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  <span className="font-semibold text-indigo-700">🔄 Đang xử lý OCR</span>
+                                </>
+                              )}
+                            </div>
+                            <span className="text-2xl font-bold text-indigo-600">{progress}%</span>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="overflow-hidden mb-4 w-full h-3 bg-gray-200 rounded-full">
+                            <div 
+                              className="h-3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500 ease-out"
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+
+                          {/* Status Message */}
+                          <p className="mb-2 text-sm font-medium text-gray-700">{statusMessage}</p>
+
+                          {/* Queue Position */}
+                          {queuePosition !== null && (
+                            <div className="p-3 mt-3 bg-yellow-50 rounded-md border border-yellow-200">
+                              <p className="text-xs text-yellow-800">
+                                📍 Vị trí trong hàng chờ: <strong className="text-lg">#{queuePosition}</strong>
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Info */}
+                          <p className="mt-3 text-xs italic text-gray-500">
+                            💡 Bạn có thể đóng cửa sổ này. Hệ thống sẽ tự động xử lý.
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -272,26 +390,26 @@ const OCRGradeSheet = ({
                 <div className="space-y-6">
                   {/* Summary */}
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <p className="text-sm text-green-700 font-medium">✅ Hợp lệ</p>
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-sm font-medium text-green-700">✅ Hợp lệ</p>
                       <p className="text-3xl font-bold text-green-900">{parsedData.total_valid}</p>
                     </div>
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <p className="text-sm text-red-700 font-medium">❌ Lỗi</p>
+                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                      <p className="text-sm font-medium text-red-700">❌ Lỗi</p>
                       <p className="text-3xl font-bold text-red-900">{parsedData.total_errors}</p>
                     </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-700 font-medium">📊 Tổng</p>
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm font-medium text-blue-700">📊 Tổng</p>
                       <p className="text-3xl font-bold text-blue-900">{parsedData.total_parsed}</p>
                     </div>
                   </div>
 
                   {/* Errors Display */}
-                  {parsedData.validation_errors.length > 0 && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-red-900 mb-2">⚠️ Lỗi validation:</h4>
-                      <div className="max-h-32 overflow-y-auto">
-                        <ul className="text-sm text-red-800 space-y-1">
+                  {parsedData.validation_errors && parsedData.validation_errors.length > 0 && (
+                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                      <h4 className="mb-2 font-semibold text-red-900">⚠️ Lỗi validation:</h4>
+                      <div className="overflow-y-auto max-h-32">
+                        <ul className="space-y-1 text-sm text-red-800">
                           {parsedData.validation_errors.map((error, idx) => (
                             <li key={idx} className="flex items-start space-x-2">
                               <span className="text-red-500">•</span>
@@ -304,11 +422,11 @@ const OCRGradeSheet = ({
                   )}
 
                   {/* OCR Errors */}
-                  {parsedData.ocr_errors.length > 0 && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-yellow-900 mb-2">⚠️ Cảnh báo OCR:</h4>
-                      <div className="max-h-32 overflow-y-auto">
-                        <ul className="text-sm text-yellow-800 space-y-1">
+                  {parsedData.ocr_errors && parsedData.ocr_errors.length > 0 && (
+                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h4 className="mb-2 font-semibold text-yellow-900">⚠️ Cảnh báo OCR:</h4>
+                      <div className="overflow-y-auto max-h-32">
+                        <ul className="space-y-1 text-sm text-yellow-800">
                           {parsedData.ocr_errors.map((error, idx) => (
                             <li key={idx} className="flex items-start space-x-2">
                               <span className="text-yellow-500">•</span>
@@ -321,18 +439,18 @@ const OCRGradeSheet = ({
                   )}
 
                   {/* Data Table */}
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="overflow-hidden rounded-lg border border-gray-200">
                     <div className="overflow-x-auto max-h-96">
                       <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 sticky top-0">
+                        <thead className="sticky top-0 bg-gray-50">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">STT</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã SV</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Họ và tên</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lớp</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ĐTX</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ĐGK</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ĐCK</th>
+                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">STT</th>
+                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Mã SV</th>
+                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Họ và tên</th>
+                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Lớp</th>
+                            <th className="px-4 py-3 text-xs font-medium text-center text-gray-500 uppercase">ĐTX</th>
+                            <th className="px-4 py-3 text-xs font-medium text-center text-gray-500 uppercase">ĐGK</th>
+                            <th className="px-4 py-3 text-xs font-medium text-center text-gray-500 uppercase">ĐCK</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -349,21 +467,21 @@ const OCRGradeSheet = ({
                               <td className="px-4 py-3 text-sm text-gray-600">{row.class_name}</td>
                               <td className="px-4 py-3 text-sm text-center">
                                 {row.diem_thuong_xuyen !== null ? (
-                                  <span className="text-blue-600 font-medium">{row.diem_thuong_xuyen}</span>
+                                  <span className="font-medium text-blue-600">{row.diem_thuong_xuyen}</span>
                                 ) : (
                                   <span className="text-gray-400">-</span>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-sm text-center">
                                 {row.diem_thi_giua_ki !== null ? (
-                                  <span className="text-blue-600 font-medium">{row.diem_thi_giua_ki}</span>
+                                  <span className="font-medium text-blue-600">{row.diem_thi_giua_ki}</span>
                                 ) : (
                                   <span className="text-gray-400">-</span>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-sm text-center">
                                 {row.diem_thi_cuoi_ki !== null ? (
-                                  <span className="text-blue-600 font-medium">{row.diem_thi_cuoi_ki}</span>
+                                  <span className="font-medium text-blue-600">{row.diem_thi_cuoi_ki}</span>
                                 ) : (
                                   <span className="text-gray-400">-</span>
                                 )}
@@ -383,7 +501,7 @@ const OCRGradeSheet = ({
                         setSelectedImage(null);
                         setImagePreview(null);
                       }}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                      className="px-4 py-2 font-medium text-gray-700 bg-gray-200 rounded-lg transition-colors hover:bg-gray-300"
                     >
                       ← Phân tích ảnh khác
                     </button>
@@ -391,7 +509,7 @@ const OCRGradeSheet = ({
                     <div className="flex space-x-3">
                       <button
                         onClick={handleExportToExcel}
-                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm hover:shadow-md"
+                        className="flex items-center px-4 py-2 space-x-2 font-medium text-white bg-green-600 rounded-lg shadow-sm transition-colors hover:bg-green-700 hover:shadow-md"
                       >
                         <span>📥</span>
                         <span>Tải Excel</span>
@@ -399,16 +517,16 @@ const OCRGradeSheet = ({
 
                       <button
                         onClick={handleConfirmImport}
-                        disabled={uploading || parsedData.parsed_rows.length === 0}
+                        disabled={uploading || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0}
                         className={`flex items-center space-x-2 px-6 py-2 rounded-lg font-bold transition-all shadow-md hover:shadow-lg ${
-                          uploading || parsedData.parsed_rows.length === 0
+                          uploading || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0
                             ? 'bg-gray-400 cursor-not-allowed text-white'
                             : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
                         }`}
                       >
                         {uploading ? (
                           <>
-                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
