@@ -94,7 +94,10 @@ class OCRFactory:
             service = GradeSheetOCRService()
         elif model == OCRModel.VINTERN:
             from services.vintern_ocr_service import VinternOCRService
-            service = VinternOCRService()
+            from config.ocr_config import OCRConfig
+            # Đọc device từ config
+            device = OCRConfig.VINTERN_DEVICE
+            service = VinternOCRService(device=device)
         else:
             raise ValueError(f"Unsupported OCR model: {model}")
         
