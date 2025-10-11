@@ -301,13 +301,15 @@ class QwenOCRService:
             # Move to device
             inputs = inputs.to(self.device)
             
-            # Generation config - TỐI ƯU CHO TỐC ĐỘ
-            # 50 dòng ~ 2000-3000 tokens, không cần 8192!
+            # Generation config - TỐI ƯU CHO JSON HOÀN CHỈNH
+            # 50 dòng ~ 6000-8000 tokens (với JSON format đầy đủ)
+            # 100 dòng ~ 12000-15000 tokens
+            # Model hỗ trợ 32K context length → dư sức xử lý
             logger.info("🚀 Generating response...")
             with torch.no_grad():
                 generated_ids = self.model.generate(
                     **inputs,
-                    max_new_tokens=3000,  # Giảm từ 8192 → 3000 (đủ cho 50 dòng)
+                    max_new_tokens=10000,  # Tăng lên 10000 để đủ cho 50-100 dòng
                     do_sample=False,  # Deterministic cho accuracy
                     num_beams=1,  # Greedy search (nhanh nhất) thay vì beam=3
                     temperature=None,  # Không dùng khi do_sample=False
@@ -339,7 +341,7 @@ class QwenOCRService:
     
     def _parse_model_response(self, response_text: str) -> Dict:
         """
-        Parse JSON response từ Qwen2.5-VL
+        Parse JSON response từ Qwen2.5-VL với fallback handling cho truncated JSON
         
         Args:
             response_text: Text response từ model
@@ -370,14 +372,90 @@ class QwenOCRService:
             
         except json.JSONDecodeError as e:
             logger.error(f"❌ JSON decode error: {e}")
-            logger.error(f"Response text (first 500 chars): {response_text[:500]}...")
+            logger.error(f"Response length: {len(response_text)} chars")
+            logger.error(f"Error position: line {e.lineno}, column {e.colno}, char {e.pos}")
+            logger.error(f"Response text (first 1000 chars):\n{response_text[:1000]}")
+            logger.error(f"Response text (last 500 chars):\n{response_text[-500:]}")
+            
+            # Thử phục hồi JSON bị truncate
+            logger.warning("⚠️ Attempting to recover truncated JSON...")
+            recovered_data = self._recover_truncated_json(response_text)
+            
+            if recovered_data and recovered_data.get('rows'):
+                logger.info(f"✅ Recovered {len(recovered_data['rows'])} rows from truncated JSON")
+                return recovered_data
+            
             return {
                 'success': False,
                 'headers': [],
                 'rows': [],
-                'errors': [f'Không thể parse JSON từ Qwen2.5-VL: {str(e)}'],
+                'errors': [
+                    f'JSON bị cắt cụt tại line {e.lineno}, column {e.colno}. '
+                    f'Vui lòng thử lại hoặc giảm số dòng trong ảnh.'
+                ],
                 'total_rows': 0
             }
+    
+    def _recover_truncated_json(self, response_text: str) -> Optional[Dict]:
+        """
+        Cố gắng phục hồi JSON bị cắt cụt bằng cách thêm closing brackets
+        
+        Args:
+            response_text: JSON text bị cắt cụt
+            
+        Returns:
+            Recovered data hoặc None nếu không thể phục hồi
+        """
+        try:
+            # Đếm số lượng brackets chưa đóng
+            open_braces = response_text.count('{')
+            close_braces = response_text.count('}')
+            open_brackets = response_text.count('[')
+            close_brackets = response_text.count(']')
+            open_quotes = response_text.count('"')
+            
+            # Nếu có unterminated string, thử cắt bỏ phần string cuối
+            if open_quotes % 2 != 0:
+                # Tìm vị trí quote cuối cùng
+                last_quote_pos = response_text.rfind('"')
+                if last_quote_pos > 0:
+                    # Cắt từ quote cuối trở về trước
+                    response_text = response_text[:last_quote_pos]
+                    # Tìm dấu phẩy gần nhất
+                    last_comma = response_text.rfind(',')
+                    if last_comma > 0:
+                        response_text = response_text[:last_comma]
+            
+            # Thêm closing brackets còn thiếu
+            missing_close_braces = open_braces - close_braces
+            missing_close_brackets = open_brackets - close_brackets
+            
+            fixed_text = response_text
+            # Thêm } trước (đóng object)
+            fixed_text += '}' * missing_close_braces
+            # Thêm ] sau (đóng array)
+            fixed_text += ']' * missing_close_brackets
+            
+            logger.info(f"🔧 Recovery: added {missing_close_braces} '}}' and {missing_close_brackets} ']'")
+            
+            # Thử parse lại
+            data = json.loads(fixed_text)
+            
+            # Validate cấu trúc cơ bản
+            if isinstance(data, dict) and 'rows' in data:
+                data['success'] = True
+                data['errors'] = data.get('errors', [])
+                data['errors'].append(
+                    f'⚠️ JSON bị cắt cụt, đã phục hồi được {len(data.get("rows", []))} dòng'
+                )
+                data['total_rows'] = len(data.get('rows', []))
+                return data
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to recover truncated JSON: {e}")
+            return None
     
     def _validate_and_normalize(self, data: Dict) -> Dict:
         """

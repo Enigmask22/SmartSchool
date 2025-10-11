@@ -88,7 +88,10 @@ class OCRConfig:
     # ============================================
     
     # Maximum tokens for generation
-    MAX_OUTPUT_TOKENS = 4096
+    # Tăng lên 10000 để đủ cho 50-100 dòng dữ liệu
+    # - 50 dòng: ~6000-8000 tokens (JSON format)
+    # - 100 dòng: ~12000-15000 tokens
+    MAX_OUTPUT_TOKENS = 10000
     
     # Temperature for generation (0.0 - 1.0)
     # Lower = more deterministic, Higher = more creative
