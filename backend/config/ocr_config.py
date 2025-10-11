@@ -59,9 +59,9 @@ class OCRConfig:
     
     # Device: 'cuda', 'cpu', hoặc None (auto-detect)
     # Auto-detect: Sẽ dùng CUDA nếu có GPU, fallback về CPU nếu không
-    # Force CPU: set VINTERN_DEVICE='cpu' (cho testing)
+    # Force CPU: set VINTERN_DEVICE='cpu' (cho testing hoặc hệ thống không có GPU)
     # Force GPU: set VINTERN_DEVICE='cuda' (recommended nếu có GPU)
-    VINTERN_DEVICE = os.getenv('VINTERN_DEVICE', 'cuda')  # Default: dùng GPU
+    VINTERN_DEVICE = os.getenv('VINTERN_DEVICE', 'cuda')  # Default: dùng CPU (thay đổi thành 'cuda' hoặc None để dùng GPU)
     
     # ============================================
     # GENERAL OCR CONFIG
