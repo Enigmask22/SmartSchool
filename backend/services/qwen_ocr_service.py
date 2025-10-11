@@ -309,9 +309,9 @@ class QwenOCRService:
             with torch.no_grad():
                 generated_ids = self.model.generate(
                     **inputs,
-                    max_new_tokens=10000,  # Tăng lên 10000 để đủ cho 50-100 dòng
+                    max_new_tokens=7200,  # Tăng lên 10000 để đủ cho 50-100 dòng
                     do_sample=False,  # Deterministic cho accuracy
-                    num_beams=1,  # Greedy search (nhanh nhất) thay vì beam=3
+                    num_beams=1,  # Greedy search (nhanh nhất)
                     temperature=None,  # Không dùng khi do_sample=False
                     repetition_penalty=1.1,  # Giảm từ 1.2 → 1.1
                     pad_token_id=self.processor.tokenizer.pad_token_id,
