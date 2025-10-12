@@ -570,7 +570,7 @@ async def get_all_subjects(db=Depends(get_db)):
         return ResponseModel(
             success=True,
             message="Lấy danh sách môn học thành công",
-            data=subjects.data
+            data={"subjects": subjects.data}
         )
         
     except Exception as e:

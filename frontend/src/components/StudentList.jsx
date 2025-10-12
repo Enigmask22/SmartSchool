@@ -67,6 +67,16 @@ const StudentList = () => {
   const [feedbackError, setFeedbackError] = useState('');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
+
+  // Subject selection states
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [selectedStudentForSubject, setSelectedStudentForSubject] = useState(null);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [selectedSubjects, setSelectedSubjects] = useState({
+    core_subjects: ['TOAN', 'VAN', 'ANH'], // Mặc định 3 môn chính
+    elective_subjects: [] // Môn tự chọn
+  });
+  const [subjectLoading, setSubjectLoading] = useState(false);
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -923,6 +933,148 @@ const StudentList = () => {
     }
   };
 
+  // Subject selection functions
+  const fetchAvailableSubjects = async () => {
+    try {
+      const response = await ApiService.getSubjectsAdmin();
+      if (response.success && response.data) {
+        setAvailableSubjects(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+      // Fallback data nếu API không hoạt động
+      setAvailableSubjects([
+        { subject_code: 'TOAN', subject_name: 'Toán' },
+        { subject_code: 'VAN', subject_name: 'Ngữ Văn' },
+        { subject_code: 'ANH', subject_name: 'Tiếng Anh' },
+        { subject_code: 'LY', subject_name: 'Vật Lý' },
+        { subject_code: 'HOA', subject_name: 'Hóa Học' },
+        { subject_code: 'SINH', subject_name: 'Sinh Học' },
+        { subject_code: 'SU', subject_name: 'Lịch Sử' },
+        { subject_code: 'DIA', subject_name: 'Địa Lý' },
+        { subject_code: 'GDCD', subject_name: 'Giáo Dục Công Dân' },
+        { subject_code: 'CNTT', subject_name: 'Tin Học' }
+      ]);
+    }
+  };
+
+  const handleSubjectSelection = (student) => {
+    setSelectedStudentForSubject(student);
+    
+    // Debug log để kiểm tra dữ liệu
+    console.log('=== DEBUG SUBJECT SELECTION ===');
+    console.log('Student data:', student);
+    console.log('Subject selected:', student.subject_selected);
+    console.log('Subject selected type:', typeof student.subject_selected);
+    
+    // Load existing subject selection nếu có
+    if (student.subject_selected) {
+      // Parse JSON nếu là string
+      let subjectData = student.subject_selected;
+      if (typeof subjectData === 'string') {
+        try {
+          subjectData = JSON.parse(subjectData);
+        } catch (e) {
+          console.error('Error parsing subject_selected:', e);
+          subjectData = null;
+        }
+      }
+      
+      if (subjectData && typeof subjectData === 'object') {
+        console.log('Setting selected subjects:', subjectData);
+        setSelectedSubjects(subjectData);
+      } else {
+        // Reset về mặc định nếu data không hợp lệ
+        setSelectedSubjects({
+          core_subjects: ['TOAN', 'VAN', 'ANH'],
+          elective_subjects: []
+        });
+      }
+    } else {
+      // Reset về mặc định
+      setSelectedSubjects({
+        core_subjects: ['TOAN', 'VAN', 'ANH'],
+        elective_subjects: []
+      });
+    }
+    
+    setShowSubjectModal(true);
+    fetchAvailableSubjects();
+  };
+
+  const toggleSubjectSelection = (subjectCode, type) => {
+    setSelectedSubjects(prev => {
+      const currentSubjects = prev[type] || [];
+      const isSelected = currentSubjects.includes(subjectCode);
+      
+      if (isSelected) {
+        // Remove subject
+        return {
+          ...prev,
+          [type]: currentSubjects.filter(code => code !== subjectCode)
+        };
+      } else {
+        // Add subject (max 3 cho mỗi loại)
+        if (currentSubjects.length >= 3) {
+          alert(`Tối đa 3 môn ${type === 'core_subjects' ? 'chính' : 'tự chọn'}`);
+          return prev;
+        }
+        return {
+          ...prev,
+          [type]: [...currentSubjects, subjectCode]
+        };
+      }
+    });
+  };
+
+  const saveSubjectSelection = async () => {
+    if (!selectedStudentForSubject) return;
+
+    setSubjectLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/students/${selectedStudentForSubject.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject_selected: selectedSubjects
+        })
+      });
+
+      if (response.ok) {
+        alert('Lưu môn học thành công!');
+        setShowSubjectModal(false);
+        
+        // Cập nhật dữ liệu học sinh trong state để không cần refresh
+        setStudents(prevStudents => 
+          prevStudents.map(student => 
+            student.id === selectedStudentForSubject.id 
+              ? { ...student, subject_selected: selectedSubjects }
+              : student
+          )
+        );
+      } else {
+        const errorData = await response.json();
+        alert(`Lỗi khi lưu môn học: ${errorData.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error saving subject selection:', error);
+      alert('Có lỗi xảy ra khi lưu môn học');
+    } finally {
+      setSubjectLoading(false);
+    }
+  };
+
+  const closeSubjectModal = () => {
+    setShowSubjectModal(false);
+    setSelectedStudentForSubject(null);
+    setSelectedSubjects({
+      core_subjects: ['TOAN', 'VAN', 'ANH'],
+      elective_subjects: []
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -1114,7 +1266,16 @@ const StudentList = () => {
                     </button>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleSubjectSelection(student)}
+                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
+                      title="Chọn môn học"
+                    >
+                      <span className="text-sm">📚</span>
+                      <span>Môn học</span>
+                    </button>
+                    
                     <button
                       onClick={() => handleEdit(student)}
                       className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md transition-colors hover:bg-gray-200"
@@ -2138,6 +2299,158 @@ const StudentList = () => {
                   Đóng
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subject Selection Modal */}
+      {showSubjectModal && selectedStudentForSubject && (
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
+            {/* Modal Header */}
+            <div className="p-6 text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-2xl font-bold">📚 Chọn môn học</h3>
+                  <p className="mt-1 text-blue-100">
+                    {selectedStudentForSubject.full_name} - {selectedStudentForSubject.student_id}
+                  </p>
+                  <p className="text-sm text-blue-100">
+                    Lớp {selectedStudentForSubject.class_name} - Khối {selectedStudentForSubject.grade}
+                  </p>
+                </div>
+                <button
+                  onClick={closeSubjectModal}
+                  className="text-3xl font-bold text-white hover:text-blue-200"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Core Subjects */}
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900">📖 Môn học chính (3 môn)</h3>
+                    <p className="text-sm text-gray-600">Bắt buộc: Toán, Văn, Anh</p>
+                  </div>
+                  <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
+                    {availableSubjects
+                      .filter(subject => ['TOAN', 'VAN', 'ANH'].includes(subject.subject_code))
+                      .map((subject) => (
+                      <label key={subject.subject_code} className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedSubjects.core_subjects.includes(subject.subject_code)}
+                          onChange={() => toggleSubjectSelection(subject.subject_code, 'core_subjects')}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-900">
+                          {subject.subject_name} ({subject.subject_code})
+                        </span>
+                        {selectedSubjects.core_subjects.includes(subject.subject_code) && (
+                          <span className="text-xs font-medium text-blue-600">✓</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="px-6 py-3 bg-blue-50 border-t border-gray-200">
+                    <p className="text-xs text-blue-700">
+                      Đã chọn: {selectedSubjects.core_subjects.length}/3 môn chính
+                    </p>
+                  </div>
+                </div>
+
+                {/* Elective Subjects */}
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900">🎯 Môn tự chọn (3 môn)</h3>
+                    <p className="text-sm text-gray-600">Chọn 3 môn từ danh sách</p>
+                  </div>
+                  <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
+                    {availableSubjects
+                      .filter(subject => !['TOAN', 'VAN', 'ANH'].includes(subject.subject_code))
+                      .map((subject) => (
+                      <label key={subject.subject_code} className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedSubjects.elective_subjects.includes(subject.subject_code)}
+                          onChange={() => toggleSubjectSelection(subject.subject_code, 'elective_subjects')}
+                          className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                        />
+                        <span className="text-sm font-medium text-gray-900">
+                          {subject.subject_name} ({subject.subject_code})
+                        </span>
+                        {selectedSubjects.elective_subjects.includes(subject.subject_code) && (
+                          <span className="text-xs font-medium text-green-600">✓</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="px-6 py-3 bg-green-50 border-t border-gray-200">
+                    <p className="text-xs text-green-700">
+                      Đã chọn: {selectedSubjects.elective_subjects.length}/3 môn tự chọn
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Selection Summary */}
+              <div className="p-4 mt-6 bg-gray-50 rounded-lg">
+                <h4 className="mb-3 font-medium text-gray-900">📋 Tóm tắt lựa chọn:</h4>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Môn chính:</p>
+                    <p className="text-sm text-gray-600">
+                      {selectedSubjects.core_subjects.length > 0 
+                        ? selectedSubjects.core_subjects.join(', ') 
+                        : 'Chưa chọn môn nào'
+                      }
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-green-700">Môn tự chọn:</p>
+                    <p className="text-sm text-gray-600">
+                      {selectedSubjects.elective_subjects.length > 0 
+                        ? selectedSubjects.elective_subjects.join(', ') 
+                        : 'Chưa chọn môn nào'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={closeSubjectModal}
+                  className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors hover:bg-gray-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={saveSubjectSelection}
+                  disabled={subjectLoading || selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3}
+                  className={`px-6 py-2 font-medium text-white rounded-lg transition-colors ${
+                    subjectLoading || selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {subjectLoading ? '⏳ Đang lưu...' : '💾 Lưu môn học'}
+                </button>
+              </div>
+              {selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3 ? (
+                <p className="mt-2 text-xs text-center text-red-600">
+                  ⚠️ Vui lòng chọn đúng 3 môn chính và 3 môn tự chọn
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

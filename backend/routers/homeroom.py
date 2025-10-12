@@ -292,7 +292,8 @@ async def get_homeroom_students(
             face_samples_count,
             encoding_version,
             recognition_enabled,
-            last_recognized
+            last_recognized,
+            subject_selected
         """).in_("class_name", managed_classes)
 
         # Nếu có filter theo lớp cụ thể
@@ -323,7 +324,8 @@ async def get_homeroom_students(
                     "face_samples_count": student["face_samples_count"],
                     "encoding_version": student["encoding_version"],
                     "recognition_enabled": student["recognition_enabled"],
-                    "last_recognized": student["last_recognized"]
+                    "last_recognized": student["last_recognized"],
+                    "subject_selected": student["subject_selected"]
                 })
 
         return {
