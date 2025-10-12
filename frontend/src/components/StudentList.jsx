@@ -874,7 +874,7 @@ const StudentList = () => {
     setGeneratedFeedback('');
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/feedback/generate-feedback`, {
+      const response = await fetch(`${API_BASE_URL}/feedback/generate-feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

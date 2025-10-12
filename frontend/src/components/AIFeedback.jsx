@@ -11,6 +11,8 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/react/24/solid';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
 const AIFeedback = () => {
   const [formData, setFormData] = useState({
     student_name: '',
@@ -89,7 +91,7 @@ const AIFeedback = () => {
     setFeedback('');
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/feedback/generate-feedback`, {
+      const response = await fetch(`${API_BASE_URL}/feedback/generate-feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,7 +153,7 @@ const AIFeedback = () => {
     setError('');
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/feedback/generate-batch-feedback`, {
+      const response = await fetch(`${API_BASE_URL}/feedback/generate-batch-feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
