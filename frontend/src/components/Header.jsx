@@ -11,15 +11,15 @@ const Header = ({ currentView, setCurrentView, user }) => {
     ];
 
     if (isAdmin()) {
-      // Admin có tất cả menu
+      // Admin chỉ có các menu cấu hình và quản trị
       return [
         ...baseItems,
-        { id: 'students', label: 'Học sinh', icon: '👥' },
-        { id: 'attendance', label: 'Điểm danh', icon: '📋' },
-        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
-        { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+        // { id: 'students', label: 'Học sinh', icon: '👥' }, // Ẩn cho Admin
+        // { id: 'attendance', label: 'Điểm danh', icon: '📋' }, // Ẩn cho Admin
+        // { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' }, // Ẩn cho Admin
+        // { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' }, // Ẩn cho Admin
         // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
-        { id: 'grades', label: 'Quản lý điểm', icon: '📝' },
+        // { id: 'grades', label: 'Quản lý điểm', icon: '📝' }, // Ẩn cho Admin
         { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
       ];
     } else if (isHomeroomTeacher()) {
@@ -91,7 +91,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
             {user ? (
               <div className="flex items-center space-x-2">
                 <span className="text-sm">Xin chào, {user.full_name}</span>
-                <span className="text-xs bg-blue-500 px-2 py-1 rounded">
+                <span className="px-2 py-1 text-xs bg-blue-500 rounded">
                   {user.role === 'admin' 
                     ? 'Quản trị' 
                     : user.role === 'homeroom_teacher' 

@@ -52,15 +52,15 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
     ];
 
     if (isAdmin()) {
-      // Admin có tất cả menu bao gồm cấu hình học tập
+      // Admin chỉ có các menu cấu hình và quản trị
       return [
         ...baseItems,
-        { id: 'students', label: 'Học sinh', icon: '👥' },
-        { id: 'attendance', label: 'Điểm danh', icon: '📋' },
-        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
-        { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+        // { id: 'students', label: 'Học sinh', icon: '👥' }, // Ẩn cho Admin
+        // { id: 'attendance', label: 'Điểm danh', icon: '📋' }, // Ẩn cho Admin
+        // { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' }, // Ẩn cho Admin
+        // { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' }, // Ẩn cho Admin
         // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
-        { id: 'grades', label: 'Quản lý điểm', icon: '📝' },
+        // { id: 'grades', label: 'Quản lý điểm', icon: '📝' }, // Ẩn cho Admin
         { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
         { id: 'admin-management', label: 'Quản trị hệ thống', icon: '🛠️' },
       ];
@@ -204,7 +204,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
 
           {/* Dashboard Switch Button - Only show if user has both roles AND not admin */}
           {hasBothRoles && onDashboardSwitch && !isAdmin() && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="pt-4 mt-4 border-t border-gray-200">
               <button
                 onClick={() => {
                   onDashboardSwitch();

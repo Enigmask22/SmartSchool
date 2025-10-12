@@ -69,8 +69,8 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="w-12 h-12 rounded-full border-b-2 border-indigo-600 animate-spin"></div>
       </div>
     );
   }
@@ -90,20 +90,21 @@ function AppContent() {
       switch (currentView) {
         case 'dashboard':
           return <Dashboard setCurrentView={setCurrentView} />;
-        case 'students':
-          return <StudentList />;
-        case 'attendance':
-          return <AttendanceView />;
-        case 'camera':
-          return <AICamera />;
-        case 'continuous':
-          return <ContinuousRecognition />;
-        case 'faces':
-          return <FaceManagement />;
+        // Ẩn các tab không cần thiết cho Admin
+        // case 'students':
+        //   return <StudentList />;
+        // case 'attendance':
+        //   return <AttendanceView />;
+        // case 'camera':
+        //   return <AICamera />;
+        // case 'continuous':
+        //   return <ContinuousRecognition />;
+        // case 'faces':
+        //   return <FaceManagement />;
         case 'school-config':
           return <SchoolDaysConfig />;
-        case 'grades':
-          return <GradeManagement />;
+        // case 'grades':
+        //   return <GradeManagement />;
         case 'admin-management':
           return <AdminManagement />;
         default:
@@ -176,8 +177,8 @@ function AppContent() {
     } else {
       // Default fallback
       return (
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Chưa được phân quyền</h2>
+        <div className="py-12 text-center">
+          <h2 className="mb-2 text-2xl font-bold text-gray-900">Chưa được phân quyền</h2>
           <p className="text-gray-600">Vui lòng liên hệ quản trị viên để được cấp quyền truy cập</p>
         </div>
       );
@@ -199,7 +200,7 @@ function AppContent() {
   };
 
   return (
-    <div className="App flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 App">
       <Sidebar 
         currentView={currentView}
         setCurrentView={setCurrentView}
