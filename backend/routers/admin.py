@@ -756,6 +756,13 @@ async def bulk_import_students(
                             break
                         counter += 1
                 
+                # Validate gender field
+                gender = student_record.gioi_tinh or "Nam"
+                if gender not in ['Nam', 'Nữ', 'Khác']:
+                    errors.append(f"Giới tính không hợp lệ cho học sinh {student_record.ho_va_ten}: {gender}")
+                    error_count += 1
+                    continue
+                
                 # Prepare student data
                 student_data = {
                     "student_id": student_id,
@@ -768,6 +775,7 @@ async def bulk_import_students(
                     "address": student_record.dia_chi,
                     "parent_name": student_record.ten_phu_huynh,
                     "parent_phone": student_record.sdt_phu_huynh,
+                    "gender": gender,
                     "is_active": True,
                     "created_at": datetime.now().isoformat(),
                     "updated_at": datetime.now().isoformat()

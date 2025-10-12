@@ -12,7 +12,8 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
     date_of_birth: '',
     address: '',
     parent_name: '',
-    parent_phone: ''
+    parent_phone: '',
+    gender: 'Nam'
   });
   
   const [loading, setLoading] = useState(false);
@@ -93,7 +94,8 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
         date_of_birth: '',
         address: '',
         parent_name: '',
-        parent_phone: ''
+        parent_phone: '',
+        gender: 'Nam'
       });
       
       onSuccess && onSuccess();
@@ -121,7 +123,8 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
       date_of_birth: '',
       address: '',
       parent_name: '',
-      parent_phone: ''
+      parent_phone: '',
+      gender: 'Nam'
     });
     setErrors({});
     onClose();
@@ -255,6 +258,22 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
               {errors.grade && (
                 <p className="mt-1 text-sm text-red-500">{errors.grade}</p>
               )}
+            </div>
+
+            {/* Giới tính */}
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-700">
+                Giới tính
+              </label>
+              <select
+                value={formData.gender}
+                onChange={(e) => handleChange('gender', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Nam">Nam</option>
+                <option value="Nữ">Nữ</option>
+                <option value="Khác">Khác</option>
+              </select>
             </div>
 
             {/* Ngày sinh */}

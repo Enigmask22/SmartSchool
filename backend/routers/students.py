@@ -34,6 +34,10 @@ async def create_student(
         if existing.data:
             raise HTTPException(status_code=400, detail="Mã học sinh đã tồn tại")
         
+        # Validate gender field
+        if student.gender not in ['Nam', 'Nữ', 'Khác']:
+            raise HTTPException(status_code=400, detail="Giới tính phải là Nam, Nữ hoặc Khác")
+        
         # Tạo student data
         student_data = student.dict()
         
@@ -206,6 +210,10 @@ async def update_student(
         
         if not existing.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
+        
+        # Validate gender field if provided
+        if student_update.gender and student_update.gender not in ['Nam', 'Nữ', 'Khác']:
+            raise HTTPException(status_code=400, detail="Giới tính phải là Nam, Nữ hoặc Khác")
         
         # Prepare update data
         update_data = student_update.dict(exclude_unset=True)

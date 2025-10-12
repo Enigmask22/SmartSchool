@@ -22,7 +22,8 @@ const ClassManagement = () => {
     date_of_birth: '',
     address: '',
     parent_name: '',
-    parent_phone: ''
+    parent_phone: '',
+    gender: 'Nam'
   });
   const [studentFormErrors, setStudentFormErrors] = useState({});
   const [studentFormLoading, setStudentFormLoading] = useState(false);
@@ -235,7 +236,8 @@ const ClassManagement = () => {
           date_of_birth: '',
           address: '',
           parent_name: '',
-          parent_phone: ''
+          parent_phone: '',
+          gender: 'Nam'
         });
         setStudentFormErrors({});
         setShowAddStudentModal(false);
@@ -266,7 +268,8 @@ const ClassManagement = () => {
       date_of_birth: '',
       address: '',
       parent_name: '',
-      parent_phone: ''
+      parent_phone: '',
+      gender: 'Nam'
     });
     setStudentFormErrors({});
     setShowAddStudentModal(false);
@@ -283,9 +286,10 @@ const ClassManagement = () => {
         'lop_hoc': '10A1',
         'khoi': '10',
         'ngay_sinh': '2006-01-01',
+        'gioi_tinh': 'Nam',
         'ten_phu_huynh': 'Nguyễn Văn B',
         'sdt_phu_huynh': '0987654321',
-        'dia_chi': 'TP.HCM'
+        'dia_chi': 'TP.HCM',
       }
     ];
 
@@ -361,6 +365,14 @@ const ClassManagement = () => {
             rowErrors.push('Khối học phải là 10, 11 hoặc 12');
           }
 
+          // Kiểm tra giới tính
+          if (row.gioi_tinh && row.gioi_tinh.toString().trim() !== '') {
+            const validGenders = ['Nam', 'Nữ', 'Khác'];
+            if (!validGenders.includes(row.gioi_tinh.toString().trim())) {
+              rowErrors.push('Giới tính phải là: Nam, Nữ, hoặc Khác');
+            }
+          }
+
           if (rowErrors.length > 0) {
             errors.push({
               row: index + 2, // +2 vì Excel bắt đầu từ 1 và có header
@@ -377,7 +389,8 @@ const ClassManagement = () => {
               ngay_sinh: row.ngay_sinh ? row.ngay_sinh.toString().trim() : null,
               ten_phu_huynh: row.ten_phu_huynh ? row.ten_phu_huynh.toString().trim() : null,
               sdt_phu_huynh: row.sdt_phu_huynh ? row.sdt_phu_huynh.toString().trim() : null,
-              dia_chi: row.dia_chi ? row.dia_chi.toString().trim() : null
+              dia_chi: row.dia_chi ? row.dia_chi.toString().trim() : null,
+              gioi_tinh: row.gioi_tinh ? row.gioi_tinh.toString().trim() : 'Nam'
             });
           }
         });
@@ -486,7 +499,7 @@ const ClassManagement = () => {
       <div className="mb-6">
         <div className="p-6 bg-white rounded-xl border border-gray-100 shadow-lg">
           <h3 className="mb-4 text-lg font-semibold text-gray-800">Bộ lọc lớp học</h3>
-          <div className="flex flex-wrap items-center gap-6">
+          <div className="flex flex-wrap gap-6 items-center">
             {/* Class Selection */}
             <div className="flex flex-col">
               <label className="mb-2 text-sm font-medium text-gray-700">Chọn lớp học</label>
@@ -664,8 +677,8 @@ const ClassManagement = () => {
                   if (totalPages <= 1) return null;
                   
                   return (
-                    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                      <div className="flex flex-wrap gap-3 justify-between items-center">
                         <div className="flex items-center space-x-4">
                           <div className="text-sm text-gray-700">
                             Hiển thị <span className="font-semibold">{((currentPage - 1) * classManagementPageSize) + 1}</span> đến <span className="font-semibold">{Math.min(currentPage * classManagementPageSize, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
@@ -857,6 +870,22 @@ const ClassManagement = () => {
                   )}
                 </div>
 
+                {/* Giới tính */}
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
+                    Giới tính
+                  </label>
+                  <select
+                    value={studentFormData.gender}
+                    onChange={(e) => handleStudentFormChange('gender', e.target.value)}
+                    className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                    <option value="Khác">Khác</option>
+                  </select>
+                </div>
+
                 {/* Ngày sinh */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -981,15 +1010,15 @@ const ClassManagement = () => {
 
             {/* Import Errors */}
             {importErrors.length > 0 && (
-              <div className="mb-6 p-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="p-4 mb-6 bg-red-50 rounded-lg border border-red-200">
                 <h3 className="mb-3 text-lg font-semibold text-red-800">Các lỗi cần sửa:</h3>
-                <div className="max-h-40 overflow-y-auto space-y-2">
+                <div className="overflow-y-auto space-y-2 max-h-40">
                   {importErrors.map((error, index) => (
                     <div key={index} className="p-2 bg-red-100 rounded border border-red-300">
                       <p className="font-medium text-red-800">
                         Dòng {error.row}: {error.student_name}
                       </p>
-                      <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
+                      <ul className="mt-1 text-sm list-disc list-inside text-red-700">
                         {error.errors.map((err, errIndex) => (
                           <li key={errIndex}>{err}</li>
                         ))}
@@ -1002,7 +1031,7 @@ const ClassManagement = () => {
 
             {/* Preview Table */}
             <div className="overflow-x-auto mb-6">
-              <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+              <table className="min-w-full rounded-lg border border-gray-200 divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
                   <tr>
                     <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
@@ -1022,6 +1051,9 @@ const ClassManagement = () => {
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
                       Khối
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      Giới tính
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
                       Ngày sinh
@@ -1053,6 +1085,9 @@ const ClassManagement = () => {
                         {student.khoi}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
+                        {student.gioi_tinh || 'Nam'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
                         {student.ngay_sinh || '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
@@ -1070,7 +1105,7 @@ const ClassManagement = () => {
             </div>
 
             {/* Thông báo về mã học sinh */}
-            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="p-4 mb-6 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
