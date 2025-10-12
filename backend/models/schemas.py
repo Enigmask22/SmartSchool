@@ -49,6 +49,7 @@ class StudentUpdate(BaseModel):
     parent_name: Optional[str] = None
     parent_phone: Optional[str] = None
     is_active: Optional[bool] = None
+    subject_selected: Optional[dict] = None
 
 class Student(StudentBase):
     id: int
