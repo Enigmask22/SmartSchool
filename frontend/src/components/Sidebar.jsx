@@ -1,18 +1,13 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useCallback } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
-import { Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../services/api';
 
 const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selectedDashboardType, onDashboardSwitch }) => {
-  const { logout, isTeacher, isHomeroomTeacher, isSubjectTeacher, isAdmin, hasRole } = useContext(AuthContext);
+  const { logout, isHomeroomTeacher, isSubjectTeacher, isAdmin } = useContext(AuthContext);
   const [hasBothRoles, setHasBothRoles] = useState(false);
   
-  // Check if user has both roles
-  useEffect(() => {
-    checkBothRoles();
-  }, [user]);
-
-  const checkBothRoles = async () => {
+  const checkBothRoles = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -43,9 +38,14 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
     } catch (error) {
       console.error('Error checking roles:', error);
     }
-  };
+  }, [user]);
 
-  // Menu items based on user role (đồng bộ với Header)
+  // Check if user has both roles
+  useEffect(() => {
+    checkBothRoles();
+  }, [user, checkBothRoles]);
+
+  // Menu items based on selected dashboard type (ưu tiên selectedDashboardType hơn role functions)
   const getMenuItems = () => {
     const baseItems = [
       { id: 'dashboard', label: 'Trang chủ', icon: '🏠' }
@@ -65,9 +65,9 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         { id: 'class-management', label: 'Quản trị lớp học', icon: '🎯' },
         { id: 'admin-management', label: 'Quản trị hệ thống', icon: '🛠️' },
       ];
-    } else if (isHomeroomTeacher()) {
-      // Giáo viên chủ nhiệm - không có cấu hình học tập
-      const homeroomMenus = [
+    } else if (selectedDashboardType === 'homeroom') {
+      // Dashboard chủ nhiệm - chỉ hiển thị menu chủ nhiệm (không có quản lý điểm)
+      return [
         ...baseItems,
         { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: '👥' },
         { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
@@ -75,20 +75,30 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
         // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
       ];
-      
-      // Thêm quản lý điểm nếu họ cũng là subject teacher
-      homeroomMenus.push({ id: 'grades', label: 'Quản lý điểm', icon: '📝' });
-      
-      return homeroomMenus;
-    } else if (isSubjectTeacher()) {
-      // Giáo viên bộ môn - Dashboard và Quản lý điểm
+    } else if (selectedDashboardType === 'subject') {
+      // Dashboard bộ môn - chỉ hiển thị menu bộ môn
       return [
         { id: 'dashboard', label: 'Dashboard Phân Tích', icon: '📊' },
         { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
       ];
     } else {
-      // Default fallback
-      return baseItems;
+      // Fallback: sử dụng role functions nếu chưa có selectedDashboardType
+      if (isHomeroomTeacher()) {
+        return [
+          ...baseItems,
+          { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: '👥' },
+          { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
+          { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
+          { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+        ];
+      } else if (isSubjectTeacher()) {
+        return [
+          { id: 'dashboard', label: 'Dashboard Phân Tích', icon: '📊' },
+          { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
+        ];
+      } else {
+        return baseItems;
+      }
     }
   };
 
@@ -163,11 +173,15 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
                 <div className="text-xs text-gray-500">
                   {user.role === 'admin' 
                     ? 'Quản trị viên' 
-                    : user.role === 'homeroom_teacher' 
-                      ? 'Giáo viên chủ nhiệm' 
-                      : user.role === 'teacher' 
-                        ? 'Giáo viên bộ môn' 
-                        : 'Nhân viên'}
+                    : selectedDashboardType === 'homeroom'
+                      ? 'Giáo viên chủ nhiệm'
+                      : selectedDashboardType === 'subject'
+                        ? 'Giáo viên bộ môn'
+                        : user.role === 'homeroom_teacher' 
+                          ? 'Giáo viên chủ nhiệm' 
+                          : user.role === 'teacher' 
+                            ? 'Giáo viên bộ môn' 
+                            : 'Nhân viên'}
                 </div>
               </div>
             ) : (
