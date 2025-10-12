@@ -18,6 +18,7 @@ import Login from './components/Login';
 import GradeManagement from './components/GradeManagement';
 import HomeroomDashboard from './components/HomeroomDashboard';
 import AdminManagement from './components/AdminManagement';
+import ClassManagement from './components/ClassManagement';
 import SubjectTeacherDashboard from './components/SubjectTeacherDashboard';
 import DashboardSelector from './components/DashboardSelector';
 
@@ -103,6 +104,8 @@ function AppContent() {
         //   return <FaceManagement />;
         case 'school-config':
           return <SchoolDaysConfig />;
+        case 'class-management':
+          return <ClassManagement />;
         // case 'grades':
         //   return <GradeManagement />;
         case 'admin-management':

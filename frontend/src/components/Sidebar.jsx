@@ -62,6 +62,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
         // { id: 'grades', label: 'Quản lý điểm', icon: '📝' }, // Ẩn cho Admin
         { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
+        { id: 'class-management', label: 'Quản trị lớp học', icon: '🎯' },
         { id: 'admin-management', label: 'Quản trị hệ thống', icon: '🛠️' },
       ];
     } else if (isHomeroomTeacher()) {
