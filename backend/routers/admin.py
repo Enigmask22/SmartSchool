@@ -267,11 +267,22 @@ async def delete_subject(subject_id: int, db=Depends(get_db)):
 
 @router.get("/classes")
 async def get_all_classes(db=Depends(get_db)):
-    """Lấy danh sách tất cả lớp học"""
+    """Lấy danh sách tất cả lớp học với số lượng học sinh"""
     try:
         response = db.table("classes").select("*, teachers(teacher_code, full_name)").order("grade, class_name").execute()
         
-        return {"success": True, "data": response.data}
+        # Thêm số lượng học sinh cho mỗi lớp
+        classes_with_student_count = []
+        for class_item in response.data:
+            # Đếm số học sinh trong lớp này
+            student_count_response = db.table("students").select("id", count="exact").eq("class_name", class_item["class_name"]).eq("is_active", True).execute()
+            total_students = student_count_response.count if student_count_response.count else 0
+            
+            # Thêm thông tin số học sinh vào class item
+            class_item["total_students"] = total_students
+            classes_with_student_count.append(class_item)
+        
+        return {"success": True, "data": classes_with_student_count}
     except Exception as e:
         logger.error(f"Error getting classes: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách lớp học: {str(e)}")
