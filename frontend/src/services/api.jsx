@@ -887,6 +887,20 @@ class ApiService {
   }
 
   // ===============================================
+  // BULK STUDENT IMPORT APIs
+  // ===============================================
+
+  /**
+   * Nhập học sinh hàng loạt từ file Excel/CSV
+   */
+  async bulkImportStudents(importData) {
+    return this.request('/admin/students/bulk-import', {
+      method: 'POST',
+      body: JSON.stringify(importData),
+    });
+  }
+
+  // ===============================================
   // OCR GRADE SHEET APIs
   // ===============================================
 

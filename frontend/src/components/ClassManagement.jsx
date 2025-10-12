@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Upload, FileText, Download } from 'lucide-react';
 import api from '../services/api';
+import * as XLSX from 'xlsx';
 
 const ClassManagement = () => {
   // States cho Class Management
@@ -29,6 +30,12 @@ const ClassManagement = () => {
   // Pagination states cho Class Management
   const [currentPage, setCurrentPage] = useState(1);
   const [classManagementPageSize, setClassManagementPageSize] = useState(10); // 10 học sinh mỗi trang
+
+  // States cho import học sinh bằng file
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importedData, setImportedData] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
+  const [importLoading, setImportLoading] = useState(false);
 
   // Reference data cho dropdowns
   const [classes, setClasses] = useState([]);
@@ -265,6 +272,185 @@ const ClassManagement = () => {
     setShowAddStudentModal(false);
   };
 
+  // Hàm download template cho import học sinh
+  const downloadStudentTemplate = () => {
+    // Tạo dữ liệu mẫu
+    const templateData = [
+      {
+        'ho_va_ten': 'Nguyễn Văn A',
+        'email': 'nguyenvana@example.com',
+        'so_dien_thoai': '0123456789',
+        'lop_hoc': '10A1',
+        'khoi': '10',
+        'ngay_sinh': '2006-01-01',
+        'ten_phu_huynh': 'Nguyễn Văn B',
+        'sdt_phu_huynh': '0987654321',
+        'dia_chi': 'TP.HCM'
+      }
+    ];
+
+    // Tạo workbook
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Danh sách học sinh');
+
+    // Download file
+    XLSX.writeFile(wb, 'template_hoc_sinh.xlsx');
+  };
+
+  // Hàm xử lý upload file
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        // Validate format
+        const errors = [];
+        const validData = [];
+
+        if (jsonData.length === 0) {
+          alert('❌ File không có dữ liệu!');
+          return;
+        }
+
+        // Kiểm tra cột bắt buộc
+        const requiredColumns = ['ho_va_ten', 'lop_hoc', 'khoi'];
+        const firstRow = jsonData[0];
+        const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+
+        if (missingColumns.length > 0) {
+          alert(`❌ File thiếu các cột bắt buộc: ${missingColumns.join(', ')}\n\nVui lòng tải template để có đúng định dạng!`);
+          return;
+        }
+
+        // Validate từng dòng
+        jsonData.forEach((row, index) => {
+          const rowErrors = [];
+          
+          // Kiểm tra các trường bắt buộc
+          if (!row.ho_va_ten || row.ho_va_ten.toString().trim() === '') {
+            rowErrors.push('Họ tên không được để trống');
+          }
+          
+          if (!row.lop_hoc || row.lop_hoc.toString().trim() === '') {
+            rowErrors.push('Lớp học không được để trống');
+          }
+          
+          if (!row.khoi || row.khoi.toString().trim() === '') {
+            rowErrors.push('Khối không được để trống');
+          }
+
+          // Kiểm tra định dạng email
+          if (row.email && row.email.toString().trim() !== '') {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(row.email.toString().trim())) {
+              rowErrors.push('Email không hợp lệ');
+            }
+          }
+
+          // Kiểm tra khối học
+          if (row.khoi && !['10', '11', '12'].includes(row.khoi.toString())) {
+            rowErrors.push('Khối học phải là 10, 11 hoặc 12');
+          }
+
+          if (rowErrors.length > 0) {
+            errors.push({
+              row: index + 2, // +2 vì Excel bắt đầu từ 1 và có header
+              student_name: row.ho_va_ten || 'Unknown',
+              errors: rowErrors
+            });
+          } else {
+            validData.push({
+              ho_va_ten: row.ho_va_ten.toString().trim(),
+              email: row.email ? row.email.toString().trim() : null,
+              so_dien_thoai: row.so_dien_thoai ? row.so_dien_thoai.toString().trim() : null,
+              lop_hoc: row.lop_hoc.toString().trim(),
+              khoi: row.khoi.toString().trim(),
+              ngay_sinh: row.ngay_sinh ? row.ngay_sinh.toString().trim() : null,
+              ten_phu_huynh: row.ten_phu_huynh ? row.ten_phu_huynh.toString().trim() : null,
+              sdt_phu_huynh: row.sdt_phu_huynh ? row.sdt_phu_huynh.toString().trim() : null,
+              dia_chi: row.dia_chi ? row.dia_chi.toString().trim() : null
+            });
+          }
+        });
+
+        if (errors.length > 0) {
+          setImportErrors(errors);
+          alert(`❌ File có ${errors.length} lỗi. Vui lòng kiểm tra!`);
+          return;
+        }
+
+        setImportedData(validData);
+        setImportErrors([]);
+        setShowImportModal(true);
+
+      } catch (error) {
+        console.error('Error parsing file:', error);
+        alert('❌ Lỗi khi đọc file! Vui lòng kiểm tra định dạng file.');
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+    // Reset input để có thể upload lại cùng file
+    event.target.value = '';
+  };
+
+  // Hàm confirm import
+  const handleConfirmImport = async () => {
+    if (importedData.length === 0) {
+      alert('Không có dữ liệu để import!');
+      return;
+    }
+
+    try {
+      setImportLoading(true);
+
+      const importPayload = {
+        students: importedData
+      };
+
+      const response = await api.bulkImportStudents(importPayload);
+
+      if (response.success) {
+        alert(`✅ ${response.message}\n\nThành công: ${response.data.success_count} học sinh${response.data.error_count > 0 ? `\nLỗi: ${response.data.error_count} học sinh` : ''}`);
+        
+        if (response.data.errors && response.data.errors.length > 0) {
+          console.log('Import errors:', response.data.errors);
+        }
+
+        // Refresh data
+        if (selectedClassForManagement) {
+          loadClassStudents();
+        }
+        setShowImportModal(false);
+        setImportedData([]);
+        setImportErrors([]);
+      } else {
+        alert('❌ Lỗi khi import học sinh: ' + response.message);
+      }
+    } catch (error) {
+      console.error('Error importing students:', error);
+      alert('❌ Lỗi khi import học sinh!');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // Hàm đóng modal import
+  const handleCloseImportModal = () => {
+    setShowImportModal(false);
+    setImportedData([]);
+    setImportErrors([]);
+  };
+
   // Load dữ liệu khi component mount
   useEffect(() => {
     loadClassManagementData();
@@ -368,13 +554,34 @@ const ClassManagement = () => {
               <h3 className="text-lg font-semibold text-gray-800">
                 Danh sách học sinh ({classStudents.length} học sinh)
               </h3>
-              <button
-                onClick={() => setShowAddStudentModal(true)}
-                className="px-4 py-2 font-medium text-white bg-green-600 rounded-lg shadow-lg transition-all duration-200 transform hover:bg-green-700 hover:scale-105"
-              >
-                <Plus className="inline mr-2 w-4 h-4" />
-                Thêm học sinh
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={downloadStudentTemplate}
+                  className="flex items-center px-4 py-2 font-medium text-blue-600 bg-blue-50 rounded-lg shadow-sm transition-all duration-200 hover:bg-blue-100 hover:shadow-md"
+                >
+                  <Download className="mr-2 w-4 h-4" />
+                  Tải template
+                </button>
+                
+                <label className="flex items-center px-4 py-2 font-medium text-purple-600 bg-purple-50 rounded-lg shadow-sm transition-all duration-200 cursor-pointer hover:bg-purple-100 hover:shadow-md">
+                  <Upload className="mr-2 w-4 h-4" />
+                  Nhập từ file
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  onClick={() => setShowAddStudentModal(true)}
+                  className="flex items-center px-4 py-2 font-medium text-white bg-green-600 rounded-lg shadow-lg transition-all duration-200 transform hover:bg-green-700 hover:scale-105"
+                >
+                  <Plus className="mr-2 w-4 h-4" />
+                  Thêm học sinh
+                </button>
+              </div>
             </div>
           </div>
 
@@ -751,6 +958,162 @@ const ClassManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Preview Import Học Sinh */}
+      {showImportModal && (
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="overflow-y-auto p-6 mx-4 w-full max-w-6xl max-h-screen bg-white rounded-xl">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Xem trước dữ liệu import</h2>
+                <p className="text-gray-600">Kiểm tra dữ liệu trước khi nhập vào hệ thống ({importedData.length} học sinh)</p>
+              </div>
+              <button
+                onClick={handleCloseImportModal}
+                className="text-3xl text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Import Errors */}
+            {importErrors.length > 0 && (
+              <div className="mb-6 p-4 bg-red-50 rounded-lg border border-red-200">
+                <h3 className="mb-3 text-lg font-semibold text-red-800">Các lỗi cần sửa:</h3>
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {importErrors.map((error, index) => (
+                    <div key={index} className="p-2 bg-red-100 rounded border border-red-300">
+                      <p className="font-medium text-red-800">
+                        Dòng {error.row}: {error.student_name}
+                      </p>
+                      <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
+                        {error.errors.map((err, errIndex) => (
+                          <li key={errIndex}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Preview Table */}
+            <div className="overflow-x-auto mb-6">
+              <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
+                  <tr>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      STT
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      Họ tên
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      Email
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      SĐT
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      Lớp
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      Khối
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      Ngày sinh
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
+                      Phụ huynh
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {importedData.map((student, index) => (
+                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {index + 1}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {student.ho_va_ten}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {student.email || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {student.so_dien_thoai || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {student.lop_hoc}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {student.khoi}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {student.ngay_sinh || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        <div>
+                          <div>{student.ten_phu_huynh || '-'}</div>
+                          {student.sdt_phu_huynh && (
+                            <div className="text-xs text-gray-500">{student.sdt_phu_huynh}</div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Thông báo về mã học sinh */}
+            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700">
+                    <strong>Lưu ý:</strong> Mã học sinh sẽ được hệ thống tự động tạo dựa trên khối học.
+                    Khối 10: bắt đầu bằng 25, Khối 11: bắt đầu bằng 24, Khối 12: bắt đầu bằng 23.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end pt-6 space-x-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={handleCloseImportModal}
+                className="px-6 py-3 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors hover:bg-gray-200"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={importLoading || importErrors.length > 0}
+                className="flex items-center px-8 py-3 space-x-2 font-medium text-white bg-green-600 rounded-lg transition-colors hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {importLoading ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-b-2 border-white animate-spin"></div>
+                    <span>Đang nhập...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📤</span>
+                    <span>Xác nhận nhập ({importedData.length} học sinh)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
