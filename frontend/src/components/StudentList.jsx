@@ -174,7 +174,8 @@ const StudentList = () => {
           class_name: '10A1',
           grade: '10',
           email: 'an.nguyen@student.edu.vn',
-          phone: '0123456789'
+          phone: '0123456789',
+          gender: 'Nam'
         },
         {
           id: 2,
@@ -183,7 +184,8 @@ const StudentList = () => {
           class_name: '10A1',
           grade: '10',
           email: 'binh.tran@student.edu.vn',
-          phone: '0123456790'
+          phone: '0123456790',
+          gender: 'Nữ'
         },
         {
           id: 3,
@@ -192,7 +194,8 @@ const StudentList = () => {
           class_name: '10A2',
           grade: '10',
           email: 'chau.le@student.edu.vn',
-          phone: '0123456791'
+          phone: '0123456791',
+          gender: 'Nữ'
         }
       ]);
     } finally {
@@ -620,7 +623,8 @@ const StudentList = () => {
       date_of_birth: student.date_of_birth || '',
       address: student.address || '',
       parent_name: student.parent_name || '',
-      parent_phone: student.parent_phone || ''
+      parent_phone: student.parent_phone || '',
+      gender: student.gender || 'Nam'
     });
     setShowEditModal(true);
   };
@@ -647,9 +651,6 @@ const StudentList = () => {
       }
     });
 
-    console.log('Debug - editForm data:', editForm);
-    console.log('Debug - cleaned data:', cleanFormData);
-    console.log('Debug - student ID:', selectedStudentForEdit.id);
 
     setEditLoading(true);
     try {
@@ -663,8 +664,14 @@ const StudentList = () => {
 
       if (response.ok) {
         alert('Cập nhật thông tin học sinh thành công!');
+        
+        // Fetch students để cập nhật danh sách
+        await fetchStudents();
+        
+        // Đóng modal sau khi đã fetch xong
         setShowEditModal(false);
-        fetchStudents();
+        setSelectedStudentForEdit(null);
+        setEditForm({});
       } else {
         const errorData = await response.json();
         console.error('API Error Response:', errorData);
@@ -1270,6 +1277,11 @@ const StudentList = () => {
                       <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-white/20">
                         🎓 {student.class_name}
                       </div>
+                      {student.gender && (
+                        <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-white/20">
+                          {student.gender === 'Nam' ? '👨' : student.gender === 'Nữ' ? '👩' : '👤'} {student.gender}
+                        </div>
+                      )}
                       {student.is_active === false && (
                         <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-red-500/50">
                           🗑️ Đã xóa
@@ -1894,6 +1906,21 @@ const StudentList = () => {
                     <option value="10">Khối 10</option>
                     <option value="11">Khối 11</option>
                     <option value="12">Khối 12</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
+                    Giới tính
+                  </label>
+                  <select
+                    value={editForm.gender || 'Nam'}
+                    onChange={(e) => handleEditFormChange('gender', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                    <option value="Khác">Khác</option>
                   </select>
                 </div>
 

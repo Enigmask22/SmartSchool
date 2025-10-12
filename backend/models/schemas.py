@@ -49,6 +49,7 @@ class StudentBase(BaseModel):
     address: Optional[str] = None
     parent_name: Optional[str] = None
     parent_phone: Optional[str] = None
+    gender: str = Field(default="Nam", description="Giới tính: Nam, Nữ, hoặc Khác")
 
 class StudentCreate(StudentBase):
     pass
@@ -63,6 +64,7 @@ class StudentUpdate(BaseModel):
     address: Optional[str] = None
     parent_name: Optional[str] = None
     parent_phone: Optional[str] = None
+    gender: Optional[str] = None
     is_active: Optional[bool] = None
     subject_selected: Optional[dict] = None
 
@@ -278,6 +280,7 @@ class StudentImportRecord(BaseModel):
     ten_phu_huynh: Optional[str] = None
     sdt_phu_huynh: Optional[str] = None
     dia_chi: Optional[str] = None
+    gioi_tinh: str = Field(default="Nam", description="Giới tính: Nam, Nữ, hoặc Khác")
 
 class BulkStudentImport(BaseModel):
     students: List[StudentImportRecord] = Field(..., description="Danh sách học sinh để import") 
