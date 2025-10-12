@@ -207,6 +207,37 @@ class ApiService {
     }
   }
 
+  // Forgot Password
+  async forgotPassword(email, otpEmail) {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp_email: otpEmail }),
+    });
+  }
+
+  async verifyOTP(email, otp) {
+    return this.request('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  async resetPassword(email, otp, newPassword, confirmPassword) {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        email, 
+        otp, 
+        new_password: newPassword, 
+        confirm_password: confirmPassword 
+      }),
+    });
+  }
+
+  async getOTPStatus(email) {
+    return this.request(`/auth/otp-status/${email}`);
+  }
+
   // Students
   async getStudents(params = {}) {
     const queryParams = new URLSearchParams();

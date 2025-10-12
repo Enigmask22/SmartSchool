@@ -10,9 +10,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from models.schemas import UserLogin, UserCreate, Token, ResponseModel
+from models.schemas import (
+    UserLogin, UserCreate, Token, ResponseModel,
+    ForgotPasswordRequest, VerifyOTPRequest, ResetPasswordRequest
+)
 from database.connection import get_db
 from utils.logger import setup_logger
+from services.email_service import email_service
+from services.otp_service import otp_service
 
 logger = setup_logger()
 router = APIRouter()
@@ -376,6 +381,203 @@ async def change_password(
         raise
     except Exception as e:
         logger.error(f"ERROR: Error changing password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.post("/forgot-password", response_model=ResponseModel)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db=Depends(get_db)
+):
+    """Gửi OTP qua email để đặt lại mật khẩu"""
+    try:
+        # Kiểm tra xem email có tồn tại trong hệ thống không
+        user_response = db.table("users").select("id, email, full_name").eq("email", request.email).execute()
+        
+        if not user_response.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Email không tồn tại trong hệ thống"
+            )
+        
+        user = user_response.data[0]
+        
+        # Kiểm tra xem SMTP đã được cấu hình chưa
+        if not email_service.is_smtp_configured():
+            logger.warning("SMTP chưa được cấu hình, sử dụng OTP giả lập")
+            # Trong môi trường development, có thể sử dụng OTP cố định
+            otp = "123456"  # OTP giả lập cho development
+        else:
+            # Tạo OTP ngẫu nhiên
+            otp = email_service.generate_otp()
+        
+        # Lưu OTP tạm thời
+        if not otp_service.generate_and_store_otp(request.email, request.otp_email, otp):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Lỗi tạo mã OTP"
+            )
+        
+        # Gửi email OTP
+        if email_service.is_smtp_configured():
+            email_sent = await email_service.send_otp_email(request.otp_email, otp)
+            if not email_sent:
+                # Xóa OTP nếu gửi email thất bại
+                otp_service.delete_otp(request.email)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Không thể gửi email OTP. Vui lòng thử lại sau"
+                )
+        
+        logger.info(f"✅ Đã gửi OTP cho email {request.email} đến {request.otp_email}")
+        
+        return ResponseModel(
+            success=True,
+            message="Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư (bao gồm thư mục spam)",
+            data={
+                "email": request.email,
+                "otp_email": request.otp_email,
+                "otp_expiry_minutes": 10,
+                "is_smtp_configured": email_service.is_smtp_configured()
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error in forgot password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.post("/verify-otp", response_model=ResponseModel)
+async def verify_otp(request: VerifyOTPRequest):
+    """Xác thực mã OTP"""
+    try:
+        result = otp_service.verify_otp(request.email, request.otp)
+        
+        if result["success"]:
+            return ResponseModel(
+                success=True,
+                message=result["message"],
+                data={
+                    "email": request.email,
+                    "is_verified": True
+                }
+            )
+        else:
+            status_code = status.HTTP_400_BAD_REQUEST
+            if result.get("error_code") == "OTP_NOT_FOUND":
+                status_code = status.HTTP_404_NOT_FOUND
+            elif result.get("error_code") == "MAX_ATTEMPTS_EXCEEDED":
+                status_code = status.HTTP_429_TOO_MANY_REQUESTS
+            
+            raise HTTPException(
+                status_code=status_code,
+                detail=result["message"]
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error verifying OTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.post("/reset-password", response_model=ResponseModel)
+async def reset_password(
+    request: ResetPasswordRequest,
+    db=Depends(get_db)
+):
+    """Đặt lại mật khẩu mới"""
+    try:
+        # Kiểm tra mật khẩu mới và xác nhận mật khẩu
+        if request.new_password != request.confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mật khẩu mới và xác nhận mật khẩu không khớp"
+            )
+        
+        # Xác thực OTP
+        otp_result = otp_service.verify_otp(request.email, request.otp)
+        if not otp_result["success"]:
+            status_code = status.HTTP_400_BAD_REQUEST
+            if otp_result.get("error_code") == "OTP_NOT_FOUND":
+                status_code = status.HTTP_404_NOT_FOUND
+            elif otp_result.get("error_code") == "MAX_ATTEMPTS_EXCEEDED":
+                status_code = status.HTTP_429_TOO_MANY_REQUESTS
+            
+            raise HTTPException(
+                status_code=status_code,
+                detail=otp_result["message"]
+            )
+        
+        # Kiểm tra xem user có tồn tại không
+        user_response = db.table("users").select("id, email").eq("email", request.email).execute()
+        if not user_response.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy tài khoản"
+            )
+        
+        user = user_response.data[0]
+        
+        # Hash mật khẩu mới
+        new_password_hash = get_password_hash(request.new_password)
+        
+        # Cập nhật mật khẩu
+        update_response = db.table("users").update({
+            "password_hash": new_password_hash,
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", user["id"]).execute()
+        
+        if not update_response.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Lỗi cập nhật mật khẩu"
+            )
+        
+        # Xóa OTP sau khi đổi mật khẩu thành công
+        otp_service.delete_otp(request.email)
+        
+        logger.info(f"✅ Đã đặt lại mật khẩu thành công cho email {request.email}")
+        
+        return ResponseModel(
+            success=True,
+            message="Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới",
+            data={
+                "email": request.email
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error resetting password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.get("/otp-status/{email}", response_model=ResponseModel)
+async def get_otp_status(email: str):
+    """Lấy trạng thái OTP cho email"""
+    try:
+        status_info = otp_service.get_otp_status(email)
+        
+        return ResponseModel(
+            success=True,
+            message="Lấy trạng thái OTP thành công",
+            data=status_info
+        )
+        
+    except Exception as e:
+        logger.error(f"ERROR: Error getting OTP status: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"

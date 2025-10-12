@@ -17,6 +17,21 @@ class UserCreate(BaseModel):
     full_name: str
     role: str = "teacher"
 
+# Forgot Password Schemas
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(..., description="Email đăng nhập")
+    otp_email: str = Field(..., description="Email nhận OTP")
+
+class VerifyOTPRequest(BaseModel):
+    email: str = Field(..., description="Email đăng nhập")
+    otp: str = Field(..., min_length=6, max_length=6, description="Mã OTP 6 số")
+
+class ResetPasswordRequest(BaseModel):
+    email: str = Field(..., description="Email đăng nhập")
+    otp: str = Field(..., min_length=6, max_length=6, description="Mã OTP 6 số")
+    new_password: str = Field(..., min_length=6, description="Mật khẩu mới")
+    confirm_password: str = Field(..., min_length=6, description="Xác nhận mật khẩu mới")
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

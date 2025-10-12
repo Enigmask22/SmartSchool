@@ -1,5 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
+import ForgotPassword from './ForgotPassword';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -8,6 +9,7 @@ const Login = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   
   const { login } = useContext(AuthContext);
 
@@ -33,6 +35,11 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // Nếu đang hiển thị forgot password
+  if (showForgotPassword) {
+    return <ForgotPassword onBackToLogin={() => setShowForgotPassword(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -125,6 +132,16 @@ const Login = () => {
                 ) : (
                   'Đăng nhập'
                 )}
+              </button>
+            </div>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-indigo-600 hover:text-indigo-500 font-medium"
+              >
+                Quên mật khẩu?
               </button>
             </div>
           </form>
