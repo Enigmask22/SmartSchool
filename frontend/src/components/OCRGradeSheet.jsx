@@ -456,8 +456,8 @@ const OCRGradeSheet = ({
                     
                     if (totalRows > pageSize) {
                       return (
-                        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="p-3 mb-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex flex-wrap gap-3 justify-between items-center">
                             <div className="text-sm text-gray-700">
                               Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalRows)}</span> trong tổng số <span className="font-semibold">{totalRows}</span> bản ghi
                             </div>
@@ -469,7 +469,7 @@ const OCRGradeSheet = ({
                                   setPageSize(Number(e.target.value));
                                   setCurrentPage(1);
                                 }}
-                                className="pl-3 pr-8 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                className="py-1 pr-8 pl-3 text-sm bg-white rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               >
                                 <option value={10}>10</option>
                                 <option value={20}>20</option>
@@ -491,7 +491,7 @@ const OCRGradeSheet = ({
                         <thead className="sticky top-0 bg-gray-50">
                           <tr>
                             <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">STT</th>
-                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Mã SV</th>
+                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Mã HS</th>
                             <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Họ và tên</th>
                             <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Lớp</th>
                             <th className="px-4 py-3 text-xs font-medium text-center text-gray-500 uppercase">ĐTX</th>
@@ -504,7 +504,13 @@ const OCRGradeSheet = ({
                             const totalRows = parsedData.parsed_rows.length;
                             const startIndex = (currentPage - 1) * pageSize;
                             const endIndex = startIndex + pageSize;
-                            const paginatedRows = parsedData.parsed_rows.slice(startIndex, endIndex);
+                            // Sắp xếp theo student_id tăng dần trước khi phân trang
+                            const sortedRows = parsedData.parsed_rows.sort((a, b) => {
+                              const aId = parseInt(a.student_id) || 0;
+                              const bId = parseInt(b.student_id) || 0;
+                              return aId - bId;
+                            });
+                            const paginatedRows = sortedRows.slice(startIndex, endIndex);
                             
                             return paginatedRows.map((row, idx) => (
                             <tr key={idx} className="hover:bg-gray-50">
@@ -556,7 +562,7 @@ const OCRGradeSheet = ({
                     if (totalPages <= 1) return null;
                     
                     return (
-                      <div className="mt-4 flex justify-center items-center space-x-2">
+                      <div className="flex justify-center items-center mt-4 space-x-2">
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                           disabled={currentPage === 1}

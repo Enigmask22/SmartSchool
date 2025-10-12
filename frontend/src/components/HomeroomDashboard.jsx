@@ -41,7 +41,13 @@ const HomeroomDashboard = () => {
       console.log('👥 Students response:', studentsResponse);
       if (studentsResponse.success) {
         console.log('👥 Students data:', studentsResponse.data);
-        setStudents(studentsResponse.data || []);
+        // Sắp xếp học sinh theo student_id tăng dần (250001, 250002, 250003...)
+        const sortedStudents = (studentsResponse.data || []).sort((a, b) => {
+          const aId = parseInt(a.student_id) || 0;
+          const bId = parseInt(b.student_id) || 0;
+          return aId - bId;
+        });
+        setStudents(sortedStudents);
       }
 
       // Fetch attendance stats for today

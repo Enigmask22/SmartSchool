@@ -158,7 +158,7 @@ const StudentList = () => {
       setStudents([
         {
           id: 1,
-          student_id: 'SV001',
+          student_id: '250001',
           full_name: 'Nguyễn Văn An',
           class_name: '10A1',
           grade: '10',
@@ -167,7 +167,7 @@ const StudentList = () => {
         },
         {
           id: 2,
-          student_id: 'SV002',
+          student_id: '250002',
           full_name: 'Trần Thị Bình',
           class_name: '10A1',
           grade: '10',
@@ -176,7 +176,7 @@ const StudentList = () => {
         },
         {
           id: 3,
-          student_id: 'SV003',
+          student_id: '250003',
           full_name: 'Lê Minh Châu',
           class_name: '10A2',
           grade: '10',
@@ -189,12 +189,17 @@ const StudentList = () => {
     }
   };
 
-  // Filter students based on search and class - với safety check
+  // Filter and sort students based on search and class - với safety check
   const filteredStudents = Array.isArray(students) ? students.filter(student => {
     const matchesSearch = student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          student.student_id?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = selectedClass === '' || student.class_name === selectedClass;
     return matchesSearch && matchesClass;
+  }).sort((a, b) => {
+    // Sắp xếp theo student_id tăng dần (250001, 250002, 250003...)
+    const aId = parseInt(a.student_id) || 0;
+    const bId = parseInt(b.student_id) || 0;
+    return aId - bId;
   }) : [];
 
   // Calculate pagination
@@ -1002,8 +1007,8 @@ const StudentList = () => {
 
       {/* Pagination Summary */}
       {totalStudents > 0 && (
-        <div className="mb-4 p-4 bg-white rounded-lg shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 mb-4 bg-white rounded-lg shadow-sm">
+          <div className="flex flex-wrap gap-3 justify-between items-center">
             <div className="text-sm text-gray-700">
               Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
             </div>
@@ -1015,7 +1020,7 @@ const StudentList = () => {
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="pl-3 pr-8 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="py-1 pr-8 pl-3 text-sm bg-white rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value={6}>6</option>
                 <option value={12}>12</option>
@@ -1137,11 +1142,11 @@ const StudentList = () => {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="mt-6 flex justify-center items-center space-x-2">
+        <div className="flex justify-center items-center mt-6 space-x-2">
           <button
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ← Trước
           </button>
@@ -1181,7 +1186,7 @@ const StudentList = () => {
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Sau →
           </button>

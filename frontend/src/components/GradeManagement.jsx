@@ -65,7 +65,13 @@ const GradeManagement = () => {
       );
       
       if (studentsResponse.success) {
-        setStudents(studentsResponse.data.students || []);
+        // Sắp xếp học sinh theo student_id tăng dần (250001, 250002, 250003...)
+        const sortedStudents = (studentsResponse.data.students || []).sort((a, b) => {
+          const aId = parseInt(a.student?.student_id) || 0;
+          const bId = parseInt(b.student?.student_id) || 0;
+          return aId - bId;
+        });
+        setStudents(sortedStudents);
       }
 
       // Fetch grade config for this subject

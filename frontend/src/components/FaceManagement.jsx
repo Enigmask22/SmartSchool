@@ -116,6 +116,13 @@ const FaceManagement = () => {
           studentsData = studentsData.filter(student => student.class_name === selectedClass);
         }
         
+        // Sắp xếp học sinh theo student_id tăng dần (250001, 250002, 250003...)
+        studentsData = studentsData.sort((a, b) => {
+          const aId = parseInt(a.student_id) || 0;
+          const bId = parseInt(b.student_id) || 0;
+          return aId - bId;
+        });
+        
         setStudents(studentsData);
       } else {
         setStudents([]);
@@ -320,7 +327,7 @@ const FaceManagement = () => {
       {/* Students with Face Registration */}
       <div className="overflow-hidden bg-white rounded-lg shadow-md">
         <div className="p-6 border-b">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-3 justify-between items-center">
             <div>
               <h3 className="text-xl font-semibold">Học sinh đã đăng ký khuôn mặt</h3>
               <p className="mt-1 text-gray-600">
@@ -351,7 +358,7 @@ const FaceManagement = () => {
 
         {/* Header */}
         <div className="grid grid-cols-12 gap-4 items-center px-4 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase bg-gray-50 border-b">
-          <div className="col-span-2">Mã SV</div>
+          <div className="col-span-2">Mã HS</div>
           <div className="col-span-3">Họ tên</div>
           <div className="col-span-1">Lớp</div>
           <div className="col-span-4">Trạng thái khuôn mặt</div>
@@ -436,8 +443,8 @@ const FaceManagement = () => {
           if (totalPages <= 1) return null;
           
           return (
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+              <div className="flex flex-wrap gap-3 justify-between items-center">
                 <div className="text-sm text-gray-700">
                   Hiển thị <span className="font-semibold">{((currentPage - 1) * pageSize) + 1}</span> đến <span className="font-semibold">{Math.min(currentPage * pageSize, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
                 </div>
