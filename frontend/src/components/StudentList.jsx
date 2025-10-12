@@ -38,6 +38,7 @@ const StudentList = () => {
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
   
   // Show inactive students option
   const [showInactive, setShowInactive] = useState(false);
@@ -123,7 +124,7 @@ const StudentList = () => {
   
   useEffect(() => {
     fetchStudents();
-  }, [showInactive, selectedClass]);
+  }, [selectedClass]);
 
   useEffect(() => {
     fetchAvailableClasses();
@@ -144,12 +145,12 @@ const StudentList = () => {
           setLoading(false);
           return;
         }
-        // If homeroom teacher, get only their homeroom students
+        // If homeroom teacher, get only their homeroom students (luôn lấy tất cả, kể cả inactive)
         response = await ApiService.getHomeroomStudents(selectedClass);
       } else {
-        // If admin or other roles, get all students
-        const params = showInactive ? { is_active: null } : {};
-        response = await ApiService.getStudents(params);
+        // If admin or other roles, get all students (luôn lấy tất cả, kể cả inactive)
+        // Frontend sẽ filter theo showInactive
+        response = await ApiService.getStudents({});
       }
       
       console.log('Students API response:', response);
@@ -199,12 +200,23 @@ const StudentList = () => {
     }
   };
 
-  // Filter and sort students based on search and class - với safety check
+  // Filter and sort students based on search, class, and active status - với safety check
   const filteredStudents = Array.isArray(students) ? students.filter(student => {
     const matchesSearch = student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          student.student_id?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = selectedClass === '' || student.class_name === selectedClass;
-    return matchesSearch && matchesClass;
+    
+    // Filter theo trạng thái is_active
+    let matchesActiveStatus = true;
+    if (showInactive) {
+      // Nếu tick "Đã xóa", chỉ hiển thị học sinh is_active = false
+      matchesActiveStatus = student.is_active === false;
+    } else {
+      // Nếu không tick "Đã xóa", chỉ hiển thị học sinh is_active = true hoặc null (mặc định là active)
+      matchesActiveStatus = student.is_active !== false;
+    }
+    
+    return matchesSearch && matchesClass && matchesActiveStatus;
   }).sort((a, b) => {
     // Sắp xếp theo student_id tăng dần (250001, 250002, 250003...)
     const aId = parseInt(a.student_id) || 0;
@@ -690,6 +702,44 @@ const StudentList = () => {
       } catch (error) {
         console.error('Error deleting student:', error);
         alert('Có lỗi xảy ra khi xóa học sinh: ' + error.message);
+      }
+    }
+  };
+
+  const handleRestore = async (student) => {
+    console.log('Restore button clicked for student:', student);
+    
+    if (window.confirm(`Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`)) {
+      setRestoreLoading(true);
+      try {
+        console.log('Sending restore request for student ID:', student.id);
+        const response = await fetch(`${API_BASE_URL}/students/${student.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            is_active: true
+          })
+        });
+
+        console.log('Restore response status:', response.status);
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Restore successful:', result);
+          alert('Khôi phục học sinh thành công!');
+          fetchStudents(); // Refresh danh sách
+        } else {
+          const errorData = await response.json();
+          console.error('API Error Response:', errorData);
+          alert(`Lỗi khi khôi phục: ${errorData.detail || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Error restoring student:', error);
+        alert('Có lỗi xảy ra khi khôi phục học sinh: ' + error.message);
+      } finally {
+        setRestoreLoading(false);
       }
     }
   };
@@ -1198,9 +1248,17 @@ const StudentList = () => {
           </div>
         ) : (
           paginatedStudents.map((student) => (
-            <div key={student.id} className="overflow-hidden bg-white rounded-xl border border-gray-100 shadow-lg transition-all duration-300 hover:shadow-xl">
+            <div key={student.id} className={`overflow-hidden bg-white rounded-xl border shadow-lg transition-all duration-300 hover:shadow-xl ${
+              student.is_active === false 
+                ? 'border-red-300 bg-red-50 opacity-75' 
+                : 'border-gray-100'
+            }`}>
               {/* Header with avatar and basic info */}
-              <div className="p-5 text-white bg-blue-600">
+              <div className={`p-5 text-white ${
+                student.is_active === false 
+                  ? 'bg-red-600' 
+                  : 'bg-blue-600'
+              }`}>
                 <div className="flex items-center space-x-3">
                   <div className="flex justify-center items-center w-14 h-14 text-xl font-bold rounded-lg bg-white/20">
                     {student.full_name?.charAt(0)?.toUpperCase() || '?'}
@@ -1208,8 +1266,15 @@ const StudentList = () => {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-semibold truncate">{student.full_name}</h3>
                     <p className="text-sm text-blue-100">{student.student_id}</p>
-                    <div className="inline-flex items-center px-2 py-0.5 mt-1 text-xs rounded-md bg-white/20">
-                      🎓 {student.class_name}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-white/20">
+                        🎓 {student.class_name}
+                      </div>
+                      {student.is_active === false && (
+                        <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-red-500/50">
+                          🗑️ Đã xóa
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1234,66 +1299,101 @@ const StudentList = () => {
 
                 {/* Action buttons */}
                 <div className="pt-3 border-t border-gray-100">
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    <button
-                      onClick={() => handleFeedbackClick(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
-                      title="Tạo nhận xét"
-                    >
-                      <span className="text-sm">💬</span>
-                      <span>Nhận xét</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setSelectedStudentForMultiple(student);
-                        setShowMultipleModal(true);
-                      }}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-green-700 bg-green-50 rounded-md transition-colors hover:bg-green-100"
-                      title="Nhiều ảnh"
-                    >
-                      <span className="text-sm">📸</span>
-                      <span>Nhiều ảnh</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => handleViewGrades(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
-                      title="Xem điểm số"
-                    >
-                      <span className="text-sm">📊</span>
-                      <span>Điểm số</span>
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => handleSubjectSelection(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
-                      title="Chọn môn học"
-                    >
-                      <span className="text-sm">📚</span>
-                      <span>Môn học</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => handleEdit(student)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md transition-colors hover:bg-gray-200"
-                      title="Sửa thông tin"
-                    >
-                      <span className="text-sm">✏️</span>
-                      <span>Sửa</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => handleDelete(student.id)}
-                      className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-red-700 bg-red-50 rounded-md transition-colors hover:bg-red-100"
-                      title="Xóa học sinh"
-                    >
-                      <span className="text-sm">🗑️</span>
-                      <span>Xóa</span>
-                    </button>
-                  </div>
+                  {student.is_active === false ? (
+                    // Actions for deleted students (limited)
+                    <div className="text-center">
+                      <button
+                        onClick={() => handleRestore(student)}
+                        disabled={restoreLoading}
+                        className={`flex justify-center items-center px-4 py-2 mx-auto space-x-1 text-xs font-medium text-white rounded-md transition-colors ${
+                          restoreLoading 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                        title="Khôi phục học sinh"
+                      >
+                        {restoreLoading ? (
+                          <>
+                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Đang khôi phục...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-sm">🔄</span>
+                            <span>Khôi phục</span>
+                          </>
+                        )}
+                      </button>
+                      <p className="mt-2 text-xs text-gray-500">Học sinh đã bị xóa</p>
+                    </div>
+                  ) : (
+                    // Actions for active students (full)
+                    <>
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        <button
+                          onClick={() => handleFeedbackClick(student)}
+                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
+                          title="Tạo nhận xét"
+                        >
+                          <span className="text-sm">💬</span>
+                          <span>Nhận xét</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setSelectedStudentForMultiple(student);
+                            setShowMultipleModal(true);
+                          }}
+                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-green-700 bg-green-50 rounded-md transition-colors hover:bg-green-100"
+                          title="Nhiều ảnh"
+                        >
+                          <span className="text-sm">📸</span>
+                          <span>Nhiều ảnh</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleViewGrades(student)}
+                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
+                          title="Xem điểm số"
+                        >
+                          <span className="text-sm">📊</span>
+                          <span>Điểm số</span>
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => handleSubjectSelection(student)}
+                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
+                          title="Chọn môn học"
+                        >
+                          <span className="text-sm">📚</span>
+                          <span>Môn học</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleEdit(student)}
+                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md transition-colors hover:bg-gray-200"
+                          title="Sửa thông tin"
+                        >
+                          <span className="text-sm">✏️</span>
+                          <span>Sửa</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleDelete(student.id)}
+                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-red-700 bg-red-50 rounded-md transition-colors hover:bg-red-100"
+                          title="Xóa học sinh"
+                        >
+                          <span className="text-sm">🗑️</span>
+                          <span>Xóa</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1691,6 +1791,11 @@ const StudentList = () => {
           Hiển thị {filteredStudents.length} / {students.length} học sinh
           {selectedClass && ` trong lớp ${selectedClass}`}
           {searchTerm && ` với từ khóa "${searchTerm}"`}
+          {showInactive && ` (chỉ hiển thị học sinh đã xóa)`}
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          Tổng: {students.filter(s => s.is_active !== false).length} học sinh đang hoạt động, 
+          {students.filter(s => s.is_active === false).length} học sinh đã xóa
         </p>
       </div>
 
