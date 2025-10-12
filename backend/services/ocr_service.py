@@ -97,7 +97,7 @@ Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là 
    - Mỗi dòng là thông tin của một học sinh
 
 2. **Quy tắc đọc dữ liệu:**
-   - **ID học sinh**: Thường có dạng SV001, SV002,... hoặc chỉ số như 001, 002,...
+   - **ID học sinh**: Thường có dạng 6 số như 250001, 250002,... 
    - **Họ và tên**: Tên đầy đủ của học sinh (chữ tiếng Việt có dấu)
    - **Điểm số**: 
      * Là số thập phân từ 0 đến 10
@@ -120,14 +120,14 @@ Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là 
      "headers": ["id", "ho_va_ten", "diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"],
      "rows": [
        {
-         "student_id": "SV001",
+         "student_id": "250001",
          "ho_va_ten": "Nguyễn Văn A",
          "diem_thuong_xuyen": 8.5,
          "diem_thi_giua_ki": 7.0,
          "diem_thi_cuoi_ki": 9.0
        },
        {
-         "student_id": "SV002",
+         "student_id": "250002",
          "ho_va_ten": "Trần Thị B",
          "diem_thuong_xuyen": 6.5,
          "diem_thi_giua_ki": 7.5,
@@ -346,12 +346,12 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
             student_id: Raw student ID
             
         Returns:
-            Normalized student ID (format: SV001, SV002, ...)
+            Normalized student ID (format: 250001, 250002, ...)
         """
         student_id = student_id.strip().upper()
         
-        # Pattern: SV + số
-        match = re.search(r'(SV\d+)', student_id)
+        # Pattern: 6 số
+        match = re.search(r'(\d{6})', student_id)
         if match:
             return match.group(1)
         
@@ -359,9 +359,8 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         match = re.search(r'(\d+)', student_id)
         if match:
             num = match.group(1)
-            # Thêm prefix SV và pad với zeros
             if len(num) <= 4:
-                return f"SV{num.zfill(3)}"
+                return f"{num.zfill(6)}"
         
         return None
     

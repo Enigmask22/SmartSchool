@@ -62,12 +62,12 @@ Thêm hàm `_recover_truncated_json()` để phục hồi dữ liệu nếu JSON
 # JSON bị cắt:
 {
   "rows": [
-    {"student_id": "SV001", "ho_va_ten": "Nguyễn Văn
+    {"student_id": "250001", "ho_va_ten": "Nguyễn Văn
 
 # Sau khi recovery:
 {
   "rows": [
-    {"student_id": "SV001"}
+    {"student_id": "250001"}
   ]
 }
 # + Warning: "⚠️ JSON bị cắt cụt, đã phục hồi được 1 dòng"
@@ -148,7 +148,7 @@ POST /api/ocr/grade-sheet
   "total_rows": 50,
   "rows": [
     {
-      "student_id": "SV001",
+      "student_id": "250001",
       "ho_va_ten": "...",
       "diem_thuong_xuyen": 7.5,
       ...

@@ -146,34 +146,34 @@ const AICamera = () => {
   return (
     <div className="ai-camera">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">AI Camera</h2>
+        <h2 className="mb-2 text-3xl font-bold text-gray-800">AI Camera</h2>
         <p className="text-gray-600">Điểm danh tự động bằng nhận diện khuôn mặt</p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className="p-3 mb-4 text-red-700 bg-red-100 rounded border border-red-400">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Camera Section */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-semibold mb-4">Camera</h3>
+        <div className="p-6 bg-white rounded-lg shadow-md">
+          <h3 className="mb-4 text-xl font-semibold">Camera</h3>
           
-          <div className="relative bg-gray-800 rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
+          <div className="overflow-hidden relative bg-gray-800 rounded-lg" style={{ aspectRatio: '4/3' }}>
             <video
               ref={videoRef}
               autoPlay
               playsInline
-              className="w-full h-full object-cover"
+              className="object-cover w-full h-full"
               style={{ display: isStreamActive ? 'block' : 'none' }}
             />
             
             {!isStreamActive && (
-              <div className="absolute inset-0 flex items-center justify-center text-white">
+              <div className="flex absolute inset-0 justify-center items-center text-white">
                 <div className="text-center">
-                  <span className="text-6xl mb-4 block">📷</span>
+                  <span className="block mb-4 text-6xl">📷</span>
                   <p>Camera chưa được bật</p>
                 </div>
               </div>
@@ -187,7 +187,7 @@ const AICamera = () => {
               {!isStreamActive ? (
                 <button
                   onClick={startCamera}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                  className="flex-1 px-4 py-2 text-white bg-blue-600 rounded transition-colors hover:bg-blue-700"
                 >
                   📷 Bật Camera
                 </button>
@@ -196,13 +196,13 @@ const AICamera = () => {
                   <button
                     onClick={captureAndRecognize}
                     disabled={isProcessing}
-                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                    className="flex-1 px-4 py-2 text-white bg-green-600 rounded transition-colors hover:bg-green-700 disabled:bg-gray-400"
                   >
                     {isProcessing ? '⏳ Đang xử lý...' : '🎯 Chụp & Nhận diện'}
                   </button>
                   <button
                     onClick={stopCamera}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                    className="px-4 py-2 text-white bg-red-600 rounded transition-colors hover:bg-red-700"
                   >
                     ❌ Tắt Camera
                   </button>
@@ -212,7 +212,7 @@ const AICamera = () => {
             
             {/* Demo Mode - Upload Image */}
             {(demoMode || !isStreamActive) && (
-              <div className="border-t border-gray-200 pt-2">
+              <div className="pt-2 border-t border-gray-200">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -224,11 +224,11 @@ const AICamera = () => {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isProcessing}
-                  className="w-full bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
+                  className="px-4 py-2 w-full text-white bg-purple-600 rounded transition-colors hover:bg-purple-700 disabled:bg-gray-400"
                 >
                   {isProcessing ? '⏳ Đang xử lý...' : '📁 Upload ảnh để test (Demo)'}
                 </button>
-                <p className="text-xs text-gray-500 mt-1 text-center">
+                <p className="mt-1 text-xs text-center text-gray-500">
                   Hỗ trợ: JPG, PNG, WebP
                 </p>
               </div>
@@ -237,34 +237,34 @@ const AICamera = () => {
         </div>
 
         {/* Results Section */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-semibold mb-4">Kết quả nhận diện</h3>
+        <div className="p-6 bg-white rounded-lg shadow-md">
+          <h3 className="mb-4 text-xl font-semibold">Kết quả nhận diện</h3>
           
           {!lastRecognition ? (
-            <div className="text-center py-8 text-gray-500">
-              <span className="text-4xl block mb-2">🔍</span>
+            <div className="py-8 text-center text-gray-500">
+              <span className="block mb-2 text-4xl">🔍</span>
               <p>Chưa có kết quả nhận diện</p>
             </div>
           ) : (
             <div className="space-y-4">
               {lastRecognition.recognized ? (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex items-center mb-2">
-                    <span className="text-green-600 text-xl mr-2">✅</span>
+                    <span className="mr-2 text-xl text-green-600">✅</span>
                     <span className="font-semibold text-green-800">Nhận diện thành công</span>
                   </div>
-                  <div className="text-sm text-gray-600 space-y-1">
+                  <div className="space-y-1 text-sm text-gray-600">
                     <p><strong>Tên:</strong> {lastRecognition.student?.full_name}</p>
-                    <p><strong>Mã SV:</strong> {lastRecognition.student?.student_id}</p>
+                    <p><strong>Mã HS:</strong> {lastRecognition.student?.student_id}</p>
                     <p><strong>Lớp:</strong> {lastRecognition.student?.class_name}</p>
                     <p><strong>Độ chính xác:</strong> {lastRecognition.confidence}%</p>
                     <p><strong>Thời gian:</strong> {new Date().toLocaleString('vi-VN')}</p>
                   </div>
                 </div>
               ) : (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                   <div className="flex items-center mb-2">
-                    <span className="text-yellow-600 text-xl mr-2">❓</span>
+                    <span className="mr-2 text-xl text-yellow-600">❓</span>
                     <span className="font-semibold text-yellow-800">Không nhận diện được</span>
                   </div>
                   <p className="text-sm text-gray-600">
@@ -279,18 +279,18 @@ const AICamera = () => {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="mt-4 bg-gray-50 border rounded-lg p-4">
-          <h4 className="font-semibold text-gray-800 mb-3">⚙️ Cài đặt Camera</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div className="p-4 mt-4 bg-gray-50 rounded-lg border">
+          <h4 className="mb-3 font-semibold text-gray-800">⚙️ Cài đặt Camera</h4>
+          <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
             <div>
-              <label className="block text-gray-700 mb-1">Độ phân giải:</label>
+              <label className="block mb-1 text-gray-700">Độ phân giải:</label>
               <select 
                 value={`${cameraSettings.width}x${cameraSettings.height}`}
                 onChange={(e) => {
                   const [width, height] = e.target.value.split('x').map(Number);
                   setCameraSettings(prev => ({...prev, width, height}));
                 }}
-                className="w-full border rounded px-2 py-1"
+                className="px-2 py-1 w-full rounded border"
               >
                 <option value="640x480">640x480 (Thấp)</option>
                 <option value="1280x720">1280x720 (HD)</option>
@@ -298,11 +298,11 @@ const AICamera = () => {
               </select>
             </div>
             <div>
-              <label className="block text-gray-700 mb-1">Camera:</label>
+              <label className="block mb-1 text-gray-700">Camera:</label>
               <select 
                 value={cameraSettings.facingMode}
                 onChange={(e) => setCameraSettings(prev => ({...prev, facingMode: e.target.value}))}
-                className="w-full border rounded px-2 py-1"
+                className="px-2 py-1 w-full rounded border"
               >
                 <option value="user">Camera trước</option>
                 <option value="environment">Camera sau</option>
@@ -316,7 +316,7 @@ const AICamera = () => {
                     setTimeout(startCamera, 500);
                   }
                 }}
-                className="w-full bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 transition-colors"
+                className="px-3 py-1 w-full text-white bg-gray-600 rounded transition-colors hover:bg-gray-700"
               >
                 🔄 Áp dụng
               </button>
@@ -326,28 +326,28 @@ const AICamera = () => {
       )}
 
       {/* Instructions */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="p-4 mt-6 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex justify-between items-center mb-2">
           <h4 className="font-semibold text-blue-800">Hướng dẫn sử dụng:</h4>
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="text-blue-600 hover:text-blue-800 transition-colors"
+            className="text-blue-600 transition-colors hover:text-blue-800"
           >
             ⚙️ Cài đặt
           </button>
         </div>
-        <ul className="text-sm text-blue-700 space-y-1">
+        <ul className="space-y-1 text-sm text-blue-700">
           <li>1. Nhấn "Bật Camera" để kích hoạt camera</li>
           <li>2. Đưa khuôn mặt vào vùng camera, đảm bảo ánh sáng đủ</li>
           <li>3. Nhấn "Chụp & Nhận diện" để thực hiện điểm danh</li>
           <li>4. Hệ thống sẽ tự động đánh dấu điểm danh nếu nhận diện thành công</li>
         </ul>
-        <div className="mt-3 pt-3 border-t border-blue-200">
+        <div className="pt-3 mt-3 border-t border-blue-200">
           <p className="text-xs text-blue-600">
             💡 <strong>Mẹo:</strong> Nếu không nhận diện được, thử điều chỉnh góc độ, ánh sáng hoặc biểu cảm tự nhiên hơn.
             Hệ thống đã được tối ưu để nhận diện linh hoạt với các thay đổi nhỏ về góc chụp và biểu cảm.
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="mt-1 text-xs text-gray-500">
             🎯 <strong>Production:</strong> Với camera thật, độ chính xác sẽ cao hơn nhờ chất lượng ảnh tốt và góc chụp cố định.
           </p>
         </div>

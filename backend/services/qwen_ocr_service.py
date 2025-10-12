@@ -139,7 +139,7 @@ class QwenOCRService:
 - Mỗi dòng là thông tin một học sinh
 
 **QUY TẮC:**
-1. **ID học sinh**: Dạng SV001, SV002,... (nếu chỉ thấy số thì thêm prefix SV)
+1. **ID học sinh**: Gồm 6 số có dạng 250001, 250002,... 
 2. **Họ tên**: Tên đầy đủ tiếng Việt có dấu
 3. **Điểm số**: 
    - Số thập phân 0-10, bước 0.25
@@ -154,7 +154,7 @@ class QwenOCRService:
   "headers": ["id", "ho_va_ten", "diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"],
   "rows": [
     {
-      "student_id": "SV001",
+      "student_id": "250001",
       "ho_va_ten": "Nguyễn Văn A",
       "diem_thuong_xuyen": 8.5,
       "diem_thi_giua_ki": 7.0,
@@ -531,22 +531,21 @@ class QwenOCRService:
             student_id: Raw student ID
             
         Returns:
-            Normalized student ID (format: SV001, SV002, ...)
+            Normalized student ID (format: 250001, 250002, ...)
         """
-        student_id = student_id.strip().upper()
+        student_id = student_id.strip()
         
-        # Pattern: SV + số
-        match = re.search(r'(SV\d+)', student_id)
+        # Pattern: 6 chữ số (250001, 250002, ...)
+        match = re.search(r'(\d{6})', student_id)
         if match:
             return match.group(1)
         
-        # Pattern: chỉ số (001, 002, 1, 2, ...)
+        # Pattern: số có ít hơn 6 chữ số - pad với zeros để thành 6 chữ số
         match = re.search(r'(\d+)', student_id)
         if match:
             num = match.group(1)
-            # Thêm prefix SV và pad với zeros
-            if len(num) <= 4:
-                return f"SV{num.zfill(3)}"
+            if len(num) <= 6:
+                return num.zfill(6)
         
         return None
     
