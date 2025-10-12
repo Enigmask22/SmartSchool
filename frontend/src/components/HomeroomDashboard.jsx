@@ -41,8 +41,11 @@ const HomeroomDashboard = () => {
       console.log('👥 Students response:', studentsResponse);
       if (studentsResponse.success) {
         console.log('👥 Students data:', studentsResponse.data);
+        // Filter chỉ hiển thị học sinh đang hoạt động (is_active !== false)
+        const activeStudents = (studentsResponse.data || []).filter(student => student.is_active !== false);
+        
         // Sắp xếp học sinh theo student_id tăng dần (250001, 250002, 250003...)
-        const sortedStudents = (studentsResponse.data || []).sort((a, b) => {
+        const sortedStudents = activeStudents.sort((a, b) => {
           const aId = parseInt(a.student_id) || 0;
           const bId = parseInt(b.student_id) || 0;
           return aId - bId;

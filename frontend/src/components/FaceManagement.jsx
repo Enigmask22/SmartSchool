@@ -116,6 +116,9 @@ const FaceManagement = () => {
           studentsData = studentsData.filter(student => student.class_name === selectedClass);
         }
         
+        // Filter chỉ hiển thị học sinh đang hoạt động (is_active !== false)
+        studentsData = studentsData.filter(student => student.is_active !== false);
+        
         // Sắp xếp học sinh theo student_id tăng dần (250001, 250002, 250003...)
         studentsData = studentsData.sort((a, b) => {
           const aId = parseInt(a.student_id) || 0;
