@@ -5,6 +5,7 @@ import bcrypt
 
 from database.connection import get_db
 from utils.logger import setup_logger
+from models.schemas import BulkStudentImport, StudentImportRecord, ResponseModel
 
 logger = setup_logger(__name__)
 router = APIRouter(tags=["admin"])
@@ -666,4 +667,149 @@ async def delete_student(student_id: str, db=Depends(get_db)):
         
     except Exception as e:
         logger.error(f"Error deleting student: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa học sinh: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa học sinh: {str(e)}")
+
+# ===============================================
+# BULK STUDENT IMPORT ENDPOINTS
+# ===============================================
+
+def generate_student_id(grade: str, db) -> str:
+    """Tạo mã học sinh tự động dựa trên khối"""
+    try:
+        # Xác định năm học dựa trên khối
+        current_year = datetime.now().year
+        year_prefix = None
+        
+        if grade == '10':
+            year_prefix = str(current_year)[-2:]  # 2025 -> 25
+        elif grade == '11':
+            year_prefix = str(current_year - 1)[-2:]  # 2024 -> 24
+        elif grade == '12':
+            year_prefix = str(current_year - 2)[-2:]  # 2023 -> 23
+        else:
+            raise ValueError('Khối học không hợp lệ')
+
+        # Query tất cả học sinh có mã bắt đầu bằng yearPrefix
+        response = db.table("students").select("student_id").eq("grade", grade).execute()
+        
+        if response.data:
+            students = response.data
+            
+            # Lọc các học sinh có mã bắt đầu bằng yearPrefix và sắp xếp
+            filtered_students = [
+                int(student['student_id']) for student in students 
+                if student['student_id'] and student['student_id'].startswith(year_prefix)
+            ]
+            filtered_students = [id for id in filtered_students if not isinstance(id, str)]
+            filtered_students.sort()
+            
+            # Tìm mã tiếp theo
+            next_id = int(year_prefix + '0001')
+            if filtered_students:
+                max_id = max(filtered_students)
+                next_id = max_id + 1
+            
+            return str(next_id)
+        else:
+            return year_prefix + '0001'
+            
+    except Exception as e:
+        logger.error(f"Error generating student ID: {str(e)}")
+        # Fallback: tạo mã dựa trên thời gian hiện tại
+        current_year = datetime.now().year
+        year_prefix = str(current_year)[-2:] if grade == '10' else str(current_year - 1)[-2:] if grade == '11' else str(current_year - 2)[-2:]
+        return year_prefix + str(int(datetime.now().timestamp()))[-4:]
+
+@router.post("/students/bulk-import", response_model=ResponseModel)
+async def bulk_import_students(
+    import_data: BulkStudentImport,
+    db=Depends(get_db)
+):
+    """Nhập học sinh hàng loạt từ file Excel/CSV"""
+    try:
+        success_count = 0
+        error_count = 0
+        errors = []
+        created_students = []
+        
+        for student_record in import_data.students:
+            try:
+                # Validate required fields
+                if not student_record.ho_va_ten or not student_record.lop_hoc or not student_record.khoi:
+                    errors.append(f"Thiếu thông tin bắt buộc cho học sinh: {student_record.ho_va_ten or 'Unknown'}")
+                    error_count += 1
+                    continue
+                
+                # Generate student ID
+                student_id = generate_student_id(student_record.khoi, db)
+                
+                # Check if student ID already exists
+                existing = db.table("students").select("student_id").eq("student_id", student_id).execute()
+                if existing.data:
+                    # Generate new ID if exists
+                    counter = 1
+                    while existing.data:
+                        new_id = student_id[:-4] + str(int(student_id[-4:]) + counter).zfill(4)
+                        existing = db.table("students").select("student_id").eq("student_id", new_id).execute()
+                        if not existing.data:
+                            student_id = new_id
+                            break
+                        counter += 1
+                
+                # Prepare student data
+                student_data = {
+                    "student_id": student_id,
+                    "full_name": student_record.ho_va_ten,
+                    "email": student_record.email,
+                    "phone": student_record.so_dien_thoai,
+                    "class_name": student_record.lop_hoc,
+                    "grade": student_record.khoi,
+                    "date_of_birth": student_record.ngay_sinh,
+                    "address": student_record.dia_chi,
+                    "parent_name": student_record.ten_phu_huynh,
+                    "parent_phone": student_record.sdt_phu_huynh,
+                    "is_active": True,
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat()
+                }
+                
+                # Remove None values
+                student_data = {k: v for k, v in student_data.items() if v is not None}
+                
+                # Insert student
+                response = db.table("students").insert(student_data).execute()
+                
+                if response.data:
+                    success_count += 1
+                    created_students.append({
+                        "student_id": student_id,
+                        "full_name": student_record.ho_va_ten,
+                        "class_name": student_record.lop_hoc
+                    })
+                else:
+                    errors.append(f"Không thể tạo học sinh: {student_record.ho_va_ten}")
+                    error_count += 1
+                    
+            except Exception as e:
+                error_msg = f"Lỗi khi tạo học sinh {student_record.ho_va_ten}: {str(e)}"
+                errors.append(error_msg)
+                error_count += 1
+                logger.error(error_msg)
+        
+        return ResponseModel(
+            success=True,
+            message=f"Nhập học sinh hoàn thành. Thành công: {success_count}, Lỗi: {error_count}",
+            data={
+                "success_count": success_count,
+                "error_count": error_count,
+                "errors": errors,
+                "created_students": created_students
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in bulk import students: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        ) 

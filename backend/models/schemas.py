@@ -4,15 +4,15 @@ Pydantic models cho API request/response schemas
 
 from datetime import datetime, date
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 # Authentication Schemas
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     full_name: str
     role: str = "teacher"
@@ -26,7 +26,7 @@ class Token(BaseModel):
 class StudentBase(BaseModel):
     student_id: str = Field(..., description="Mã số học sinh")
     full_name: str = Field(..., description="Họ và tên")
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     class_name: str = Field(..., description="Lớp học")
     grade: str = Field(..., description="Khối")
@@ -40,7 +40,7 @@ class StudentCreate(StudentBase):
 
 class StudentUpdate(BaseModel):
     full_name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     class_name: Optional[str] = None
     grade: Optional[str] = None
@@ -213,7 +213,7 @@ class Subject(SubjectBase):
 class TeacherBase(BaseModel):
     teacher_code: str = Field(..., description="Mã giáo viên")
     full_name: str = Field(..., description="Họ tên giáo viên")
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     user_id: Optional[int] = None
 
@@ -250,4 +250,19 @@ class Grade(GradeBase):
     updated_at: datetime
 
 class SchoolDaysConfigBatch(BaseModel):
-    configs: List[SchoolDaysConfigCreate] = Field(..., description="Cấu hình cho tất cả các khối") 
+    configs: List[SchoolDaysConfigCreate] = Field(..., description="Cấu hình cho tất cả các khối")
+
+# Bulk Student Import Schemas
+class StudentImportRecord(BaseModel):
+    ho_va_ten: str = Field(..., description="Họ và tên học sinh")
+    email: Optional[str] = None
+    so_dien_thoai: Optional[str] = None
+    lop_hoc: str = Field(..., description="Lớp học")
+    khoi: str = Field(..., description="Khối học")
+    ngay_sinh: Optional[str] = None
+    ten_phu_huynh: Optional[str] = None
+    sdt_phu_huynh: Optional[str] = None
+    dia_chi: Optional[str] = None
+
+class BulkStudentImport(BaseModel):
+    students: List[StudentImportRecord] = Field(..., description="Danh sách học sinh để import") 
