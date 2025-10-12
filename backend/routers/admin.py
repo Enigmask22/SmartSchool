@@ -287,6 +287,25 @@ async def get_all_classes(db=Depends(get_db)):
         logger.error(f"Error getting classes: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách lớp học: {str(e)}")
 
+@router.get("/classes/{class_id}/students")
+async def get_class_students(class_id: int, db=Depends(get_db)):
+    """Lấy danh sách học sinh của một lớp cụ thể"""
+    try:
+        # Lấy thông tin lớp học
+        class_response = db.table("classes").select("*").eq("id", class_id).execute()
+        if not class_response.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+        
+        class_info = class_response.data[0]
+        
+        # Lấy danh sách học sinh trong lớp
+        students_response = db.table("students").select("*").eq("class_name", class_info["class_name"]).execute()
+        
+        return {"success": True, "data": students_response.data}
+    except Exception as e:
+        logger.error(f"Error getting class students: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách học sinh: {str(e)}")
+
 @router.post("/classes")
 async def create_class(class_data: dict, db=Depends(get_db)):
     """Tạo lớp học mới"""
