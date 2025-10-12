@@ -568,4 +568,102 @@ async def delete_class_subject(class_subject_id: int, db=Depends(get_db)):
         
     except Exception as e:
         logger.error(f"Error deleting class subject: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa quan hệ lớp - môn học: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa quan hệ lớp - môn học: {str(e)}")
+
+# ===============================================
+# STUDENTS CRUD ENDPOINTS
+# ===============================================
+
+@router.get("/students")
+async def get_all_students(db=Depends(get_db)):
+    """Lấy danh sách tất cả học sinh"""
+    try:
+        response = db.table("students").select("*").order("student_id").execute()
+        
+        return {"success": True, "data": response.data}
+    except Exception as e:
+        logger.error(f"Error getting students: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách học sinh: {str(e)}")
+
+@router.get("/students/by-grade")
+async def get_students_by_grade(grade: str, db=Depends(get_db)):
+    """Lấy danh sách học sinh theo khối"""
+    try:
+        response = db.table("students").select("*").eq("grade", grade).execute()
+        
+        return {"success": True, "data": response.data}
+    except Exception as e:
+        logger.error(f"Error getting students by grade: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách học sinh theo khối: {str(e)}")
+
+@router.post("/students")
+async def create_student(student_data: dict, db=Depends(get_db)):
+    """Tạo học sinh mới"""
+    try:
+        data = {
+            "student_id": student_data['student_id'],
+            "full_name": student_data['full_name'],
+            "email": student_data.get('email'),
+            "phone": student_data.get('phone'),
+            "class_name": student_data.get('class_name'),
+            "grade": student_data.get('grade'),
+            "date_of_birth": student_data.get('date_of_birth'),
+            "address": student_data.get('address'),
+            "parent_name": student_data.get('parent_name'),
+            "parent_phone": student_data.get('parent_phone'),
+            "is_active": student_data.get('is_active', True),
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        response = db.table("students").insert(data).execute()
+        
+        if response.data:
+            return {"success": True, "data": response.data[0], "message": "Tạo học sinh thành công"}
+        else:
+            raise HTTPException(status_code=500, detail="Không thể tạo học sinh")
+        
+    except Exception as e:
+        logger.error(f"Error creating student: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo học sinh: {str(e)}")
+
+@router.put("/students/{student_id}")
+async def update_student(student_id: str, student_data: dict, db=Depends(get_db)):
+    """Cập nhật thông tin học sinh"""
+    try:
+        update_data = {}
+        for field in ['full_name', 'email', 'phone', 'class_name', 'grade', 'date_of_birth', 
+                     'address', 'parent_name', 'parent_phone', 'is_active']:
+            if field in student_data:
+                update_data[field] = student_data[field]
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="Không có trường nào để cập nhật")
+        
+        update_data['updated_at'] = datetime.now().isoformat()
+        
+        response = db.table("students").update(update_data).eq("student_id", student_id).execute()
+        
+        if response.data:
+            return {"success": True, "data": response.data[0], "message": "Cập nhật học sinh thành công"}
+        else:
+            raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
+        
+    except Exception as e:
+        logger.error(f"Error updating student: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật học sinh: {str(e)}")
+
+@router.delete("/students/{student_id}")
+async def delete_student(student_id: str, db=Depends(get_db)):
+    """Xóa học sinh"""
+    try:
+        response = db.table("students").delete().eq("student_id", student_id).execute()
+        
+        if response.data:
+            return {"success": True, "message": "Xóa học sinh thành công"}
+        else:
+            raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
+        
+    except Exception as e:
+        logger.error(f"Error deleting student: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa học sinh: {str(e)}") 
