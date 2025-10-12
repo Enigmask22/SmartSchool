@@ -12,6 +12,13 @@ const AdminManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  
+  // States cho Class Management tab
+  const [selectedClassForManagement, setSelectedClassForManagement] = useState('');
+  const [showInactiveStudents, setShowInactiveStudents] = useState(false);
+  const [classStudents, setClassStudents] = useState([]);
+  const [homeroomTeacher, setHomeroomTeacher] = useState(null);
+  const [loadingClassData, setLoadingClassData] = useState(false);
 
   // Reference data cho dropdowns
   const [teachers, setTeachers] = useState([]);
@@ -64,6 +71,7 @@ const AdminManagement = () => {
     { id: 'teachers', label: 'Giáo viên', icon: '👨‍🏫' },
     { id: 'subjects', label: 'Môn học', icon: '📚' },
     { id: 'classes', label: 'Lớp học', icon: '🏫' },
+    { id: 'class_management', label: 'Quản trị lớp học', icon: '🎯' },
     { id: 'subject_teachers', label: 'GV-Môn học', icon: '👨‍🏫📚' },
     { id: 'class_subjects', label: 'Lớp-Môn học', icon: '🏫📚' }
   ];
@@ -72,9 +80,20 @@ const AdminManagement = () => {
 
   // Load dữ liệu khi đổi tab
   useEffect(() => {
-    loadData();
-    loadReferenceData();
+    if (activeTab === 'class_management') {
+      loadClassManagementData();
+    } else {
+      loadData();
+      loadReferenceData();
+    }
   }, [activeTab]);
+
+  // Load dữ liệu khi chọn lớp
+  useEffect(() => {
+    if (selectedClassForManagement && activeTab === 'class_management') {
+      loadClassStudents();
+    }
+  }, [selectedClassForManagement, showInactiveStudents]);
 
   const loadData = async () => {
     setLoading(true);
@@ -109,6 +128,62 @@ const AdminManagement = () => {
       if (usersRes.success) setUsers(usersRes.data || []);
     } catch (err) {
       console.error('Error loading reference data:', err);
+    }
+  };
+
+  // Load dữ liệu cho Class Management tab
+  const loadClassManagementData = async () => {
+    try {
+      const response = await api.request('/admin/classes');
+      if (response.success) {
+        setClasses(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading classes:', err);
+    }
+  };
+
+  // Load học sinh của lớp được chọn
+  const loadClassStudents = async () => {
+    if (!selectedClassForManagement) return;
+    
+    setLoadingClassData(true);
+    try {
+      const response = await api.request(`/admin/classes/${selectedClassForManagement}/students`);
+      if (response.success) {
+        let students = response.data || [];
+        
+        // Filter theo trạng thái active/inactive
+        if (showInactiveStudents) {
+          students = students.filter(student => student.is_active === false);
+        } else {
+          students = students.filter(student => student.is_active !== false);
+        }
+        
+        // Sắp xếp theo student_id
+        students = students.sort((a, b) => {
+          const aId = parseInt(a.student_id) || 0;
+          const bId = parseInt(b.student_id) || 0;
+          return aId - bId;
+        });
+        
+        setClassStudents(students);
+        
+        // Load thông tin giáo viên chủ nhiệm
+        const classInfo = classes.find(c => c.id === parseInt(selectedClassForManagement));
+        if (classInfo) {
+          setHomeroomTeacher({
+            name: classInfo.homeroom_teacher || 'Chưa phân công',
+            code: classInfo.teachers?.teacher_code || '',
+            full_name: classInfo.teachers?.full_name || ''
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error loading class students:', err);
+      setError('Không thể tải danh sách học sinh');
+    } finally {
+      setLoadingClassData(false);
     }
   };
 
@@ -403,6 +478,175 @@ const AdminManagement = () => {
     );
   };
 
+  // Render Class Management tab
+  const renderClassManagement = () => {
+    return (
+      <div className="space-y-6">
+        {/* Filter Section */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Bộ lọc lớp học</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Class Selection */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-2">
+                Chọn lớp học
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedClassForManagement}
+                  onChange={(e) => setSelectedClassForManagement(e.target.value)}
+                  className="w-full px-4 py-3 pr-10 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white cursor-pointer"
+                >
+                  <option value="" disabled>Chọn lớp học</option>
+                  {classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.class_name} - Khối {cls.grade}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Show Inactive Students */}
+            <div className="flex items-end">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showInactiveStudents}
+                  onChange={(e) => setShowInactiveStudents(e.target.checked)}
+                  className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Hiển thị học sinh đã xóa
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Homeroom Teacher Info */}
+        {selectedClassForManagement && homeroomTeacher && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-lg border border-blue-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Giáo viên chủ nhiệm</h3>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-lg font-bold">
+                  {homeroomTeacher.full_name?.charAt(0) || '?'}
+                </span>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">
+                  {homeroomTeacher.full_name || homeroomTeacher.name}
+                </p>
+                {homeroomTeacher.code && (
+                  <p className="text-sm text-gray-600">Mã GV: {homeroomTeacher.code}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Students Table */}
+        {selectedClassForManagement && (
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Danh sách học sinh ({classStudents.length} học sinh)
+                </h3>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {loadingClassData ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Đang tải danh sách học sinh...</p>
+                </div>
+              ) : classStudents.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-gray-400 text-2xl">👥</span>
+                  </div>
+                  <p className="text-gray-500 font-medium">
+                    {showInactiveStudents ? 'Không có học sinh đã xóa' : 'Không có học sinh trong lớp này'}
+                  </p>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Mã HS
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Họ Tên
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Lớp
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Trạng thái khuôn mặt
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {classStudents.map((student, index) => (
+                      <tr key={student.id} className={`hover:bg-blue-50 transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${student.is_active === false ? 'opacity-60' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {student.student_id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span className="text-sm font-medium text-blue-600">
+                                  {student.full_name?.charAt(0) || '?'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {student.full_name}
+                              </div>
+                              {student.is_active === false && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  🗑️ Đã xóa
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {student.class_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            student.face_encoding || student.insightface_encoding 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {student.face_encoding || student.insightface_encoding ? '✅ Đã đăng ký' : '❌ Chưa đăng ký'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6">
       {/* Header Section */}
@@ -441,39 +685,42 @@ const AdminManagement = () => {
       </div>
 
       {/* Enhanced Content */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-        {/* Enhanced Header */}
-        <div className="bg-gradient-to-r from-gray-50 to-blue-50 px-8 py-6 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                {currentConfig.title}
-              </h2>
-              <p className="text-gray-600">Quản lý và cấu hình dữ liệu hệ thống</p>
+      {activeTab === 'class_management' ? (
+        renderClassManagement()
+      ) : (
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+          {/* Enhanced Header */}
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50 px-8 py-6 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                  {currentConfig.title}
+                </h2>
+                <p className="text-gray-600">Quản lý và cấu hình dữ liệu hệ thống</p>
+              </div>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transform hover:scale-105 transition-all duration-200 shadow-lg font-medium"
+              >
+                <Plus className="w-5 h-5 inline mr-2" />
+                Thêm mới
+              </button>
             </div>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transform hover:scale-105 transition-all duration-200 shadow-lg font-medium"
-            >
-              <Plus className="w-5 h-5 inline mr-2" />
-              Thêm mới
-            </button>
-          </div>
 
-          {/* Enhanced Search */}
-          <div className="mt-6">
-            <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 pr-4 py-3 w-full border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-              />
+            {/* Enhanced Search */}
+            <div className="mt-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-12 pr-4 py-3 w-full border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Enhanced Add Form */}
         {showAddForm && (
@@ -591,7 +838,8 @@ const AdminManagement = () => {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
