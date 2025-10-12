@@ -179,11 +179,38 @@ async def get_students_by_class_subject(
         subject_data = db.table("subjects").select("*").eq("id", class_subject_info["subject_id"]).execute()
         subject_info = subject_data.data[0] if subject_data.data else None
         
-        # Lấy danh sách học sinh trong lớp theo class_name và grade
+        # Lấy danh sách học sinh trong lớp theo class_name và grade (bao gồm subject_selected)
         students = db.table("students").select("*").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).execute()
         
+        # Filter học sinh theo subject_selected (core_subjects hoặc elective_subjects)
+        filtered_students = []
+        if students.data and subject_info:
+            subject_code = subject_info.get("subject_code")
+            logger.info(f"Filtering students for subject: {subject_code}")
+            logger.info(f"Total students in class: {len(students.data)}")
+            
+            for student in students.data:
+                subject_selected = student.get("subject_selected")
+                if subject_selected and isinstance(subject_selected, dict):
+                    core_subjects = subject_selected.get("core_subjects", [])
+                    elective_subjects = subject_selected.get("elective_subjects", [])
+                    
+                    # Kiểm tra xem học sinh có học môn này không
+                    if subject_code in core_subjects or subject_code in elective_subjects:
+                        filtered_students.append(student)
+                        logger.info(f"Student {student.get('full_name')} ({student.get('student_id')}) studies {subject_code}")
+                else:
+                    # Nếu không có subject_selected, KHÔNG bao gồm học sinh
+                    # Chỉ bao gồm học sinh có dữ liệu subject_selected rõ ràng
+                    logger.info(f"Student {student.get('full_name')} ({student.get('student_id')}) has no subject_selected data - EXCLUDED")
+        else:
+            # Nếu không có dữ liệu, giữ nguyên danh sách
+            filtered_students = students.data or []
+        
+        logger.info(f"Filtered students count: {len(filtered_students)}")
+        
         # Lấy điểm của các học sinh cho môn này
-        student_ids = [s["id"] for s in students.data]
+        student_ids = [s["id"] for s in filtered_students]
         grades = db.table("grades").select("*").in_("student_id", student_ids).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
         
         # Tạo dictionary để map điểm với học sinh
@@ -191,7 +218,7 @@ async def get_students_by_class_subject(
         
         # Combine student info with grades
         student_grades = []
-        for student in students.data:
+        for student in filtered_students:
             student_grade = {
                 "student": student,
                 "grade": grades_dict.get(student["id"], None)
@@ -907,8 +934,35 @@ async def download_grade_template(
         class_subject_info = class_subject.data[0]
         class_info = class_subject_info["classes"]
         
-        # Lấy danh sách học sinh
+        # Lấy danh sách học sinh (bao gồm subject_selected)
         students = db.table("students").select("*").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).order("student_id").execute()
+        
+        # Filter học sinh theo subject_selected (giống như endpoint get_students_by_class_subject)
+        subject_info = class_subject_info["subjects"]
+        filtered_students = []
+        if students.data and subject_info:
+            subject_code = subject_info.get("subject_code")
+            logger.info(f"Template filtering students for subject: {subject_code}")
+            logger.info(f"Total students in class: {len(students.data)}")
+            
+            for student in students.data:
+                subject_selected = student.get("subject_selected")
+                if subject_selected and isinstance(subject_selected, dict):
+                    core_subjects = subject_selected.get("core_subjects", [])
+                    elective_subjects = subject_selected.get("elective_subjects", [])
+                    
+                    # Kiểm tra xem học sinh có học môn này không
+                    if subject_code in core_subjects or subject_code in elective_subjects:
+                        filtered_students.append(student)
+                        logger.info(f"Template: Student {student.get('full_name')} ({student.get('student_id')}) studies {subject_code}")
+                else:
+                    # Nếu không có subject_selected, KHÔNG bao gồm học sinh
+                    logger.info(f"Template: Student {student.get('full_name')} ({student.get('student_id')}) has no subject_selected data - EXCLUDED")
+        else:
+            # Nếu không có dữ liệu, giữ nguyên danh sách
+            filtered_students = students.data or []
+        
+        logger.info(f"Template filtered students count: {len(filtered_students)}")
         
         # Tạo file Excel
         output = io.BytesIO()
@@ -936,8 +990,8 @@ async def download_grade_template(
         for col, header in enumerate(headers):
             worksheet.write(0, col, header, header_format)
         
-        # Dữ liệu học sinh
-        for row, student in enumerate(students.data, start=1):
+        # Dữ liệu học sinh (chỉ những học sinh có học môn này)
+        for row, student in enumerate(filtered_students, start=1):
             worksheet.write(row, 0, student['student_id'], cell_format)
             worksheet.write(row, 1, student['full_name'], cell_format)
             worksheet.write(row, 2, '', cell_format)  # Điểm thường xuyên
@@ -953,7 +1007,7 @@ async def download_grade_template(
         output.seek(0)
         
         # Tên file
-        filename = f"Template_Diem_{class_info['class_name']}_{class_subject_info['subjects']['subject_name']}.xlsx"
+        filename = f"Template_Diem_{class_info['class_name']}_{class_subject_info['subjects']['subject_name']}_{len(filtered_students)}HS.xlsx"
         
         return StreamingResponse(
             output,
