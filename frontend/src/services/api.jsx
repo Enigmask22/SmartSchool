@@ -163,7 +163,17 @@ class ApiService {
       }
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage;
+        try {
+          const responseText = await response.text();
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.detail || errorData.message || `HTTP error! status: ${response.status}`;
+        } catch (parseError) {
+          // Nếu không parse được JSON, fallback về message cũ
+          errorMessage = `HTTP error! status: ${response.status}`;
+        }
+        
+        throw new Error(errorMessage);
       }
       
       const result = await response.json();
