@@ -89,10 +89,10 @@ async def get_current_user(
     
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
+        username: str = payload.get("sub")  # Thay đổi từ email sang username
         token_type: str = payload.get("type")
         
-        if email is None:
+        if username is None:
             raise credentials_exception
             
         # Chỉ chấp nhận access token cho authentication
@@ -102,8 +102,10 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     
-    # Get user from database
-    user_response = db.table("users").select("*").eq("email", email).execute()
+    # Get user from database - tìm kiếm theo username hoặc email (backward compatibility)
+    user_response = db.table("users").select("*").or_(
+        f"username.eq.{username},email.eq.{username}"
+    ).execute()
     
     if not user_response.data:
         raise credentials_exception
@@ -123,10 +125,10 @@ async def get_current_user_from_refresh_token(
     
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
+        username: str = payload.get("sub")  # Thay đổi từ email sang username
         token_type: str = payload.get("type")
         
-        if email is None:
+        if username is None:
             raise credentials_exception
             
         # Chỉ chấp nhận refresh token
@@ -136,8 +138,10 @@ async def get_current_user_from_refresh_token(
     except JWTError:
         raise credentials_exception
     
-    # Get user from database
-    user_response = db.table("users").select("*").eq("email", email).execute()
+    # Get user from database - tìm kiếm theo username hoặc email (backward compatibility)
+    user_response = db.table("users").select("*").or_(
+        f"username.eq.{username},email.eq.{username}"
+    ).execute()
     
     if not user_response.data:
         raise credentials_exception
@@ -152,13 +156,23 @@ async def register(
     """Đăng ký user mới"""
     try:
         # Kiểm tra email đã tồn tại chưa
-        existing = db.table("users").select("id").eq("email", user.email).execute()
+        existing_email = db.table("users").select("id").eq("email", user.email).execute()
         
-        if existing.data:
+        if existing_email.data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email đã được sử dụng"
             )
+        
+        # Kiểm tra username đã tồn tại chưa (nếu có)
+        if user.username:
+            existing_username = db.table("users").select("id").eq("username", user.username).execute()
+            
+            if existing_username.data:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username đã được sử dụng"
+                )
         
         # Hash password
         hashed_password = get_password_hash(user.password)
@@ -173,6 +187,10 @@ async def register(
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
+        
+        # Thêm username nếu có
+        if user.username:
+            user_data["username"] = user.username
         
         # Insert vào database
         response = db.table("users").insert(user_data).execute()
@@ -209,13 +227,15 @@ async def login(
 ):
     """Đăng nhập user"""
     try:
-        # Tìm user trong database
-        user_response = db.table("users").select("*").eq("email", user_credentials.email).execute()
+        # Tìm user trong database - tìm kiếm theo username hoặc email
+        user_response = db.table("users").select("*").or_(
+            f"username.eq.{user_credentials.username},email.eq.{user_credentials.username}"
+        ).execute()
         
         if not user_response.data:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email hoặc password không đúng"
+                detail="Username hoặc password không đúng"
             )
         
         user = user_response.data[0]
@@ -226,7 +246,7 @@ async def login(
         if not password_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email hoặc password không đúng"
+                detail="Username hoặc password không đúng"
             )
         
         # Kiểm tra user active
@@ -236,17 +256,20 @@ async def login(
                 detail="Tài khoản đã bị vô hiệu hóa"
             )
         
-        # Tạo access token và refresh token
+        # Tạo access token và refresh token - sử dụng username nếu có, fallback về email
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         
+        # Ưu tiên username, nếu không có thì dùng email (backward compatibility)
+        token_subject = user.get("username") or user.get("email")
+        
         access_token = create_access_token(
-            data={"sub": user["email"]},
+            data={"sub": token_subject},
             expires_delta=access_token_expires
         )
         
         refresh_token = create_refresh_token(
-            data={"sub": user["email"]},
+            data={"sub": token_subject},
             expires_delta=refresh_token_expires
         )
         

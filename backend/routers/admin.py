@@ -18,7 +18,7 @@ router = APIRouter(tags=["admin"])
 async def get_all_users(db=Depends(get_db)):
     """Lấy danh sách tất cả người dùng"""
     try:
-        response = db.table("users").select("id, email, full_name, role, is_active, last_login, created_at, updated_at").order("created_at", desc=True).execute()
+        response = db.table("users").select("id, email, username, full_name, role, is_active, last_login, created_at, updated_at").order("created_at", desc=True).execute()
         
         return {"success": True, "data": response.data}
     except Exception as e:
@@ -29,6 +29,17 @@ async def get_all_users(db=Depends(get_db)):
 async def create_user(user_data: dict, db=Depends(get_db)):
     """Tạo người dùng mới"""
     try:
+        # Kiểm tra email đã tồn tại chưa
+        existing_email = db.table("users").select("id").eq("email", user_data['email']).execute()
+        if existing_email.data:
+            raise HTTPException(status_code=400, detail="Email đã được sử dụng")
+        
+        # Kiểm tra username đã tồn tại chưa (nếu có)
+        if user_data.get('username'):
+            existing_username = db.table("users").select("id").eq("username", user_data['username']).execute()
+            if existing_username.data:
+                raise HTTPException(status_code=400, detail="Username đã được sử dụng")
+        
         # Hash password
         password = user_data.get('password', 'defaultpassword')
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -43,6 +54,10 @@ async def create_user(user_data: dict, db=Depends(get_db)):
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
+        
+        # Thêm username nếu có
+        if user_data.get('username'):
+            data["username"] = user_data['username']
         
         response = db.table("users").insert(data).execute()
         
@@ -62,9 +77,21 @@ async def create_user(user_data: dict, db=Depends(get_db)):
 async def update_user(user_id: int, user_data: dict, db=Depends(get_db)):
     """Cập nhật thông tin người dùng"""
     try:
+        # Kiểm tra email đã tồn tại chưa (nếu thay đổi email)
+        if 'email' in user_data:
+            existing_email = db.table("users").select("id").eq("email", user_data['email']).neq("id", user_id).execute()
+            if existing_email.data:
+                raise HTTPException(status_code=400, detail="Email đã được sử dụng")
+        
+        # Kiểm tra username đã tồn tại chưa (nếu thay đổi username)
+        if 'username' in user_data and user_data['username']:
+            existing_username = db.table("users").select("id").eq("username", user_data['username']).neq("id", user_id).execute()
+            if existing_username.data:
+                raise HTTPException(status_code=400, detail="Username đã được sử dụng")
+        
         # Build update data
         update_data = {}
-        for field in ['email', 'full_name', 'role', 'is_active']:
+        for field in ['email', 'username', 'full_name', 'role', 'is_active']:
             if field in user_data:
                 update_data[field] = user_data[field]
         
