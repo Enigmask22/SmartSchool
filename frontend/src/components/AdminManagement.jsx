@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Users, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Users, Download, Shuffle, Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
 
 const AdminManagement = () => {
@@ -438,18 +438,18 @@ const AdminManagement = () => {
                     <button
                       type="button"
                       onClick={handleGeneratePassword}
-                      className="px-2 py-1 text-xs text-green-700 bg-green-100 rounded transition-colors hover:bg-green-200"
+                      className="flex justify-center items-center w-6 h-6 text-xs text-green-700 bg-green-100 rounded transition-colors hover:bg-green-200"
                       title="Tạo mật khẩu tự động"
                     >
-                      🎲
+                      <Shuffle className="w-3 h-3" />
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="px-2 py-1 text-xs text-blue-700 bg-blue-100 rounded transition-colors hover:bg-blue-200"
+                      className="flex justify-center items-center w-6 h-6 text-xs text-blue-700 bg-blue-100 rounded transition-colors hover:bg-blue-200"
                       title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                     >
-                      {showPassword ? "👁️" : "👁️‍🗨️"}
+                      {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                     </button>
                   </div>
                 )}

@@ -29,16 +29,19 @@ async def get_all_users(db=Depends(get_db)):
 async def create_user(user_data: dict, db=Depends(get_db)):
     """Tạo người dùng mới"""
     try:
-        # Kiểm tra email đã tồn tại chưa
-        existing_email = db.table("users").select("id").eq("email", user_data['email']).execute()
-        if existing_email.data:
-            raise HTTPException(status_code=400, detail="Email đã được sử dụng")
+        # Kiểm tra email đã tồn tại chưa (không dùng email để tạo user)
+        # existing_email = db.table("users").select("id").eq("email", user_data['email']).execute()
+        # if existing_email.data:
+        #     raise HTTPException(status_code=400, detail="Email đã được sử dụng")
         
         # Kiểm tra username đã tồn tại chưa (nếu có)
         if user_data.get('username'):
-            existing_username = db.table("users").select("id").eq("username", user_data['username']).execute()
-            if existing_username.data:
-                raise HTTPException(status_code=400, detail="Username đã được sử dụng")
+            # Trim username để loại bỏ whitespace
+            trimmed_username = user_data['username'].strip()
+            if trimmed_username:
+                existing_username = db.table("users").select("id").eq("username", trimmed_username).execute()
+                if existing_username.data:
+                    raise HTTPException(status_code=400, detail="Username đã được sử dụng")
         
         # Hash password
         password = user_data.get('password', 'defaultpassword')
@@ -55,9 +58,9 @@ async def create_user(user_data: dict, db=Depends(get_db)):
             "updated_at": datetime.now().isoformat()
         }
         
-        # Thêm username nếu có
+        # Thêm username nếu có (đã trim)
         if user_data.get('username'):
-            data["username"] = user_data['username']
+            data["username"] = user_data['username'].strip()
         
         response = db.table("users").insert(data).execute()
         
@@ -69,31 +72,52 @@ async def create_user(user_data: dict, db=Depends(get_db)):
         else:
             raise HTTPException(status_code=500, detail="Không thể tạo người dùng")
         
+    except HTTPException as he:
+        # Re-raise HTTPException để giữ nguyên status code và message
+        raise he
     except Exception as e:
         logger.error(f"Error creating user: {str(e)}")
+        
+        # Kiểm tra xem có phải lỗi constraint violation từ Supabase không
+        error_str = str(e)
+        if "duplicate key value violates unique constraint" in error_str:
+            if "users_email_key" in error_str:
+                raise HTTPException(status_code=400, detail="Email đã được sử dụng bởi người dùng khác")
+            elif "users_username_key" in error_str:
+                raise HTTPException(status_code=400, detail="Username đã được sử dụng bởi người dùng khác")
+            else:
+                raise HTTPException(status_code=400, detail="Dữ liệu bị trùng lặp")
+        
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo người dùng: {str(e)}")
 
 @router.put("/users/{user_id}")
 async def update_user(user_id: int, user_data: dict, db=Depends(get_db)):
     """Cập nhật thông tin người dùng"""
     try:
-        # Kiểm tra email đã tồn tại chưa (nếu thay đổi email)
-        if 'email' in user_data:
-            existing_email = db.table("users").select("id").eq("email", user_data['email']).neq("id", user_id).execute()
-            if existing_email.data:
-                raise HTTPException(status_code=400, detail="Email đã được sử dụng")
+        # Kiểm tra email đã tồn tại chưa (không dùng email để tạo user)
+        # if 'email' in user_data:
+        #     existing_email = db.table("users").select("id").eq("email", user_data['email']).neq("id", user_id).execute()
+        #     if existing_email.data:
+        #         raise HTTPException(status_code=400, detail="Email đã được sử dụng")
         
         # Kiểm tra username đã tồn tại chưa (nếu thay đổi username)
         if 'username' in user_data and user_data['username']:
-            existing_username = db.table("users").select("id").eq("username", user_data['username']).neq("id", user_id).execute()
-            if existing_username.data:
-                raise HTTPException(status_code=400, detail="Username đã được sử dụng")
+            # Trim username để loại bỏ whitespace
+            trimmed_username = user_data['username'].strip()
+            if trimmed_username:
+                existing_username = db.table("users").select("id").eq("username", trimmed_username).neq("id", user_id).execute()
+                if existing_username.data:
+                    raise HTTPException(status_code=400, detail="Username đã được sử dụng")
         
         # Build update data
         update_data = {}
         for field in ['email', 'username', 'full_name', 'role', 'is_active']:
             if field in user_data:
-                update_data[field] = user_data[field]
+                if field == 'username' and user_data[field]:
+                    # Trim username trước khi lưu
+                    update_data[field] = user_data[field].strip()
+                else:
+                    update_data[field] = user_data[field]
         
         if not update_data:
             raise HTTPException(status_code=400, detail="Không có trường nào để cập nhật")
@@ -110,8 +134,22 @@ async def update_user(user_id: int, user_data: dict, db=Depends(get_db)):
         else:
             raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
+    except HTTPException as he:
+        # Re-raise HTTPException để giữ nguyên status code và message
+        raise he
     except Exception as e:
         logger.error(f"Error updating user: {str(e)}")
+        
+        # Kiểm tra xem có phải lỗi constraint violation từ Supabase không
+        error_str = str(e)
+        if "duplicate key value violates unique constraint" in error_str:
+            if "users_email_key" in error_str:
+                raise HTTPException(status_code=400, detail="Email đã được sử dụng bởi người dùng khác")
+            elif "users_username_key" in error_str:
+                raise HTTPException(status_code=400, detail="Username đã được sử dụng bởi người dùng khác")
+            else:
+                raise HTTPException(status_code=400, detail="Dữ liệu bị trùng lặp")
+        
         raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật người dùng: {str(e)}")
 
 @router.delete("/users/{user_id}")
