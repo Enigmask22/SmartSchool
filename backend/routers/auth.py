@@ -14,12 +14,13 @@ from models.schemas import (
     UserLogin, UserCreate, Token, ResponseModel,
     ForgotPasswordRequest, VerifyOTPRequest, ResetPasswordRequest
 )
-from database.connection import get_db
+from database.connection import get_db, get_school_db
 from utils.logger import setup_logger
 from services.email_service import email_service
 from services.otp_service import otp_service
 
 logger = setup_logger()
+
 router = APIRouter()
 
 # Security configuration
@@ -77,8 +78,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db=Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Lấy user hiện tại từ JWT token"""
     credentials_exception = HTTPException(
@@ -102,6 +102,9 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     
+    # Lấy school database dựa trên username từ token
+    db = get_school_db(username)
+    
     # Get user from database - tìm kiếm theo username hoặc email (backward compatibility)
     user_response = db.table("users").select("*").or_(
         f"username.eq.{username},email.eq.{username}"
@@ -113,8 +116,7 @@ async def get_current_user(
     return user_response.data[0]
 
 async def get_current_user_from_refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db=Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Lấy user hiện tại từ refresh token"""
     credentials_exception = HTTPException(
@@ -138,6 +140,9 @@ async def get_current_user_from_refresh_token(
     except JWTError:
         raise credentials_exception
     
+    # Lấy school database dựa trên username từ token
+    db = get_school_db(username)
+    
     # Get user from database - tìm kiếm theo username hoặc email (backward compatibility)
     user_response = db.table("users").select("*").or_(
         f"username.eq.{username},email.eq.{username}"
@@ -150,11 +155,17 @@ async def get_current_user_from_refresh_token(
 
 @router.post("/register", response_model=ResponseModel)
 async def register(
-    user: UserCreate,
-    db=Depends(get_db)
+    user: UserCreate
 ):
     """Đăng ký user mới"""
     try:
+        # Lấy school database dựa trên username (nếu có)
+        # Fallback về default database nếu không có username
+        if hasattr(user, 'username') and user.username:
+            db = get_school_db(user.username)
+        else:
+            db = get_db()
+        
         # Kiểm tra email đã tồn tại chưa
         existing_email = db.table("users").select("id").eq("email", user.email).execute()
         
@@ -222,11 +233,13 @@ async def register(
 
 @router.post("/login")
 async def login(
-    user_credentials: UserLogin,
-    db=Depends(get_db)
+    user_credentials: UserLogin
 ):
     """Đăng nhập user"""
     try:
+        # Lấy school database dựa trên username
+        db = get_school_db(user_credentials.username)
+        
         # Tìm user trong database - tìm kiếm theo username hoặc email
         user_response = db.table("users").select("*").or_(
             f"username.eq.{user_credentials.username},email.eq.{user_credentials.username}"
@@ -357,11 +370,14 @@ async def logout(
 async def change_password(
     current_password: str,
     new_password: str,
-    current_user=Depends(get_current_user),
-    db=Depends(get_db)
+    current_user=Depends(get_current_user)
 ):
     """Đổi password"""
     try:
+        # Lấy school database dựa trên username của current user
+        username = current_user.get("username") or current_user.get("email")
+        db = get_school_db(username)
+        
         # Get user with password hash
         user_response = db.table("users").select("*").eq("id", current_user["id"]).execute()
         
@@ -411,11 +427,13 @@ async def change_password(
 
 @router.post("/forgot-password", response_model=ResponseModel)
 async def forgot_password(
-    request: ForgotPasswordRequest,
-    db=Depends(get_db)
+    request: ForgotPasswordRequest
 ):
     """Gửi OTP qua email để đặt lại mật khẩu"""
     try:
+        # Lấy school database dựa trên username
+        db = get_school_db(request.username)
+        
         # Kiểm tra xem username có tồn tại trong hệ thống không
         user_response = db.table("users").select("id, email, full_name, username").eq("username", request.username).execute()
         
@@ -514,11 +532,12 @@ async def verify_otp(request: VerifyOTPRequest):
 
 @router.post("/reset-password", response_model=ResponseModel)
 async def reset_password(
-    request: ResetPasswordRequest,
-    db=Depends(get_db)
+    request: ResetPasswordRequest
 ):
     """Đặt lại mật khẩu mới"""
     try:
+        # Lấy school database dựa trên username
+        db = get_school_db(request.username)
         # Kiểm tra mật khẩu mới và xác nhận mật khẩu
         if request.new_password != request.confirm_password:
             raise HTTPException(
