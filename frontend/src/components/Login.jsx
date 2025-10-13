@@ -52,7 +52,7 @@ const Login = () => {
             </svg>
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Hệ thống quản lý điểm số
+          SynapseS
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             Đăng nhập để truy cập tính năng nhập điểm

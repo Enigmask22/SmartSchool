@@ -416,13 +416,13 @@ async def forgot_password(
 ):
     """Gửi OTP qua email để đặt lại mật khẩu"""
     try:
-        # Kiểm tra xem email có tồn tại trong hệ thống không
-        user_response = db.table("users").select("id, email, full_name").eq("email", request.email).execute()
+        # Kiểm tra xem username có tồn tại trong hệ thống không
+        user_response = db.table("users").select("id, email, full_name, username").eq("username", request.username).execute()
         
         if not user_response.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Email không tồn tại trong hệ thống"
+                detail="Username không tồn tại trong hệ thống"
             )
         
         user = user_response.data[0]
@@ -437,7 +437,7 @@ async def forgot_password(
             otp = email_service.generate_otp()
         
         # Lưu OTP tạm thời
-        if not otp_service.generate_and_store_otp(request.email, request.otp_email, otp):
+        if not otp_service.generate_and_store_otp(request.username, request.otp_email, otp):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Lỗi tạo mã OTP"
@@ -448,19 +448,19 @@ async def forgot_password(
             email_sent = await email_service.send_otp_email(request.otp_email, otp)
             if not email_sent:
                 # Xóa OTP nếu gửi email thất bại
-                otp_service.delete_otp(request.email)
+                otp_service.delete_otp(request.username)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Không thể gửi email OTP. Vui lòng thử lại sau"
                 )
         
-        logger.info(f"✅ Đã gửi OTP cho email {request.email} đến {request.otp_email}")
+        logger.info(f"✅ Đã gửi OTP cho username {request.username} đến {request.otp_email}")
         
         return ResponseModel(
             success=True,
             message="Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư (bao gồm thư mục spam)",
             data={
-                "email": request.email,
+                "username": request.username,
                 "otp_email": request.otp_email,
                 "otp_expiry_minutes": 10,
                 "is_smtp_configured": email_service.is_smtp_configured()
@@ -480,14 +480,14 @@ async def forgot_password(
 async def verify_otp(request: VerifyOTPRequest):
     """Xác thực mã OTP"""
     try:
-        result = otp_service.verify_otp(request.email, request.otp)
+        result = otp_service.verify_otp(request.username, request.otp)
         
         if result["success"]:
             return ResponseModel(
                 success=True,
                 message=result["message"],
                 data={
-                    "email": request.email,
+                    "username": request.username,
                     "is_verified": True
                 }
             )
@@ -527,7 +527,7 @@ async def reset_password(
             )
         
         # Xác thực OTP
-        otp_result = otp_service.verify_otp(request.email, request.otp)
+        otp_result = otp_service.verify_otp(request.username, request.otp)
         if not otp_result["success"]:
             status_code = status.HTTP_400_BAD_REQUEST
             if otp_result.get("error_code") == "OTP_NOT_FOUND":
@@ -541,7 +541,7 @@ async def reset_password(
             )
         
         # Kiểm tra xem user có tồn tại không
-        user_response = db.table("users").select("id, email").eq("email", request.email).execute()
+        user_response = db.table("users").select("id, username").eq("username", request.username).execute()
         if not user_response.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -566,15 +566,15 @@ async def reset_password(
             )
         
         # Xóa OTP sau khi đổi mật khẩu thành công
-        otp_service.delete_otp(request.email)
+        otp_service.delete_otp(request.username)
         
-        logger.info(f"✅ Đã đặt lại mật khẩu thành công cho email {request.email}")
+        logger.info(f"✅ Đã đặt lại mật khẩu thành công cho username {request.username}")
         
         return ResponseModel(
             success=True,
             message="Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới",
             data={
-                "email": request.email
+                "username": request.username
             }
         )
         
@@ -587,11 +587,11 @@ async def reset_password(
             detail=f"Lỗi server: {str(e)}"
         )
 
-@router.get("/otp-status/{email}", response_model=ResponseModel)
-async def get_otp_status(email: str):
-    """Lấy trạng thái OTP cho email"""
+@router.get("/otp-status/{username}", response_model=ResponseModel)
+async def get_otp_status(username: str):
+    """Lấy trạng thái OTP cho username"""
     try:
-        status_info = otp_service.get_otp_status(email)
+        status_info = otp_service.get_otp_status(username)
         
         return ResponseModel(
             success=True,
