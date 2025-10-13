@@ -210,6 +210,124 @@ async def delete_teacher(teacher_id: int, db=Depends(get_db)):
         logger.error(f"Error deleting teacher: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa giáo viên: {str(e)}")
 
+@router.get("/users/teachers")
+async def get_teacher_users(db=Depends(get_db)):
+    """Lấy danh sách users có role teacher hoặc homeroom_teacher chưa được tạo teacher"""
+    try:
+        # Lấy danh sách users có role teacher hoặc homeroom_teacher
+        users_response = db.table("users").select("id, email, username, full_name, role, is_active").in_("role", ["teacher", "homeroom_teacher"]).eq("is_active", True).execute()
+        
+        # Lấy danh sách user_ids đã có trong bảng teachers
+        teachers_response = db.table("teachers").select("user_id").execute()
+        existing_user_ids = [teacher["user_id"] for teacher in teachers_response.data if teacher["user_id"]]
+        
+        # Lọc ra những user chưa được tạo teacher
+        available_users = [user for user in users_response.data if user["id"] not in existing_user_ids]
+        
+        return {"success": True, "data": available_users}
+    except Exception as e:
+        logger.error(f"Error getting teacher users: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách users giáo viên: {str(e)}")
+
+@router.get("/teachers/next-code")
+async def get_next_teacher_code(db=Depends(get_db)):
+    """Lấy teacher_code tiếp theo"""
+    try:
+        # Lấy tất cả teacher_code hiện tại
+        response = db.table("teachers").select("teacher_code").execute()
+        
+        if not response.data:
+            return {"success": True, "data": {"next_code": "GV001"}}
+        
+        # Lọc và sắp xếp các mã số
+        codes = []
+        for teacher in response.data:
+            teacher_code = teacher["teacher_code"]
+            if teacher_code and teacher_code.startswith("GV"):
+                try:
+                    # Bỏ prefix "GV" và lấy số
+                    number = int(teacher_code[2:])
+                    codes.append(number)
+                except ValueError:
+                    continue
+        
+        # Tìm số lớn nhất và tăng 1
+        if codes:
+            next_number = max(codes) + 1
+        else:
+            next_number = 1
+        
+        # Format lại với prefix "GV" và 3 chữ số
+        next_code = f"GV{next_number:03d}"
+        
+        return {"success": True, "data": {"next_code": next_code}}
+    except Exception as e:
+        logger.error(f"Error getting next teacher code: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo mã giáo viên: {str(e)}")
+
+@router.post("/teachers/import-from-users")
+async def import_teachers_from_users(user_ids: List[int], db=Depends(get_db)):
+    """Tạo teachers từ danh sách user_ids"""
+    try:
+        if not user_ids:
+            raise HTTPException(status_code=400, detail="Danh sách user_ids không được trống")
+        
+        # Lấy thông tin users
+        users_response = db.table("users").select("id, email, username, full_name, role").in_("id", user_ids).execute()
+        
+        if len(users_response.data) != len(user_ids):
+            raise HTTPException(status_code=400, detail="Một số user không tồn tại")
+        
+        # Lấy teacher_code tiếp theo
+        next_code_response = await get_next_teacher_code(db)
+        next_code = next_code_response["data"]["next_code"]
+        
+        # Tạo teachers
+        created_teachers = []
+        for i, user in enumerate(users_response.data):
+            teacher_data = {
+                "teacher_code": f"GV{int(next_code[2:]) + i:03d}",  # Tăng dần mã giáo viên
+                "full_name": user["full_name"],
+                "email": user["email"],
+                "phone": None,
+                "user_id": user["id"],
+                "is_active": True,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            response = db.table("teachers").insert(teacher_data).execute()
+            if response.data:
+                created_teachers.append(response.data[0])
+        
+        return {
+            "success": True, 
+            "data": created_teachers, 
+            "message": f"Đã tạo thành công {len(created_teachers)} giáo viên"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error importing teachers from users: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo giáo viên từ users: {str(e)}")
+
+@router.get("/teachers/homeroom")
+async def get_homeroom_teachers(db=Depends(get_db)):
+    """Lấy danh sách giáo viên có role homeroom_teacher"""
+    try:
+        # Lấy tất cả teachers với thông tin users
+        response = db.table("teachers").select("*, users(role)").eq("is_active", True).order("teacher_code").execute()
+        
+        # Lọc ra những teacher có role homeroom_teacher
+        homeroom_teachers = []
+        for teacher in response.data:
+            if teacher.get("users") and teacher["users"]["role"] == "homeroom_teacher":
+                homeroom_teachers.append(teacher)
+        
+        return {"success": True, "data": homeroom_teachers}
+    except Exception as e:
+        logger.error(f"Error getting homeroom teachers: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách giáo viên chủ nhiệm: {str(e)}")
+
 # ===============================================
 # SUBJECTS CRUD ENDPOINTS
 # ===============================================
