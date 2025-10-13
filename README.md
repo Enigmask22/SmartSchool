@@ -193,7 +193,7 @@ SUPABASE_SERVICE_KEY=your-service-role-key
 
 # JWT Security
 SECRET_KEY=your-super-secret-key-change-this
-ALGORITHM=HS256
+ALGORITHM=your-algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # AI Configuration

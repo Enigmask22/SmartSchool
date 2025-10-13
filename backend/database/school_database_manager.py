@@ -9,6 +9,9 @@ from typing import Dict, Optional, Tuple
 from supabase import create_client, Client
 from threading import Lock
 import time
+import base64
+import hmac
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -38,21 +41,124 @@ class SchoolDatabaseManager:
             self._load_school_configs()
     
     def _load_school_configs(self):
-        """Load cấu hình schools từ file JSON"""
+        """Load cấu hình schools từ file JSON (có thể là file gốc hoặc file encoded)"""
         try:
-            config_path = os.path.join(os.path.dirname(__file__), 'school_databases.json')
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                self._school_configs = config.get('schools', {})
-                self._default_school = config.get('default_school', '')
-                self._cache_ttl = config.get('cache_ttl', 300)
-                self._max_connections = config.get('max_connections', 10)
+            config_dir = os.path.dirname(__file__)
+            
+            # Thử load từ file encoded trước
+            encoded_path = os.path.join(config_dir, 'school_databases.encoded')
+            json_path = os.path.join(config_dir, 'school_databases.json')
+            
+            config = None
+            
+            # Kiểm tra file encoded trước
+            if os.path.exists(encoded_path):
+                try:
+                    config = self._load_from_encoded_file(encoded_path)
+                    logger.info("Đã load cấu hình từ file encoded")
+                except Exception as e:
+                    logger.warning(f"Không thể load từ file encoded: {str(e)}")
+                    config = None
+            
+            # Fallback về file JSON gốc
+            if config is None and os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                    logger.info("Đã load cấu hình từ file JSON gốc")
+                except Exception as e:
+                    logger.error(f"Không thể load từ file JSON: {str(e)}")
+                    raise
+            
+            if config is None:
+                raise ValueError("Không tìm thấy file cấu hình schools")
+            
+            # Parse config
+            self._school_configs = config.get('schools', {})
+            self._default_school = config.get('default_school', '')
+            self._cache_ttl = config.get('cache_ttl', 300)
+            self._max_connections = config.get('max_connections', 10)
                 
             logger.info(f"Đã load {len(self._school_configs)} school configurations")
             
         except Exception as e:
             logger.error(f"Lỗi khi load school configs: {str(e)}")
             raise
+    
+    def _load_from_encoded_file(self, encoded_path: str) -> dict:
+        """Load cấu hình từ file encoded"""
+        try:
+            # Đọc biến môi trường
+            secret_key = os.getenv("SECRET_KEY")
+            algorithm = os.getenv("ALGORITHM")
+            
+            if not secret_key:
+                raise ValueError("SECRET_KEY không được tìm thấy trong biến môi trường")
+            
+            if not algorithm:
+                raise ValueError("ALGORITHM không được cấu hình trong biến môi trường")
+            
+            # Đọc file encoded
+            with open(encoded_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            
+            encoded_data = metadata.get('data')
+            if not encoded_data:
+                raise ValueError("Không tìm thấy dữ liệu trong file encoded")
+            
+            # Đọc thuật toán từ metadata
+            file_algorithm = metadata.get('algorithm', algorithm)
+            
+            # Giải mã
+            decoded_data = self._decode_data(encoded_data, secret_key, file_algorithm)
+            if not decoded_data:
+                raise ValueError("Không thể giải mã file encoded")
+            
+            # Parse JSON
+            config = json.loads(decoded_data)
+            return config
+            
+        except Exception as e:
+            logger.error(f"Lỗi khi load từ file encoded: {str(e)}")
+            raise
+    
+    def _decode_data(self, encoded_data: str, secret_key: str, algorithm: str) -> str:
+        """Giải mã dữ liệu được mã hóa bằng thuật toán từ biến môi trường"""
+        try:
+            # Decode base64
+            combined = base64.b64decode(encoded_data.encode('utf-8'))
+            
+            # Tách data và signature
+            parts = combined.split(b'|', 1)
+            if len(parts) != 2:
+                return None
+            
+            data_bytes, signature = parts
+            data = data_bytes.decode('utf-8')
+            
+            # Tạo HMAC signature để so sánh bằng thuật toán từ biến môi trường
+            key_bytes = secret_key.encode('utf-8')
+            
+            if algorithm.upper() == "HS256":
+                expected_signature = hmac.new(key_bytes, data.encode('utf-8'), hashlib.sha256).digest()
+            elif algorithm.upper() == "HS512":
+                expected_signature = hmac.new(key_bytes, data.encode('utf-8'), hashlib.sha512).digest()
+            elif algorithm.upper() == "HS1":
+                expected_signature = hmac.new(key_bytes, data.encode('utf-8'), hashlib.sha1).digest()
+            else:
+                # Fallback về SHA256 nếu không nhận diện được
+                expected_signature = hmac.new(key_bytes, data.encode('utf-8'), hashlib.sha256).digest()
+            
+            # So sánh signature
+            if hmac.compare_digest(signature, expected_signature):
+                return data
+            else:
+                logger.error("Signature không khớp - file có thể bị chỉnh sửa")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Lỗi giải mã: {str(e)}")
+            return None
     
     def _get_school_key_from_username(self, username: str) -> str:
         """
@@ -96,14 +202,22 @@ class SchoolDatabaseManager:
             if not school_config:
                 raise ValueError(f"Không tìm thấy config cho school: {school_key}")
             
-            url = school_config.get('supabase_url')
-            key = school_config.get('supabase_key')
+            # Đọc từ biến môi trường
+            url_env = school_config.get('supabase_url_env')
+            key_env = school_config.get('supabase_key_env')
+            
+            if not url_env or not key_env:
+                raise ValueError(f"Thiếu supabase_url_env hoặc supabase_key_env cho school: {school_key}")
+            
+            # Lấy giá trị từ biến môi trường
+            url = os.getenv(url_env)
+            key = os.getenv(key_env)
             
             if not url or not key:
-                raise ValueError(f"Thiếu SUPABASE_URL hoặc SUPABASE_KEY cho school: {school_key}")
+                raise ValueError(f"Không tìm thấy biến môi trường {url_env} hoặc {key_env} cho school: {school_key}")
             
             client = create_client(url, key)
-            logger.info(f"Đã tạo client cho school: {school_key}")
+            logger.info(f"Đã tạo client cho school: {school_key} từ biến môi trường {url_env}")
             return client
             
         except Exception as e:

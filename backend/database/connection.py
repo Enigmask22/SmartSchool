@@ -47,7 +47,14 @@ class Database:
                 print("Kết nối Supabase thành công (school config mode)")
             except Exception as e:
                 logger.error(f"Không thể kết nối database: {str(e)}")
-                raise ValueError("Không thể khởi tạo database connection")
+                # Thử kết nối với default school key trực tiếp
+                try:
+                    default_school = school_db_manager._default_school
+                    self._client = school_db_manager.get_client(f"default.{default_school}")
+                    print(f"Kết nối Supabase thành công với default school: {default_school}")
+                except Exception as e2:
+                    logger.error(f"Không thể kết nối database với default school: {str(e2)}")
+                    raise ValueError("Không thể khởi tạo database connection")
     
     @property
     def client(self) -> Client:
