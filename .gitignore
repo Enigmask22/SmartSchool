@@ -309,6 +309,7 @@ settings.backup.*
 backend/database/school_databases.json
 database/school_databases.json
 school_databases.json
+backend/database/encode_school_config.py
 
 # ================
 # LOGS
