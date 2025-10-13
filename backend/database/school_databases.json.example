@@ -1,0 +1,28 @@
+{
+  "schools": {
+    "chuyen_le_quy_don.tphcm": {
+      "school_name": "Trường THPT Chuyên Lê Quý Đôn",
+      "province": "TP. Hồ Chí Minh",
+      "supabase_url": "YOUR_SUPABASE_URL_1",
+      "supabase_key": "YOUR_SUPABASE_ANON_KEY_1",
+      "description": "Trường chuyên Lê Quý Đôn TP.HCM"
+    },
+    "chuyen_le_quy_don.khanh_hoa": {
+      "school_name": "Trường THPT Chuyên Lê Quý Đôn",
+      "province": "Khánh Hòa",
+      "supabase_url": "YOUR_SUPABASE_URL_2",
+      "supabase_key": "YOUR_SUPABASE_ANON_KEY_2",
+      "description": "Trường chuyên Lê Quý Đôn Khánh Hòa"
+    },
+    "chuyen_le_hong_phong.tphcm": {
+      "school_name": "Trường THPT Chuyên Lê Hồng Phong",
+      "province": "TP. Hồ Chí Minh",
+      "supabase_url": "YOUR_SUPABASE_URL_3",
+      "supabase_key": "YOUR_SUPABASE_ANON_KEY_3",
+      "description": "Trường THPT Chuyên Lê Hồng Phong TP.HCM"
+    }
+  },
+  "default_school": "chuyen_le_quy_don.tphcm",
+  "cache_ttl": 300,
+  "max_connections": 10
+}
