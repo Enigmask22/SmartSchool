@@ -147,7 +147,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         <div className="flex justify-between items-center p-4 text-white bg-blue-600 border-b border-gray-200">
           {isOpen && (
             <div className="flex items-center">
-              <h1 className="text-lg font-bold">Smart School</h1>
+              <h1 className="text-lg font-bold">SynapseS</h1>
             </div>
           )}
           <button

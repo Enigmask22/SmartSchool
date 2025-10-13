@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import api from '../services/api';
 
 const ForgotPassword = ({ onBackToLogin }) => {
-  const [step, setStep] = useState(1); // 1: Nhập email, 2: Nhập OTP, 3: Đặt mật khẩu mới
+  const [step, setStep] = useState(1); // 1: Nhập username, 2: Nhập OTP, 3: Đặt mật khẩu mới
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
   // Form data
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     otpEmail: '',
     otp: '',
     newPassword: '',
@@ -84,19 +84,15 @@ const ForgotPassword = ({ onBackToLogin }) => {
 
     try {
       // Validate
-      if (!formData.email || !formData.otpEmail) {
+      if (!formData.username || !formData.otpEmail) {
         throw new Error('Vui lòng điền đầy đủ thông tin');
-      }
-      
-      if (!validateEmail(formData.email)) {
-        throw new Error('Email đăng nhập không hợp lệ');
       }
       
       if (!validateEmail(formData.otpEmail)) {
         throw new Error('Email nhận OTP không hợp lệ');
       }
 
-      const response = await api.forgotPassword(formData.email, formData.otpEmail);
+      const response = await api.forgotPassword(formData.username, formData.otpEmail);
       
       if (response.success) {
         setSuccess('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư (bao gồm thư mục spam)');
@@ -123,7 +119,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
         throw new Error('Vui lòng nhập đầy đủ 6 số OTP');
       }
 
-      const response = await api.verifyOTP(formData.email, formData.otp);
+      const response = await api.verifyOTP(formData.username, formData.otp);
       
       if (response.success) {
         setSuccess('Xác thực OTP thành công');
@@ -159,7 +155,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
       }
 
       const response = await api.resetPassword(
-        formData.email, 
+        formData.username, 
         formData.otp, 
         formData.newPassword, 
         formData.confirmPassword
@@ -187,25 +183,25 @@ const ForgotPassword = ({ onBackToLogin }) => {
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900">Quên mật khẩu?</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Nhập email đăng nhập và email nhận OTP để đặt lại mật khẩu
+          Nhập username đăng nhập và email nhận OTP để đặt lại mật khẩu
         </p>
       </div>
 
       <form onSubmit={handleStep1Submit} className="space-y-4">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email đăng nhập
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+            Username đăng nhập
           </label>
           <div className="mt-1">
             <input
-              id="email"
-              name="email"
-              type="email"
+              id="username"
+              name="username"
+              type="text"
               required
-              value={formData.email}
+              value={formData.username}
               onChange={handleInputChange}
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="teacher@school.edu.vn"
+              className="block px-3 py-2 w-full placeholder-gray-400 rounded-md border border-gray-300 appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="ho_va_ten.ten_truong.ten_tinh"
             />
           </div>
         </div>
@@ -222,7 +218,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
               required
               value={formData.otpEmail}
               onChange={handleInputChange}
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block px-3 py-2 w-full placeholder-gray-400 rounded-md border border-gray-300 appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               placeholder="your-email@gmail.com"
             />
           </div>
@@ -235,14 +231,14 @@ const ForgotPassword = ({ onBackToLogin }) => {
           <button
             type="button"
             onClick={onBackToLogin}
-            className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             Quay lại
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 py-2 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md border border-transparent hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Đang gửi...' : 'Gửi OTP'}
           </button>
@@ -262,7 +258,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
 
       <form onSubmit={handleStep2Submit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+          <label className="block mb-3 text-sm font-medium text-gray-700">
             Mã OTP (6 số)
           </label>
           <div className="flex justify-center space-x-3">
@@ -277,12 +273,12 @@ const ForgotPassword = ({ onBackToLogin }) => {
                 onChange={(e) => handleOTPChange(index, e.target.value)}
                 onKeyDown={(e) => handleOTPKeyDown(index, e)}
                 onPaste={handleOTPPaste}
-                className="w-12 h-12 text-center text-lg font-bold border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-12 h-12 text-lg font-bold text-center rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 autoComplete="off"
               />
             ))}
           </div>
-          <p className="mt-2 text-xs text-gray-500 text-center">
+          <p className="mt-2 text-xs text-center text-gray-500">
             Mã OTP có hiệu lực trong 10 phút
           </p>
         </div>
@@ -291,14 +287,14 @@ const ForgotPassword = ({ onBackToLogin }) => {
           <button
             type="button"
             onClick={() => setStep(1)}
-            className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             Quay lại
           </button>
           <button
             type="submit"
             disabled={loading || formData.otp.length !== 6}
-            className="flex-1 py-2 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md border border-transparent hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Đang xác thực...' : 'Xác thực OTP'}
           </button>
@@ -312,7 +308,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900">Đặt mật khẩu mới</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Nhập mật khẩu mới cho tài khoản <strong>{formData.email}</strong>
+          Nhập mật khẩu mới cho tài khoản <strong>{formData.username}</strong>
         </p>
       </div>
 
@@ -329,7 +325,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
               required
               value={formData.newPassword}
               onChange={handleInputChange}
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block px-3 py-2 w-full placeholder-gray-400 rounded-md border border-gray-300 appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               placeholder="Nhập mật khẩu mới"
             />
           </div>
@@ -347,7 +343,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
               required
               value={formData.confirmPassword}
               onChange={handleInputChange}
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block px-3 py-2 w-full placeholder-gray-400 rounded-md border border-gray-300 appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               placeholder="Nhập lại mật khẩu mới"
             />
           </div>
@@ -357,14 +353,14 @@ const ForgotPassword = ({ onBackToLogin }) => {
           <button
             type="button"
             onClick={() => setStep(2)}
-            className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             Quay lại
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 py-2 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md border border-transparent hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}
           </button>
@@ -374,17 +370,17 @@ const ForgotPassword = ({ onBackToLogin }) => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="flex justify-center items-center p-4 min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="space-y-8 w-full max-w-md">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-indigo-600 rounded-full flex items-center justify-center">
-            <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex justify-center items-center mx-auto w-16 h-16 bg-indigo-600 rounded-full">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
           </div>
           <h1 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Hệ thống quản lý điểm số
+          SynapseS
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             Đặt lại mật khẩu
@@ -392,13 +388,13 @@ const ForgotPassword = ({ onBackToLogin }) => {
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="p-8 bg-white rounded-xl shadow-lg">
           {/* Error Message */}
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="p-4 mb-4 bg-red-50 rounded-md border border-red-200">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -411,10 +407,10 @@ const ForgotPassword = ({ onBackToLogin }) => {
 
           {/* Success Message */}
           {success && (
-            <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="p-4 mb-4 bg-green-50 rounded-md border border-green-200">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>

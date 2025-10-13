@@ -61,7 +61,7 @@ const Dashboard = ({ setCurrentView }) => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="w-32 h-32 rounded-full border-b-2 border-blue-600 animate-spin"></div>
       </div>
     );
   }
@@ -69,17 +69,17 @@ const Dashboard = ({ setCurrentView }) => {
   return (
     <div className="dashboard">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">Trang chủ</h2>
-        <p className="text-gray-600">Tổng quan hệ thống Smart School</p>
+        <h2 className="mb-2 text-3xl font-bold text-gray-800">Trang chủ</h2>
+        <p className="text-gray-600">Tổng quan hệ thống SynapseS</p>
         {error && (
-          <div className="mt-2 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+          <div className="p-3 mt-2 text-yellow-700 bg-yellow-100 rounded border border-yellow-400">
             {error}
           </div>
         )}
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Tổng học sinh"
           value={stats.totalStudents}
@@ -107,9 +107,9 @@ const Dashboard = ({ setCurrentView }) => {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h3 className="text-xl font-semibold mb-4">Thao tác nhanh</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="p-6 mb-8 bg-white rounded-lg shadow-md">
+        <h3 className="mb-4 text-xl font-semibold">Thao tác nhanh</h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <QuickActionButton
             title="Điểm danh AI"
             description="Sử dụng camera để điểm danh tự động"
@@ -135,8 +135,8 @@ const Dashboard = ({ setCurrentView }) => {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-xl font-semibold mb-4">Hoạt động gần đây</h3>
+      <div className="p-6 bg-white rounded-lg shadow-md">
+        <h3 className="mb-4 text-xl font-semibold">Hoạt động gần đây</h3>
         <div className="space-y-3">
           <ActivityItem
             time="9:30 AM"
@@ -172,9 +172,9 @@ const Dashboard = ({ setCurrentView }) => {
 };
 
 const StatCard = ({ title, value, icon, color }) => (
-  <div className="bg-white rounded-lg shadow-md p-6">
+  <div className="p-6 bg-white rounded-lg shadow-md">
     <div className="flex items-center">
-      <div className={`${color} text-white p-3 rounded-lg mr-4`}>
+      <div className={`p-3 mr-4 text-white rounded-lg ${color}`}>
         <span className="text-2xl">{icon}</span>
       </div>
       <div>
@@ -188,9 +188,9 @@ const StatCard = ({ title, value, icon, color }) => (
 const QuickActionButton = ({ title, description, icon, color, onClick }) => (
   <button 
     onClick={onClick}
-    className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all duration-200 group"
+    className="p-4 text-left rounded-lg border-2 border-gray-200 transition-all duration-200 hover:border-blue-300 hover:shadow-md group"
   >
-    <div className={`${color} text-white p-2 rounded-lg w-fit mb-3 group-hover:scale-110 transition-transform`}>
+    <div className={`p-2 mb-3 text-white rounded-lg transition-transform ${color} w-fit group-hover:scale-110`}>
       <span className="text-xl">{icon}</span>
     </div>
     <h4 className="font-semibold text-gray-800">{title}</h4>
@@ -207,8 +207,8 @@ const ActivityItem = ({ time, message, type }) => {
   };
 
   return (
-    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-      <span className="text-sm text-gray-500 font-mono">{time}</span>
+    <div className="flex items-center p-3 space-x-3 bg-gray-50 rounded-lg">
+      <span className="font-mono text-sm text-gray-500">{time}</span>
       <span className={`text-sm ${typeColors[type]}`}>{message}</span>
     </div>
   );

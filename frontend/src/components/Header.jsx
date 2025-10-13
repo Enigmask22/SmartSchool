@@ -67,7 +67,7 @@ const Header = ({ currentView, setCurrentView, user }) => {
       <div className="container px-4 py-3 mx-auto">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <h1 className="text-xl font-bold">Smart School System</h1>
+            <h1 className="text-xl font-bold">SynapseS System</h1>
           </div>
           
           <nav className="hidden space-x-6 md:flex">

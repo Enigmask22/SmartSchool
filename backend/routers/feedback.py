@@ -248,7 +248,7 @@ async def send_sms_feedback(
         logger.info(f"SMS would be sent successfully to {formatted_phone}")
         
         # Simulation: SMS sending logic
-        sms_content = f"Nhận xét học tập:\n{feedback}\n\nTrường THPT ABC - Hệ thống Smart School"
+        sms_content = f"Nhận xét học tập:\n{feedback}\n\nTrường THPT ABC - SynapseS"
         
         return ResponseModel(
             success=True,

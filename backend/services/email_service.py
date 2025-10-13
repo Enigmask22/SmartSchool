@@ -23,7 +23,7 @@ class EmailService:
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.email = os.getenv("SMTP_EMAIL", "your-email@gmail.com")
         self.password = os.getenv("SMTP_PASSWORD", "your-app-password")
-        self.sender_name = os.getenv("SMTP_SENDER_NAME", "Smart School System")
+        self.sender_name = os.getenv("SMTP_SENDER_NAME", "SynapseS System")
         
     def generate_otp(self, length: int = 6) -> str:
         """Tạo mã OTP ngẫu nhiên"""
@@ -117,7 +117,7 @@ class EmailService:
             <div class="container">
                 <div class="header">
                     <div class="logo">📚</div>
-                    <h1 class="title">Hệ thống quản lý điểm số</h1>
+                    <h1 class="title">SynapseS</h1>
                     <p class="subtitle">Mã OTP đặt lại mật khẩu</p>
                 </div>
                 
@@ -143,7 +143,7 @@ class EmailService:
                 <p>Nếu bạn gặp khó khăn, vui lòng liên hệ với quản trị viên hệ thống.</p>
                 
                 <div class="footer">
-                    <p>Email này được gửi tự động từ hệ thống Smart School.</p>
+                    <p>Email này được gửi tự động từ hệ thống SynapseS.</p>
                     <p>Thời gian gửi: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
                 </div>
             </div>
@@ -172,7 +172,7 @@ Lưu ý quan trọng:
 Nếu bạn gặp khó khăn, vui lòng liên hệ với quản trị viên hệ thống.
 
 ---
-Email này được gửi tự động từ hệ thống Smart School.
+Email này được gửi tự động từ hệ thống SynapseS.
 Thời gian gửi: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
         """
     
@@ -190,7 +190,7 @@ Thời gian gửi: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
         try:
             # Tạo message
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"[Smart School] Mã OTP đặt lại mật khẩu - {otp}"
+            msg['Subject'] = f"[SynapseS] Mã OTP đặt lại mật khẩu - {otp}"
             msg['From'] = f"{self.sender_name} <{self.email}>"
             msg['To'] = recipient_email
             
