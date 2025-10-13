@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Users, Download } from 'lucide-react';
 import api from '../services/api';
 
 const AdminManagement = () => {
@@ -12,13 +12,19 @@ const AdminManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({});
   const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordField, setShowPasswordField] = useState(false);
   
   // Reference data cho dropdowns
   const [teachers, setTeachers] = useState([]);
+  const [homeroomTeachers, setHomeroomTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
   const [users, setUsers] = useState([]);
+  
+  // Import từ Users modal state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [importLoading, setImportLoading] = useState(false);
 
   // Configuration cho từng tab
   const tabConfig = {
@@ -108,14 +114,16 @@ const AdminManagement = () => {
   // Load reference data cho dropdowns
   const loadReferenceData = useCallback(async () => {
     try {
-      const [teachersRes, subjectsRes, classesRes, usersRes] = await Promise.all([
+      const [teachersRes, homeroomTeachersRes, subjectsRes, classesRes, usersRes] = await Promise.all([
         api.request('/admin/teachers'),
+        api.request('/admin/teachers/homeroom'),
         api.request('/admin/subjects'),
         api.request('/admin/classes'),
         api.request('/admin/users')
       ]);
 
       if (teachersRes.success) setTeachers(teachersRes.data || []);
+      if (homeroomTeachersRes.success) setHomeroomTeachers(homeroomTeachersRes.data || []);
       if (subjectsRes.success) setSubjects(subjectsRes.data || []);
       if (classesRes.success) setClasses(classesRes.data || []);
       if (usersRes.success) setUsers(usersRes.data || []);
@@ -199,6 +207,67 @@ const AdminManagement = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Load available users for import
+  const loadAvailableUsers = async () => {
+    try {
+      const response = await api.request('/admin/users/teachers');
+      if (response.success) {
+        setAvailableUsers(response.data || []);
+      } else {
+        setError(response.message || 'Không thể tải danh sách users');
+      }
+    } catch (err) {
+      setError('Lỗi khi tải danh sách users: ' + err.message);
+    }
+  };
+
+  // Handle import teachers from users
+  const handleImportTeachers = async () => {
+    if (selectedUserIds.length === 0) {
+      alert('Vui lòng chọn ít nhất một user để tạo giáo viên');
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const response = await api.request('/admin/teachers/import-from-users', {
+        method: 'POST',
+        body: JSON.stringify(selectedUserIds)
+      });
+
+      if (response.success) {
+        setShowImportModal(false);
+        setSelectedUserIds([]);
+        loadData(); // Reload teachers list
+        alert(`Tạo thành công ${response.data.length} giáo viên!`);
+      } else {
+        setError(response.message || 'Không thể tạo giáo viên');
+      }
+    } catch (err) {
+      setError('Lỗi khi tạo giáo viên: ' + err.message);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // Handle user selection
+  const handleUserSelect = (userId) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  // Handle select all users
+  const handleSelectAllUsers = () => {
+    if (selectedUserIds.length === availableUsers.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(availableUsers.map(user => user.id));
+    }
+  };
+
   const filteredData = data.filter(item => {
     const searchLower = searchTerm.toLowerCase();
     return Object.values(item).some(value => 
@@ -207,7 +276,6 @@ const AdminManagement = () => {
   });
 
   const renderForm = (isEdit = false, item = null) => {
-    const currentData = isEdit ? item : formData;
     
     return (
       <form onSubmit={(e) => {
@@ -300,7 +368,7 @@ const AdminManagement = () => {
                 className="px-4 py-3 w-full rounded-lg border-2 border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Chọn GVCN (tùy chọn)</option>
-                {teachers.map(teacher => (
+                {homeroomTeachers.map(teacher => (
                   <option key={teacher.id} value={teacher.id}>
                     {teacher.teacher_code} - {teacher.full_name}
                   </option>
@@ -473,13 +541,27 @@ const AdminManagement = () => {
               </h2>
               <p className="text-gray-600">Quản lý và cấu hình dữ liệu hệ thống</p>
             </div>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="px-6 py-3 font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-lg transition-all duration-200 transform hover:from-blue-600 hover:to-indigo-600 hover:scale-105"
-            >
-              <Plus className="inline mr-2 w-5 h-5" />
-              Thêm mới
-            </button>
+            <div className="flex space-x-3">
+              {activeTab === 'teachers' && (
+                <button
+                  onClick={() => {
+                    setShowImportModal(true);
+                    loadAvailableUsers();
+                  }}
+                  className="px-6 py-3 font-medium text-white bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-lg transition-all duration-200 transform hover:from-green-600 hover:to-emerald-600 hover:scale-105"
+                >
+                  <Download className="inline mr-2 w-5 h-5" />
+                  Import từ Users
+                </button>
+              )}
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="px-6 py-3 font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-lg transition-all duration-200 transform hover:from-blue-600 hover:to-indigo-600 hover:scale-105"
+              >
+                <Plus className="inline mr-2 w-5 h-5" />
+                Thêm mới
+              </button>
+            </div>
           </div>
 
           {/* Enhanced Search */}
@@ -617,6 +699,146 @@ const AdminManagement = () => {
           )}
         </div>
       </div>
+
+      {/* Import từ Users Modal */}
+      {showImportModal && (
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-xl shadow-2xl">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Import giáo viên từ Users</h3>
+                  <p className="text-sm text-gray-600">Chọn những user có role teacher hoặc homeroom_teacher để tạo thành giáo viên</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setSelectedUserIds([]);
+                  }}
+                  className="p-2 text-gray-400 rounded-lg transition-colors hover:text-gray-600 hover:bg-gray-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+              {availableUsers.length === 0 ? (
+                <div className="py-12 text-center">
+                  <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-gray-100 rounded-full">
+                    <Users className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="font-medium text-gray-500">Không có user nào có thể import</p>
+                  <p className="mt-2 text-sm text-gray-400">
+                    Tất cả users có role teacher/homeroom_teacher đã được tạo thành giáo viên
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Select All */}
+                  <div className="p-3 mb-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.length === availableUsers.length && availableUsers.length > 0}
+                        onChange={handleSelectAllUsers}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500 focus:ring-2"
+                      />
+                      <span className="ml-3 font-medium text-blue-800">
+                        Chọn tất cả ({availableUsers.length} users)
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Users List */}
+                  <div className="space-y-2">
+                    {availableUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                          selectedUserIds.includes(user.id)
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleUserSelect(user.id)}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedUserIds.includes(user.id)}
+                              onChange={() => handleUserSelect(user.id)}
+                              className="w-4 h-4 text-green-600 bg-gray-100 rounded border-gray-300 focus:ring-green-500 focus:ring-2"
+                            />
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <h4 className="font-medium text-gray-900">{user.full_name}</h4>
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  user.role === 'teacher' 
+                                    ? 'bg-blue-100 text-blue-800' 
+                                    : 'bg-purple-100 text-purple-800'
+                                }`}>
+                                  {user.role === 'teacher' ? 'Teacher' : 'Homeroom Teacher'}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600">{user.email}</p>
+                              {user.username && (
+                                <p className="text-xs text-gray-500">@{user.username}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">ID: {user.id}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  Đã chọn: <span className="font-medium text-green-600">{selectedUserIds.length}</span> users
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setSelectedUserIds([]);
+                    }}
+                    className="px-4 py-2 font-medium text-gray-700 bg-white rounded-lg border border-gray-300 transition-colors hover:bg-gray-50"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleImportTeachers}
+                    disabled={selectedUserIds.length === 0 || importLoading}
+                    className="flex items-center px-6 py-2 font-medium text-white bg-green-600 rounded-lg transition-colors hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {importLoading ? (
+                      <>
+                        <div className="mr-2 w-4 h-4 rounded-full border-2 border-white animate-spin border-t-transparent"></div>
+                        Đang tạo...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 w-4 h-4" />
+                        Tạo {selectedUserIds.length} giáo viên
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
