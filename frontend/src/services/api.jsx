@@ -178,10 +178,10 @@ class ApiService {
   }
 
   // Authentication
-  async login(email, password) {
+  async login(username, password) {
     return this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
   }
 
@@ -208,25 +208,25 @@ class ApiService {
   }
 
   // Forgot Password
-  async forgotPassword(email, otpEmail) {
+  async forgotPassword(username, otpEmail) {
     return this.request('/auth/forgot-password', {
       method: 'POST',
-      body: JSON.stringify({ email, otp_email: otpEmail }),
+      body: JSON.stringify({ username, otp_email: otpEmail }),
     });
   }
 
-  async verifyOTP(email, otp) {
+  async verifyOTP(username, otp) {
     return this.request('/auth/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ email, otp }),
+      body: JSON.stringify({ username, otp }),
     });
   }
 
-  async resetPassword(email, otp, newPassword, confirmPassword) {
+  async resetPassword(username, otp, newPassword, confirmPassword) {
     return this.request('/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ 
-        email, 
+        username, 
         otp, 
         new_password: newPassword, 
         confirm_password: confirmPassword 
@@ -234,8 +234,8 @@ class ApiService {
     });
   }
 
-  async getOTPStatus(email) {
-    return this.request(`/auth/otp-status/${email}`);
+  async getOTPStatus(username) {
+    return this.request(`/auth/otp-status/${username}`);
   }
 
   // Students

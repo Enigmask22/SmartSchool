@@ -12,6 +12,7 @@ const AdminManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordField, setShowPasswordField] = useState(false);
   
   // Reference data cho dropdowns
   const [teachers, setTeachers] = useState([]);
@@ -23,8 +24,8 @@ const AdminManagement = () => {
   const tabConfig = {
     users: {
       title: 'Quản lý người dùng',
-      fields: ['email', 'full_name', 'password', 'role'],
-      displayFields: ['id', 'email', 'full_name', 'role', 'is_active', 'created_at'],
+      fields: ['email', 'username', 'full_name', 'password', 'role'],
+      displayFields: ['id', 'email', 'username', 'full_name', 'role', 'is_active'],
       endpoint: '/admin/users'
     },
     teachers: {
@@ -69,6 +70,21 @@ const AdminManagement = () => {
   ];
 
   const currentConfig = tabConfig[activeTab];
+
+  // Function để generate password
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const handleGeneratePassword = () => {
+    const newPassword = generatePassword();
+    setFormData(prev => ({ ...prev, password: newPassword }));
+  };
 
   const loadData = useCallback(async () => {
     if (!currentConfig?.endpoint) return;
@@ -207,6 +223,9 @@ const AdminManagement = () => {
             <label className="block mb-2 text-sm font-semibold text-gray-800">
               {field === 'password' ? 'Mật khẩu' : 
                field === 'full_name' ? 'Họ tên' :
+               field === 'username' ? 'Username' :
+               field === 'email' ? 'Email' :
+               field === 'role' ? 'Vai trò' :
                field === 'teacher_code' ? 'Mã giáo viên' :
                field === 'subject_code' ? 'Mã môn học' :
                field === 'subject_name' ? 'Tên môn học' :
@@ -218,7 +237,7 @@ const AdminManagement = () => {
                field === 'class_id' ? 'Lớp học' :
                field === 'homeroom_teacher_id' ? 'Giáo viên chủ nhiệm' :
                field.replace(/_/g, ' ')}
-              {field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher' && field !== 'homeroom_teacher_id' && field !== 'user_id' ? ' *' : ''}
+              {field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username' ? ' *' : ''}
             </label>
             
             {field === 'role' ? (
@@ -229,7 +248,6 @@ const AdminManagement = () => {
                 required
               >
                 <option value="">Chọn vai trò</option>
-                <option value="admin">Quản trị viên</option>
                 <option value="teacher">Giáo viên</option>
                 <option value="homeroom_teacher">Giáo viên chủ nhiệm</option>
               </select>
@@ -332,14 +350,48 @@ const AdminManagement = () => {
                 className="px-4 py-3 w-full rounded-lg border-2 border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 rows="3"
               />
+            ) : field === 'password' && isEdit ? (
+              // Bỏ trường password khi edit
+              <div className="px-4 py-3 text-sm text-gray-500 bg-gray-100 rounded-lg border-2 border-gray-200">
+                Mật khẩu không thể thay đổi ở đây. Người dùng có thể tự đổi mật khẩu trong phần cài đặt.
+              </div>
             ) : (
-              <input
-                type={field.includes('email') ? 'email' : field.includes('phone') ? 'tel' : field === 'password' ? (showPassword ? 'text' : 'password') : 'text'}
-                value={formData[field] || item?.[field] || ''}
-                onChange={(e) => handleChange(field, e.target.value)}
-                className="px-4 py-3 w-full rounded-lg border-2 border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required={field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher' && field !== 'homeroom_teacher_id' && field !== 'user_id'}
-              />
+              <div className="relative">
+                <input
+                  type={field.includes('email') ? 'email' : field.includes('phone') ? 'tel' : field === 'password' ? (showPassword ? 'text' : 'password') : 'text'}
+                  value={formData[field] || item?.[field] || ''}
+                  onChange={(e) => handleChange(field, e.target.value)}
+                  className="px-4 py-3 w-full rounded-lg border-2 border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={field === 'username' ? 'ho_va_ten.ten_truong.ten_tinh' : ''}
+                  required={field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username'}
+                />
+                {field === 'password' && !isEdit && (
+                  <div className="flex absolute right-2 top-1/2 space-x-1 transform -translate-y-1/2">
+                    <button
+                      type="button"
+                      onClick={handleGeneratePassword}
+                      className="px-2 py-1 text-xs text-green-700 bg-green-100 rounded transition-colors hover:bg-green-200"
+                      title="Tạo mật khẩu tự động"
+                    >
+                      🎲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="px-2 py-1 text-xs text-blue-700 bg-blue-100 rounded transition-colors hover:bg-blue-200"
+                      title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    >
+                      {showPassword ? "👁️" : "👁️‍🗨️"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {field === 'username' && (
+              <p className="mt-1 text-xs text-gray-500">
+                Tùy chọn. Format: tên.school.province (VD: nguyen_thi_lan.chuyen_le_quy_don.tphcm)
+              </p>
             )}
           </div>
         ))}
@@ -351,9 +403,10 @@ const AdminManagement = () => {
               if (isEdit) {
                 setEditingItem(null);
               } else {
-                setShowAddForm(false);
-              }
-              setFormData({});
+              setShowAddForm(false);
+            }
+            setFormData({});
+            setShowPassword(false);
             }}
             className="px-6 py-3 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors duration-200 hover:bg-gray-200"
           >
@@ -492,7 +545,10 @@ const AdminManagement = () => {
                         key={field}
                         className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase"
                       >
-                        {field.replace(/_/g, ' ')}
+                        {field === 'username' ? 'USERNAME' :
+                         field === 'full_name' ? 'HỌ TÊN' :
+                         field === 'is_active' ? 'TRẠNG THÁI' :
+                         field.replace(/_/g, ' ').toUpperCase()}
                       </th>
                     ))}
                     <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
