@@ -57,7 +57,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         ...baseItems,
         // { id: 'students', label: 'Học sinh', icon: '👥' }, // Ẩn cho Admin
         // { id: 'attendance', label: 'Điểm danh', icon: '📋' }, // Ẩn cho Admin
-        // { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' }, // Ẩn cho Admin
+        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' }, // Ẩn cho Admin
         // { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' }, // Ẩn cho Admin
         // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
         // { id: 'grades', label: 'Quản lý điểm', icon: '📝' }, // Ẩn cho Admin
@@ -71,7 +71,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         ...baseItems,
         { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: '👥' },
         { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
-        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
+        // { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
         { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
         // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
       ];

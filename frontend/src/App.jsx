@@ -98,8 +98,8 @@ function AppContent() {
         //   return <AttendanceView />;
         // case 'camera':
         //   return <AICamera />;
-        // case 'continuous':
-        //   return <ContinuousRecognition />;
+        case 'continuous':
+          return <ContinuousRecognition isAdmin={true} />;
         // case 'faces':
         //   return <FaceManagement />;
         case 'school-config':
