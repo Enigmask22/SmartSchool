@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { GraduationCap, Settings, Plus, Download, Upload, AlertCircle, Trash2, Save, BarChart3, FileEdit, Scale, Key, Lightbulb, Star, Zap, Pencil, FileText, Clipboard } from 'lucide-react';
+import { GraduationCap, Settings, Plus, Download, Upload, AlertCircle, Trash2, Save, BarChart3, FileEdit, Scale, Key, Lightbulb, Star, Zap, Pencil, FileText, Clipboard, Calendar, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -519,10 +519,12 @@ const GradeManagement = () => {
                 </CardDescription>
                 <div className="flex items-center mt-2 space-x-3">
                   <Badge variant="secondary" className="text-sm">
-                    📅 {academicYear}
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {academicYear}
                   </Badge>
                   <Badge variant="secondary" className="text-sm">
-                    📚 {semester}
+                    <BookOpen className="w-3 h-3 mr-1" />
+                    {semester}
                   </Badge>
                 </div>
               </div>
