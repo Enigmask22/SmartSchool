@@ -323,7 +323,7 @@ app.log
 error.log
 access.log
 debug.log
-
+backend/temp_otp
 # ================
 # IDE & EDITORS
 # ================

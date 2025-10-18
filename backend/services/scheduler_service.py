@@ -10,6 +10,7 @@ from threading import Thread
 from typing import Optional
 
 from database.connection import get_db
+from services.otp_service import otp_service
 from utils.logger import setup_logger
 from utils.timezone_helper import get_vietnam_time, VIETNAM_TZ
 
@@ -52,11 +53,15 @@ class SchedulerService:
         # Reset cấu hình số ngày học vào 00:00 chủ nhật hàng tuần
         schedule.every().sunday.at("00:00").do(self._reset_school_days_config)
         
+        # Dọn dẹp OTP hết hạn vào 00:10 chủ nhật hàng tuần (sau khi reset cấu hình)
+        schedule.every().sunday.at("00:10").do(self._cleanup_expired_otps)
+        
         # Có thể thêm các job khác ở đây
         # schedule.every().day.at("01:00").do(self._cleanup_old_logs)
         # schedule.every().hour.do(self._check_system_health)
         
         logger.info("Đã đăng ký tác vụ reset cấu hình số ngày học vào chủ nhật 00:00")
+        logger.info("Đã đăng ký tác vụ dọn OTP hết hạn vào chủ nhật 00:10")
     
     def _run_scheduler(self):
         """Chạy scheduler trong thread riêng"""
@@ -103,6 +108,17 @@ class SchedulerService:
             
         except Exception as e:
             logger.error(f"ERROR: Lỗi khi reset cấu hình số ngày học: {str(e)}")
+    
+    def _cleanup_expired_otps(self):
+        """Dọn dẹp các OTP đã hết hạn trong thư mục lưu tạm"""
+        try:
+            start_time = datetime.now()
+            logger.info(f"Bắt đầu dọn dẹp OTP hết hạn - {start_time.isoformat()}")
+            deleted_count = otp_service.cleanup_expired_otps()
+            duration_seconds = (datetime.now() - start_time).total_seconds()
+            logger.info(f"Hoàn thành dọn dẹp OTP: đã xóa {deleted_count} file, mất {duration_seconds:.2f}s")
+        except Exception as e:
+            logger.error(f"ERROR: Lỗi khi dọn dẹp OTP hết hạn: {str(e)}")
     
     def run_reset_now(self):
         """Chạy reset ngay lập tức (cho testing)"""
