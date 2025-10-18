@@ -53,7 +53,7 @@ const AdminManagement = () => {
     },
     classes: {
       title: 'Quản lý lớp học',
-      fields: ['class_name', 'grade', 'homeroom_teacher', 'homeroom_teacher_id', 'room_number', 'academic_year'],
+      fields: ['class_name', 'grade', 'homeroom_teacher_id', 'room_number', 'academic_year'],
       displayFields: ['id', 'class_name', 'grade', 'homeroom_teacher', 'room_number', 'academic_year', 'total_students'],
       endpoint: '/admin/classes'
     },
@@ -296,7 +296,7 @@ const AdminManagement = () => {
             <label className="block mb-2 text-sm font-semibold text-gray-800">
               {field === 'password' ? 'Mật khẩu' : 
                field === 'full_name' ? 'Họ tên' :
-               field === 'username' ? 'Username' :
+               field === 'username' ? 'Tên đăng nhập' :
                field === 'email' ? 'Email' :
                field === 'role' ? 'Vai trò' :
                field === 'teacher_code' ? 'Mã giáo viên' :
@@ -309,26 +309,29 @@ const AdminManagement = () => {
                field === 'subject_id' ? 'Môn học' :
                field === 'class_id' ? 'Lớp học' :
                field === 'homeroom_teacher_id' ? 'Giáo viên chủ nhiệm' :
+               field === 'phone' ? 'Số điện thoại' :
+               field === 'description' ? 'Mô tả' :
+               field === 'grade' ? 'Khối' :
+               field === 'semester' ? 'Học kỳ' :
                field.replace(/_/g, ' ')}
-              {field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username' ? ' *' : ''}
+              {field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username' ? ' *' : ''}
             </label>
             
             {field === 'role' ? (
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn vai trò</option>
                 <option value="teacher">Giáo viên</option>
-                <option value="homeroom_teacher">Giáo viên chủ nhiệm</option>
               </select>
             ) : field === 'teacher_id' ? (
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn giáo viên</option>
@@ -342,7 +345,7 @@ const AdminManagement = () => {
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn môn học</option>
@@ -356,7 +359,7 @@ const AdminManagement = () => {
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, parseInt(e.target.value))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn lớp</option>
@@ -370,7 +373,7 @@ const AdminManagement = () => {
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Chọn GVCN (tùy chọn)</option>
                 {homeroomTeachers.map(teacher => (
@@ -383,7 +386,7 @@ const AdminManagement = () => {
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Chọn người dùng (tùy chọn)</option>
                 {users.map(user => (
@@ -396,7 +399,7 @@ const AdminManagement = () => {
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn học kỳ</option>
@@ -408,7 +411,7 @@ const AdminManagement = () => {
               <select
                 value={formData[field] || item?.[field] || ''}
                 onChange={(e) => handleChange(field, e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn khối</option>
@@ -425,7 +428,7 @@ const AdminManagement = () => {
               />
             ) : field === 'password' && isEdit ? (
               // Bỏ trường password khi edit
-              <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <div className="flex items-center px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-muted text-muted-foreground">
                 Mật khẩu không thể thay đổi ở đây. Người dùng có thể tự đổi mật khẩu trong phần cài đặt.
               </div>
             ) : (
@@ -435,7 +438,7 @@ const AdminManagement = () => {
                   value={formData[field] || item?.[field] || ''}
                   onChange={(e) => handleChange(field, e.target.value)}
                   placeholder={field === 'username' ? 'ho_va_ten.ten_truong.ten_tinh' : ''}
-                  required={field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username'}
+                  required={field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username'}
                 />
                 {field === 'password' && !isEdit && (
                   <div className="flex absolute right-2 top-1/2 space-x-1 transform -translate-y-1/2">
@@ -444,7 +447,7 @@ const AdminManagement = () => {
                       variant="ghost"
                       size="sm"
                       onClick={handleGeneratePassword}
-                      className="h-6 w-6 p-0 text-green-700 hover:bg-green-100"
+                      className="p-0 w-6 h-6 text-green-700 hover:bg-green-100"
                       title="Tạo mật khẩu tự động"
                     >
                       <Shuffle className="w-3 h-3" />
@@ -454,7 +457,7 @@ const AdminManagement = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="h-6 w-6 p-0 text-blue-700 hover:bg-blue-100"
+                      className="p-0 w-6 h-6 text-blue-700 hover:bg-blue-100"
                       title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                     >
                       {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
@@ -529,7 +532,7 @@ const AdminManagement = () => {
                   <tab.icon className="mr-3 w-5 h-5" />
                   {tab.label}
                   {activeTab === tab.id && (
-                    <div className="ml-2 w-2 h-2 bg-primary-foreground rounded-full animate-pulse"></div>
+                    <div className="ml-2 w-2 h-2 rounded-full animate-pulse bg-primary-foreground"></div>
                   )}
                 </Button>
               ))}
@@ -572,7 +575,7 @@ const AdminManagement = () => {
           {/* Enhanced Search */}
           <div className="mt-6">
             <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 w-5 h-5 text-muted-foreground transform -translate-y-1/2" />
+              <Search className="absolute left-4 top-1/2 w-5 h-5 transform -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Tìm kiếm..."
@@ -586,7 +589,7 @@ const AdminManagement = () => {
 
         {/* Enhanced Add Form */}
         {showAddForm && (
-          <CardContent className="bg-muted/30 border-b">
+          <CardContent className="border-b bg-muted/30">
             <div className="mb-4">
               <h3 className="mb-2 text-lg font-semibold">Thông tin mới</h3>
               <p className="text-sm text-muted-foreground">Nhập thông tin để tạo bản ghi mới</p>
@@ -599,12 +602,12 @@ const AdminManagement = () => {
         <CardContent>
           {loading ? (
             <div className="py-16 text-center">
-              <div className="mx-auto w-12 h-12 rounded-full border-4 border-primary/20 animate-spin border-t-primary"></div>
+              <div className="mx-auto w-12 h-12 rounded-full border-4 animate-spin border-primary/20 border-t-primary"></div>
               <p className="mt-4 font-medium text-muted-foreground">Đang tải dữ liệu...</p>
             </div>
           ) : error ? (
             <div className="py-16 text-center">
-              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-destructive/10 rounded-full">
+              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10">
                 <span className="text-2xl text-destructive">⚠️</span>
               </div>
               <p className="mb-4 font-medium text-destructive">{error}</p>
@@ -614,7 +617,7 @@ const AdminManagement = () => {
             </div>
           ) : filteredData.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-muted rounded-full">
+              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-muted">
                 <span className="text-2xl text-muted-foreground">📋</span>
               </div>
               <p className="font-medium text-muted-foreground">Không có dữ liệu</p>
@@ -643,7 +646,7 @@ const AdminManagement = () => {
                           <TableCell key={field}>
                             {typeof item[field] === 'boolean' ? 
                               (item[field] ? (
-                                <Badge variant="default" className="bg-green-100 text-green-800">
+                                <Badge variant="default" className="text-green-800 bg-green-100">
                                   Có
                                 </Badge>
                               ) : (
@@ -704,7 +707,7 @@ const AdminManagement = () => {
         <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
           <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-xl shadow-2xl">
             {/* Modal Header */}
-            <div className="px-6 py-4 bg-muted/50 border-b">
+            <div className="px-6 py-4 border-b bg-muted/50">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">Import giáo viên từ Users</h3>
