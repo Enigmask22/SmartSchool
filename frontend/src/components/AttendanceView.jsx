@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import ApiService from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 
 const AttendanceView = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
@@ -214,17 +219,17 @@ const AttendanceView = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      present: { bg: 'bg-green-100', text: 'text-green-800', label: 'Có mặt' },
-      absent: { bg: 'bg-red-100', text: 'text-red-800', label: 'Vắng mặt' },
-      late: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Muộn' }
+      present: { variant: 'default', className: 'bg-green-100 text-green-800', label: 'Có mặt' },
+      absent: { variant: 'destructive', className: '', label: 'Vắng mặt' },
+      late: { variant: 'secondary', className: 'bg-yellow-100 text-yellow-800', label: 'Muộn' }
     };
 
-    const config = statusConfig[status] || { bg: 'bg-gray-100', text: 'text-gray-800', label: status };
+    const config = statusConfig[status] || { variant: 'outline', className: '', label: status };
     
     return (
-      <span className={`px-2 py-1 text-xs rounded-full ${config.bg} ${config.text}`}>
+      <Badge variant={config.variant} className={config.className}>
         {config.label}
-      </span>
+      </Badge>
     );
   };
 
@@ -438,8 +443,10 @@ const AttendanceView = () => {
 
   if (loading && attendanceRecords.length === 0) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-32 h-32 rounded-full border-b-2 border-blue-600 animate-spin"></div>
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
@@ -447,295 +454,321 @@ const AttendanceView = () => {
   return (
     <div className="attendance-view">
       <div className="mb-8">
-        <h2 className="mb-2 text-3xl font-bold text-gray-800">Điểm danh</h2>
-        <p className="text-gray-600">Quản lý điểm danh học sinh</p>
-        {error && (
-          <div className="p-3 mt-2 text-red-700 bg-red-100 rounded border border-red-400">
-            {error}
-          </div>
-        )}
-        {successMessage && (
-          <div className="p-3 mt-2 text-green-700 bg-green-100 rounded border border-green-400">
-            {successMessage}
-          </div>
-        )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold">Điểm danh</CardTitle>
+            <CardDescription>Quản lý điểm danh học sinh</CardDescription>
+            {error && (
+              <div className="p-3 mt-2 text-destructive bg-destructive/10 rounded border border-destructive/20">
+                {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="p-3 mt-2 text-green-700 bg-green-100 rounded border border-green-400">
+                {successMessage}
+              </div>
+            )}
+          </CardHeader>
+        </Card>
       </div>
 
       {/* Statistics */}
       {stats && (
         <div className="grid grid-cols-1 gap-6 mb-6 md:grid-cols-4">
-          <div className="p-6 bg-white rounded-lg shadow-md">
-            <div className="flex items-center">
-              <div className="p-3 text-blue-600 bg-blue-100 rounded-full">
-                👥
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-3 text-primary bg-primary/10 rounded-full">
+                  👥
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-muted-foreground">Tổng học sinh</p>
+                  <p className="text-2xl font-bold">{stats.total_students}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Tổng học sinh</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total_students}</p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="p-6 bg-white rounded-lg shadow-md">
-            <div className="flex items-center">
-              <div className="p-3 text-green-600 bg-green-100 rounded-full">
-                ✅
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-3 text-green-600 bg-green-100 rounded-full">
+                  ✅
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-muted-foreground">Có mặt</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.present_count}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Có mặt</p>
-                <p className="text-2xl font-bold text-green-600">{stats.present_count}</p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="p-6 bg-white rounded-lg shadow-md">
-            <div className="flex items-center">
-              <div className="p-3 text-red-600 bg-red-100 rounded-full">
-                ❌
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-3 text-destructive bg-destructive/10 rounded-full">
+                  ❌
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-muted-foreground">Vắng mặt</p>
+                  <p className="text-2xl font-bold text-destructive">{stats.absent_count}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Vắng mặt</p>
-                <p className="text-2xl font-bold text-red-600">{stats.absent_count}</p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="p-6 bg-white rounded-lg shadow-md">
-            <div className="flex items-center">
-              <div className="p-3 text-yellow-600 bg-yellow-100 rounded-full">
-                ⏰
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-3 text-yellow-600 bg-yellow-100 rounded-full">
+                  ⏰
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-muted-foreground">Muộn</p>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.late_count}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Muộn</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.late_count}</p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Filters */}
-      <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Bộ lọc</h3>
-          <div className="flex gap-3 items-center">
-            <span className="text-sm text-gray-600">Chế độ xem:</span>
-            <label className="flex gap-2 items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showFullList}
-                onChange={(e) => handleViewModeChange(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500"
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Bộ lọc</CardTitle>
+            <div className="flex gap-3 items-center">
+              <span className="text-sm text-muted-foreground">Chế độ xem:</span>
+              <label className="flex gap-2 items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showFullList}
+                  onChange={(e) => handleViewModeChange(e.target.checked)}
+                  className="w-4 h-4 text-primary bg-background rounded border-input focus:ring-primary"
+                />
+                <span className="text-sm font-medium">
+                  Hiển thị tất cả học sinh
+                </span>
+              </label>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Ngày
+              </label>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
               />
-              <span className="text-sm font-medium text-gray-700">
-                Hiển thị tất cả học sinh
-              </span>
-            </label>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Ngày
-            </label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Lớp
-            </label>
-            <select
-              value={selectedClass}
-              onChange={(e) => handleClassChange(e.target.value)}
-              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
-              {isHomeroomTeacher() ? (
-                <option value="">Chọn lớp chủ nhiệm</option>
-              ) : (
-                <option value="">Tất cả lớp</option>
-              )}
-              {classes.map(className => (
-                <option key={className} value={className}>
-                  {className}
-                </option>
-              ))}
-            </select>
-          </div>
+            </div>
+            
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Lớp
+              </label>
+              <select
+                value={selectedClass}
+                onChange={(e) => handleClassChange(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
+                {isHomeroomTeacher() ? (
+                  <option value="">Chọn lớp chủ nhiệm</option>
+                ) : (
+                  <option value="">Tất cả lớp</option>
+                )}
+                {classes.map(className => (
+                  <option key={className} value={className}>
+                    {className}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Trạng thái
-            </label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="present">Có mặt</option>
-              <option value="absent">Vắng mặt</option>
-              <option value="late">Muộn</option>
-            </select>
-          </div>
+            <div>
+              <label className="block mb-2 text-sm font-medium">
+                Trạng thái
+              </label>
+              <select
+                value={selectedStatus}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="present">Có mặt</option>
+                <option value="absent">Vắng mặt</option>
+                <option value="late">Muộn</option>
+              </select>
+            </div>
 
-          <div className="flex gap-2 items-end">
-            <button
-              onClick={resetFilters}
-              className="flex-1 px-4 py-2 text-white bg-gray-600 rounded-md transition-colors hover:bg-gray-700"
-            >
-              Đặt lại
-            </button>
-            <button
-              onClick={loadAttendanceData}
-              className="flex-1 px-4 py-2 text-white bg-blue-600 rounded-md transition-colors hover:bg-blue-700"
-            >
-              Tìm kiếm
-            </button>
+            <div className="flex gap-2 items-end">
+              <Button
+                variant="outline"
+                onClick={resetFilters}
+                className="flex-1"
+              >
+                Đặt lại
+              </Button>
+              <Button
+                onClick={loadAttendanceData}
+                className="flex-1"
+              >
+                Tìm kiếm
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Attendance Table */}
-      <div className="overflow-hidden bg-white rounded-lg shadow-md">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold">
+      <Card>
+        <CardHeader>
+          <CardTitle>
             Danh sách điểm danh {selectedDate && `- ${formatDate(selectedDate)}`}
-          </h3>
-          <p className="mt-1 text-sm text-gray-600">
+          </CardTitle>
+          <CardDescription>
             {showFullList ? 
               `Hiển thị ${attendanceRecords.length} học sinh (bao gồm cả học sinh chưa điểm danh)` :
               `Hiển thị ${attendanceRecords.length} bản ghi điểm danh`
             }
             {selectedClass && ` - Lớp ${selectedClass}`}
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        {/* Table Header */}
-        <div className="grid grid-cols-12 gap-2 px-6 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase bg-gray-50 border-b">
-          <div className="col-span-1">Mã HS</div>
-          <div className="col-span-2">Họ tên</div>
-          <div className="col-span-1">Lớp</div>
-          <div className="col-span-1">Giờ vào</div>
-          <div className="col-span-1">Giờ ra</div>
-          <div className="col-span-1">Trạng thái</div>
-          <div className="col-span-1">Độ chính xác</div>
-          <div className="col-span-2">Ghi chú</div>
-          <div className="col-span-2 text-center">Thao tác</div>
-        </div>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Mã HS</TableHead>
+                  <TableHead className="w-[150px]">Họ tên</TableHead>
+                  <TableHead className="w-[80px]">Lớp</TableHead>
+                  <TableHead className="w-[100px]">Giờ vào</TableHead>
+                  <TableHead className="w-[100px]">Giờ ra</TableHead>
+                  <TableHead className="w-[100px]">Trạng thái</TableHead>
+                  <TableHead className="w-[100px]">Độ chính xác</TableHead>
+                  <TableHead className="w-[150px]">Ghi chú</TableHead>
+                  <TableHead className="w-[120px] text-center">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
 
-        {/* Table Body */}
-        <div className="divide-y divide-gray-200">
-          {attendanceRecords.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-500">
-              {loading ? (
-                <div className="flex justify-center">
-                  <div className="w-8 h-8 rounded-full border-b-2 border-blue-600 animate-spin"></div>
-                </div>
-              ) : (
-                'Không có dữ liệu điểm danh'
-              )}
-            </div>
-          ) : (
-            (() => {
-              // Apply frontend pagination
-              const startIndex = (page - 1) * pageSize;
-              const endIndex = startIndex + pageSize;
-              const paginatedRecords = attendanceRecords.slice(startIndex, endIndex);
-              
-              return paginatedRecords.map((record) => (
-              <div key={record.id} className="grid grid-cols-12 gap-2 px-6 py-4 hover:bg-gray-50">
-                <div className="col-span-1 text-sm font-medium text-gray-900">
-                  {record.students?.student_id || 'N/A'}
-                </div>
-                <div className="col-span-2 text-sm text-gray-900">
-                  <div className="font-medium">{record.students?.full_name || 'Không xác định'}</div>
-                </div>
-                <div className="col-span-1 text-sm text-gray-900">
-                  <span className="px-2 py-1 text-xs text-blue-800 bg-blue-100 rounded-full">
-                    {record.students?.class_name || 'N/A'}
-                  </span>
-                </div>
-                <div className="col-span-1 text-sm text-gray-600">
-                  {formatTime(record.check_in_time)}
-                </div>
-                <div className="col-span-1 text-sm text-gray-600">
-                  {formatTime(record.check_out_time)}
-                </div>
-                <div className="col-span-1 min-w-0">
-                  {editingRecord?.id === record.id ? (
-                    <select
-                      value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value)}
-                      className="px-1 py-1 w-full text-xs bg-white rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      style={{ minWidth: '65px' }}
-                    >
-                      <option value="present">Có mặt</option>
-                      <option value="absent">Vắng</option>
-                      <option value="late">Muộn</option>
-                    </select>
-                  ) : (
-                    getStatusBadge(record.status)
-                  )}
-                </div>
-                <div className="col-span-1 text-sm text-gray-600">
-                  {record.confidence_score ? `${(record.confidence_score * 100 * 2).toFixed(1)}%` : '-'}
-                </div>
-                <div className="col-span-2 text-sm text-gray-600">
-                  {editingRecord?.id === record.id ? (
-                    <input
-                      type="text"
-                      value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
-                      placeholder="Nhập ghi chú..."
-                      className="px-2 py-1 w-full text-xs rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  ) : (
-                    <span className="truncate" title={record.notes || ''}>
-                      {record.notes || '-'}
-                    </span>
-                  )}
-                </div>
-                <div className="col-span-2">
-                  {editingRecord?.id === record.id ? (
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={handleSaveEdit}
-                        disabled={updating}
-                        className="px-3 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
-                      >
-                        {updating ? '...' : 'Lưu'}
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        disabled={updating}
-                        className="px-3 py-1 text-xs text-gray-600 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
-                      >
-                        Hủy
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex justify-center">
-                      <button
-                        onClick={() => handleEditRecord(record)}
-                        className="px-3 py-1 text-xs text-blue-600 bg-blue-100 rounded hover:bg-blue-200"
-                      >
-                        Sửa
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ));
-            })()
-          )}
-        </div>
+              <TableBody>
+                {attendanceRecords.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      {loading ? (
+                        <div className="flex justify-center">
+                          <div className="w-8 h-8 rounded-full border-b-2 border-primary animate-spin"></div>
+                        </div>
+                      ) : (
+                        'Không có dữ liệu điểm danh'
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (() => {
+                    // Apply frontend pagination
+                    const startIndex = (page - 1) * pageSize;
+                    const endIndex = startIndex + pageSize;
+                    const paginatedRecords = attendanceRecords.slice(startIndex, endIndex);
+                    
+                    return paginatedRecords.map((record) => (
+                      <TableRow key={record.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">
+                          {record.students?.student_id || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{record.students?.full_name || 'Không xác định'}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-blue-800 bg-blue-100">
+                            {record.students?.class_name || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatTime(record.check_in_time)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatTime(record.check_out_time)}
+                        </TableCell>
+                        <TableCell>
+                          {editingRecord?.id === record.id ? (
+                            <select
+                              value={editStatus}
+                              onChange={(e) => setEditStatus(e.target.value)}
+                              className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <option value="present">Có mặt</option>
+                              <option value="absent">Vắng</option>
+                              <option value="late">Muộn</option>
+                            </select>
+                          ) : (
+                            getStatusBadge(record.status)
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {record.confidence_score ? `${(record.confidence_score * 100 * 2).toFixed(1)}%` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {editingRecord?.id === record.id ? (
+                            <Input
+                              type="text"
+                              value={editNotes}
+                              onChange={(e) => setEditNotes(e.target.value)}
+                              placeholder="Nhập ghi chú..."
+                              className="h-8 text-xs"
+                            />
+                          ) : (
+                            <span className="truncate" title={record.notes || ''}>
+                              {record.notes || '-'}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {editingRecord?.id === record.id ? (
+                            <div className="flex gap-2 justify-center">
+                              <Button
+                                size="sm"
+                                onClick={handleSaveEdit}
+                                disabled={updating}
+                                className="h-8 text-xs"
+                              >
+                                {updating ? '...' : 'Lưu'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelEdit}
+                                disabled={updating}
+                                className="h-8 text-xs"
+                              >
+                                Hủy
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditRecord(record)}
+                              className="h-8 text-xs"
+                            >
+                              Sửa
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  })()
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
 
         {/* Pagination */}
         {(() => {
@@ -745,21 +778,21 @@ const AttendanceView = () => {
           if (totalPages <= 1) return null;
           
           return (
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="px-6 py-4 border-t bg-muted/50">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center space-x-4">
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm text-muted-foreground">
                     Hiển thị <span className="font-semibold">{((page - 1) * pageSize) + 1}</span> đến <span className="font-semibold">{Math.min(page * pageSize, totalRecords)}</span> trong tổng số <span className="font-semibold">{totalRecords}</span> bản ghi
                   </div>
                   <div className="flex items-center space-x-2">
-                    <label className="text-sm text-gray-700">Số lượng/trang:</label>
+                    <label className="text-sm text-muted-foreground">Số lượng/trang:</label>
                     <select
                       value={pageSize}
                       onChange={(e) => {
                         setPageSize(Number(e.target.value));
                         setPage(1);
                       }}
-                      className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="flex h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <option value={10}>10</option>
                       <option value={20}>20</option>
@@ -770,13 +803,14 @@ const AttendanceView = () => {
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setPage(Math.max(1, page - 1))}
                     disabled={page === 1}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     ← Trước
-                  </button>
+                  </Button>
                   
                   <div className="flex items-center space-x-1">
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
@@ -787,51 +821,51 @@ const AttendanceView = () => {
                       
                       if (!showPage) {
                         if (pageNum === page - 2 || pageNum === page + 2) {
-                          return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+                          return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
                         }
                         return null;
                       }
                       
                       return (
-                        <button
+                        <Button
                           key={pageNum}
+                          variant={page === pageNum ? "default" : "outline"}
+                          size="sm"
                           onClick={() => setPage(pageNum)}
-                          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                            page === pageNum
-                              ? 'bg-blue-600 text-white'
-                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                          }`}
                         >
                           {pageNum}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
                   
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setPage(Math.min(totalPages, page + 1))}
                     disabled={page === totalPages}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Sau →
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
           );
         })()}
-      </div>
+      </Card>
 
       {/* Summary */}
-      <div className="p-4 mt-6 bg-gray-50 rounded-lg">
-        <p className="text-sm text-gray-600">
-          {selectedDate === new Date().toISOString().split('T')[0] 
-            ? 'Dữ liệu điểm danh hôm nay' 
-            : `Dữ liệu điểm danh ngày ${formatDate(selectedDate)}`}
-          {selectedClass && ` - Lớp ${selectedClass}`}
-          {selectedStatus && ` - Trạng thái: ${selectedStatus}`}
-        </p>
-      </div>
+      <Card className="mt-6">
+        <CardContent className="p-4">
+          <p className="text-sm text-muted-foreground">
+            {selectedDate === new Date().toISOString().split('T')[0] 
+              ? 'Dữ liệu điểm danh hôm nay' 
+              : `Dữ liệu điểm danh ngày ${formatDate(selectedDate)}`}
+            {selectedClass && ` - Lớp ${selectedClass}`}
+            {selectedStatus && ` - Trạng thái: ${selectedStatus}`}
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 };

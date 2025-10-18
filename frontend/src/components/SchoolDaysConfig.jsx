@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, Save, RotateCcw, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
 import ApiService from '../services/api';
 
 const SchoolDaysConfig = () => {
@@ -222,48 +227,75 @@ const SchoolDaysConfig = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="flex items-center space-x-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="text-gray-600">Đang tải cấu hình...</span>
-        </div>
+        <Card className="p-8">
+          <CardContent className="flex items-center space-x-2">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="text-muted-foreground">Đang tải cấu hình...</span>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Cấu hình số ngày học theo tuần
-        </h2>
-        <p className="text-gray-600">
-          Quản lý số ngày học mặc định và tạm thời cho từng khối. 
-          Hệ thống sẽ tự động reset về cấu hình mặc định vào 00:00 chủ nhật hàng tuần.
-        </p>
-      </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Calendar className="w-6 h-6 text-primary" />
+            <span>Cấu hình số ngày học theo tuần</span>
+          </CardTitle>
+          <CardDescription>
+            Quản lý số ngày học mặc định và tạm thời cho từng khối. 
+            Hệ thống sẽ tự động reset về cấu hình mặc định vào 00:00 chủ nhật hàng tuần.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Thông tin reset tiếp theo */}
       {nextReset && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-blue-800 mb-2">⏰ Thông tin Reset Tự động</h3>
-          <div className="text-sm text-blue-700">
-            <p><strong>Reset tiếp theo:</strong> {formatDateTime(nextReset.next_reset)}</p>
-            <p><strong>Còn lại:</strong> {nextReset.days_remaining} ngày ({nextReset.hours_remaining} giờ)</p>
-          </div>
-        </div>
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-primary">
+              <Clock className="w-5 h-5" />
+              <span>Thông tin Reset Tự động</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Reset tiếp theo:</span>
+                <span className="font-medium">{formatDateTime(nextReset.next_reset)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Còn lại:</span>
+                <Badge variant="default">
+                  {nextReset.days_remaining} ngày ({nextReset.hours_remaining} giờ)
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Messages */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <p className="text-red-800">{error}</p>
-        </div>
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="flex items-center space-x-2 p-4">
+            <AlertCircle className="w-5 h-5 text-destructive" />
+            <p className="text-destructive">{error}</p>
+          </CardContent>
+        </Card>
       )}
 
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-          <p className="text-green-800">{successMessage}</p>
-        </div>
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="flex items-center space-x-2 p-4">
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <p className="text-green-800">{successMessage}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Cấu hình cho từng khối */}
@@ -273,99 +305,126 @@ const SchoolDaysConfig = () => {
           const currentWeekDays = getCurrentWeekDays(grade);
           
           return (
-            <div key={grade} className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">
-                Khối {grade}
-              </h3>
-              
-              {/* Hiển thị số ngày hiện tại */}
-              <div className="bg-gray-50 p-3 rounded-lg mb-4 text-center">
-                <p className="text-sm text-gray-600">Số ngày học tuần này</p>
-                <p className="text-2xl font-bold text-blue-600">{currentWeekDays} ngày</p>
-              </div>
+            <Card key={grade}>
+              <CardHeader>
+                <CardTitle className="text-center">
+                  Khối {grade}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Hiển thị số ngày hiện tại */}
+                <Card className="bg-muted/50">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Số ngày học tuần này</p>
+                    <p className="text-2xl font-bold text-primary">{currentWeekDays} ngày</p>
+                  </CardContent>
+                </Card>
 
-              {/* Số ngày học mặc định */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số ngày học mặc định *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="7"
-                  value={config.default_days_per_week || ''}
-                  onChange={(e) => handleConfigChange(grade, 'default_days_per_week', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ví dụ: 5"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Sẽ được auto reset vào chủ nhật
-                </p>
-              </div>
+                {/* Số ngày học mặc định */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Số ngày học mặc định *
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="7"
+                    value={config.default_days_per_week || ''}
+                    onChange={(e) => handleConfigChange(grade, 'default_days_per_week', e.target.value)}
+                    placeholder="Ví dụ: 5"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Sẽ được auto reset vào chủ nhật
+                  </p>
+                </div>
 
-              {/* Số ngày học tạm thời */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số ngày học tạm thời
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="7"
-                  value={config.temporary_days_per_week || ''}
-                  onChange={(e) => handleConfigChange(grade, 'temporary_days_per_week', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ví dụ: 6"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Cho tuần đặc biệt (tùy chọn)
-                </p>
-              </div>
+                {/* Số ngày học tạm thời */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Số ngày học tạm thời
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="7"
+                    value={config.temporary_days_per_week || ''}
+                    onChange={(e) => handleConfigChange(grade, 'temporary_days_per_week', e.target.value)}
+                    placeholder="Ví dụ: 6"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Cho tuần đặc biệt (tùy chọn)
+                  </p>
+                </div>
 
-              {/* Nút áp dụng tạm thời */}
-              {config.temporary_days_per_week && (
-                <button
-                  onClick={() => handleApplyTemporary(grade)}
-                  className="w-full mb-2 px-3 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors text-sm"
-                >
-                  Áp dụng tạm thời ({config.temporary_days_per_week} ngày)
-                </button>
-              )}
-            </div>
+                {/* Nút áp dụng tạm thời */}
+                {config.temporary_days_per_week && (
+                  <Button
+                    onClick={() => handleApplyTemporary(grade)}
+                    variant="outline"
+                    className="w-full"
+                    size="sm"
+                  >
+                    Áp dụng tạm thời ({config.temporary_days_per_week} ngày)
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
           );
         })}
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 mt-6">
-        <button
-          onClick={handleSaveConfigs}
-          disabled={saving}
-          className={`flex-1 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
-            saving ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-        >
-          {saving ? 'Đang lưu...' : '💾 Lưu tất cả cấu hình'}
-        </button>
-        
-        <button
-          onClick={handleResetToDefault}
-          className="px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
-        >
-          🔄 Reset về mặc định
-        </button>
-      </div>
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button
+              onClick={handleSaveConfigs}
+              disabled={saving}
+              className="flex-1"
+              size="lg"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Đang lưu...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu tất cả cấu hình
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={handleResetToDefault}
+              variant="outline"
+              size="lg"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset về mặc định
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Ghi chú */}
-      <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 className="font-semibold text-yellow-800 mb-2">📝 Lưu ý:</h4>
-        <ul className="text-sm text-yellow-700 space-y-1">
-          <li>• <strong>Số ngày mặc định:</strong> Áp dụng cho tất cả tuần thông thường, cần "Lưu" để persist</li>
-          <li>• <strong>Số ngày tạm thời:</strong> Có thể áp dụng ngay lập tức mà không cần lưu trước</li>
-          <li>• <strong>Auto reset:</strong> Hệ thống tự động reset về mặc định vào 00:00 chủ nhật hàng tuần</li>
-          <li>• <strong>Giá trị hợp lệ:</strong> 1-7 ngày cho tất cả trường</li>
-        </ul>
-      </div>
+      <Card className="border-yellow-200 bg-yellow-50">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-yellow-800">
+            <AlertCircle className="w-5 h-5" />
+            <span>Lưu ý</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="text-sm text-yellow-700 space-y-1">
+            <li>• <strong>Số ngày mặc định:</strong> Áp dụng cho tất cả tuần thông thường, cần "Lưu" để persist</li>
+            <li>• <strong>Số ngày tạm thời:</strong> Có thể áp dụng ngay lập tức mà không cần lưu trước</li>
+            <li>• <strong>Auto reset:</strong> Hệ thống tự động reset về mặc định vào 00:00 chủ nhật hàng tuần</li>
+            <li>• <strong>Giá trị hợp lệ:</strong> 1-7 ngày cho tất cả trường</li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -1,6 +1,32 @@
 import React, { useContext, useState, useEffect, useCallback } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
-import { Menu, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from './ui/button';
+import { Card } from './ui/card';
+import { 
+  Home, 
+  Users, 
+  GraduationCap, 
+  BarChart3, 
+  Camera,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  User,
+  FileText,
+  ClipboardList,
+  Smile,
+  MessageCircle,
+  Calendar,
+  Building,
+  BookOpen,
+  PieChart,
+  Cog,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  School
+} from 'lucide-react';
 import api from '../services/api';
 
 const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selectedDashboardType, onDashboardSwitch }) => {
@@ -45,56 +71,70 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
     checkBothRoles();
   }, [user, checkBothRoles]);
 
+  // Icon mapping
+  const getIcon = (iconName) => {
+    const iconMap = {
+      'dashboard': Home,
+      'students': Users,
+      'attendance': ClipboardList,
+      'continuous': Camera,
+      'faces': Smile,
+      'feedback': MessageCircle,
+      'grades': FileText,
+      'school-config': Settings,
+      'class-management': School,
+      'admin-management': Cog,
+      'logout': LogOut,
+      'switch': RefreshCw
+    };
+    const IconComponent = iconMap[iconName] || Home;
+    return <IconComponent className="w-5 h-5" />;
+  };
+
   // Menu items based on selected dashboard type (ưu tiên selectedDashboardType hơn role functions)
   const getMenuItems = () => {
     const baseItems = [
-      { id: 'dashboard', label: 'Trang chủ', icon: '🏠' }
+      { id: 'dashboard', label: 'Trang chủ', icon: 'dashboard' }
     ];
 
     if (isAdmin()) {
       // Admin chỉ có các menu cấu hình và quản trị
       return [
-        ...baseItems,
-        // { id: 'students', label: 'Học sinh', icon: '👥' }, // Ẩn cho Admin
-        // { id: 'attendance', label: 'Điểm danh', icon: '📋' }, // Ẩn cho Admin
-        { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' }, // Ẩn cho Admin
-        // { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' }, // Ẩn cho Admin
-        // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
-        // { id: 'grades', label: 'Quản lý điểm', icon: '📝' }, // Ẩn cho Admin
-        { id: 'school-config', label: 'Cấu hình học tập', icon: '⚙️' },
-        { id: 'class-management', label: 'Quản trị lớp học', icon: '🎯' },
-        { id: 'admin-management', label: 'Quản trị hệ thống', icon: '🛠️' },
+        { id: 'dashboard', label: 'Dashboard Thống Kê', icon: 'dashboard' },
+        { id: 'continuous', label: 'Điểm danh tự động', icon: 'continuous' },
+        { id: 'school-config', label: 'Cấu hình học tập', icon: 'school-config' },
+        { id: 'class-management', label: 'Quản trị lớp học', icon: 'class-management' },
+        { id: 'admin-management', label: 'Quản trị hệ thống', icon: 'admin-management' },
+        { id: 'ui-demo', label: 'UI Demo', icon: 'dashboard' },
       ];
     } else if (selectedDashboardType === 'homeroom') {
       // Dashboard chủ nhiệm - chỉ hiển thị menu chủ nhiệm (không có quản lý điểm)
       return [
         ...baseItems,
-        { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: '👥' },
-        { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
-        // { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
-        { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
-        // { id: 'feedback', label: 'AI Nhận xét', icon: '💬' }, // Tạm ẩn AI Nhận xét
+        { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: 'students' },
+        { id: 'attendance', label: 'Điểm danh lớp', icon: 'attendance' },
+        { id: 'faces', label: 'Quản lý khuôn mặt', icon: 'faces' },
       ];
     } else if (selectedDashboardType === 'subject') {
       // Dashboard bộ môn - chỉ hiển thị menu bộ môn
       return [
-        { id: 'dashboard', label: 'Dashboard Phân Tích', icon: '📊' },
-        { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
+        { id: 'dashboard', label: 'Dashboard Phân Tích', icon: 'dashboard' },
+        { id: 'grades', label: 'Quản lý điểm', icon: 'grades' }
       ];
     } else {
       // Fallback: sử dụng role functions nếu chưa có selectedDashboardType
       if (isHomeroomTeacher()) {
         return [
           ...baseItems,
-          { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: '👥' },
-          { id: 'attendance', label: 'Điểm danh lớp', icon: '📋' },
-          { id: 'continuous', label: 'Điểm danh tự động', icon: '🎥' },
-          { id: 'faces', label: 'Quản lý khuôn mặt', icon: '🤖' },
+          { id: 'students', label: 'Học sinh lớp chủ nhiệm', icon: 'students' },
+          { id: 'attendance', label: 'Điểm danh lớp', icon: 'attendance' },
+          { id: 'continuous', label: 'Điểm danh tự động', icon: 'continuous' },
+          { id: 'faces', label: 'Quản lý khuôn mặt', icon: 'faces' },
         ];
       } else if (isSubjectTeacher()) {
         return [
-          { id: 'dashboard', label: 'Dashboard Phân Tích', icon: '📊' },
-          { id: 'grades', label: 'Quản lý điểm', icon: '📝' }
+          { id: 'dashboard', label: 'Dashboard Phân Tích', icon: 'dashboard' },
+          { id: 'grades', label: 'Quản lý điểm', icon: 'grades' }
         ];
       } else {
         return baseItems;
@@ -137,29 +177,32 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
       )}
       
       {/* Sidebar */}
-      <div className={`
-        fixed top-0 left-0 h-full bg-white shadow-xl z-50 transition-all duration-300 ease-in-out
+      <Card className={`
+        fixed top-0 left-0 h-full bg-white shadow-xl z-50 transition-all duration-300 ease-in-out border-0 rounded-none
         ${isOpen ? 'w-64' : 'w-16'}
         ${!isOpen ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'}
       `}>
         
         {/* Header */}
-        <div className="flex justify-between items-center p-4 text-white bg-blue-600 border-b border-gray-200">
+        <div className="flex justify-between items-center p-4 bg-blue-600 text-white">
           {isOpen && (
-            <div className="flex items-center">
+            <div className="flex items-center space-x-2">
+              <School className="w-6 h-6" />
               <h1 className="text-lg font-bold">SynapseS</h1>
             </div>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleSidebar}
-            className="p-2 rounded-lg transition-colors hover:bg-blue-700"
+            className="text-white hover:bg-blue-700"
           >
             {isOpen ? (
               <ChevronLeft className="w-5 h-5" />
             ) : (
               <ChevronRight className="w-5 h-5" />
             )}
-          </button>
+          </Button>
         </div>
 
         {/* User Info */}
@@ -197,11 +240,12 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         {/* Navigation */}
         <nav className="overflow-y-auto flex-1 px-2 py-4 space-y-1">
           {menuItems.map((item) => (
-            <button
+            <Button
               key={item.id}
+              variant={currentView === item.id ? "secondary" : "ghost"}
               onClick={() => handleMenuClick(item.id)}
               className={`
-                w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
+                w-full justify-start h-10 px-3 text-sm font-medium
                 ${currentView === item.id
                   ? 'bg-blue-100 text-blue-900 border-r-2 border-blue-600'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -210,17 +254,18 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
               `}
               title={!isOpen ? item.label : ''}
             >
-              <span className="text-lg">{item.icon}</span>
+              {getIcon(item.icon)}
               {isOpen && (
                 <span className="ml-3 truncate">{item.label}</span>
               )}
-            </button>
+            </Button>
           ))}
 
           {/* Dashboard Switch Button - Only show if user has both roles AND not admin */}
           {hasBothRoles && onDashboardSwitch && !isAdmin() && (
             <div className="pt-4 mt-4 border-t border-gray-200">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => {
                   onDashboardSwitch();
                   if (window.innerWidth < 1024) {
@@ -228,52 +273,54 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
                   }
                 }}
                 className={`
-                  w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
-                  bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 hover:from-purple-200 hover:to-pink-200
+                  w-full justify-start h-10 px-3 text-sm font-medium
+                  bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-800
                   ${!isOpen && 'justify-center px-2'}
                 `}
                 title={!isOpen ? 'Đổi Dashboard' : ''}
               >
-                <span className="text-lg">🔄</span>
+                {getIcon('switch')}
                 {isOpen && (
                   <span className="ml-3 truncate">
                     {selectedDashboardType === 'homeroom' ? 'Chuyển sang Bộ môn' : 'Chuyển sang Chủ nhiệm'}
                   </span>
                 )}
-              </button>
+              </Button>
             </div>
           )}
         </nav>
 
         {/* Logout */}
         <div className="p-4 border-t border-gray-200">
-          <button
+          <Button
+            variant="ghost"
             onClick={handleLogout}
             className={`
-              w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors
+              w-full justify-start h-10 px-3 text-sm font-medium text-red-600 hover:bg-red-50
               ${!isOpen && 'justify-center px-2'}
             `}
             title={!isOpen ? 'Đăng xuất' : ''}
           >
-            <span className="text-lg">🚪</span>
+            {getIcon('logout')}
             {isOpen && (
               <span className="ml-3">Đăng xuất</span>
             )}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* Mobile toggle button */}
       {!isOpen && (
-        <button
+        <Button
+          size="icon"
           onClick={() => setIsOpen(true)}
-          className="fixed top-4 left-4 z-30 p-2 text-white bg-blue-600 rounded-lg shadow-lg transition-colors lg:hidden hover:bg-blue-700"
+          className="fixed top-4 left-4 z-30 bg-blue-600 hover:bg-blue-700 text-white shadow-lg lg:hidden"
         >
           <Menu className="w-5 h-5" />
-        </button>
+        </Button>
       )}
     </>
   );
 };
 
-export default Sidebar; 
+export default Sidebar;

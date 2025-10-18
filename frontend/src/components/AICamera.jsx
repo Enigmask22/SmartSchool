@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ApiService from '../services/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 
 const AICamera = () => {
   const videoRef = useRef(null);
@@ -146,212 +149,231 @@ const AICamera = () => {
   return (
     <div className="ai-camera">
       <div className="mb-8">
-        <h2 className="mb-2 text-3xl font-bold text-gray-800">AI Camera</h2>
-        <p className="text-gray-600">Điểm danh tự động bằng nhận diện khuôn mặt</p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold">AI Camera</CardTitle>
+            <CardDescription>Điểm danh tự động bằng nhận diện khuôn mặt</CardDescription>
+            {error && (
+              <div className="p-3 mt-2 text-destructive bg-destructive/10 rounded border border-destructive/20">
+                {error}
+              </div>
+            )}
+          </CardHeader>
+        </Card>
       </div>
-
-      {error && (
-        <div className="p-3 mb-4 text-red-700 bg-red-100 rounded border border-red-400">
-          {error}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Camera Section */}
-        <div className="p-6 bg-white rounded-lg shadow-md">
-          <h3 className="mb-4 text-xl font-semibold">Camera</h3>
-          
-          <div className="overflow-hidden relative bg-gray-800 rounded-lg" style={{ aspectRatio: '4/3' }}>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="object-cover w-full h-full"
-              style={{ display: isStreamActive ? 'block' : 'none' }}
-            />
-            
-            {!isStreamActive && (
-              <div className="flex absolute inset-0 justify-center items-center text-white">
-                <div className="text-center">
-                  <span className="block mb-4 text-6xl">📷</span>
-                  <p>Camera chưa được bật</p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Camera</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-hidden relative bg-muted rounded-lg" style={{ aspectRatio: '4/3' }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="object-cover w-full h-full"
+                style={{ display: isStreamActive ? 'block' : 'none' }}
+              />
+              
+              {!isStreamActive && (
+                <div className="flex absolute inset-0 justify-center items-center text-muted-foreground">
+                  <div className="text-center">
+                    <span className="block mb-4 text-6xl">📷</span>
+                    <p>Camera chưa được bật</p>
+                  </div>
                 </div>
-              </div>
-            )}
-            
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-          </div>
-
-          <div className="mt-4 space-y-2">
-            <div className="flex gap-2">
-              {!isStreamActive ? (
-                <button
-                  onClick={startCamera}
-                  className="flex-1 px-4 py-2 text-white bg-blue-600 rounded transition-colors hover:bg-blue-700"
-                >
-                  📷 Bật Camera
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={captureAndRecognize}
-                    disabled={isProcessing}
-                    className="flex-1 px-4 py-2 text-white bg-green-600 rounded transition-colors hover:bg-green-700 disabled:bg-gray-400"
-                  >
-                    {isProcessing ? '⏳ Đang xử lý...' : '🎯 Chụp & Nhận diện'}
-                  </button>
-                  <button
-                    onClick={stopCamera}
-                    className="px-4 py-2 text-white bg-red-600 rounded transition-colors hover:bg-red-700"
-                  >
-                    ❌ Tắt Camera
-                  </button>
-                </>
               )}
+              
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
             </div>
-            
-            {/* Demo Mode - Upload Image */}
-            {(demoMode || !isStreamActive) && (
-              <div className="pt-2 border-t border-gray-200">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={uploadImageForRecognition}
-                  disabled={isProcessing}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isProcessing}
-                  className="px-4 py-2 w-full text-white bg-purple-600 rounded transition-colors hover:bg-purple-700 disabled:bg-gray-400"
-                >
-                  {isProcessing ? '⏳ Đang xử lý...' : '📁 Upload ảnh để test (Demo)'}
-                </button>
-                <p className="mt-1 text-xs text-center text-gray-500">
-                  Hỗ trợ: JPG, PNG, WebP
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Results Section */}
-        <div className="p-6 bg-white rounded-lg shadow-md">
-          <h3 className="mb-4 text-xl font-semibold">Kết quả nhận diện</h3>
-          
-          {!lastRecognition ? (
-            <div className="py-8 text-center text-gray-500">
-              <span className="block mb-2 text-4xl">🔍</span>
-              <p>Chưa có kết quả nhận diện</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {lastRecognition.recognized ? (
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center mb-2">
-                    <span className="mr-2 text-xl text-green-600">✅</span>
-                    <span className="font-semibold text-green-800">Nhận diện thành công</span>
-                  </div>
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <p><strong>Tên:</strong> {lastRecognition.student?.full_name}</p>
-                    <p><strong>Mã HS:</strong> {lastRecognition.student?.student_id}</p>
-                    <p><strong>Lớp:</strong> {lastRecognition.student?.class_name}</p>
-                    <p><strong>Độ chính xác:</strong> {lastRecognition.confidence}%</p>
-                    <p><strong>Thời gian:</strong> {new Date().toLocaleString('vi-VN')}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <div className="flex items-center mb-2">
-                    <span className="mr-2 text-xl text-yellow-600">❓</span>
-                    <span className="font-semibold text-yellow-800">Không nhận diện được</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Không tìm thấy khuôn mặt đã đăng ký trong hệ thống
+            <div className="mt-4 space-y-2">
+              <div className="flex gap-2">
+                {!isStreamActive ? (
+                  <Button
+                    onClick={startCamera}
+                    className="flex-1"
+                  >
+                    📷 Bật Camera
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={captureAndRecognize}
+                      disabled={isProcessing}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                    >
+                      {isProcessing ? '⏳ Đang xử lý...' : '🎯 Chụp & Nhận diện'}
+                    </Button>
+                    <Button
+                      onClick={stopCamera}
+                      variant="destructive"
+                    >
+                      ❌ Tắt Camera
+                    </Button>
+                  </>
+                )}
+              </div>
+              
+              {/* Demo Mode - Upload Image */}
+              {(demoMode || !isStreamActive) && (
+                <div className="pt-2 border-t">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={uploadImageForRecognition}
+                    disabled={isProcessing}
+                    className="hidden"
+                  />
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isProcessing}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {isProcessing ? '⏳ Đang xử lý...' : '📁 Upload ảnh để test (Demo)'}
+                  </Button>
+                  <p className="mt-1 text-xs text-center text-muted-foreground">
+                    Hỗ trợ: JPG, PNG, WebP
                   </p>
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
+
+        {/* Results Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Kết quả nhận diện</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!lastRecognition ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <span className="block mb-2 text-4xl">🔍</span>
+                <p>Chưa có kết quả nhận diện</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {lastRecognition.recognized ? (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center mb-2">
+                      <span className="mr-2 text-xl text-green-600">✅</span>
+                      <span className="font-semibold text-green-800">Nhận diện thành công</span>
+                    </div>
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <p><strong>Tên:</strong> {lastRecognition.student?.full_name}</p>
+                      <p><strong>Mã HS:</strong> {lastRecognition.student?.student_id}</p>
+                      <p><strong>Lớp:</strong> {lastRecognition.student?.class_name}</p>
+                      <p><strong>Độ chính xác:</strong> {lastRecognition.confidence}%</p>
+                      <p><strong>Thời gian:</strong> {new Date().toLocaleString('vi-VN')}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="flex items-center mb-2">
+                      <span className="mr-2 text-xl text-yellow-600">❓</span>
+                      <span className="font-semibold text-yellow-800">Không nhận diện được</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Không tìm thấy khuôn mặt đã đăng ký trong hệ thống
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="p-4 mt-4 bg-gray-50 rounded-lg border">
-          <h4 className="mb-3 font-semibold text-gray-800">⚙️ Cài đặt Camera</h4>
-          <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
-            <div>
-              <label className="block mb-1 text-gray-700">Độ phân giải:</label>
-              <select 
-                value={`${cameraSettings.width}x${cameraSettings.height}`}
-                onChange={(e) => {
-                  const [width, height] = e.target.value.split('x').map(Number);
-                  setCameraSettings(prev => ({...prev, width, height}));
-                }}
-                className="px-2 py-1 w-full rounded border"
-              >
-                <option value="640x480">640x480 (Thấp)</option>
-                <option value="1280x720">1280x720 (HD)</option>
-                <option value="1920x1080">1920x1080 (Full HD)</option>
-              </select>
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="text-lg">⚙️ Cài đặt Camera</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
+              <div>
+                <label className="block mb-1 text-sm font-medium">Độ phân giải:</label>
+                <select 
+                  value={`${cameraSettings.width}x${cameraSettings.height}`}
+                  onChange={(e) => {
+                    const [width, height] = e.target.value.split('x').map(Number);
+                    setCameraSettings(prev => ({...prev, width, height}));
+                  }}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="640x480">640x480 (Thấp)</option>
+                  <option value="1280x720">1280x720 (HD)</option>
+                  <option value="1920x1080">1920x1080 (Full HD)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 text-sm font-medium">Camera:</label>
+                <select 
+                  value={cameraSettings.facingMode}
+                  onChange={(e) => setCameraSettings(prev => ({...prev, facingMode: e.target.value}))}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="user">Camera trước</option>
+                  <option value="environment">Camera sau</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  onClick={() => {
+                    if (isStreamActive) {
+                      stopCamera();
+                      setTimeout(startCamera, 500);
+                    }
+                  }}
+                  className="w-full"
+                >
+                  🔄 Áp dụng
+                </Button>
+              </div>
             </div>
-            <div>
-              <label className="block mb-1 text-gray-700">Camera:</label>
-              <select 
-                value={cameraSettings.facingMode}
-                onChange={(e) => setCameraSettings(prev => ({...prev, facingMode: e.target.value}))}
-                className="px-2 py-1 w-full rounded border"
-              >
-                <option value="user">Camera trước</option>
-                <option value="environment">Camera sau</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={() => {
-                  if (isStreamActive) {
-                    stopCamera();
-                    setTimeout(startCamera, 500);
-                  }
-                }}
-                className="px-3 py-1 w-full text-white bg-gray-600 rounded transition-colors hover:bg-gray-700"
-              >
-                🔄 Áp dụng
-              </button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Instructions */}
-      <div className="p-4 mt-6 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex justify-between items-center mb-2">
-          <h4 className="font-semibold text-blue-800">Hướng dẫn sử dụng:</h4>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="text-blue-600 transition-colors hover:text-blue-800"
-          >
-            ⚙️ Cài đặt
-          </button>
-        </div>
-        <ul className="space-y-1 text-sm text-blue-700">
-          <li>1. Nhấn "Bật Camera" để kích hoạt camera</li>
-          <li>2. Đưa khuôn mặt vào vùng camera, đảm bảo ánh sáng đủ</li>
-          <li>3. Nhấn "Chụp & Nhận diện" để thực hiện điểm danh</li>
-          <li>4. Hệ thống sẽ tự động đánh dấu điểm danh nếu nhận diện thành công</li>
-        </ul>
-        <div className="pt-3 mt-3 border-t border-blue-200">
-          <p className="text-xs text-blue-600">
-            💡 <strong>Mẹo:</strong> Nếu không nhận diện được, thử điều chỉnh góc độ, ánh sáng hoặc biểu cảm tự nhiên hơn.
-            Hệ thống đã được tối ưu để nhận diện linh hoạt với các thay đổi nhỏ về góc chụp và biểu cảm.
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            🎯 <strong>Production:</strong> Với camera thật, độ chính xác sẽ cao hơn nhờ chất lượng ảnh tốt và góc chụp cố định.
-          </p>
-        </div>
-      </div>
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-blue-800">Hướng dẫn sử dụng:</CardTitle>
+            <Button
+              variant="ghost"
+              onClick={() => setShowSettings(!showSettings)}
+              className="text-blue-600 hover:text-blue-800"
+            >
+              ⚙️ Cài đặt
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-1 text-sm text-blue-700">
+            <li>1. Nhấn "Bật Camera" để kích hoạt camera</li>
+            <li>2. Đưa khuôn mặt vào vùng camera, đảm bảo ánh sáng đủ</li>
+            <li>3. Nhấn "Chụp & Nhận diện" để thực hiện điểm danh</li>
+            <li>4. Hệ thống sẽ tự động đánh dấu điểm danh nếu nhận diện thành công</li>
+          </ul>
+          <div className="pt-3 mt-3 border-t">
+            <p className="text-xs text-blue-600">
+              💡 <strong>Mẹo:</strong> Nếu không nhận diện được, thử điều chỉnh góc độ, ánh sáng hoặc biểu cảm tự nhiên hơn.
+              Hệ thống đã được tối ưu để nhận diện linh hoạt với các thay đổi nhỏ về góc chụp và biểu cảm.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              🎯 <strong>Production:</strong> Với camera thật, độ chính xác sẽ cao hơn nhờ chất lượng ảnh tốt và góc chụp cố định.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

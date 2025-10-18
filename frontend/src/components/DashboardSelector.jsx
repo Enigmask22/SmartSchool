@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { GraduationCap, Users, Loader2, ArrowRight } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
 import api from '../services/api';
 
 const DashboardSelector = ({ onSelectDashboard }) => {
@@ -47,11 +50,13 @@ const DashboardSelector = ({ onSelectDashboard }) => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <div className="spinner-dual">
-          <div className="spinner-primary"></div>
-          <div className="spinner-secondary"></div>
-        </div>
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <Card className="w-96">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-primary" />
+            <p className="text-lg text-muted-foreground">Đang kiểm tra quyền truy cập...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -69,133 +74,137 @@ const DashboardSelector = ({ onSelectDashboard }) => {
 
   // Nếu có cả 2 role, hiển thị lựa chọn
   return (
-    <div className="flex justify-center items-center p-6 min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="flex justify-center items-center p-6 min-h-screen bg-gray-50">
       <div className="w-full max-w-4xl">
         {/* Header */}
-        <div className="mb-12 text-center">
-          <div className="inline-flex justify-center items-center mb-6 w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shadow-lg">
-            <span className="text-4xl">🎯</span>
-          </div>
-          <h1 className="mb-3 text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
-            Chọn Dashboard
-          </h1>
-          <p className="text-lg text-gray-600">
-            Bạn vừa là Giáo viên chủ nhiệm vừa là Giáo viên bộ môn
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            Vui lòng chọn dashboard bạn muốn xem
-          </p>
-        </div>
+        <Card className="mb-8">
+          <CardContent className="p-8 text-center">
+            <div className="inline-flex justify-center items-center mb-6 w-20 h-20 bg-primary rounded-full shadow-lg">
+              <GraduationCap className="w-10 h-10 text-primary-foreground" />
+            </div>
+            <CardTitle className="mb-3 text-4xl font-bold text-primary">
+              Chọn Dashboard
+            </CardTitle>
+            <CardDescription className="text-lg">
+              Bạn vừa là Giáo viên chủ nhiệm vừa là Giáo viên bộ môn
+            </CardDescription>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Vui lòng chọn dashboard bạn muốn xem
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Dashboard Options */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Homeroom Teacher Dashboard */}
           {hasHomeroomRole && (
-            <div
+            <Card
               onClick={() => handleSelectDashboard('homeroom')}
-              className="overflow-hidden bg-white rounded-2xl border-2 border-transparent shadow-lg transition-all duration-300 transform cursor-pointer group hover:shadow-2xl hover:scale-105 hover:border-blue-500"
+              className="overflow-hidden cursor-pointer group hover:shadow-xl hover:scale-105 transition-all duration-300"
             >
-              <div className="p-6 text-white bg-gradient-to-br from-blue-500 to-blue-600">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex justify-center items-center w-14 h-14 bg-white bg-opacity-20 rounded-xl">
-                    <span className="text-3xl">🏠</span>
+              <CardHeader className="bg-primary text-primary-foreground">
+                <div className="flex justify-between items-center">
+                  <div className="flex justify-center items-center w-14 h-14 bg-primary-foreground/20 rounded-xl">
+                    <Users className="w-8 h-8 text-primary-foreground" />
                   </div>
-                  <div className="flex justify-center items-center w-8 h-8 bg-white bg-opacity-20 rounded-full transition-all group-hover:bg-opacity-30">
-                    <span className="text-xl text-white">→</span>
+                  <div className="flex justify-center items-center w-8 h-8 bg-primary-foreground/20 rounded-full transition-all group-hover:bg-primary-foreground/30">
+                    <ArrowRight className="w-5 h-5 text-primary-foreground" />
                   </div>
                 </div>
-                <h3 className="mb-2 text-2xl font-bold">Dashboard Chủ Nhiệm</h3>
-                <p className="text-sm text-blue-100">
+                <CardTitle className="text-2xl font-bold text-primary-foreground">Dashboard Chủ Nhiệm</CardTitle>
+                <CardDescription className="text-primary-foreground/80">
                   Quản lý lớp chủ nhiệm của bạn
-                </p>
-              </div>
+                </CardDescription>
+              </CardHeader>
               
-              <div className="p-6">
+              <CardContent className="p-6">
                 <ul className="space-y-3">
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">Theo dõi điểm danh học sinh</span>
                   </li>
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">Quản lý thông tin học sinh</span>
                   </li>
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">Thống kê chuyên cần theo tuần</span>
                   </li>
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">Quản lý khuôn mặt AI</span>
                   </li>
                 </ul>
-              </div>
+              </CardContent>
 
               <div className="px-6 pb-6">
-                <button className="px-6 py-3 w-full font-semibold text-white bg-blue-500 rounded-lg shadow-md transition-colors duration-200 hover:bg-blue-600 hover:shadow-lg">
+                <Button className="w-full">
                   Chọn Dashboard Chủ Nhiệm
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           )}
 
           {/* Subject Teacher Dashboard */}
           {hasSubjectRole && (
-            <div
+            <Card
               onClick={() => handleSelectDashboard('subject')}
-              className="overflow-hidden bg-white rounded-2xl border-2 border-transparent shadow-lg transition-all duration-300 transform cursor-pointer group hover:shadow-2xl hover:scale-105 hover:border-purple-500"
+              className="overflow-hidden cursor-pointer group hover:shadow-xl hover:scale-105 transition-all duration-300"
             >
-              <div className="p-6 text-white bg-gradient-to-br from-purple-500 to-pink-500">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex justify-center items-center w-14 h-14 bg-white bg-opacity-20 rounded-xl">
-                    <span className="text-3xl">📊</span>
+              <CardHeader className="bg-purple-600 text-white">
+                <div className="flex justify-between items-center">
+                  <div className="flex justify-center items-center w-14 h-14 bg-white/20 rounded-xl">
+                    <GraduationCap className="w-8 h-8 text-white" />
                   </div>
-                  <div className="flex justify-center items-center w-8 h-8 bg-white bg-opacity-20 rounded-full transition-all group-hover:bg-opacity-30">
-                    <span className="text-xl text-white">→</span>
+                  <div className="flex justify-center items-center w-8 h-8 bg-white/20 rounded-full transition-all group-hover:bg-white/30">
+                    <ArrowRight className="w-5 h-5 text-white" />
                   </div>
                 </div>
-                <h3 className="mb-2 text-2xl font-bold">Dashboard Bộ Môn</h3>
-                <p className="text-sm text-purple-100">
+                <CardTitle className="text-2xl font-bold text-white">Dashboard Bộ Môn</CardTitle>
+                <CardDescription className="text-white/80">
                   Phân tích điểm số các lớp bạn dạy
-                </p>
-              </div>
+                </CardDescription>
+              </CardHeader>
               
-              <div className="p-6">
+              <CardContent className="p-6">
                 <ul className="space-y-3">
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">Phân tích điểm số chuyên sâu</span>
                   </li>
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">Phân nhóm học lực chi tiết</span>
                   </li>
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">Học sinh cần quan tâm</span>
                   </li>
-                  <li className="flex items-center text-gray-700">
+                  <li className="flex items-center text-muted-foreground">
                     <span className="mr-2 text-green-500">✓</span>
                     <span className="text-sm">So sánh giữa các lớp</span>
                   </li>
                 </ul>
-              </div>
+              </CardContent>
 
               <div className="px-6 pb-6">
-                <button className="px-6 py-3 w-full font-semibold text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md transition-all duration-200 hover:from-purple-600 hover:to-pink-600 hover:shadow-lg">
+                <Button className="w-full bg-purple-600 hover:bg-purple-700">
                   Chọn Dashboard Bộ Môn
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           )}
         </div>
 
         {/* Footer Note */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
-            💡 <span className="font-medium">Lưu ý:</span> Bạn có thể chuyển đổi giữa các dashboard bất cứ lúc nào thông qua menu bên trái
-          </p>
-        </div>
+        <Card className="mt-8">
+          <CardContent className="p-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              💡 <span className="font-medium">Lưu ý:</span> Bạn có thể chuyển đổi giữa các dashboard bất cứ lúc nào thông qua menu bên trái
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

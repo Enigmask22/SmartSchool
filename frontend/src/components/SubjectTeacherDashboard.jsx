@@ -70,13 +70,13 @@ const SubjectTeacherDashboard = () => {
   const COLORS = ['#059669', '#2563EB', '#D97706', '#EA580C', '#DC2626'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header Card */}
         <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-600">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center shadow-lg">
                 <span className="text-3xl">📊</span>
               </div>
               <div>
@@ -301,7 +301,7 @@ const SubjectTeacherDashboard = () => {
                 </BarChart>
               </ResponsiveContainer>
               
-              <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-slate-50 rounded-lg border border-blue-200">
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-xs text-gray-600 mb-1">Điểm cao nhất</p>
@@ -323,7 +323,7 @@ const SubjectTeacherDashboard = () => {
 
         {selectedTab === 'attention' && (
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-red-500 to-pink-500 px-6 py-4">
+            <div className="bg-destructive px-6 py-4">
               <h3 className="text-xl font-bold text-white flex items-center">
                 <span className="mr-2">⚠️</span>
                 Học sinh cần quan tâm ({analytics.students_need_attention?.length || 0} học sinh)
@@ -399,7 +399,7 @@ const SubjectTeacherDashboard = () => {
 
         {selectedTab === 'top' && (
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-green-500 to-blue-500 px-6 py-4">
+            <div className="bg-primary px-6 py-4">
               <h3 className="text-xl font-bold text-white flex items-center">
                 <span className="mr-2">🏆</span>
                 Top học sinh xuất sắc ({analytics.top_students?.length || 0} học sinh)
@@ -444,7 +444,7 @@ const SubjectTeacherDashboard = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="px-4 py-2 inline-flex text-lg leading-5 font-bold rounded-full bg-gradient-to-r from-green-400 to-blue-500 text-white shadow-md">
+                          <span className="px-4 py-2 inline-flex text-lg leading-5 font-bold rounded-full bg-primary text-primary-foreground shadow-md">
                             {student.final_grade || 0}
                           </span>
                         </td>
@@ -470,7 +470,7 @@ const SubjectTeacherDashboard = () => {
 
         {selectedTab === 'comparison' && (
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-6 py-4">
+            <div className="bg-primary px-6 py-4">
               <h3 className="text-xl font-bold text-white flex items-center">
                 <span className="mr-2">📉</span>
                 So sánh kết quả giữa các lớp
@@ -523,7 +523,7 @@ const SubjectTeacherDashboard = () => {
                           <div className="flex items-center justify-center space-x-2">
                             <div className="w-20 bg-gray-200 rounded-full h-2">
                               <div
-                                className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full"
+                                className="bg-primary h-2 rounded-full"
                                 style={{ width: `${classData.pass_rate}%` }}
                               ></div>
                             </div>

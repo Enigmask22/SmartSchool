@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Upload, FileText, Download } from 'lucide-react';
+import { Plus, Upload, Download, Users, GraduationCap, UserCheck, AlertCircle, Loader2, Trash2, Edit, RefreshCw, Search } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Label } from './ui/label';
 import api from '../services/api';
 import * as XLSX from 'xlsx';
 
@@ -10,6 +17,14 @@ const ClassManagement = () => {
   const [classStudents, setClassStudents] = useState([]);
   const [homeroomTeacher, setHomeroomTeacher] = useState(null);
   const [loadingClassData, setLoadingClassData] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Edit student states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
   
   // States cho thêm học sinh
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
@@ -476,37 +491,171 @@ const ClassManagement = () => {
     }
   }, [selectedClassForManagement, loadClassStudents]);
 
-  // Pagination logic
-  const totalStudents = classStudents.length;
+  // Reset trang khi search
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Hàm xử lý xóa học sinh
+  const handleDeleteStudent = async (studentId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa học sinh này?')) {
+      try {
+        const response = await api.deleteStudent(studentId);
+        if (response.success) {
+          alert('Xóa học sinh thành công!');
+          loadClassStudents(); // Reload danh sách học sinh
+        } else {
+          alert(`Lỗi: ${response.message || 'Không thể xóa học sinh'}`);
+        }
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        alert('Có lỗi xảy ra khi xóa học sinh: ' + error.message);
+      }
+    }
+  };
+
+  // Hàm xử lý sửa học sinh
+  const handleEditStudent = (student) => {
+    setSelectedStudentForEdit(student);
+    setEditForm({
+      full_name: student.full_name || '',
+      email: student.email || '',
+      phone: student.phone || '',
+      class_name: student.class_name || '',
+      grade: student.grade || '',
+      date_of_birth: student.date_of_birth || '',
+      address: student.address || '',
+      parent_name: student.parent_name || '',
+      parent_phone: student.parent_phone || '',
+      gender: student.gender || 'Nam'
+    });
+    setShowEditModal(true);
+  };
+
+  // Hàm xử lý khôi phục học sinh
+  const handleRestore = async (student) => {
+    console.log('Restore button clicked for student:', student);
+    
+    if (window.confirm(`Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`)) {
+      setRestoreLoading(true);
+      try {
+        console.log('Sending restore request for student ID:', student.id);
+        const response = await api.restoreStudent(student.id);
+        console.log('Restore response:', response);
+        
+        if (response.success) {
+          alert('Khôi phục học sinh thành công!');
+          loadClassStudents(); // Refresh danh sách học sinh
+        } else {
+          alert(`Lỗi: ${response.message || 'Không thể khôi phục học sinh'}`);
+        }
+      } catch (error) {
+        console.error('Error restoring student:', error);
+        alert('Có lỗi xảy ra khi khôi phục học sinh: ' + error.message);
+      } finally {
+        setRestoreLoading(false);
+      }
+    }
+  };
+
+  // Hàm xử lý thay đổi form edit
+  const handleEditFormChange = (field, value) => {
+    setEditForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Hàm submit edit form
+  const submitEditForm = async () => {
+    if (!selectedStudentForEdit || !editForm.full_name.trim()) {
+      alert('Vui lòng nhập đầy đủ thông tin bắt buộc');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      console.log('Updating student:', selectedStudentForEdit.id, editForm);
+      const response = await api.updateStudent(selectedStudentForEdit.id, editForm);
+      console.log('Update response:', response);
+      
+      if (response.success) {
+        alert('Cập nhật thông tin học sinh thành công!');
+        
+        // Fetch students để cập nhật danh sách
+        await loadClassStudents();
+        
+        // Đóng modal sau khi đã fetch xong
+        setShowEditModal(false);
+        setSelectedStudentForEdit(null);
+        setEditForm({});
+      } else {
+        alert(`Lỗi: ${response.message || 'Không thể cập nhật thông tin học sinh'}`);
+      }
+    } catch (error) {
+      console.error('Error updating student:', error);
+      alert('Có lỗi xảy ra khi cập nhật thông tin học sinh');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Hàm đóng edit modal
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setSelectedStudentForEdit(null);
+    setEditForm({});
+  };
+
+  // Filter and pagination logic
+  const filteredStudents = classStudents.filter(student => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      student.full_name?.toLowerCase().includes(searchLower) ||
+      student.student_id?.toLowerCase().includes(searchLower) ||
+      student.class_name?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const totalStudents = filteredStudents.length;
   const totalPages = Math.ceil(totalStudents / classManagementPageSize);
   const startIndex = (currentPage - 1) * classManagementPageSize;
   const endIndex = startIndex + classManagementPageSize;
-  const paginatedStudents = classStudents.slice(startIndex, endIndex);
+  const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
 
   return (
-    <div className="p-6 min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="p-6 space-y-6 min-h-screen bg-gray-50">
       {/* Header Section */}
-      <div className="mb-8">
-        <div className="p-6 bg-white rounded-xl border border-blue-100 shadow-lg">
-          <h1 className="mb-2 text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-            Quản trị lớp học
-          </h1>
-          <p className="text-lg text-gray-600">Quản lý học sinh và lớp học trong hệ thống</p>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-3">
+            <GraduationCap className="w-8 h-8 text-primary" />
+            <span className="text-3xl font-bold">Quản trị lớp học</span>
+          </CardTitle>
+          <CardDescription className="text-lg">
+            Quản lý học sinh và lớp học trong hệ thống
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {/* Class Filter */}
-      <div className="mb-6">
-        <div className="p-6 bg-white rounded-xl border border-gray-100 shadow-lg">
-          <h3 className="mb-4 text-lg font-semibold text-gray-800">Bộ lọc lớp học</h3>
-          <div className="flex flex-wrap gap-6 items-center">
+      <Card>
+        <CardHeader>
+          <CardTitle>Bộ lọc lớp học</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-6 items-start sm:flex-row sm:items-end">
             {/* Class Selection */}
-            <div className="flex flex-col">
-              <label className="mb-2 text-sm font-medium text-gray-700">Chọn lớp học</label>
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="class-select" className="text-sm font-medium">
+                Chọn lớp học
+              </Label>
               <select
+                id="class-select"
                 value={selectedClassForManagement}
                 onChange={(e) => setSelectedClassForManagement(e.target.value)}
-                className="px-4 py-3 w-64 rounded-lg border-2 border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-4 py-3 w-full rounded-lg border sm:w-64 border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
               >
                 <option value="">Chọn lớp học</option>
                 {classes.map(cls => (
@@ -518,367 +667,767 @@ const ClassManagement = () => {
             </div>
 
             {/* Show Inactive Students */}
-            <div className="flex items-end">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showInactiveStudents}
-                  onChange={(e) => setShowInactiveStudents(e.target.checked)}
-                  className="w-5 h-5 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500 focus:ring-2"
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  Hiển thị học sinh đã xóa
-                </span>
-              </label>
+            <div className="flex items-center mt-2 space-x-2 sm:mt-0">
+              <input
+                type="checkbox"
+                id="show-inactive"
+                checked={showInactiveStudents}
+                onChange={(e) => setShowInactiveStudents(e.target.checked)}
+                className="w-4 h-4 rounded text-primary bg-background border-input focus:ring-2 focus:ring-ring"
+              />
+              <Label htmlFor="show-inactive" className="text-sm font-medium cursor-pointer">
+                Hiển thị học sinh đã xóa
+              </Label>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Homeroom Teacher Info */}
       {selectedClassForManagement && homeroomTeacher && (
-        <div className="mb-6">
-          <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 shadow-lg">
-            <h3 className="mb-2 text-lg font-semibold text-gray-800">Giáo viên chủ nhiệm</h3>
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <UserCheck className="w-5 h-5 text-primary" />
+              <span>Giáo viên chủ nhiệm</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="flex items-center space-x-4">
-              <div className="flex justify-center items-center w-12 h-12 bg-blue-500 rounded-full">
-                <span className="text-lg font-bold text-white">
+              <div className="flex justify-center items-center w-12 h-12 rounded-full bg-primary">
+                <span className="text-lg font-bold text-primary-foreground">
                   {homeroomTeacher.full_name?.charAt(0) || '?'}
                 </span>
               </div>
               <div>
-                <p className="font-semibold text-gray-900">
+                <p className="font-semibold text-foreground">
                   {homeroomTeacher.full_name || homeroomTeacher.name}
                 </p>
                 {homeroomTeacher.code && (
-                  <p className="text-sm text-gray-600">Mã GV: {homeroomTeacher.code}</p>
+                  <p className="text-sm text-muted-foreground">Mã GV: {homeroomTeacher.code}</p>
                 )}
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Students Table */}
       {selectedClassForManagement && (
-        <div className="overflow-hidden bg-white rounded-xl border border-gray-100 shadow-lg">
-          <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 border-b border-gray-200">
+        <Card>
+          <CardHeader>
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Danh sách học sinh ({classStudents.length} học sinh)
-              </h3>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={downloadStudentTemplate}
-                  className="flex items-center px-4 py-2 font-medium text-blue-600 bg-blue-50 rounded-lg shadow-sm transition-all duration-200 hover:bg-blue-100 hover:shadow-md"
-                >
-                  <Download className="mr-2 w-4 h-4" />
-                  Tải template
-                </button>
+              <div className="flex-1">
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5" />
+                  <span>Danh sách học sinh</span>
+                </CardTitle>
+                <CardDescription>
+                  {totalStudents} học sinh {searchTerm && `(tìm kiếm: "${searchTerm}")`}
+                </CardDescription>
                 
-                <label className="flex items-center px-4 py-2 font-medium text-purple-600 bg-purple-50 rounded-lg shadow-sm transition-all duration-200 cursor-pointer hover:bg-purple-100 hover:shadow-md">
-                  <Upload className="mr-2 w-4 h-4" />
-                  Nhập từ file
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-
-                <button
-                  onClick={() => setShowAddStudentModal(true)}
-                  className="flex items-center px-4 py-2 font-medium text-white bg-green-600 rounded-lg shadow-lg transition-all duration-200 transform hover:bg-green-700 hover:scale-105"
+                {/* Search Bar */}
+                <div className="mt-4 max-w-md">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 w-4 h-4 transform -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Tìm kiếm theo tên, mã học sinh hoặc lớp..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="py-2 pr-4 pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={downloadStudentTemplate}
+                  className="flex items-center space-x-2"
                 >
-                  <Plus className="mr-2 w-4 h-4" />
-                  Thêm học sinh
-                </button>
+                  <Download className="w-4 h-4" />
+                  <span>Tải template</span>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  asChild
+                  className="flex items-center space-x-2"
+                >
+                  <label className="cursor-pointer">
+                    <Upload className="w-4 h-4" />
+                    <span>Nhập từ file</span>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </Button>
+
+                <Button
+                  onClick={() => setShowAddStudentModal(true)}
+                  className="flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Thêm học sinh</span>
+                </Button>
               </div>
             </div>
-          </div>
+          </CardHeader>
 
-          <div className="overflow-x-auto">
+          <CardContent>
             {loadingClassData ? (
               <div className="py-12 text-center">
-                <div className="mx-auto w-8 h-8 rounded-full border-4 border-blue-200 animate-spin border-t-blue-600"></div>
-                <p className="mt-4 font-medium text-gray-600">Đang tải dữ liệu...</p>
+                <Loader2 className="mx-auto w-8 h-8 animate-spin text-primary" />
+                <p className="mt-4 font-medium text-muted-foreground">Đang tải dữ liệu...</p>
               </div>
             ) : error ? (
               <div className="py-12 text-center">
-                <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full">
-                  <span className="text-2xl text-red-500">⚠️</span>
+                <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10">
+                  <AlertCircle className="w-8 h-8 text-destructive" />
                 </div>
-                <p className="mb-4 font-medium text-red-600">{error}</p>
-                <button
-                  onClick={loadClassStudents}
-                  className="px-6 py-3 font-medium text-white bg-blue-500 rounded-lg transition-colors duration-200 hover:bg-blue-600"
-                >
+                <p className="mb-4 font-medium text-destructive">{error}</p>
+                <Button onClick={loadClassStudents}>
                   Thử lại
-                </button>
+                </Button>
               </div>
             ) : paginatedStudents.length === 0 ? (
               <div className="py-12 text-center">
-                <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-gray-100 rounded-full">
-                  <span className="text-2xl text-gray-400">👥</span>
+                <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-muted">
+                  <Users className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <p className="font-medium text-gray-500">Chưa có học sinh nào trong lớp này</p>
+                <p className="font-medium text-muted-foreground">Chưa có học sinh nào trong lớp này</p>
               </div>
             ) : (
               <>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
-                    <tr>
-                      <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                        MÃ HS
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                        HỌ TÊN
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                        LỚP
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                        TRẠNG THÁI KHUÔN MẶT
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {paginatedStudents.map((student, index) => (
-                      <tr key={student.id} className={`hover:bg-blue-50 transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>MÃ HS</TableHead>
+                      <TableHead>HỌ TÊN</TableHead>
+                      <TableHead>LỚP</TableHead>
+                      <TableHead>TRẠNG THÁI KHUÔN MẶT</TableHead>
+                      <TableHead>HÀNH ĐỘNG</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedStudents.map((student) => (
+                      <TableRow key={student.id}>
+                        <TableCell className="font-medium">
                           {student.student_id}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center space-x-3">
-                            <div className="flex justify-center items-center w-8 h-8 bg-blue-500 rounded-full">
-                              <span className="text-sm font-bold text-white">
+                            <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary">
+                              <span className="text-sm font-bold text-primary-foreground">
                                 {student.full_name?.charAt(0) || '?'}
                               </span>
                             </div>
                             <span>{student.full_name}</span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                          {student.class_name}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        </TableCell>
+                        <TableCell>{student.class_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="destructive">
                             ✗ Chưa đăng ký
-                          </span>
-                        </td>
-                      </tr>
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {student.is_active === false ? (
+                              // Actions for deleted students (restore only)
+                              <Button
+                                onClick={() => handleRestore(student)}
+                                disabled={restoreLoading}
+                                variant="outline"
+                                size="sm"
+                                className="flex items-center space-x-1 text-green-600 hover:text-green-600 hover:bg-green-50 hover:border-green-200"
+                              >
+                                {restoreLoading ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    <span>Đang khôi phục...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="w-3 h-3" />
+                                    <span>Khôi phục</span>
+                                  </>
+                                )}
+                              </Button>
+                            ) : (
+                              // Actions for active students (edit and delete)
+                              <>
+                                <Button
+                                  onClick={() => handleEditStudent(student)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex items-center space-x-1"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                  <span>Sửa</span>
+                                </Button>
+                                <Button
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex items-center space-x-1 text-destructive hover:text-destructive hover:bg-destructive/5 hover:border-destructive/50"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Xóa</span>
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
 
                 {/* Pagination for Class Management */}
-                {(() => {
-                  if (totalPages <= 1) return null;
-                  
-                  return (
-                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                      <div className="flex flex-wrap gap-3 justify-between items-center">
-                        <div className="flex items-center space-x-4">
-                          <div className="text-sm text-gray-700">
-                            Hiển thị <span className="font-semibold">{((currentPage - 1) * classManagementPageSize) + 1}</span> đến <span className="font-semibold">{Math.min(currentPage * classManagementPageSize, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm text-gray-700">Số lượng/trang:</label>
-                            <select
-                              value={classManagementPageSize}
-                              onChange={(e) => {
-                                setClassManagementPageSize(Number(e.target.value));
-                                setCurrentPage(1);
-                              }}
-                              className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                            >
-                              <option value={10}>10</option>
-                              <option value={20}>20</option>
-                              <option value={30}>30</option>
-                              <option value={50}>50</option>
-                            </select>
-                          </div>
+                {totalPages > 1 && (
+                  <div className="px-6 py-4 border-t bg-muted/50">
+                    <div className="flex flex-wrap gap-3 justify-between items-center">
+                      <div className="flex items-center space-x-4">
+                        <div className="text-sm text-muted-foreground">
+                          Hiển thị <span className="font-semibold">{((currentPage - 1) * classManagementPageSize) + 1}</span> đến <span className="font-semibold">{Math.min(currentPage * classManagementPageSize, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
                         </div>
-                        
                         <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                            disabled={currentPage === 1}
-                            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          <Label className="text-sm">Số lượng/trang:</Label>
+                          <select
+                            value={classManagementPageSize}
+                            onChange={(e) => {
+                              setClassManagementPageSize(Number(e.target.value));
+                              setCurrentPage(1);
+                            }}
+                            className="pl-3 pr-8 py-1.5 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                           >
-                            ← Trước
-                          </button>
-                          
-                          <div className="flex items-center space-x-1">
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                              const showPage = 
-                                pageNum === 1 || 
-                                pageNum === totalPages || 
-                                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
-                              
-                              if (!showPage) {
-                                if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                                  return <span key={pageNum} className="px-2 text-gray-500">...</span>;
-                                }
-                                return null;
-                              }
-                              
-                              return (
-                                <button
-                                  key={pageNum}
-                                  onClick={() => setCurrentPage(pageNum)}
-                                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                                    currentPage === pageNum
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  {pageNum}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          
-                          <button
-                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                            disabled={currentPage === totalPages}
-                            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            Sau →
-                          </button>
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                            <option value={30}>30</option>
+                            <option value={50}>50</option>
+                          </select>
                         </div>
                       </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          ← Trước
+                        </Button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                            const showPage = 
+                              pageNum === 1 || 
+                              pageNum === totalPages || 
+                              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+                            
+                            if (!showPage) {
+                              if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                                return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
+                              }
+                              return null;
+                            }
+                            
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(pageNum)}
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Sau →
+                        </Button>
+                      </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                )}
               </>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Modal Thêm Học Sinh */}
-      {showAddStudentModal && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="overflow-y-auto p-6 mx-4 w-full max-w-4xl max-h-screen bg-white rounded-xl">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Thêm học sinh mới</h2>
-                <p className="text-gray-600">Điền thông tin để đăng ký học sinh mới vào hệ thống</p>
+      <Dialog open={showAddStudentModal} onOpenChange={setShowAddStudentModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Thêm học sinh mới</DialogTitle>
+            <DialogDescription>
+              Điền thông tin để đăng ký học sinh mới vào hệ thống
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmitStudentForm} className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {/* Họ tên */}
+              <div className="space-y-2">
+                <Label htmlFor="full_name">
+                  Họ và tên *
+                </Label>
+                <Input
+                  id="full_name"
+                  type="text"
+                  value={studentFormData.full_name}
+                  onChange={(e) => handleStudentFormChange('full_name', e.target.value)}
+                  className={studentFormErrors.full_name ? 'border-destructive' : ''}
+                  placeholder="VD: Nguyễn Văn An"
+                />
+                {studentFormErrors.full_name && (
+                  <p className="text-sm text-destructive">{studentFormErrors.full_name}</p>
+                )}
               </div>
-              <button
+
+              {/* Email */}
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={studentFormData.email}
+                  onChange={(e) => handleStudentFormChange('email', e.target.value)}
+                  className={studentFormErrors.email ? 'border-destructive' : ''}
+                  placeholder="VD: student@example.com"
+                />
+                {studentFormErrors.email && (
+                  <p className="text-sm text-destructive">{studentFormErrors.email}</p>
+                )}
+              </div>
+
+              {/* Số điện thoại */}
+              <div className="space-y-2">
+                <Label htmlFor="phone">
+                  Số điện thoại
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={studentFormData.phone}
+                  onChange={(e) => handleStudentFormChange('phone', e.target.value)}
+                  placeholder="VD: 0123456789"
+                />
+              </div>
+
+              {/* Lớp */}
+              <div className="space-y-2">
+                <Label htmlFor="class_name">
+                  Lớp học *
+                </Label>
+                <Input
+                  id="class_name"
+                  type="text"
+                  value={studentFormData.class_name}
+                  onChange={(e) => handleStudentFormChange('class_name', e.target.value)}
+                  className={studentFormErrors.class_name ? 'border-destructive' : ''}
+                  placeholder="VD: 10A1"
+                />
+                {studentFormErrors.class_name && (
+                  <p className="text-sm text-destructive">{studentFormErrors.class_name}</p>
+                )}
+              </div>
+
+              {/* Khối */}
+              <div className="space-y-2">
+                <Label htmlFor="grade">
+                  Khối *
+                </Label>
+                <select
+                  id="grade"
+                  value={studentFormData.grade}
+                  onChange={(e) => handleStudentFormChange('grade', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring ${
+                    studentFormErrors.grade ? 'border-destructive' : 'border-input'
+                  }`}
+                >
+                  <option value="">Chọn khối</option>
+                  <option value="10">Khối 10</option>
+                  <option value="11">Khối 11</option>
+                  <option value="12">Khối 12</option>
+                </select>
+                {studentFormErrors.grade && (
+                  <p className="text-sm text-destructive">{studentFormErrors.grade}</p>
+                )}
+              </div>
+
+              {/* Giới tính */}
+              <div className="space-y-2">
+                <Label htmlFor="gender">
+                  Giới tính
+                </Label>
+                <select
+                  id="gender"
+                  value={studentFormData.gender}
+                  onChange={(e) => handleStudentFormChange('gender', e.target.value)}
+                  className="px-4 py-3 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+
+              {/* Ngày sinh */}
+              <div className="space-y-2">
+                <Label htmlFor="date_of_birth">
+                  Ngày sinh
+                </Label>
+                <Input
+                  id="date_of_birth"
+                  type="date"
+                  value={studentFormData.date_of_birth}
+                  onChange={(e) => handleStudentFormChange('date_of_birth', e.target.value)}
+                />
+              </div>
+
+              {/* Tên phụ huynh */}
+              <div className="space-y-2">
+                <Label htmlFor="parent_name">
+                  Tên phụ huynh
+                </Label>
+                <Input
+                  id="parent_name"
+                  type="text"
+                  value={studentFormData.parent_name}
+                  onChange={(e) => handleStudentFormChange('parent_name', e.target.value)}
+                  placeholder="VD: Nguyễn Văn Bình"
+                />
+              </div>
+
+              {/* SĐT phụ huynh */}
+              <div className="space-y-2">
+                <Label htmlFor="parent_phone">
+                  SĐT phụ huynh
+                </Label>
+                <Input
+                  id="parent_phone"
+                  type="tel"
+                  value={studentFormData.parent_phone}
+                  onChange={(e) => handleStudentFormChange('parent_phone', e.target.value)}
+                  placeholder="VD: 0987654321"
+                />
+              </div>
+              </div>
+
+            {/* Địa chỉ */}
+            <div className="space-y-2">
+              <Label htmlFor="address">
+                Địa chỉ
+              </Label>
+              <textarea
+                id="address"
+                value={studentFormData.address}
+                onChange={(e) => handleStudentFormChange('address', e.target.value)}
+                rows={3}
+                className="px-4 py-3 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
+              />
+            </div>
+
+            {/* Thông báo mã học sinh sẽ được tạo tự động */}
+            <div className="p-4 rounded-lg border bg-primary/5 border-primary/20">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="w-5 h-5 text-primary" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-primary">
+                    <strong>Lưu ý:</strong> Mã học sinh sẽ được hệ thống tự động tạo dựa trên khối học bạn chọn.
+                    Khối 10: bắt đầu bằng 25, Khối 11: bắt đầu bằng 24, Khối 12: bắt đầu bằng 23.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
                 onClick={handleCloseAddStudentModal}
-                className="text-3xl text-gray-400 hover:text-gray-600"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                disabled={studentFormLoading}
+              >
+                {studentFormLoading ? (
+                  <>
+                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    <span>Đang thêm...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 w-4 h-4" />
+                    <span>Thêm học sinh</span>
+                  </>
+                )}
+              </Button>
+          </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Preview Import Học Sinh */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Xem trước dữ liệu import</DialogTitle>
+            <DialogDescription>
+              Kiểm tra dữ liệu trước khi nhập vào hệ thống ({importedData.length} học sinh)
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Import Errors */}
+          {importErrors.length > 0 && (
+            <div className="p-4 mb-6 rounded-lg border bg-destructive/10 border-destructive/20">
+              <h3 className="mb-3 text-lg font-semibold text-destructive">Các lỗi cần sửa:</h3>
+              <div className="overflow-y-auto space-y-2 max-h-40">
+                {importErrors.map((error, index) => (
+                  <div key={index} className="p-2 rounded border bg-destructive/5 border-destructive/20">
+                    <p className="font-medium text-destructive">
+                      Dòng {error.row}: {error.student_name}
+                    </p>
+                    <ul className="mt-1 text-sm list-disc list-inside text-destructive/80">
+                      {error.errors.map((err, errIndex) => (
+                        <li key={errIndex}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preview Table */}
+          <div className="overflow-x-auto mb-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>STT</TableHead>
+                  <TableHead>Họ tên</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>SĐT</TableHead>
+                  <TableHead>Lớp</TableHead>
+                  <TableHead>Khối</TableHead>
+                  <TableHead>Giới tính</TableHead>
+                  <TableHead>Ngày sinh</TableHead>
+                  <TableHead>Phụ huynh</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {importedData.map((student, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {student.ho_va_ten}
+                    </TableCell>
+                    <TableCell>
+                      {student.email || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {student.so_dien_thoai || '-'}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {student.lop_hoc}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {student.khoi}
+                    </TableCell>
+                    <TableCell>
+                      {student.gioi_tinh || 'Nam'}
+                    </TableCell>
+                    <TableCell>
+                      {student.ngay_sinh || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div>{student.ten_phu_huynh || '-'}</div>
+                        {student.sdt_phu_huynh && (
+                          <div className="text-xs text-muted-foreground">{student.sdt_phu_huynh}</div>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Thông báo về mã học sinh */}
+          <div className="p-4 mb-6 rounded-lg border bg-primary/5 border-primary/20">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-primary" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-primary">
+                  <strong>Lưu ý:</strong> Mã học sinh sẽ được hệ thống tự động tạo dựa trên khối học.
+                  Khối 10: bắt đầu bằng 25, Khối 11: bắt đầu bằng 24, Khối 12: bắt đầu bằng 23.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseImportModal}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmImport}
+              disabled={importLoading || importErrors.length > 0}
+            >
+              {importLoading ? (
+                <>
+                  <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                  <span>Đang nhập...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 w-4 h-4" />
+                  <span>Xác nhận nhập ({importedData.length} học sinh)</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Student Modal */}
+      {showEditModal && selectedStudentForEdit && (
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="overflow-y-auto p-6 mx-4 w-full max-w-2xl max-h-screen bg-white rounded-lg">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Sửa thông tin học sinh
+              </h3>
+              <button
+                onClick={closeEditModal}
+                className="text-2xl text-gray-400 hover:text-gray-600"
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmitStudentForm} className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* Họ tên */}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
+                    Mã học sinh (Không thể thay đổi)
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedStudentForEdit.student_id || ''}
+                    className="px-3 py-2 w-full text-gray-500 bg-gray-50 rounded-lg border border-gray-300"
+                    readOnly
+                  />
+                </div>
+
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Họ và tên *
                   </label>
                   <input
                     type="text"
-                    value={studentFormData.full_name}
-                    onChange={(e) => handleStudentFormChange('full_name', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      studentFormErrors.full_name ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    value={editForm.full_name || ''}
+                    onChange={(e) => handleEditFormChange('full_name', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Nguyễn Văn An"
                   />
-                  {studentFormErrors.full_name && (
-                    <p className="mt-1 text-sm text-red-500">{studentFormErrors.full_name}</p>
-                  )}
                 </div>
 
-                {/* Email */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Email
                   </label>
                   <input
                     type="email"
-                    value={studentFormData.email}
-                    onChange={(e) => handleStudentFormChange('email', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      studentFormErrors.email ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    value={editForm.email || ''}
+                    onChange={(e) => handleEditFormChange('email', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: student@example.com"
                   />
-                  {studentFormErrors.email && (
-                    <p className="mt-1 text-sm text-red-500">{studentFormErrors.email}</p>
-                  )}
                 </div>
 
-                {/* Số điện thoại */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Số điện thoại
                   </label>
                   <input
                     type="tel"
-                    value={studentFormData.phone}
-                    onChange={(e) => handleStudentFormChange('phone', e.target.value)}
-                    className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={editForm.phone || ''}
+                    onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0123456789"
                   />
                 </div>
 
-                {/* Lớp */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Lớp học *
+                    Lớp
                   </label>
                   <input
                     type="text"
-                    value={studentFormData.class_name}
-                    onChange={(e) => handleStudentFormChange('class_name', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      studentFormErrors.class_name ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    value={editForm.class_name || ''}
+                    onChange={(e) => handleEditFormChange('class_name', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 10A1"
                   />
-                  {studentFormErrors.class_name && (
-                    <p className="mt-1 text-sm text-red-500">{studentFormErrors.class_name}</p>
-                  )}
                 </div>
 
-                {/* Khối */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Khối *
+                    Khối
                   </label>
                   <select
-                    value={studentFormData.grade}
-                    onChange={(e) => handleStudentFormChange('grade', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      studentFormErrors.grade ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    value={editForm.grade || ''}
+                    onChange={(e) => handleEditFormChange('grade', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Chọn khối</option>
                     <option value="10">Khối 10</option>
                     <option value="11">Khối 11</option>
                     <option value="12">Khối 12</option>
                   </select>
-                  {studentFormErrors.grade && (
-                    <p className="mt-1 text-sm text-red-500">{studentFormErrors.grade}</p>
-                  )}
                 </div>
 
-                {/* Giới tính */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Giới tính
                   </label>
                   <select
-                    value={studentFormData.gender}
-                    onChange={(e) => handleStudentFormChange('gender', e.target.value)}
-                    className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={editForm.gender || 'Nam'}
+                    onChange={(e) => handleEditFormChange('gender', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
@@ -886,269 +1435,83 @@ const ClassManagement = () => {
                   </select>
                 </div>
 
-                {/* Ngày sinh */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Ngày sinh
                   </label>
                   <input
                     type="date"
-                    value={studentFormData.date_of_birth}
-                    onChange={(e) => handleStudentFormChange('date_of_birth', e.target.value)}
-                    className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={editForm.date_of_birth || ''}
+                    onChange={(e) => handleEditFormChange('date_of_birth', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
-                {/* Tên phụ huynh */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Tên phụ huynh
                   </label>
                   <input
                     type="text"
-                    value={studentFormData.parent_name}
-                    onChange={(e) => handleStudentFormChange('parent_name', e.target.value)}
-                    className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: Nguyễn Văn Bình"
+                    value={editForm.parent_name || ''}
+                    onChange={(e) => handleEditFormChange('parent_name', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: Nguyễn Văn Bố"
                   />
                 </div>
 
-                {/* SĐT phụ huynh */}
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
-                    SĐT phụ huynh
+                    Số điện thoại phụ huynh
                   </label>
                   <input
                     type="tel"
-                    value={studentFormData.parent_phone}
-                    onChange={(e) => handleStudentFormChange('parent_phone', e.target.value)}
-                    className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={editForm.parent_phone || ''}
+                    onChange={(e) => handleEditFormChange('parent_phone', e.target.value)}
+                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0987654321"
                   />
                 </div>
               </div>
 
-              {/* Địa chỉ */}
               <div>
                 <label className="block mb-2 text-sm font-medium text-gray-700">
                   Địa chỉ
                 </label>
                 <textarea
-                  value={studentFormData.address}
-                  onChange={(e) => handleStudentFormChange('address', e.target.value)}
+                  value={editForm.address || ''}
+                  onChange={(e) => handleEditFormChange('address', e.target.value)}
                   rows={3}
-                  className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
                 />
               </div>
 
-              {/* Thông báo mã học sinh sẽ được tạo tự động */}
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-blue-700">
-                      <strong>Lưu ý:</strong> Mã học sinh sẽ được hệ thống tự động tạo dựa trên khối học bạn chọn.
-                      Khối 10: bắt đầu bằng 25, Khối 11: bắt đầu bằng 24, Khối 12: bắt đầu bằng 23.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex justify-end pt-6 space-x-4 border-t border-gray-200">
+              <div className="flex justify-end pt-4 space-x-3">
                 <button
                   type="button"
-                  onClick={handleCloseAddStudentModal}
-                  className="px-6 py-3 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors hover:bg-gray-200"
+                  onClick={closeEditModal}
+                  className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
                 >
                   Hủy
                 </button>
                 <button
-                  type="submit"
-                  disabled={studentFormLoading}
-                  className="flex items-center px-8 py-3 space-x-2 font-medium text-white bg-green-600 rounded-lg transition-colors hover:bg-green-700 disabled:opacity-50"
+                  type="button"
+                  onClick={submitEditForm}
+                  disabled={editLoading}
+                  className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {studentFormLoading ? (
+                  {editLoading ? (
                     <>
-                      <div className="w-4 h-4 rounded-full border-b-2 border-white animate-spin"></div>
-                      <span>Đang thêm...</span>
+                      <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                      Đang cập nhật...
                     </>
                   ) : (
-                    <>
-                      <span>➕</span>
-                      <span>Thêm học sinh</span>
-                    </>
+                    'Cập nhật'
                   )}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Preview Import Học Sinh */}
-      {showImportModal && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="overflow-y-auto p-6 mx-4 w-full max-w-6xl max-h-screen bg-white rounded-xl">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Xem trước dữ liệu import</h2>
-                <p className="text-gray-600">Kiểm tra dữ liệu trước khi nhập vào hệ thống ({importedData.length} học sinh)</p>
-              </div>
-              <button
-                onClick={handleCloseImportModal}
-                className="text-3xl text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Import Errors */}
-            {importErrors.length > 0 && (
-              <div className="p-4 mb-6 bg-red-50 rounded-lg border border-red-200">
-                <h3 className="mb-3 text-lg font-semibold text-red-800">Các lỗi cần sửa:</h3>
-                <div className="overflow-y-auto space-y-2 max-h-40">
-                  {importErrors.map((error, index) => (
-                    <div key={index} className="p-2 bg-red-100 rounded border border-red-300">
-                      <p className="font-medium text-red-800">
-                        Dòng {error.row}: {error.student_name}
-                      </p>
-                      <ul className="mt-1 text-sm list-disc list-inside text-red-700">
-                        {error.errors.map((err, errIndex) => (
-                          <li key={errIndex}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Preview Table */}
-            <div className="overflow-x-auto mb-6">
-              <table className="min-w-full rounded-lg border border-gray-200 divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
-                  <tr>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      STT
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      Họ tên
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      Email
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      SĐT
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      Lớp
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      Khối
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      Giới tính
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      Ngày sinh
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase">
-                      Phụ huynh
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {importedData.map((student, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {index + 1}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {student.ho_va_ten}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {student.email || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {student.so_dien_thoai || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {student.lop_hoc}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {student.khoi}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {student.gioi_tinh || 'Nam'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {student.ngay_sinh || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        <div>
-                          <div>{student.ten_phu_huynh || '-'}</div>
-                          {student.sdt_phu_huynh && (
-                            <div className="text-xs text-gray-500">{student.sdt_phu_huynh}</div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Thông báo về mã học sinh */}
-            <div className="p-4 mb-6 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-blue-700">
-                    <strong>Lưu ý:</strong> Mã học sinh sẽ được hệ thống tự động tạo dựa trên khối học.
-                    Khối 10: bắt đầu bằng 25, Khối 11: bắt đầu bằng 24, Khối 12: bắt đầu bằng 23.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex justify-end pt-6 space-x-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={handleCloseImportModal}
-                className="px-6 py-3 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors hover:bg-gray-200"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmImport}
-                disabled={importLoading || importErrors.length > 0}
-                className="flex items-center px-8 py-3 space-x-2 font-medium text-white bg-green-600 rounded-lg transition-colors hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {importLoading ? (
-                  <>
-                    <div className="w-4 h-4 rounded-full border-b-2 border-white animate-spin"></div>
-                    <span>Đang nhập...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>📤</span>
-                    <span>Xác nhận nhập ({importedData.length} học sinh)</span>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
         </div>
       )}

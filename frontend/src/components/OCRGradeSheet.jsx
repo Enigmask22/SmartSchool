@@ -1,4 +1,10 @@
 import React, { useState } from 'react';
+import { Upload, Camera, Loader2, CheckCircle, XCircle, AlertCircle, Eye, Download, BarChart3, FileText, Clock, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import api from '../services/api';
 
 const OCRGradeSheet = ({ 
@@ -246,74 +252,78 @@ const OCRGradeSheet = ({
   return (
     <>
       {/* OCR Button */}
-      <button
+      <Button
         onClick={() => setShowOCRModal(true)}
-        className="flex items-center px-4 py-2 space-x-2 font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-sm transition-all hover:from-indigo-700 hover:to-purple-700 hover:shadow-md"
+        className="flex items-center space-x-2"
         title="Upload ảnh bảng điểm viết tay để tự động nhận dạng"
       >
-        <span>📸</span>
+        <Camera className="w-4 h-4" />
         <span>OCR - Nhập điểm từ ảnh</span>
-      </button>
+      </Button>
 
       {/* OCR Modal */}
-      {showOCRModal && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 text-white bg-gradient-to-r from-indigo-600 to-purple-600">
-              <div>
-                <h3 className="text-xl font-bold">📸 OCR - Nhận dạng bảng điểm viết tay</h3>
-                <p className="mt-1 text-sm text-indigo-100">
-                  Upload ảnh chụp bảng điểm để tự động nhận dạng và nhập điểm
-                </p>
-              </div>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 text-white rounded-full transition-colors hover:bg-white hover:bg-opacity-20"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+      <Dialog open={showOCRModal} onOpenChange={setShowOCRModal}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Camera className="w-6 h-6 text-primary" />
+              <span>OCR - Nhận dạng bảng điểm viết tay</span>
+            </DialogTitle>
+            <DialogDescription>
+              Upload ảnh chụp bảng điểm để tự động nhận dạng và nhập điểm
+            </DialogDescription>
+          </DialogHeader>
 
-            {/* Content */}
-            <div className="overflow-y-auto flex-1 p-6">
-              {!parsedData ? (
-                // Upload Section
-                <div className="space-y-6">
-                  {/* Instructions */}
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h4 className="mb-2 font-semibold text-blue-900">📋 Hướng dẫn:</h4>
-                    <ul className="space-y-1 text-sm list-disc list-inside text-blue-800">
-                      <li>Chụp ảnh bảng điểm rõ nét, đủ sáng</li>
-                      <li>Bảng điểm phải có các cột: <strong>id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki</strong></li>
-                      <li>Viết tay hoặc in đều được hỗ trợ</li>
-                      <li>Định dạng ảnh: JPG, PNG (tối đa 10MB)</li>
+          {/* Content */}
+          <div className="overflow-y-auto flex-1 p-6">
+            {!parsedData ? (
+              // Upload Section
+              <div className="space-y-6">
+                {/* Instructions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg">
+                      <FileText className="w-5 h-5 text-primary" />
+                      <span>Hướng dẫn</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li>• Chụp ảnh bảng điểm rõ nét, đủ sáng</li>
+                      <li>• Bảng điểm phải có các cột: <strong>id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki</strong></li>
+                      <li>• Viết tay hoặc in đều được hỗ trợ</li>
+                      <li>• Định dạng ảnh: JPG, PNG (tối đa 10MB)</li>
                     </ul>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Image Preview */}
-                  {imagePreview && (
-                    <div className="p-4 rounded-lg border-2 border-gray-300 border-dashed">
-                      <p className="mb-2 text-sm font-medium text-gray-700">Ảnh đã chọn:</p>
+                {/* Image Preview */}
+                {imagePreview && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Ảnh đã chọn</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                       <img 
                         src={imagePreview} 
                         alt="Preview" 
                         className="mx-auto max-w-full max-h-96 rounded-lg shadow-md"
                       />
-                      <p className="mt-2 text-xs text-center text-gray-500">
+                      <p className="mt-2 text-xs text-center text-muted-foreground">
                         {selectedImage.name} ({(selectedImage.size / 1024 / 1024).toFixed(2)} MB)
                       </p>
-                    </div>
-                  )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                  {/* Upload Button */}
-                  <div className="flex flex-col items-center space-y-4">
-                    <label className="flex justify-center items-center px-6 py-4 space-x-3 w-full max-w-md font-medium text-white bg-indigo-600 rounded-lg shadow-md transition-colors cursor-pointer hover:bg-indigo-700 hover:shadow-lg">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
+                {/* Upload Button */}
+                <div className="flex flex-col items-center space-y-4">
+                  <Button
+                    asChild
+                    className="w-full max-w-md"
+                  >
+                    <label className="cursor-pointer">
+                      <Upload className="w-5 h-5 mr-2" />
                       <span>{selectedImage ? 'Chọn ảnh khác' : 'Chọn ảnh bảng điểm'}</span>
                       <input
                         type="file"
@@ -322,154 +332,194 @@ const OCRGradeSheet = ({
                         className="hidden"
                       />
                     </label>
+                  </Button>
 
-                    {selectedImage && !parsing && (
-                      <button
-                        onClick={handleUploadAndParse}
-                        disabled={uploading}
-                        className={`flex items-center space-x-3 px-8 py-4 rounded-lg font-bold text-lg shadow-lg transition-all w-full max-w-md justify-center ${
-                          uploading 
-                            ? 'bg-gray-400 cursor-not-allowed' 
-                            : 'text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl'
-                        }`}
-                      >
-                        <span>🚀</span>
-                        <span>Phân tích bảng điểm</span>
-                      </button>
-                    )}
+                  {selectedImage && !parsing && (
+                    <Button
+                      onClick={handleUploadAndParse}
+                      disabled={uploading}
+                      size="lg"
+                      className="w-full max-w-md"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          <span>Đang tải lên...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-5 h-5 mr-2" />
+                          <span>Phân tích bảng điểm</span>
+                        </>
+                      )}
+                    </Button>
+                  )}
 
-                    {/* Progress Display */}
-                    {parsing && (
-                      <div className="mt-6 space-y-4 w-full max-w-md">
-                        {/* Status Card */}
-                        <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border-2 border-indigo-200 shadow-md">
-                          {/* Status Header */}
-                          <div className="flex justify-between items-center mb-4">
-                            <div className="flex items-center space-x-3">
-                              {ocrStatus === 'queued' && (
-                                <>
-                                  <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
-                                  <span className="font-semibold text-yellow-700">⏳ Đang trong hàng chờ</span>
-                                </>
-                              )}
-                              {ocrStatus === 'processing' && (
-                                <>
-                                  <svg className="w-5 h-5 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  <span className="font-semibold text-indigo-700">🔄 Đang xử lý OCR</span>
-                                </>
-                              )}
-                            </div>
-                            <span className="text-2xl font-bold text-indigo-600">{progress}%</span>
+                  {/* Progress Display */}
+                  {parsing && (
+                    <Card className="mt-6 w-full max-w-md">
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            {ocrStatus === 'queued' && (
+                              <>
+                                <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                                <span className="font-semibold text-yellow-700 flex items-center space-x-2">
+                                  <Clock className="w-4 h-4" />
+                                  <span>Đang trong hàng chờ</span>
+                                </span>
+                              </>
+                            )}
+                            {ocrStatus === 'processing' && (
+                              <>
+                                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                <span className="font-semibold text-primary flex items-center space-x-2">
+                                  <RefreshCw className="w-4 h-4" />
+                                  <span>Đang xử lý OCR</span>
+                                </span>
+                              </>
+                            )}
                           </div>
-
-                          {/* Progress Bar */}
-                          <div className="overflow-hidden mb-4 w-full h-3 bg-gray-200 rounded-full">
-                            <div 
-                              className="h-3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500 ease-out"
-                              style={{ width: `${progress}%` }}
-                            ></div>
-                          </div>
-
-                          {/* Status Message */}
-                          <p className="mb-2 text-sm font-medium text-gray-700">{statusMessage}</p>
-
-                          {/* Queue Position */}
-                          {queuePosition !== null && (
-                            <div className="p-3 mt-3 bg-yellow-50 rounded-md border border-yellow-200">
-                              <p className="text-xs text-yellow-800">
-                                📍 Vị trí trong hàng chờ: <strong className="text-lg">#{queuePosition}</strong>
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Info */}
-                          <p className="mt-3 text-xs italic text-gray-500">
-                            💡 Bạn có thể đóng cửa sổ này. Hệ thống sẽ tự động xử lý.
-                          </p>
+                          <span className="text-2xl font-bold text-primary">{progress}%</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Progress Bar */}
+                        <div className="overflow-hidden mb-4 w-full h-3 bg-gray-200 rounded-full">
+                          <div 
+                            className="h-3 bg-primary rounded-full transition-all duration-500 ease-out"
+                            style={{ width: `${progress}%` }}
+                          ></div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                // Results Section
-                <div className="space-y-6">
-                  {/* Summary */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-sm font-medium text-green-700">✅ Hợp lệ</p>
-                      <p className="text-3xl font-bold text-green-900">{parsedData.total_valid}</p>
-                    </div>
-                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                      <p className="text-sm font-medium text-red-700">❌ Lỗi</p>
-                      <p className="text-3xl font-bold text-red-900">{parsedData.total_errors}</p>
-                    </div>
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <p className="text-sm font-medium text-blue-700">📊 Tổng</p>
-                      <p className="text-3xl font-bold text-blue-900">{parsedData.total_parsed}</p>
-                    </div>
-                  </div>
 
-                  {/* Errors Display */}
-                  {parsedData.validation_errors && parsedData.validation_errors.length > 0 && (
-                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                      <h4 className="mb-2 font-semibold text-red-900">⚠️ Lỗi validation:</h4>
+                        {/* Status Message */}
+                        <p className="mb-2 text-sm font-medium text-muted-foreground">{statusMessage}</p>
+
+                        {/* Queue Position */}
+                        {queuePosition !== null && (
+                          <div className="p-3 mt-3 bg-yellow-50 rounded-md border border-yellow-200">
+                            <p className="text-xs text-yellow-800 flex items-center space-x-2">
+                              <Clock className="w-4 h-4" />
+                              <span>Vị trí trong hàng chờ: <strong className="text-lg">#{queuePosition}</strong></span>
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Info */}
+                        <p className="mt-3 text-xs italic text-muted-foreground">
+                          💡 Bạn có thể đóng cửa sổ này. Hệ thống sẽ tự động xử lý.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Results Section
+              <div className="space-y-6">
+                {/* Summary */}
+                <div className="grid grid-cols-3 gap-4">
+                  <Card className="border-green-200 bg-green-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <p className="text-sm font-medium text-green-700">Hợp lệ</p>
+                      </div>
+                      <p className="text-3xl font-bold text-green-900">{parsedData.total_valid}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-red-200 bg-red-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <XCircle className="w-5 h-5 text-red-600" />
+                        <p className="text-sm font-medium text-red-700">Lỗi</p>
+                      </div>
+                      <p className="text-3xl font-bold text-red-900">{parsedData.total_errors}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-blue-200 bg-blue-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <BarChart3 className="w-5 h-5 text-blue-600" />
+                        <p className="text-sm font-medium text-blue-700">Tổng</p>
+                      </div>
+                      <p className="text-3xl font-bold text-blue-900">{parsedData.total_parsed}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Errors Display */}
+                {parsedData.validation_errors && parsedData.validation_errors.length > 0 && (
+                  <Card className="border-red-200 bg-red-50">
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2 text-red-900">
+                        <AlertCircle className="w-5 h-5" />
+                        <span>Lỗi validation</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
                       <div className="overflow-y-auto max-h-32">
-                        <ul className="space-y-1 text-sm text-red-800">
+                        <ul className="space-y-2 text-sm text-red-800">
                           {parsedData.validation_errors.map((error, idx) => (
                             <li key={idx} className="flex items-start space-x-2">
-                              <span className="text-red-500">•</span>
+                              <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
                               <span>Row {error.row}: {error.error}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
-                    </div>
-                  )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                  {/* OCR Errors */}
-                  {parsedData.ocr_errors && parsedData.ocr_errors.length > 0 && (
-                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <h4 className="mb-2 font-semibold text-yellow-900">⚠️ Cảnh báo OCR:</h4>
+                {/* OCR Errors */}
+                {parsedData.ocr_errors && parsedData.ocr_errors.length > 0 && (
+                  <Card className="border-yellow-200 bg-yellow-50">
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2 text-yellow-900">
+                        <AlertCircle className="w-5 h-5" />
+                        <span>Cảnh báo OCR</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
                       <div className="overflow-y-auto max-h-32">
-                        <ul className="space-y-1 text-sm text-yellow-800">
+                        <ul className="space-y-2 text-sm text-yellow-800">
                           {parsedData.ocr_errors.map((error, idx) => (
                             <li key={idx} className="flex items-start space-x-2">
-                              <span className="text-yellow-500">•</span>
+                              <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                               <span>{error}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
-                    </div>
-                  )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                  {/* Pagination Summary */}
-                  {(() => {
-                    const totalRows = parsedData.parsed_rows.length;
-                    const totalPages = Math.ceil(totalRows / pageSize);
-                    const startIndex = (currentPage - 1) * pageSize;
-                    const endIndex = startIndex + pageSize;
-                    
-                    if (totalRows > pageSize) {
-                      return (
-                        <div className="p-3 mb-4 bg-gray-50 rounded-lg border border-gray-200">
+                {/* Pagination Summary */}
+                {(() => {
+                  const totalRows = parsedData.parsed_rows.length;
+                  const totalPages = Math.ceil(totalRows / pageSize);
+                  const startIndex = (currentPage - 1) * pageSize;
+                  const endIndex = startIndex + pageSize;
+                  
+                  if (totalRows > pageSize) {
+                    return (
+                      <Card className="mb-4">
+                        <CardContent className="p-4">
                           <div className="flex flex-wrap gap-3 justify-between items-center">
-                            <div className="text-sm text-gray-700">
+                            <div className="text-sm text-muted-foreground">
                               Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalRows)}</span> trong tổng số <span className="font-semibold">{totalRows}</span> bản ghi
                             </div>
                             <div className="flex items-center space-x-2">
-                              <label className="text-sm text-gray-700">Số lượng/trang:</label>
+                              <label className="text-sm text-muted-foreground">Số lượng/trang:</label>
                               <select
                                 value={pageSize}
                                 onChange={(e) => {
                                   setPageSize(Number(e.target.value));
                                   setCurrentPage(1);
                                 }}
-                                className="py-1 pr-8 pl-3 text-sm bg-white rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="py-1 pr-8 pl-3 text-sm bg-background rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring"
                               >
                                 <option value={10}>10</option>
                                 <option value={20}>20</option>
@@ -478,28 +528,30 @@ const OCRGradeSheet = ({
                               </select>
                             </div>
                           </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                        </CardContent>
+                      </Card>
+                    );
+                  }
+                  return null;
+                })()}
 
-                  {/* Data Table */}
-                  <div className="overflow-hidden rounded-lg border border-gray-200">
+                {/* Data Table */}
+                <Card>
+                  <CardContent className="p-0">
                     <div className="overflow-x-auto max-h-96">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="sticky top-0 bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">STT</th>
-                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Mã HS</th>
-                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Họ và tên</th>
-                            <th className="px-4 py-3 text-xs font-medium text-left text-gray-500 uppercase">Lớp</th>
-                            <th className="px-4 py-3 text-xs font-medium text-center text-gray-500 uppercase">ĐTX</th>
-                            <th className="px-4 py-3 text-xs font-medium text-center text-gray-500 uppercase">ĐGK</th>
-                            <th className="px-4 py-3 text-xs font-medium text-center text-gray-500 uppercase">ĐCK</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs font-medium text-left">STT</TableHead>
+                            <TableHead className="text-xs font-medium text-left">Mã HS</TableHead>
+                            <TableHead className="text-xs font-medium text-left">Họ và tên</TableHead>
+                            <TableHead className="text-xs font-medium text-left">Lớp</TableHead>
+                            <TableHead className="text-xs font-medium text-center">ĐTX</TableHead>
+                            <TableHead className="text-xs font-medium text-center">ĐGK</TableHead>
+                            <TableHead className="text-xs font-medium text-center">ĐCK</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {(() => {
                             const totalRows = parsedData.parsed_rows.length;
                             const startIndex = (currentPage - 1) * pageSize;
@@ -513,159 +565,157 @@ const OCRGradeSheet = ({
                             const paginatedRows = sortedRows.slice(startIndex, endIndex);
                             
                             return paginatedRows.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900">{startIndex + idx + 1}</td>
-                              <td className="px-4 py-3 text-sm font-medium text-indigo-600">{row.student_id}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                            <TableRow key={idx}>
+                              <TableCell className="text-sm">{startIndex + idx + 1}</TableCell>
+                              <TableCell className="text-sm font-medium text-primary">{row.student_id}</TableCell>
+                              <TableCell className="text-sm">
                                 {row.full_name}
                                 {row.ocr_name && row.ocr_name !== row.full_name && (
-                                  <span className="block text-xs text-gray-500">OCR: {row.ocr_name}</span>
+                                  <span className="block text-xs text-muted-foreground">OCR: {row.ocr_name}</span>
                                 )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{row.class_name}</td>
-                              <td className="px-4 py-3 text-sm text-center">
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{row.class_name}</TableCell>
+                              <TableCell className="text-sm text-center">
                                 {row.diem_thuong_xuyen !== null ? (
-                                  <span className="font-medium text-blue-600">{row.diem_thuong_xuyen}</span>
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                                    {row.diem_thuong_xuyen}
+                                  </Badge>
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-muted-foreground">-</span>
                                 )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center">
+                              </TableCell>
+                              <TableCell className="text-sm text-center">
                                 {row.diem_thi_giua_ki !== null ? (
-                                  <span className="font-medium text-blue-600">{row.diem_thi_giua_ki}</span>
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                                    {row.diem_thi_giua_ki}
+                                  </Badge>
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-muted-foreground">-</span>
                                 )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center">
+                              </TableCell>
+                              <TableCell className="text-sm text-center">
                                 {row.diem_thi_cuoi_ki !== null ? (
-                                  <span className="font-medium text-blue-600">{row.diem_thi_cuoi_ki}</span>
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                                    {row.diem_thi_cuoi_ki}
+                                  </Badge>
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-muted-foreground">-</span>
                                 )}
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ));
                           })()}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Pagination Controls */}
-                  {(() => {
-                    const totalRows = parsedData.parsed_rows.length;
-                    const totalPages = Math.ceil(totalRows / pageSize);
-                    const startIndex = (currentPage - 1) * pageSize;
-                    const endIndex = startIndex + pageSize;
-                    
-                    if (totalPages <= 1) return null;
-                    
-                    return (
-                      <div className="flex justify-center items-center mt-4 space-x-2">
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          ← Trước
-                        </button>
-                        
-                        <div className="flex items-center space-x-1">
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                            const showPage = 
-                              pageNum === 1 || 
-                              pageNum === totalPages || 
-                              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
-                            
-                            if (!showPage) {
-                              if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                                return <span key={pageNum} className="px-2 text-gray-500">...</span>;
-                              }
-                              return null;
+                {/* Pagination Controls */}
+                {(() => {
+                  const totalRows = parsedData.parsed_rows.length;
+                  const totalPages = Math.ceil(totalRows / pageSize);
+                  const startIndex = (currentPage - 1) * pageSize;
+                  const endIndex = startIndex + pageSize;
+                  
+                  if (totalPages <= 1) return null;
+                  
+                  return (
+                    <div className="flex justify-center items-center mt-4 space-x-2">
+                      <Button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        variant="outline"
+                        size="sm"
+                      >
+                        ← Trước
+                      </Button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                          const showPage = 
+                            pageNum === 1 || 
+                            pageNum === totalPages || 
+                            (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+                          
+                          if (!showPage) {
+                            if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                              return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
                             }
-                            
-                            return (
-                              <button
-                                key={pageNum}
-                                onClick={() => setCurrentPage(pageNum)}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                                  currentPage === pageNum
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                                }`}
-                              >
-                                {pageNum}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Sau →
-                        </button>
+                            return null;
+                          }
+                          
+                          return (
+                            <Button
+                              key={pageNum}
+                              onClick={() => setCurrentPage(pageNum)}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
                       </div>
-                    );
-                  })()}
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        setParsedData(null);
-                        setSelectedImage(null);
-                        setImagePreview(null);
-                      }}
-                      className="px-4 py-2 font-medium text-gray-700 bg-gray-200 rounded-lg transition-colors hover:bg-gray-300"
-                    >
-                      ← Phân tích ảnh khác
-                    </button>
-
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={handleExportToExcel}
-                        className="flex items-center px-4 py-2 space-x-2 font-medium text-white bg-green-600 rounded-lg shadow-sm transition-colors hover:bg-green-700 hover:shadow-md"
+                      
+                      <Button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        variant="outline"
+                        size="sm"
                       >
-                        <span>📥</span>
-                        <span>Tải Excel</span>
-                      </button>
-
-                      <button
-                        onClick={handleConfirmImport}
-                        disabled={uploading || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0}
-                        className={`flex items-center space-x-2 px-6 py-2 rounded-lg font-bold transition-all shadow-md hover:shadow-lg ${
-                          uploading || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0
-                            ? 'bg-gray-400 cursor-not-allowed text-white'
-                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
-                        }`}
-                      >
-                        {uploading ? (
-                          <>
-                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>Đang import...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>✅</span>
-                            <span>Xác nhận import</span>
-                          </>
-                        )}
-                      </button>
+                        Sau →
+                      </Button>
                     </div>
+                  );
+                })()}
+
+                {/* Action Buttons */}
+                <div className="flex justify-between items-center pt-4 border-t border-border">
+                  <Button
+                    onClick={() => {
+                      setParsedData(null);
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                    }}
+                    variant="outline"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Phân tích ảnh khác
+                  </Button>
+
+                  <div className="flex space-x-3">
+                    <Button
+                      onClick={handleExportToExcel}
+                      variant="outline"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Tải Excel
+                    </Button>
+
+                    <Button
+                      onClick={handleConfirmImport}
+                      disabled={uploading || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0}
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          <span>Đang import...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          <span>Xác nhận import</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

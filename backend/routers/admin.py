@@ -997,10 +997,250 @@ async def bulk_import_students(
                 "created_students": created_students
             }
         )
-        
     except Exception as e:
         logger.error(f"Error in bulk import students: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi server: {str(e)}"
-        ) 
+        )
+
+# ===============================================
+# ADMIN DASHBOARD ANALYTICS ENDPOINTS
+# ===============================================
+
+@router.get("/dashboard/overview")
+async def get_dashboard_overview(db=Depends(get_db)):
+    """Lấy tổng quan hệ thống cho admin dashboard"""
+    try:
+        # Tổng số users, students, teachers, classes
+        users_count = db.table("users").select("id").execute()
+        students_count = db.table("students").select("id").eq("is_active", True).execute()
+        teachers_count = db.table("teachers").select("id").eq("is_active", True).execute()
+        classes_count = db.table("classes").select("id").execute()
+        
+        # Thống kê điểm danh hôm nay
+        today = datetime.now().date().isoformat()
+        tomorrow = (datetime.now().date().replace(day=datetime.now().date().day + 1)).isoformat()
+        attendance_today = db.table("attendance").select("id, status").gte("date", today).lt("date", tomorrow).execute()
+        
+        present_today = len([r for r in attendance_today.data if r.get('status') == 'present'])
+        absent_today = len([r for r in attendance_today.data if r.get('status') == 'absent'])
+        total_attendance_today = len(attendance_today.data)
+        attendance_rate = (present_today / total_attendance_today * 100) if total_attendance_today > 0 else 0
+        
+        # Thống kê hoạt động gần đây (7 ngày qua)
+        from datetime import timedelta
+        week_ago = (datetime.now().date() - timedelta(days=7)).isoformat()
+        recent_logins = db.table("users").select("last_login").gte("last_login", week_ago).execute()
+        
+        return {
+            "success": True,
+            "data": {
+                "overview": {
+                    "total_users": len(users_count.data),
+                    "total_students": len(students_count.data),
+                    "total_teachers": len(teachers_count.data),
+                    "total_classes": len(classes_count.data)
+                },
+                "attendance_today": {
+                    "present": present_today,
+                    "absent": absent_today,
+                    "total": total_attendance_today,
+                    "rate": round(attendance_rate, 1)
+                },
+                "activity": {
+                    "recent_logins": len(recent_logins.data)
+                }
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting dashboard overview: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy tổng quan dashboard: {str(e)}")
+
+@router.get("/dashboard/attendance-trends")
+async def get_attendance_trends(days: int = 30, db=Depends(get_db)):
+    """Lấy xu hướng điểm danh theo thời gian"""
+    try:
+        from datetime import timedelta
+        end_date = datetime.now().date()
+        start_date = (end_date - timedelta(days=days)).isoformat()
+        end_date = end_date.isoformat()
+        
+        # Lấy dữ liệu điểm danh theo ngày
+        attendance_data = db.table("attendance").select("date, status").gte("date", start_date).lte("date", end_date).execute()
+        
+        # Nhóm theo ngày
+        daily_stats = {}
+        for record in attendance_data.data:
+            date = record['date']
+            if date not in daily_stats:
+                daily_stats[date] = {'present': 0, 'absent': 0, 'total': 0}
+            
+            daily_stats[date]['total'] += 1
+            if record['status'] == 'present':
+                daily_stats[date]['present'] += 1
+            elif record['status'] == 'absent':
+                daily_stats[date]['absent'] += 1
+        
+        # Tạo dữ liệu cho chart
+        chart_data = []
+        for date in sorted(daily_stats.keys()):
+            stats = daily_stats[date]
+            rate = (stats['present'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            chart_data.append({
+                "date": date,
+                "present": stats['present'],
+                "absent": stats['absent'],
+                "total": stats['total'],
+                "rate": round(rate, 1)
+            })
+        
+        return {
+            "success": True,
+            "data": chart_data
+        }
+    except Exception as e:
+        logger.error(f"Error getting attendance trends: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy xu hướng điểm danh: {str(e)}")
+
+@router.get("/dashboard/class-performance")
+async def get_class_performance(db=Depends(get_db)):
+    """Lấy hiệu suất học tập theo lớp"""
+    try:
+        # Lấy dữ liệu điểm số gần đây
+        grades_data = db.table("grades").select("student_id, class_subject_id, final_grade, semester, academic_year").execute()
+        
+        # Lấy thông tin học sinh và lớp
+        students_data = db.table("students").select("id, full_name, class_name").eq("is_active", True).execute()
+        students_dict = {s['id']: s for s in students_data.data}
+        
+        # Nhóm điểm theo lớp
+        class_performance = {}
+        for grade in grades_data.data:
+            student_id = grade['student_id']
+            if student_id in students_dict and grade['final_grade'] is not None:
+                class_name = students_dict[student_id]['class_name']
+                if class_name not in class_performance:
+                    class_performance[class_name] = []
+                class_performance[class_name].append(float(grade['final_grade']))
+        
+        # Tính toán thống kê cho mỗi lớp
+        result = []
+        for class_name, grades in class_performance.items():
+            if grades:
+                avg_grade = sum(grades) / len(grades)
+                result.append({
+                    "class_name": class_name,
+                    "total_students": len(set([g['student_id'] for g in grades_data.data if students_dict.get(g['student_id'], {}).get('class_name') == class_name])),
+                    "average_grade": round(avg_grade, 1),
+                    "total_grades": len(grades),
+                    "excellent_count": len([g for g in grades if g >= 8.0]),
+                    "good_count": len([g for g in grades if 6.5 <= g < 8.0]),
+                    "average_count": len([g for g in grades if 5.0 <= g < 6.5]),
+                    "poor_count": len([g for g in grades if g < 5.0])
+                })
+        
+        # Sắp xếp theo điểm trung bình
+        result.sort(key=lambda x: x['average_grade'], reverse=True)
+        
+        return {
+            "success": True,
+            "data": result
+        }
+    except Exception as e:
+        logger.error(f"Error getting class performance: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy hiệu suất lớp học: {str(e)}")
+
+@router.get("/dashboard/system-health")
+async def get_system_health(db=Depends(get_db)):
+    """Lấy tình trạng sức khỏe hệ thống"""
+    try:
+        # Kiểm tra kết nối database
+        db_status = "healthy"
+        try:
+            db.table("users").select("id").limit(1).execute()
+        except:
+            db_status = "error"
+        
+        # Thống kê lỗi gần đây (giả sử có bảng logs)
+        # Trong thực tế, bạn sẽ có bảng logs để track errors
+        error_count = 0  # Placeholder
+        
+        # Thống kê hoạt động API gần đây
+        from datetime import timedelta
+        yesterday = (datetime.now().date() - timedelta(days=1)).isoformat()
+        recent_activity = db.table("users").select("last_login").gte("last_login", yesterday).execute()
+        
+        return {
+            "success": True,
+            "data": {
+                "database_status": db_status,
+                "error_count_24h": error_count,
+                "active_users_24h": len(recent_activity.data),
+                "uptime": "99.9%",  # Placeholder
+                "last_backup": datetime.now().isoformat()  # Placeholder
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting system health: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy tình trạng hệ thống: {str(e)}")
+
+@router.get("/dashboard/teacher-performance")
+async def get_teacher_performance(db=Depends(get_db)):
+    """Lấy hiệu suất giảng dạy của giáo viên"""
+    try:
+        # Lấy dữ liệu giáo viên và lớp họ dạy
+        teachers_data = db.table("teachers").select("id, full_name, teacher_code").eq("is_active", True).execute()
+        
+        # Lấy dữ liệu lớp học
+        classes_data = db.table("classes").select("id, class_name, homeroom_teacher_id").execute()
+        
+        # Lấy dữ liệu điểm danh
+        from datetime import timedelta
+        thirty_days_ago = (datetime.now().date() - timedelta(days=30)).isoformat()
+        attendance_data = db.table("attendance").select("student_id, status, date").gte("date", thirty_days_ago).execute()
+        
+        # Lấy dữ liệu học sinh
+        students_data = db.table("students").select("id, class_name").eq("is_active", True).execute()
+        students_dict = {s['id']: s for s in students_data.data}
+        
+        result = []
+        for teacher in teachers_data.data:
+            # Tìm các lớp mà giáo viên này chủ nhiệm
+            teacher_classes = [c for c in classes_data.data if c.get('homeroom_teacher_id') == teacher['id']]
+            
+            total_students = 0
+            total_attendance = 0
+            present_count = 0
+            
+            for class_info in teacher_classes:
+                class_students = [s for s in students_data.data if s['class_name'] == class_info['class_name']]
+                total_students += len(class_students)
+                
+                # Tính điểm danh cho lớp này
+                class_attendance = [a for a in attendance_data.data if students_dict.get(a['student_id'], {}).get('class_name') == class_info['class_name']]
+                total_attendance += len(class_attendance)
+                present_count += len([a for a in class_attendance if a['status'] == 'present'])
+            
+            attendance_rate = (present_count / total_attendance * 100) if total_attendance > 0 else 0
+            
+            result.append({
+                "teacher_id": teacher['id'],
+                "teacher_name": teacher['full_name'],
+                "teacher_code": teacher['teacher_code'],
+                "classes_count": len(teacher_classes),
+                "total_students": total_students,
+                "attendance_rate": round(attendance_rate, 1),
+                "total_attendance_records": total_attendance
+            })
+        
+        # Sắp xếp theo tỷ lệ điểm danh
+        result.sort(key=lambda x: x['attendance_rate'], reverse=True)
+        
+        return {
+            "success": True,
+            "data": result
+        }
+    except Exception as e:
+        logger.error(f"Error getting teacher performance: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy hiệu suất giáo viên: {str(e)}") 

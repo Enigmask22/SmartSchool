@@ -1,4 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { Users, Camera, UserCheck, UserX, AlertCircle, Loader2, Search, RefreshCw, Eye, Trash2, Upload, Download } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import ApiService from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
 
@@ -209,145 +215,191 @@ const FaceManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-32 h-32 rounded-full border-b-2 border-blue-600 animate-spin"></div>
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="face-management">
-      <div className="mb-8">
-        <h2 className="mb-2 text-3xl font-bold text-gray-800">Quản lý khuôn mặt AI</h2>
+    <div className="space-y-6 p-6 min-h-screen bg-gray-50">
+      <div className="space-y-2">
+        <h2 className="text-3xl font-bold text-gray-900 flex items-center space-x-2">
+          <Camera className="w-8 h-8 text-primary" />
+          <span>Quản lý khuôn mặt AI</span>
+        </h2>
         <p className="text-gray-600">Theo dõi và quản lý dữ liệu khuôn mặt đã đăng ký</p>
         {error && (
-          <div className="p-3 mt-2 text-red-700 bg-red-100 rounded border border-red-400">
-            {error}
+          <div className="flex items-center space-x-2 p-3 mt-2 text-red-700 bg-red-100 rounded border border-red-400">
+            <AlertCircle className="w-5 h-5" />
+            <span>{error}</span>
           </div>
         )}
       </div>
 
       {/* AI Status Card */}
-      <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
-        <h3 className="mb-4 text-xl font-semibold">Trạng thái hệ thống AI</h3>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <AlertCircle className="w-5 h-5 text-primary" />
+            <span>Trạng thái hệ thống AI</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
         
-        {aiStatus ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {aiStatus.service_status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
-              </div>
-              <div className="text-sm text-gray-600">Trạng thái service</div>
-              <div className="mt-1 text-xs text-gray-500">{aiStatus.service_name}</div>
-            </div>
-            
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
-                {aiStatus.database_encodings || 0}
-              </div>
-              <div className="text-sm text-gray-600">Khuôn mặt đã đăng ký</div>
-              <div className="mt-1 text-xs text-gray-500">Database: {aiStatus.database_encodings}, Local: {aiStatus.local_ai_encodings}</div>
-            </div>
-            
-            <div className="p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">
-                {aiStatus.accuracy || 'N/A'}
-              </div>
-              <div className="text-sm text-gray-600">Độ chính xác</div>
-              <div className="mt-1 text-xs text-gray-500">
-                {aiStatus.similarity_threshold ? `Threshold: ${aiStatus.similarity_threshold}` : 'Advanced AI'}
-              </div>
-            </div>
-            
-            <div className="p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">
-                {aiStatus.sync_status === 'synced' ? '✅' : '⚠️'}
-              </div>
-              <div className="text-sm text-gray-600">Trạng thái đồng bộ</div>
-              <div className="mt-1 text-xs text-gray-500 capitalize">{aiStatus.sync_status?.replace('_', ' ')}</div>
-            </div>
+          {aiStatus ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="border-green-200 bg-green-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <UserCheck className="w-5 h-5 text-green-600" />
+                    <div className="text-2xl font-bold text-green-600">
+                      {aiStatus.service_status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">Trạng thái service</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{aiStatus.service_name}</div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-blue-200 bg-blue-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    <div className="text-2xl font-bold text-blue-600">
+                      {aiStatus.database_encodings || 0}
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">Khuôn mặt đã đăng ký</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Database: {aiStatus.database_encodings}, Local: {aiStatus.local_ai_encodings}</div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-purple-200 bg-purple-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Camera className="w-5 h-5 text-purple-600" />
+                    <div className="text-2xl font-bold text-purple-600">
+                      {aiStatus.accuracy || 'N/A'}
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">Độ chính xác</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {aiStatus.similarity_threshold ? `Threshold: ${aiStatus.similarity_threshold}` : 'Advanced AI'}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-orange-200 bg-orange-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                    <div className="text-2xl font-bold text-orange-600">
+                      {aiStatus.sync_status === 'synced' ? '✅' : '⚠️'}
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">Trạng thái đồng bộ</div>
+                  <div className="mt-1 text-xs text-muted-foreground capitalize">{aiStatus.sync_status?.replace('_', ' ')}</div>
+                </CardContent>
+              </Card>
           </div>
-        ) : (
-          <div className="text-gray-500">Không thể tải thông tin AI status</div>
-        )}
+          ) : (
+            <div className="text-muted-foreground">Không thể tải thông tin AI status</div>
+          )}
 
-        <div className="mt-4">
-          <button
-            onClick={reloadModels}
-            className="px-4 py-2 mr-3 text-white bg-blue-600 rounded-md hover:bg-blue-700"
-          >
-            Reload Models
-          </button>
-          <button
-            onClick={fetchData}
-            className="px-4 py-2 text-white bg-gray-600 rounded-md hover:bg-gray-700"
-          >
-            Làm mới
-          </button>
-        </div>
-      </div>
+          <div className="mt-4 flex space-x-3">
+            <Button
+              onClick={reloadModels}
+              variant="outline"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Reload Models
+            </Button>
+            <Button
+              onClick={fetchData}
+              variant="outline"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Làm mới
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filter Section */}
-      <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Lớp
-            </label>
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
-              {isHomeroomTeacher() ? (
-                <option value="">Chọn lớp chủ nhiệm</option>
-              ) : (
-                <option value="">Tất cả lớp</option>
-              )}
-              {availableClasses.map(className => (
-                <option key={className} value={className}>
-                  {className}
-                </option>
-              ))}
-            </select>
-          </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Search className="w-5 h-5 text-primary" />
+            <span>Bộ lọc</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-700">
+                Lớp
+              </label>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="px-3 py-2 w-full rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+              >
+                {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
+                {isHomeroomTeacher() ? (
+                  <option value="">Chọn lớp chủ nhiệm</option>
+                ) : (
+                  <option value="">Tất cả lớp</option>
+                )}
+                {availableClasses.map(className => (
+                  <option key={className} value={className}>
+                    {className}
+                  </option>
+                ))}
+              </select>
+            </div>
           
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                fetchAIStatus();
-                fetchStudentsData();
-              }}
-              className="px-4 py-2 text-white bg-blue-600 rounded-md transition-colors hover:bg-blue-700"
-            >
-              Làm mới dữ liệu
-            </button>
+            <div className="flex items-end">
+              <Button
+                onClick={() => {
+                  fetchAIStatus();
+                  fetchStudentsData();
+                }}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Làm mới dữ liệu
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Students with Face Registration */}
-      <div className="overflow-hidden bg-white rounded-lg shadow-md">
-        <div className="p-6 border-b">
+      <Card>
+        <CardHeader>
           <div className="flex flex-wrap gap-3 justify-between items-center">
             <div>
-              <h3 className="text-xl font-semibold">Học sinh đã đăng ký khuôn mặt</h3>
-              <p className="mt-1 text-gray-600">
+              <CardTitle className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-primary" />
+                <span>Học sinh đã đăng ký khuôn mặt</span>
+              </CardTitle>
+              <CardDescription>
                 Danh sách học sinh có thể được nhận diện bằng AI
                 {selectedClass && ` - Lớp ${selectedClass}`}
-              </p>
+              </CardDescription>
             </div>
             {students.length > pageSize && (
               <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-700">Số lượng/trang:</label>
+                <label className="text-sm text-muted-foreground">Số lượng/trang:</label>
                 <select
                   value={pageSize}
                   onChange={(e) => {
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="pl-3 pr-8 py-1.5 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                 >
                   <option value={10}>10</option>
                   <option value={20}>20</option>
@@ -357,35 +409,37 @@ const FaceManagement = () => {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Header */}
-        <div className="grid grid-cols-12 gap-4 items-center px-4 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase bg-gray-50 border-b">
-          <div className="col-span-2">Mã HS</div>
-          <div className="col-span-3">Họ tên</div>
-          <div className="col-span-1">Lớp</div>
-          <div className="col-span-4">Trạng thái khuôn mặt</div>
-          <div className="col-span-2 text-center">Thao tác</div>
-        </div>
-
-        {/* Body */}
-        <div className="divide-y divide-gray-200">
-          {students.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-500">
-              {isHomeroomTeacher() && !selectedClass ? (
-                <div>
-                  <div className="mb-4 text-6xl text-gray-400">🎯</div>
-                  <h3 className="mb-2 text-lg font-medium text-gray-900">Chọn lớp chủ nhiệm để xem dữ liệu</h3>
-                  <p className="text-gray-500">Vui lòng chọn lớp từ dropdown phía trên</p>
-                </div>
-              ) : (
-                <div>
-                  <div className="mb-4 text-6xl text-gray-400">👤</div>
-                  <h3 className="mb-2 text-lg font-medium text-gray-900">Chưa có học sinh nào đăng ký khuôn mặt</h3>
-                  <p className="text-gray-500">Hãy vào tab "Học sinh" để đăng ký khuôn mặt cho học sinh</p>
-                </div>
-              )}
-            </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-32">Mã HS</TableHead>
+                <TableHead className="w-48">Họ tên</TableHead>
+                <TableHead className="w-24">Lớp</TableHead>
+                <TableHead className="w-48">Trạng thái khuôn mặt</TableHead>
+                <TableHead className="w-32 text-center">Thao tác</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {students.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    {isHomeroomTeacher() && !selectedClass ? (
+                      <div>
+                        <div className="mb-4 text-6xl text-gray-400">🎯</div>
+                        <h3 className="mb-2 text-lg font-medium text-gray-900">Chọn lớp chủ nhiệm để xem dữ liệu</h3>
+                        <p className="text-gray-500">Vui lòng chọn lớp từ dropdown phía trên</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="mb-4 text-6xl text-gray-400">👤</div>
+                        <h3 className="mb-2 text-lg font-medium text-gray-900">Chưa có học sinh nào đăng ký khuôn mặt</h3>
+                        <p className="text-gray-500">Hãy vào tab "Học sinh" để đăng ký khuôn mặt cho học sinh</p>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
           ) : (
             (() => {
               // Apply pagination
@@ -394,49 +448,55 @@ const FaceManagement = () => {
               const paginatedStudents = students.slice(startIndex, endIndex);
               
               return paginatedStudents.map((student) => (
-              <div key={student.id} className="grid grid-cols-12 gap-4 items-center px-4 py-4 hover:bg-gray-50">
-                <div className="col-span-2 text-sm font-medium text-gray-900 truncate">
-                  {student.student_id}
-                </div>
-                <div className="col-span-3 text-sm text-gray-900 truncate">
-                  <div className="font-medium">{student.full_name}</div>
-                </div>
-                <div className="col-span-1 text-sm text-gray-900">
-                  <span className="px-2 py-1 text-xs text-blue-800 bg-blue-100 rounded-full">
-                    {student.class_name}
-                  </span>
-                </div>
-                <div className="col-span-4 text-sm text-gray-900">
-                  {(student.face_encoding || student.insightface_encoding) ? (
-                    <span className="inline-flex items-center px-3 py-1 text-xs text-green-800 bg-green-100 rounded-full">
-                      ✅ Đã đăng ký {student.insightface_encoding ? '(InsightFace)' : '(MediaPipe)'}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-3 py-1 text-xs text-red-800 bg-red-100 rounded-full">
-                      ❌ Chưa đăng ký
-                    </span>
-                  )}
-                </div>
-                <div className="flex col-span-2 justify-center text-sm font-medium">
-                  {(student.face_encoding || student.insightface_encoding) ? (
-                    <button 
-                      onClick={() => deleteFaceEncoding(student.id, student.full_name)}
-                      className="inline-flex gap-1 items-center px-3 py-1 text-xs text-red-700 bg-red-100 rounded transition-colors hover:bg-red-200"
-                      title="Xóa khuôn mặt đã đăng ký"
-                    >
-                      🗑️ Xóa
-                    </button>
-                  ) : (
-                    <span className="px-3 py-1 text-xs text-gray-500 bg-gray-100 rounded">
-                      Không có dữ liệu
-                    </span>
-                  )}
-                </div>
-              </div>
-            ));
+                <TableRow key={student.id}>
+                  <TableCell className="text-sm font-medium text-gray-900 truncate">
+                    {student.student_id}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900 truncate">
+                    <div className="font-medium">{student.full_name}</div>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900">
+                    <Badge variant="secondary" className="text-xs">
+                      {student.class_name}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900">
+                    {(student.face_encoding || student.insightface_encoding) ? (
+                      <Badge variant="default" className="bg-green-100 text-green-800">
+                        <UserCheck className="w-3 h-3 mr-1" />
+                        Đã đăng ký {student.insightface_encoding ? '(InsightFace)' : '(MediaPipe)'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="bg-red-100 text-red-800">
+                        <UserX className="w-3 h-3 mr-1" />
+                        Chưa đăng ký
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center text-sm font-medium">
+                    {(student.face_encoding || student.insightface_encoding) ? (
+                      <Button
+                        onClick={() => deleteFaceEncoding(student.id, student.full_name)}
+                        variant="destructive"
+                        size="sm"
+                        className="text-xs"
+                        title="Xóa khuôn mặt đã đăng ký"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Xóa
+                      </Button>
+                    ) : (
+                      <span className="px-3 py-1 text-xs text-muted-foreground bg-muted rounded">
+                        Không có dữ liệu
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ));
             })()
           )}
-        </div>
+        </TableBody>
+      </Table>
         
         {/* Pagination Controls */}
         {(() => {
@@ -446,20 +506,21 @@ const FaceManagement = () => {
           if (totalPages <= 1) return null;
           
           return (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="px-6 py-4 bg-muted/50 border-t">
               <div className="flex flex-wrap gap-3 justify-between items-center">
-                <div className="text-sm text-gray-700">
-                  Hiển thị <span className="font-semibold">{((currentPage - 1) * pageSize) + 1}</span> đến <span className="font-semibold">{Math.min(currentPage * pageSize, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
+                <div className="text-sm text-muted-foreground">
+                  Hiển thị <span className="font-semibold text-foreground">{((currentPage - 1) * pageSize) + 1}</span> đến <span className="font-semibold text-foreground">{Math.min(currentPage * pageSize, totalStudents)}</span> trong tổng số <span className="font-semibold text-foreground">{totalStudents}</span> học sinh
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  <button
+                  <Button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    variant="outline"
+                    size="sm"
                   >
                     ← Trước
-                  </button>
+                  </Button>
                   
                   <div className="flex items-center space-x-1">
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
@@ -470,52 +531,53 @@ const FaceManagement = () => {
                       
                       if (!showPage) {
                         if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                          return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+                          return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
                         }
                         return null;
                       }
                       
                       return (
-                        <button
+                        <Button
                           key={pageNum}
                           onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                            currentPage === pageNum
-                              ? 'bg-blue-600 text-white'
-                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                          }`}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
                         >
                           {pageNum}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
                   
-                  <button
+                  <Button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    variant="outline"
+                    size="sm"
                   >
                     Sau →
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
           );
         })()}
-      </div>
+      </CardContent>
+    </Card>
 
-      {/* Instructions */}
-      <div className="p-6 mt-6 bg-blue-50 rounded-lg">
-        <h4 className="mb-2 text-lg font-semibold text-blue-800">Hướng dẫn sử dụng</h4>
-        <div className="space-y-1 text-blue-700">
+    {/* Instructions */}
+    <Card className="mt-6">
+      <CardContent className="p-6">
+        <h4 className="mb-2 text-lg font-semibold text-primary">Hướng dẫn sử dụng</h4>
+        <div className="space-y-1 text-muted-foreground">
           <p>• Để đăng ký khuôn mặt cho học sinh, vào tab "Học sinh" và bấm nút "Đăng ký mặt"</p>
           <p>• Hệ thống sẽ mở camera để chụp ảnh khuôn mặt và lưu vào database</p>
           <p>• Sau khi đăng ký, học sinh có thể được nhận diện tự động trong chức năng điểm danh</p>
           <p>• Sử dụng nút "Reload Models" để cập nhật lại mô hình AI sau khi có thay đổi</p>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
+  </div>
   );
 };
 

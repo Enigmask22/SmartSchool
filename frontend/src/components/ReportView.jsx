@@ -183,15 +183,15 @@ const ReportView = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl max-w-7xl w-full mx-4 max-h-screen overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-t-xl">
+        <div className="bg-primary text-primary-foreground p-6 rounded-t-xl">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-3xl font-bold">📊 Báo cáo điểm danh</h2>
-              <p className="text-purple-100 mt-1">Thống kê chi tiết về tình hình điểm danh</p>
+              <p className="text-primary-foreground/80 mt-1">Thống kê chi tiết về tình hình điểm danh</p>
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:text-purple-200 text-3xl"
+              className="text-primary-foreground hover:text-primary-foreground/80 text-3xl"
             >
               ×
             </button>

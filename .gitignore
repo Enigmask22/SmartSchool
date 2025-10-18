@@ -480,3 +480,5 @@ recognition_cache/
 # Setup artifacts
 setup_complete.flag
 installation.log
+
+Fix_UI_Instructions.md

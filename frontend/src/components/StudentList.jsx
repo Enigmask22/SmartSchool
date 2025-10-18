@@ -1,4 +1,12 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
+import { Search, RefreshCw, Users, UserPlus, Edit, Trash2, Eye, Camera, Upload, Download, AlertCircle, Loader2, X, Mail, Phone, BookOpen, MessageCircle, Images, BarChart3, GraduationCap } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Label } from './ui/label';
 import ApiService from '../services/api';
 import MultipleFaceRegistration from './MultipleFaceRegistration';
 import { AuthContext } from '../contexts/AuthContext';
@@ -691,27 +699,6 @@ const StudentList = () => {
     setEditForm({});
   };
 
-  const handleDelete = async (studentId) => {
-    console.log('Delete button clicked for student ID:', studentId);
-    
-    if (window.confirm('Bạn có chắc chắn muốn xóa học sinh này?')) {
-      try {
-        console.log('Calling ApiService.deleteStudent with ID:', studentId);
-        const response = await ApiService.deleteStudent(studentId);
-        console.log('Delete response:', response);
-        
-        if (response.success) {
-          alert('Xóa học sinh thành công!');
-          fetchStudents();
-        } else {
-          alert(`Lỗi: ${response.message || 'Không thể xóa học sinh'}`);
-        }
-      } catch (error) {
-        console.error('Error deleting student:', error);
-        alert('Có lỗi xảy ra khi xóa học sinh: ' + error.message);
-      }
-    }
-  };
 
   const handleRestore = async (student) => {
     console.log('Restore button clicked for student:', student);
@@ -1134,336 +1121,387 @@ const StudentList = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-32 h-32 rounded-full border-b-2 border-blue-600 animate-spin"></div>
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="student-list">
-      <div className="mb-8">
-        <h2 className="mb-2 text-3xl font-bold text-gray-800">Danh sách học sinh</h2>
-        <p className="text-gray-600">Quản lý thông tin học sinh</p>
+    <div className="space-y-6 p-6 min-h-screen bg-gray-50">
+      {/* Header Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-3">
+            <Users className="w-8 h-8 text-primary" />
+            <span className="text-3xl font-bold">Danh sách học sinh</span>
+          </CardTitle>
+          <CardDescription className="text-lg">
+            Quản lý thông tin học sinh
+          </CardDescription>
+        </CardHeader>
         {error && (
-          <div className="p-3 mt-2 text-yellow-700 bg-yellow-100 rounded border border-yellow-400">
-            {error}
-          </div>
+          <CardContent>
+            <div className="flex items-center space-x-2 p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              <p className="text-destructive">{error}</p>
+            </div>
+          </CardContent>
         )}
-      </div>
+      </Card>
 
       {/* Search and Filter */}
-      <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Tìm kiếm
-            </label>
-            <input
-              type="text"
-              placeholder="Tên hoặc mã học sinh..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Lớp
-            </label>
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="px-3 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
-              {isHomeroomTeacher() ? (
-                <option value="">Chọn lớp chủ nhiệm</option>
-              ) : (
-                <option value="">Tất cả lớp</option>
-              )}
-              {availableClasses.map(className => (
-                <option key={className} value={className}>{className}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Hiển thị
-            </label>
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={showInactive}
-                  onChange={(e) => setShowInactive(e.target.checked)}
-                  className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+      <Card>
+        <CardHeader>
+          <CardTitle>Tìm kiếm và lọc</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="search">Tìm kiếm</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="search"
+                  type="text"
+                  placeholder="Tên hoặc mã học sinh..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
                 />
-                <span className="ml-2 text-sm text-gray-600">Đã xóa</span>
-              </label>
-              <button
-                onClick={fetchStudents}
-                className="px-4 py-2 text-white bg-blue-600 rounded-md transition-colors hover:bg-blue-700"
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="class-select">Lớp</Label>
+              <select
+                id="class-select"
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background"
               >
-                Làm mới
-              </button>
+                {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
+                {isHomeroomTeacher() ? (
+                  <option value="">Chọn lớp chủ nhiệm</option>
+                ) : (
+                  <option value="">Tất cả lớp</option>
+                )}
+                {availableClasses.map(className => (
+                  <option key={className} value={className}>{className}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Hiển thị</Label>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="show-inactive"
+                    checked={showInactive}
+                    onChange={(e) => setShowInactive(e.target.checked)}
+                    className="w-4 h-4 text-primary bg-background border-input rounded focus:ring-2 focus:ring-ring"
+                  />
+                  <Label htmlFor="show-inactive" className="cursor-pointer">
+                    Đã xóa
+                  </Label>
+                </div>
+                <Button
+                  onClick={fetchStudents}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Làm mới</span>
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Pagination Summary */}
       {totalStudents > 0 && (
-        <div className="p-4 mb-4 bg-white rounded-lg shadow-sm">
-          <div className="flex flex-wrap gap-3 justify-between items-center">
-            <div className="text-sm text-gray-700">
-              Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex flex-wrap gap-3 justify-between items-center">
+              <div className="text-sm text-muted-foreground">
+                Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label className="text-sm">Số lượng/trang:</Label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="py-1 pr-8 pl-3 text-sm bg-background rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value={6}>6</option>
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <label className="text-sm text-gray-700">Số lượng/trang:</label>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="py-1 pr-8 pl-3 text-sm bg-white rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value={6}>6</option>
-                <option value={12}>12</option>
-                <option value={24}>24</option>
-                <option value={48}>48</option>
-              </select>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Students Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredStudents.length === 0 ? (
-          <div className="col-span-full py-12 text-center">
-            <div className="mb-4 text-6xl text-gray-400">👥</div>
-            <h3 className="mb-2 text-lg font-medium text-gray-900">
-              {searchTerm || selectedClass ? 'Không tìm thấy học sinh nào' : 'Chưa có học sinh nào'}
-            </h3>
-            <p className="text-gray-500">
-              {searchTerm || selectedClass ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm' : 'Hãy thêm học sinh mới để bắt đầu'}
-            </p>
-          </div>
+          <Card className="col-span-full">
+            <CardContent className="py-12 text-center">
+              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-muted rounded-full">
+                <Users className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-foreground">
+                {searchTerm || selectedClass ? 'Không tìm thấy học sinh nào' : 'Chưa có học sinh nào'}
+              </h3>
+              <p className="text-muted-foreground">
+                {searchTerm || selectedClass ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm' : 'Hãy thêm học sinh mới để bắt đầu'}
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           paginatedStudents.map((student) => (
-            <div key={student.id} className={`overflow-hidden bg-white rounded-xl border shadow-lg transition-all duration-300 hover:shadow-xl ${
+            <Card key={student.id} className={`group transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
               student.is_active === false 
-                ? 'border-red-300 bg-red-50 opacity-75' 
-                : 'border-gray-100'
+                ? 'border-destructive/50 bg-destructive/5 opacity-75' 
+                : 'hover:border-primary/50'
             }`}>
               {/* Header with avatar and basic info */}
-              <div className={`p-5 text-white ${
+              <CardHeader className={`${
                 student.is_active === false 
-                  ? 'bg-red-600' 
-                  : 'bg-blue-600'
+                  ? 'bg-destructive text-destructive-foreground' 
+                  : 'bg-gradient-to-r from-primary to-primary/80 text-primary-foreground'
               }`}>
-                <div className="flex items-center space-x-3">
-                  <div className="flex justify-center items-center w-14 h-14 text-xl font-bold rounded-lg bg-white/20">
-                    {student.full_name?.charAt(0)?.toUpperCase() || '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-semibold truncate">{student.full_name}</h3>
-                    <p className="text-sm text-blue-100">{student.student_id}</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-white/20">
-                        🎓 {student.class_name}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <div className="flex justify-center items-center w-16 h-16 text-2xl font-bold rounded-full bg-white/20 backdrop-blur-sm">
+                        {student.full_name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
-                      {student.gender && (
-                        <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-white/20">
-                          {student.gender === 'Nam' ? '👨' : student.gender === 'Nữ' ? '👩' : '👤'} {student.gender}
-                        </div>
-                      )}
                       {student.is_active === false && (
-                        <div className="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-red-500/50">
-                          🗑️ Đã xóa
+                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-destructive rounded-full flex items-center justify-center">
+                          <X className="w-3 h-3 text-destructive-foreground" />
                         </div>
                       )}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-bold truncate">{student.full_name}</h3>
+                      <p className="text-sm text-primary-foreground/80 font-mono">{student.student_id}</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
+                          <GraduationCap className="w-3 h-3 mr-1" />
+                          {student.class_name}
+                        </Badge>
+                        {student.gender && (
+                          <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
+                            <Users className="w-3 h-3 mr-1" />
+                            {student.gender}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  
+                  {/* Edit button in top right corner */}
+                  {student.is_active !== false && (
+                    <Button
+                      onClick={() => handleEdit(student)}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center space-x-1 text-xs bg-white/20 text-white border-white/30 hover:bg-white/30 hover:border-white/50"
+                    >
+                      <Edit className="w-3 h-3" />
+                      <span>Sửa</span>
+                    </Button>
+                  )}
                 </div>
-              </div>
+              </CardHeader>
 
               {/* Student info */}
-              <div className="p-6 space-y-3">
-                <div className="grid grid-cols-1 gap-3 text-sm">
-                  <div className="flex items-center space-x-3">
-                    <span className="flex justify-center items-center w-5 h-5 text-gray-400">📧</span>
-                    <span className="text-gray-600 truncate">{student.email || 'Chưa có email'}</span>
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3 p-2 rounded-lg bg-muted/30">
+                    <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
+                      <Mail className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="text-sm font-medium truncate">{student.email || 'Chưa có email'}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="flex justify-center items-center w-5 h-5 text-gray-400">📱</span>
-                    <span className="text-gray-600">{student.phone || 'Chưa có SĐT'}</span>
+                  
+                  <div className="flex items-center space-x-3 p-2 rounded-lg bg-muted/30">
+                    <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
+                      <Phone className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Số điện thoại</p>
+                      <p className="text-sm font-medium">{student.phone || 'Chưa có SĐT'}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="flex justify-center items-center w-5 h-5 text-gray-400">📚</span>
-                    <span className="text-gray-600">Khối {student.grade || 'N/A'}</span>
+                  
+                  <div className="flex items-center space-x-3 p-2 rounded-lg bg-muted/30">
+                    <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
+                      <BookOpen className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Khối</p>
+                      <p className="text-sm font-medium">Khối {student.grade || 'N/A'}</p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Action buttons */}
-                <div className="pt-3 border-t border-gray-100">
+                <div className="pt-4 border-t border-border/50">
                   {student.is_active === false ? (
                     // Actions for deleted students (limited)
-                    <div className="text-center">
-                      <button
+                    <div className="text-center space-y-3">
+                      <Button
                         onClick={() => handleRestore(student)}
                         disabled={restoreLoading}
-                        className={`flex justify-center items-center px-4 py-2 mx-auto space-x-1 text-xs font-medium text-white rounded-md transition-colors ${
-                          restoreLoading 
-                            ? 'bg-gray-400 cursor-not-allowed' 
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
-                        title="Khôi phục học sinh"
+                        size="sm"
+                        className="w-full"
                       >
                         {restoreLoading ? (
                           <>
-                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             <span>Đang khôi phục...</span>
                           </>
                         ) : (
                           <>
-                            <span className="text-sm">🔄</span>
-                            <span>Khôi phục</span>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            <span>Khôi phục học sinh</span>
                           </>
                         )}
-                      </button>
-                      <p className="mt-2 text-xs text-gray-500">Học sinh đã bị xóa</p>
+                      </Button>
+                      <p className="text-xs text-muted-foreground">Học sinh đã bị xóa</p>
                     </div>
                   ) : (
                     // Actions for active students (full)
-                    <>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <button
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
                           onClick={() => handleFeedbackClick(student)}
-                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
-                          title="Tạo nhận xét"
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
                         >
-                          <span className="text-sm">💬</span>
+                          <MessageCircle className="w-4 h-4" />
                           <span>Nhận xét</span>
-                        </button>
+                        </Button>
                         
-                        <button
+                        <Button
                           onClick={() => {
                             setSelectedStudentForMultiple(student);
                             setShowMultipleModal(true);
                           }}
-                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-green-700 bg-green-50 rounded-md transition-colors hover:bg-green-100"
-                          title="Nhiều ảnh"
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
                         >
-                          <span className="text-sm">📸</span>
+                          <Images className="w-4 h-4" />
                           <span>Nhiều ảnh</span>
-                        </button>
-                        
-                        <button
-                          onClick={() => handleViewGrades(student)}
-                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
-                          title="Xem điểm số"
-                        >
-                          <span className="text-sm">📊</span>
-                          <span>Điểm số</span>
-                        </button>
+                        </Button>
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => handleViewGrades(student)}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                          <span>Điểm số</span>
+                        </Button>
+                        
+                        <Button
                           onClick={() => handleSubjectSelection(student)}
-                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md transition-colors hover:bg-blue-100"
-                          title="Chọn môn học"
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
                         >
-                          <span className="text-sm">📚</span>
+                          <GraduationCap className="w-4 h-4" />
                           <span>Môn học</span>
-                        </button>
-                        
-                        <button
-                          onClick={() => handleEdit(student)}
-                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md transition-colors hover:bg-gray-200"
-                          title="Sửa thông tin"
-                        >
-                          <span className="text-sm">✏️</span>
-                          <span>Sửa</span>
-                        </button>
-                        
-                        <button
-                          onClick={() => handleDelete(student.id)}
-                          className="flex justify-center items-center px-2 py-2 space-x-1 text-xs font-medium text-red-700 bg-red-50 rounded-md transition-colors hover:bg-red-100"
-                          title="Xóa học sinh"
-                        >
-                          <span className="text-sm">🗑️</span>
-                          <span>Xóa</span>
-                        </button>
+                        </Button>
                       </div>
-                    </>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Edit button moved to header */}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))
         )}
       </div>
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center mt-6 space-x-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            ← Trước
-          </button>
-          
-          <div className="flex items-center space-x-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-              // Show first page, last page, current page, and pages around current
-              const showPage = 
-                pageNum === 1 || 
-                pageNum === totalPages || 
-                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex justify-center items-center space-x-2">
+              <Button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                variant="outline"
+                size="sm"
+              >
+                ← Trước
+              </Button>
               
-              if (!showPage) {
-                // Show ellipsis for skipped pages
-                if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                  return <span key={pageNum} className="px-2 text-gray-500">...</span>;
-                }
-                return null;
-              }
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                  // Show first page, last page, current page, and pages around current
+                  const showPage = 
+                    pageNum === 1 || 
+                    pageNum === totalPages || 
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
+                  
+                  if (!showPage) {
+                    // Show ellipsis for skipped pages
+                    if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                      return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
+                    }
+                    return null;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
               
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-          </div>
-          
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Sau →
-          </button>
-        </div>
+              <Button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                variant="outline"
+                size="sm"
+              >
+                Sau →
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
         {/* Face Registration Modal */}
@@ -2017,14 +2055,14 @@ const StudentList = () => {
         <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
           <div className="overflow-y-auto mx-4 w-full max-w-6xl max-h-screen bg-white rounded-lg">
             {/* Modal Header */}
-            <div className="p-6 text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-t-lg">
+            <div className="p-6 text-primary-foreground bg-primary rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold">📊 Bảng điểm</h3>
-                  <p className="mt-1 text-purple-100">
+                  <p className="mt-1 text-primary-foreground/80">
                     {selectedStudentForGrades.full_name} - {selectedStudentForGrades.student_id}
                   </p>
-                  <p className="text-sm text-purple-100">
+                  <p className="text-sm text-primary-foreground/80">
                     Lớp {selectedStudentForGrades.class_name} - Khối {selectedStudentForGrades.grade}
                   </p>
                 </div>
@@ -2094,7 +2132,7 @@ const StudentList = () => {
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="flex items-center">
-                                <div className="flex justify-center items-center w-10 h-10 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-full">
+                                <div className="flex justify-center items-center w-10 h-10 text-sm font-bold text-primary-foreground bg-primary rounded-full">
                                   {gradeRecord.subject_name?.charAt(0)?.toUpperCase() || '?'}
                                 </div>
                                 <div className="ml-4">
@@ -2157,7 +2195,7 @@ const StudentList = () => {
                   </div>
 
                   {/* Summary */}
-                  <div className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+                  <div className="p-6 bg-muted/50 rounded-lg">
                     <h4 className="mb-3 font-medium text-gray-900">📈 Tổng kết</h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="text-center">
@@ -2207,14 +2245,14 @@ const StudentList = () => {
         <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
           <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
             {/* Modal Header */}
-            <div className="p-6 text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-lg">
+            <div className="p-6 text-primary-foreground bg-primary rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold">💬 Tạo nhận xét học sinh</h3>
-                  <p className="mt-1 text-indigo-100">
+                  <p className="mt-1 text-primary-foreground/80">
                     {selectedStudentForFeedback.full_name} - {selectedStudentForFeedback.student_id}
                   </p>
-                  <p className="text-sm text-indigo-100">
+                  <p className="text-sm text-primary-foreground/80">
                     Lớp {selectedStudentForFeedback.class_name} - Khối {selectedStudentForFeedback.grade}
                   </p>
                 </div>
@@ -2441,14 +2479,14 @@ const StudentList = () => {
         <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
           <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
             {/* Modal Header */}
-            <div className="p-6 text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-lg">
+            <div className="p-6 text-primary-foreground bg-primary rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold">📚 Chọn môn học</h3>
-                  <p className="mt-1 text-blue-100">
+                  <p className="mt-1 text-primary-foreground/80">
                     {selectedStudentForSubject.full_name} - {selectedStudentForSubject.student_id}
                   </p>
-                  <p className="text-sm text-blue-100">
+                  <p className="text-sm text-primary-foreground/80">
                     Lớp {selectedStudentForSubject.class_name} - Khối {selectedStudentForSubject.grade}
                   </p>
                 </div>

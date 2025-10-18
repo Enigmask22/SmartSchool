@@ -14,6 +14,10 @@ import {
   BarChart3,
   Info
 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
@@ -438,183 +442,175 @@ const ContinuousRecognition = () => {
   };
 
   return (
-    <div className="p-6 min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl">
+    <div className="p-6 space-y-6 min-h-screen bg-gray-50">
+      <div className="mx-auto space-y-6 max-w-7xl">
         {/* Header */}
-        <div className="p-6 mb-6 bg-white rounded-lg shadow-md">
-          <div className="flex justify-between items-center">
-            <h1 className="flex items-center text-3xl font-bold text-gray-800">
-              <Camera className="mr-3 text-blue-600" size={36} />
-              Điểm Danh Tự Động Liên Tục
-            </h1>
-            
-            <div className="flex items-center space-x-4">
-              {/* Status Indicators */}
-              <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-              }`}>
-                {isConnected ? <Wifi size={16} className="mr-1" /> : <WifiOff size={16} className="mr-1" />}
-                {isConnected ? 'Đã kết nối' : 'Mất kết nối'}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                <Camera className="w-8 h-8 text-primary" />
+                <div>
+                  <CardTitle className="text-3xl font-bold">Điểm Danh Tự Động Liên Tục</CardTitle>
+                  <CardDescription>Hệ thống nhận diện khuôn mặt tự động liên tục</CardDescription>
+                </div>
               </div>
               
-              <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                isRunning ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-              }`}>
-                {isRunning ? 'Đang chạy' : 'Đã dừng'}
-              </div>
+              <div className="flex items-center space-x-4">
+                {/* Status Indicators */}
+                <Badge variant={isConnected ? "default" : "destructive"} className="flex items-center space-x-1">
+                  {isConnected ? <Wifi size={16} /> : <WifiOff size={16} />}
+                  <span>{isConnected ? 'Đã kết nối' : 'Mất kết nối'}</span>
+                </Badge>
+                
+                <Badge variant={isRunning ? "default" : "secondary"} className="flex items-center space-x-1">
+                  <span>{isRunning ? 'Đang chạy' : 'Đã dừng'}</span>
+                </Badge>
 
-              {/* Camera Toggle Button */}
-              <button
-                onClick={toggleCamera}
-                className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
-                  isCameraOn
-                    ? 'text-white bg-red-600 hover:bg-red-700'
-                    : 'text-white bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {isCameraOn ? (
-                  <>
-                    <Square size={18} className="mr-2" />
-                    Tắt Camera
-                  </>
-                ) : (
-                  <>
-                    <Camera size={18} className="mr-2" />
-                    Bật Camera
-                  </>
-                )}
-              </button>
-              
-              {/* Recognition Control Button */}
-              <button
-                onClick={isRunning ? handleStop : handleStart}
-                disabled={!isConnected || !isCameraOn}
-                className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
-                  isRunning
-                    ? 'text-white bg-orange-600 hover:bg-orange-700'
-                    : 'text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
-                }`}
-              >
-                {isRunning ? (
-                  <>
-                    <Pause size={18} className="mr-2" />
-                    Dừng Nhận Diện
-                  </>
-                ) : (
-                  <>
-                    <Play size={18} className="mr-2" />
-                    Bắt Đầu Nhận Diện
-                  </>
-                )}
-              </button>
+                {/* Camera Toggle Button */}
+                <Button
+                  onClick={toggleCamera}
+                  variant={isCameraOn ? "destructive" : "default"}
+                  className="flex items-center space-x-2"
+                >
+                  {isCameraOn ? <Square size={18} /> : <Camera size={18} />}
+                  <span>{isCameraOn ? 'Tắt Camera' : 'Bật Camera'}</span>
+                </Button>
+                
+                {/* Recognition Control Button */}
+                <Button
+                  onClick={isRunning ? handleStop : handleStart}
+                  disabled={!isConnected || !isCameraOn}
+                  variant={isRunning ? "destructive" : "default"}
+                  className="flex items-center space-x-2"
+                >
+                  {isRunning ? <Pause size={18} /> : <Play size={18} />}
+                  <span>{isRunning ? 'Dừng Nhận Diện' : 'Bắt Đầu Nhận Diện'}</span>
+                </Button>
+              </div>
             </div>
-          </div>
+          </CardHeader>
           
           {/* Info Banner */}
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start">
-              <Info className="mr-2 text-blue-600 mt-0.5" size={16} />
-              <div className="text-sm text-blue-800">
+          <CardContent>
+            <div className="flex items-start p-3 space-x-2 rounded-lg border bg-primary/5 border-primary/20">
+              <Info className="w-4 h-4 text-primary mt-0.5" />
+              <div className="text-sm text-primary">
                 <strong>Về độ tin cậy:</strong> InsightFace AI sử dụng thuật toán ArcFace với độ tin cậy 20-50% là bình thường và rất chính xác. 
                 Hệ thống hiển thị cả <strong>độ tin cậy gốc</strong> (20-50%) và <strong>độ chính xác quy đổi</strong> (40-100%) để dễ hiểu hơn.
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Statistics Panel */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Recognition Stats */}
-          <div className="p-4 bg-white rounded-lg shadow-md">
-            <h3 className="flex items-center mb-3 text-lg font-semibold text-gray-800">
-              <BarChart3 className="mr-2 text-blue-600" size={20} />
-              Thống Kê Nhận Diện
-            </h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tổng nhận diện:</span>
-                <span className="font-semibold">{stats.totalRecognitions}</span>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                <span>Thống Kê Nhận Diện</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tổng nhận diện:</span>
+                  <span className="font-semibold text-primary">{stats.totalRecognitions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Học sinh unique:</span>
+                  <span className="font-semibold text-green-600">{stats.uniqueStudents.size}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Thời gian chạy:</span>
+                  <span className="font-semibold text-purple-600">{formatDuration(stats.runningTime)}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Học sinh unique:</span>
-                <span className="font-semibold">{stats.uniqueStudents.size}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Thời gian chạy:</span>
-                <span className="font-semibold">{formatDuration(stats.runningTime)}</span>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Confidence Guide */}
-          <div className="p-4 bg-white rounded-lg shadow-md">
-            <h3 className="flex items-center mb-3 text-lg font-semibold text-gray-800">
-              <Info className="mr-2 text-green-600" size={20} />
-              Hướng Dẫn Độ Tin Cậy
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-emerald-600 rounded mr-2"></div>
-                <span>≥45% (90%+): Xuất sắc</span>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Info className="w-5 h-5 text-green-600" />
+                <span>Hướng Dẫn Độ Tin Cậy</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center">
+                  <div className="mr-2 w-3 h-3 bg-emerald-600 rounded"></div>
+                  <span>≥45% (90%+): Xuất sắc</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="mr-2 w-3 h-3 bg-green-600 rounded"></div>
+                  <span>35-44% (70-88%): Rất cao</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="mr-2 w-3 h-3 bg-blue-600 rounded"></div>
+                  <span>25-34% (50-68%): Cao</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="mr-2 w-3 h-3 bg-yellow-600 rounded"></div>
+                  <span>20-24% (40-48%): Tốt</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="mr-2 w-3 h-3 bg-orange-600 rounded"></div>
+                  <span>&lt;20% (&lt;40%): Chấp nhận được</span>
+                </div>
               </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-600 rounded mr-2"></div>
-                <span>35-44% (70-88%): Rất cao</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-blue-600 rounded mr-2"></div>
-                <span>25-34% (50-68%): Cao</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-yellow-600 rounded mr-2"></div>
-                <span>20-24% (40-48%): Tốt</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-orange-600 rounded mr-2"></div>
-                <span>&lt;20% (&lt;40%): Chấp nhận được</span>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* System Status */}
-          <div className="p-4 bg-white rounded-lg shadow-md">
-            <h3 className="flex items-center mb-3 text-lg font-semibold text-gray-800">
-              <Settings className="mr-2 text-purple-600" size={20} />
-              Trạng Thái Hệ Thống
-            </h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">AI Engine:</span>
-                <span className="font-semibold text-blue-600">InsightFace</span>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="w-5 h-5 text-purple-600" />
+                <span>Trạng Thái Hệ Thống</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">AI Engine:</span>
+                  <span className="font-semibold text-primary">InsightFace</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Kết nối:</span>
+                  <Badge variant={isConnected ? "default" : "destructive"}>
+                    {isConnected ? 'Đã kết nối' : 'Mất kết nối'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Camera:</span>
+                  <Badge variant={isCameraOn ? "default" : "destructive"}>
+                    {isCameraOn ? 'Hoạt động' : 'Tắt'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cooldown:</span>
+                  <span className="font-semibold text-primary">{cooldownPeriod}s</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Kết nối:</span>
-                <span className={`font-semibold ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
-                  {isConnected ? 'Đã kết nối' : 'Mất kết nối'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Camera:</span>
-                <span className={`font-semibold ${isCameraOn ? 'text-green-600' : 'text-red-600'}`}>
-                  {isCameraOn ? 'Hoạt động' : 'Tắt'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Cooldown:</span>
-                <span className="font-semibold">{cooldownPeriod}s</span>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Camera View */}
           <div className="lg:col-span-2">
-            <div className="p-6 bg-white rounded-lg shadow-md">
-              <h2 className="flex items-center mb-4 text-xl font-semibold">
-                <Camera className="mr-2 text-blue-600" size={24} />
-                Camera Nhận Diện
-              </h2>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Camera className="w-6 h-6 text-primary" />
+                  <span>Camera Nhận Diện</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
               
               <div className="relative">
                 <video
@@ -627,10 +623,10 @@ const ContinuousRecognition = () => {
                 
                 {/* Camera Off Placeholder */}
                 {!isCameraOn && (
-                  <div className="w-full h-96 bg-gray-800 rounded-lg flex items-center justify-center">
+                  <div className="flex justify-center items-center w-full h-96 bg-gray-800 rounded-lg">
                     <div className="text-center text-white">
                       <Camera size={64} className="mx-auto mb-4 text-gray-400" />
-                      <h3 className="text-xl font-semibold mb-2">Camera đã tắt</h3>
+                      <h3 className="mb-2 text-xl font-semibold">Camera đã tắt</h3>
                       <p className="text-gray-300">Nhấn nút "Bật Camera" để bắt đầu</p>
                     </div>
                   </div>
@@ -699,137 +695,143 @@ const ContinuousRecognition = () => {
                   </div>
                 )}
               </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Panel */}
           <div className="space-y-6">
             {/* Statistics */}
-            <div className="p-6 bg-white rounded-lg shadow-md">
-              <h3 className="flex items-center mb-4 text-lg font-semibold">
-                <Users className="mr-2 text-purple-600" size={20} />
-                Thống Kê Hôm Nay
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Tổng điểm danh:</span>
-                  <span className="text-xl font-bold text-green-600">{totalRecognitionsToday}</span>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  <span>Thống Kê Hôm Nay</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Tổng điểm danh:</span>
+                    <span className="text-xl font-bold text-green-600">{totalRecognitionsToday}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Thời gian chờ:</span>
+                    <span className="font-bold text-primary">{cooldownPeriod}s</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Đang chờ:</span>
+                    <span className="font-bold text-orange-600">{Object.keys(activeCooldowns).length}</span>
+                  </div>
                 </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Thời gian chờ:</span>
-                  <span className="font-bold text-blue-600">{cooldownPeriod}s</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Đang chờ:</span>
-                  <span className="font-bold text-orange-600">{Object.keys(activeCooldowns).length}</span>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Recent Recognitions */}
-            <div className="p-6 bg-white rounded-lg shadow-md">
-              <h3 className="flex items-center mb-4 text-lg font-semibold">
-                <Clock className="mr-2 text-green-600" size={20} />
-                Nhận Diện Gần Đây
-              </h3>
-              
-              <div className="overflow-y-auto space-y-3 max-h-96">
-                {recentRecognitions.length === 0 ? (
-                  <p className="py-4 text-center text-gray-500">
-                    Chưa có nhận diện nào
-                  </p>
-                ) : (
-                  recentRecognitions.map((recognition) => (
-                    <div
-                      key={recognition.id}
-                      className="p-3 rounded-lg border border-gray-200"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-semibold text-gray-800">
-                            {recognition.student.full_name}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Clock className="w-5 h-5 text-green-600" />
+                  <span>Nhận Diện Gần Đây</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-y-auto space-y-3 max-h-96">
+                  {recentRecognitions.length === 0 ? (
+                    <p className="py-4 text-center text-muted-foreground">
+                      Chưa có nhận diện nào
+                    </p>
+                  ) : (
+                    recentRecognitions.map((recognition) => (
+                      <div
+                        key={recognition.id}
+                        className="p-3 rounded-lg border"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-semibold text-foreground">
+                              {recognition.student.full_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {recognition.student.student_code}
+                            </div>
+                            <div className="text-sm text-green-600">
+                              {(recognition.confidence/100).toFixed(3)} ({Math.round(recognition.confidence * 2)}%) - {recognition.timestamp}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {recognition.student.student_code}
-                          </div>
-                          <div className="text-sm text-green-600">
-                            {(recognition.confidence/100).toFixed(3)} ({Math.round(recognition.confidence * 2)}%) - {recognition.timestamp}
-                          </div>
-                        </div>
-                        
-                        <div className={`px-2 py-1 rounded text-xs font-medium ${
-                          recognition.attendance.type === 'created' 
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {recognition.attendance.type === 'created' ? 'Mới' : 'Cập nhật'}
+                          
+                          <Badge 
+                            variant={recognition.attendance.type === 'created' ? "success" : "default"}
+                            className="text-xs"
+                          >
+                            {recognition.attendance.type === 'created' ? 'Mới' : 'Cập nhật'}
+                          </Badge>
                         </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Settings */}
-            <div className="p-6 bg-white rounded-lg shadow-md">
-              <h3 className="flex items-center mb-4 text-lg font-semibold">
-                <Settings className="mr-2 text-gray-600" size={20} />
-                Cài Đặt
-              </h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Thời gian chờ (giây)
-                  </label>
-                  <input
-                    type="number"
-                    min="5"
-                    max="300"
-                    value={cooldownPeriod}
-                    onChange={(e) => setCooldownPeriod(parseInt(e.target.value))}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Thời gian chờ giữa các lần nhận diện cho cùng 1 học sinh
-                  </p>
-                </div>
-                
-                <button
-                  onClick={async () => {
-                    try {
-                      // Call API to update settings
-                      const response = await fetch(`${API_BASE_URL}/ai/recognition/settings`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ cooldown_period: cooldownPeriod })
-                      });
-                      
-                      const result = await response.json();
-                      
-                      if (result.success) {
-                        alert(`✅ ${result.message}`);
-                        console.log('🔧 Settings updated:', result.data);
-                      } else {
-                        alert(`❌ Lỗi: ${result.message || 'Không thể cập nhật cài đặt'}`);
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5 text-muted-foreground" />
+                  <span>Cài Đặt</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-foreground">
+                      Thời gian chờ (giây)
+                    </label>
+                    <Input
+                      type="number"
+                      min="5"
+                      max="300"
+                      value={cooldownPeriod}
+                      onChange={(e) => setCooldownPeriod(parseInt(e.target.value))}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Thời gian chờ giữa các lần nhận diện cho cùng 1 học sinh
+                    </p>
+                  </div>
+                  
+                  <Button
+                    onClick={async () => {
+                      try {
+                        // Call API to update settings
+                        const response = await fetch(`${API_BASE_URL}/ai/recognition/settings`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ cooldown_period: cooldownPeriod })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                          alert(`✅ ${result.message}`);
+                          console.log('🔧 Settings updated:', result.data);
+                        } else {
+                          alert(`❌ Lỗi: ${result.message || 'Không thể cập nhật cài đặt'}`);
+                        }
+                      } catch (error) {
+                        console.error('❌ Error updating settings:', error);
+                        alert('❌ Lỗi kết nối khi cập nhật cài đặt');
                       }
-                    } catch (error) {
-                      console.error('❌ Error updating settings:', error);
-                      alert('❌ Lỗi kết nối khi cập nhật cài đặt');
-                    }
-                  }}
-                  className="px-4 py-2 w-full text-white bg-blue-600 rounded-lg transition-colors hover:bg-blue-700"
-                >
-                  Lưu Cài Đặt
-                </button>
-              </div>
-            </div>
-
-
+                    }}
+                    className="w-full"
+                  >
+                    Lưu Cài Đặt
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
