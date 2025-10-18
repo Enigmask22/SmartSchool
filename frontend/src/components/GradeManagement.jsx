@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { GraduationCap, Users, Settings, Plus, Download, Upload, FileText, AlertCircle, Loader2, Edit, Trash2, Save, X } from 'lucide-react';
+import { GraduationCap, Settings, Plus, Download, Upload, AlertCircle, Trash2, Save, BarChart3, FileEdit, Scale, Key, Lightbulb, Star, Zap, Pencil, FileText, Clipboard } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -647,7 +647,10 @@ const GradeManagement = () => {
                       />
 
                       <div className="px-3 py-2 text-sm text-muted-foreground bg-primary/5 rounded-lg border border-primary/20">
-                        <span className="font-medium">💡 Hỗ trợ:</span> Excel (.xlsx, .xls), CSV, và ảnh bảng điểm
+                        <span className="font-medium flex items-center space-x-1">
+                          <Lightbulb className="w-4 h-4" />
+                          <span>Hỗ trợ:</span>
+                        </span> Excel (.xlsx, .xls), CSV, và ảnh bảng điểm
                       </div>
                     </div>
                   )}
@@ -656,232 +659,190 @@ const GradeManagement = () => {
             </Card>
 
             {/* Config Editor Modal */}
-            {showConfigEditor && (
-              <div 
-                className="flex fixed top-0 right-0 bottom-0 left-0 z-50 justify-center items-center p-4"
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  width: '100vw',
-                  height: '100vh',
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  backdropFilter: 'blur(4px)',
-                  margin: 0,
-                  zIndex: 9999
-                }}
-                onClick={(e) => e.target === e.currentTarget && setShowConfigEditor(false)}
-              >
-                <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                  <div className="p-6 text-white bg-blue-600 border-b border-blue-700">
-                    <h3 className="flex items-center space-x-2 text-xl font-bold">
-                      <span>⚙️</span>
-                      <span>Cấu hình cột điểm</span>
-                    </h3>
-                    <p className="mt-1 text-sm text-blue-100">Thiết lập các cột điểm và hệ số cho môn học</p>
-                  </div>
-                  
-                  <div className="p-6 max-h-[60vh] overflow-y-auto">
-                    <div className="space-y-4">
-                      {Object.keys(configForm).length === 0 ? (
-                        <div className="py-12 text-center">
-                          <div className="flex justify-center items-center mx-auto mb-4 w-24 h-24 bg-gray-100 rounded-full">
-                            <span className="text-4xl text-gray-400">📊</span>
-                          </div>
-                          <p className="mb-6 text-lg text-gray-500">Chưa có cột điểm nào</p>
-                          <p className="text-gray-400">Hãy thêm cột điểm đầu tiên để bắt đầu</p>
+            <Dialog open={showConfigEditor} onOpenChange={setShowConfigEditor}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <Settings className="w-5 h-5" />
+                    <span>Cấu hình cột điểm</span>
+                  </DialogTitle>
+                  <DialogDescription>
+                    Thiết lập các cột điểm và hệ số cho môn học
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="max-h-[60vh] overflow-y-auto">
+                  <div className="space-y-4">
+                    {Object.keys(configForm).length === 0 ? (
+                      <div className="py-12 text-center">
+                        <div className="flex justify-center items-center mx-auto mb-4 w-24 h-24 bg-muted rounded-full">
+                          <BarChart3 className="w-12 h-12 text-muted-foreground" />
                         </div>
-                      ) : (
-                        getSortedColumnNames(configForm).map((columnName, index) => (
-                          <div key={columnName} className="p-5 bg-gray-50 rounded-lg border border-gray-200 transition-all hover:shadow-md">
+                        <p className="mb-6 text-lg text-muted-foreground">Chưa có cột điểm nào</p>
+                        <p className="text-muted-foreground">Hãy thêm cột điểm đầu tiên để bắt đầu</p>
+                      </div>
+                    ) : (
+                      getSortedColumnNames(configForm).map((columnName, index) => (
+                        <Card key={columnName} className="transition-all hover:shadow-md">
+                          <CardContent className="p-5">
                             <div className="flex items-center space-x-4">
-                              <div className="flex justify-center items-center w-10 h-10 text-base font-bold text-white bg-blue-600 rounded-lg">
+                              <div className="flex justify-center items-center w-10 h-10 text-base font-bold text-white bg-primary rounded-lg">
                                 {index + 1}
                               </div>
                               
                               <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    <span className="flex items-center space-x-1">
-                                      <span>📝</span>
-                                      <span>Tên hiển thị</span>
-                                      <span className="text-red-500">*</span>
-                                    </span>
-                                  </label>
-                                  <input
+                                  <Label className="flex items-center space-x-1 mb-1.5">
+                                    <FileEdit className="w-4 h-4" />
+                                    <span>Tên hiển thị</span>
+                                    <span className="text-destructive">*</span>
+                                  </Label>
+                                  <Input
                                     type="text"
                                     value={configForm[columnName].label}
                                     onChange={(e) => handleConfigInputChange(columnName, 'label', e.target.value)}
-                                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     placeholder="Nhập tên hiển thị"
                                   />
-                                  <p className="px-2 py-1 mt-1 text-xs text-gray-500 bg-white rounded">Key: {columnName}</p>
+                                  <p className="px-2 py-1 mt-1 text-xs text-muted-foreground bg-muted rounded">Key: {columnName}</p>
                                 </div>
                                 
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    <span className="flex items-center space-x-1">
-                                      <span>⚖️</span>
-                                      <span>Hệ số</span>
-                                      <span className="text-red-500">*</span>
-                                    </span>
-                                  </label>
-                                  <input
+                                  <Label className="flex items-center space-x-1 mb-1.5">
+                                    <Scale className="w-4 h-4" />
+                                    <span>Hệ số</span>
+                                    <span className="text-destructive">*</span>
+                                  </Label>
+                                  <Input
                                     type="number"
                                     min="1"
                                     max="10"
                                     value={configForm[columnName].he_so}
                                     onChange={(e) => handleConfigInputChange(columnName, 'he_so', parseInt(e.target.value) || 1)}
-                                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                   />
                                 </div>
                               </div>
                               
-                              <button
+                              <Button
                                 onClick={() => handleRemoveColumn(columnName)}
-                                className="w-10 h-10 text-red-600 bg-red-100 rounded-lg transition-colors hover:bg-red-200"
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/5 hover:border-destructive/50"
                                 title={`Xóa cột "${configForm[columnName].label}"`}
                               >
-                                🗑️
-                              </button>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center p-5 bg-gray-50 border-t">
-                    <button
-                      onClick={handleAddColumn}
-                      className="flex items-center space-x-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm hover:shadow-md"
-                    >
-                      <span>➕</span>
-                      <span>Thêm cột</span>
-                    </button>
-                    
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setShowConfigEditor(false)}
-                        className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        onClick={handleSaveConfig}
-                        className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
-                      >
-                        💾 Lưu cấu hình
-                      </button>
-                    </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* Add Column Modal */}
-            {showAddColumnModal && (
-              <div 
-                className="flex fixed top-0 right-0 bottom-0 left-0 z-50 justify-center items-center p-4"
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  width: '100vw',
-                  height: '100vh',
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  backdropFilter: 'blur(4px)',
-                  margin: 0,
-                  zIndex: 9999
-                }}
-                onClick={(e) => e.target === e.currentTarget && setShowAddColumnModal(false)}
-              >
-                <div className="overflow-hidden w-full max-w-md bg-white rounded-xl shadow-xl" onClick={(e) => e.stopPropagation()}>
-                  <div className="p-5 text-white bg-green-600 border-b border-green-700">
-                    <h3 className="flex items-center space-x-2 text-lg font-bold">
-                      <span>➕</span>
-                      <span>Thêm cột điểm mới</span>
-                    </h3>
-                  </div>
+                <DialogFooter className="flex justify-between">
+                  <Button
+                    onClick={handleAddColumn}
+                    className="flex items-center space-x-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Thêm cột</span>
+                  </Button>
                   
-                  <div className="p-5 space-y-5">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        <span className="flex items-center space-x-1">
-                          <span>🔑</span>
-                          <span>Tên cột (key)</span>
-                          <span className="text-red-500">*</span>
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        value={newColumnForm.name}
-                        onChange={(e) => setNewColumnForm(prev => ({...prev, name: e.target.value}))}
-                        placeholder="vd: Diem_thi_15_phut"
-                        className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      />
-                      <p className="mt-1.5 text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md p-2">
-                        ⚠️ Chỉ được sử dụng chữ cái, số và dấu gạch dưới. Không dấu.
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        <span className="flex items-center space-x-1">
-                          <span>📝</span>
-                          <span>Tên hiển thị</span>
-                          <span className="text-red-500">*</span>
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        value={newColumnForm.label}
-                        onChange={(e) => setNewColumnForm(prev => ({...prev, label: e.target.value}))}
-                        placeholder="vd: Điểm thi 15 phút"
-                        className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        <span className="flex items-center space-x-1">
-                          <span>⚖️</span>
-                          <span>Hệ số</span>
-                          <span className="text-red-500">*</span>
-                        </span>
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="10"
-                        value={newColumnForm.he_so}
-                        onChange={(e) => setNewColumnForm(prev => ({...prev, he_so: e.target.value}))}
-                        className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end p-5 space-x-2 bg-gray-50 border-t">
-                    <button
-                      onClick={() => setShowAddColumnModal(false)}
-                      className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowConfigEditor(false)}
                     >
                       Hủy
-                    </button>
-                    <button
-                      onClick={handleConfirmAddColumn}
-                      className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm hover:shadow-md"
+                    </Button>
+                    <Button
+                      onClick={handleSaveConfig}
+                      className="flex items-center space-x-2"
                     >
-                      ➕ Thêm cột
-                    </button>
+                      <Save className="w-4 h-4" />
+                      <span>Lưu cấu hình</span>
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Add Column Modal */}
+            <Dialog open={showAddColumnModal} onOpenChange={setShowAddColumnModal}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <Plus className="w-5 h-5" />
+                    <span>Thêm cột điểm mới</span>
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-5">
+                  <div>
+                    <Label className="flex items-center space-x-1 mb-1.5">
+                      <Key className="w-4 h-4" />
+                      <span>Tên cột (key)</span>
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      type="text"
+                      value={newColumnForm.name}
+                      onChange={(e) => setNewColumnForm(prev => ({...prev, name: e.target.value}))}
+                      placeholder="vd: Diem_thi_15_phut"
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground bg-muted border border-border rounded-md p-2">
+                      <AlertCircle className="inline w-3 h-3 mr-1" />
+                      Chỉ được sử dụng chữ cái, số và dấu gạch dưới. Không dấu.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label className="flex items-center space-x-1 mb-1.5">
+                      <FileEdit className="w-4 h-4" />
+                      <span>Tên hiển thị</span>
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      type="text"
+                      value={newColumnForm.label}
+                      onChange={(e) => setNewColumnForm(prev => ({...prev, label: e.target.value}))}
+                      placeholder="vd: Điểm thi 15 phút"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label className="flex items-center space-x-1 mb-1.5">
+                      <Scale className="w-4 h-4" />
+                      <span>Hệ số</span>
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={newColumnForm.he_so}
+                      onChange={(e) => setNewColumnForm(prev => ({...prev, he_so: parseInt(e.target.value) || 1}))}
+                    />
                   </div>
                 </div>
-              </div>
-            )}
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAddColumnModal(false)}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    onClick={handleConfirmAddColumn}
+                    className="flex items-center space-x-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Thêm cột</span>
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Students Grade Table */}
             {gradeConfig ? (
@@ -936,13 +897,13 @@ const GradeManagement = () => {
                         ))}
                         <th className="px-5 py-3 text-left">
                           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
-                            <span>🏆</span>
+                            <Star className="w-4 h-4" />
                             <span>Điểm TB</span>
                           </span>
                         </th>
                         <th className="px-5 py-3 text-left">
                           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
-                            <span>⚡</span>
+                            <Zap className="w-4 h-4" />
                             <span>Thao tác</span>
                           </span>
                         </th>
@@ -1001,7 +962,7 @@ const GradeManagement = () => {
                               onClick={() => handleEditGrade(studentData)}
                               className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium text-sm"
                             >
-                              <span>{studentData.grade ? '✏️' : '➕'}</span>
+                              {studentData.grade ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                               <span>{studentData.grade ? 'Sửa' : 'Nhập điểm'}</span>
                             </button>
                           </td>
@@ -1083,7 +1044,7 @@ const GradeManagement = () => {
             ) : (
               <div className="py-12 text-center bg-white rounded-lg shadow-md">
                 <div className="flex justify-center items-center mx-auto mb-4 w-20 h-20 bg-blue-100 rounded-full">
-                  <span className="text-3xl">📊</span>
+                  <BarChart3 className="w-8 h-8" />
                 </div>
                 <h3 className="mb-2 text-lg font-bold text-gray-800">Chưa có cấu hình cột điểm</h3>
                 <p className="mb-6 text-gray-600">Môn học này chưa có cấu hình cột điểm. Hãy tạo cấu hình để bắt đầu nhập điểm.</p>
@@ -1091,7 +1052,7 @@ const GradeManagement = () => {
                   onClick={handleShowConfigEditor}
                   className="inline-flex items-center px-6 py-3 space-x-2 font-medium text-white bg-blue-600 rounded-lg shadow-sm transition-colors hover:bg-blue-700 hover:shadow-md"
                 >
-                  <span>⚙️</span>
+                  <Settings className="w-4 h-4" />
                   <span>Tạo cấu hình cột điểm</span>
                 </button>
               </div>
@@ -1121,7 +1082,7 @@ const GradeManagement = () => {
             <div className="overflow-hidden w-full max-w-lg bg-white rounded-xl shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="p-5 text-white bg-blue-600 border-b border-blue-700">
                 <h3 className="flex items-center space-x-2 text-lg font-bold">
-                  <span>✏️</span>
+                  <Pencil className="w-4 h-4" />
                   <span>Nhập điểm cho {editingStudent.student.full_name}</span>
                 </h3>
                 <p className="mt-1 text-sm text-blue-100">Mã số: {editingStudent.student.student_id}</p>
@@ -1192,7 +1153,7 @@ const GradeManagement = () => {
             <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <div className="p-6 text-white bg-purple-600 border-b border-purple-700">
                 <h3 className="flex items-center space-x-2 text-xl font-bold">
-                  <span>📋</span>
+                  <Clipboard className="w-4 h-4" />
                   <span>Xem trước dữ liệu import</span>
                 </h3>
                 <p className="mt-1 text-sm text-purple-100">
@@ -1203,7 +1164,10 @@ const GradeManagement = () => {
               <div className="p-6 max-h-[60vh] overflow-y-auto">
                 {importErrors.length > 0 && (
                   <div className="p-4 mb-4 bg-red-50 rounded-lg border border-red-200">
-                    <h4 className="mb-2 font-bold text-red-800">⚠️ Có {importErrors.length} lỗi:</h4>
+                    <h4 className="mb-2 font-bold text-red-800 flex items-center space-x-1">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Có {importErrors.length} lỗi:</span>
+                    </h4>
                     <ul className="space-y-1 text-sm list-disc list-inside text-red-700">
                       {importErrors.slice(0, 10).map((error, idx) => (
                         <li key={idx}>{error}</li>
@@ -1269,7 +1233,7 @@ const GradeManagement = () => {
                 {importedData.length === 0 && (
                   <div className="py-12 text-center">
                     <div className="flex justify-center items-center mx-auto mb-4 w-20 h-20 bg-gray-100 rounded-full">
-                      <span className="text-3xl">📄</span>
+                      <FileText className="w-8 h-8" />
                     </div>
                     <p className="text-gray-500">Không có dữ liệu hợp lệ</p>
                   </div>

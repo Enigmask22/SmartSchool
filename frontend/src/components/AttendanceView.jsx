@@ -445,7 +445,7 @@ const AttendanceView = () => {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          <div className="w-16 h-16 rounded-full border-4 border-blue-200 animate-spin border-t-blue-600"></div>
         </div>
       </div>
     );
@@ -459,7 +459,7 @@ const AttendanceView = () => {
             <CardTitle className="text-3xl font-bold">Điểm danh</CardTitle>
             <CardDescription>Quản lý điểm danh học sinh</CardDescription>
             {error && (
-              <div className="p-3 mt-2 text-destructive bg-destructive/10 rounded border border-destructive/20">
+              <div className="p-3 mt-2 rounded border text-destructive bg-destructive/10 border-destructive/20">
                 {error}
               </div>
             )}
@@ -478,7 +478,7 @@ const AttendanceView = () => {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-3 text-primary bg-primary/10 rounded-full">
+                <div className="p-3 rounded-full text-primary bg-primary/10">
                   👥
                 </div>
                 <div className="ml-4">
@@ -506,7 +506,7 @@ const AttendanceView = () => {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-3 text-destructive bg-destructive/10 rounded-full">
+                <div className="p-3 rounded-full text-destructive bg-destructive/10">
                   ❌
                 </div>
                 <div className="ml-4">
@@ -545,7 +545,7 @@ const AttendanceView = () => {
                   type="checkbox"
                   checked={showFullList}
                   onChange={(e) => handleViewModeChange(e.target.checked)}
-                  className="w-4 h-4 text-primary bg-background rounded border-input focus:ring-primary"
+                  className="w-4 h-4 rounded text-primary bg-background border-input focus:ring-primary"
                 />
                 <span className="text-sm font-medium">
                   Hiển thị tất cả học sinh
@@ -555,8 +555,8 @@ const AttendanceView = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div>
+          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            <div className="flex-1 max-w-[160px]">
               <label className="block mb-2 text-sm font-medium">
                 Ngày
               </label>
@@ -564,17 +564,18 @@ const AttendanceView = () => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
+                className="w-full"
               />
             </div>
             
-            <div>
+            <div className="flex-1 max-w-[200px]">
               <label className="block mb-2 text-sm font-medium">
                 Lớp
               </label>
               <select
                 value={selectedClass}
                 onChange={(e) => handleClassChange(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
                 {isHomeroomTeacher() ? (
@@ -590,14 +591,14 @@ const AttendanceView = () => {
               </select>
             </div>
 
-            <div>
+            <div className="flex-1 max-w-[200px]">
               <label className="block mb-2 text-sm font-medium">
                 Trạng thái
               </label>
               <select
                 value={selectedStatus}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Tất cả trạng thái</option>
                 <option value="present">Có mặt</option>
@@ -606,17 +607,15 @@ const AttendanceView = () => {
               </select>
             </div>
 
-            <div className="flex gap-2 items-end">
+            <div className="flex gap-2">
               <Button
                 variant="outline"
                 onClick={resetFilters}
-                className="flex-1"
               >
                 Đặt lại
               </Button>
               <Button
                 onClick={loadAttendanceData}
-                className="flex-1"
               >
                 Tìm kiếm
               </Button>
@@ -660,10 +659,10 @@ const AttendanceView = () => {
               <TableBody>
                 {attendanceRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={9} className="py-8 text-center">
                       {loading ? (
                         <div className="flex justify-center">
-                          <div className="w-8 h-8 rounded-full border-b-2 border-primary animate-spin"></div>
+                          <div className="w-8 h-8 rounded-full border-b-2 animate-spin border-primary"></div>
                         </div>
                       ) : (
                         'Không có dữ liệu điểm danh'
@@ -701,7 +700,7 @@ const AttendanceView = () => {
                             <select
                               value={editStatus}
                               onChange={(e) => setEditStatus(e.target.value)}
-                              className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="flex px-2 py-1 w-full h-8 text-xs rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               <option value="present">Có mặt</option>
                               <option value="absent">Vắng</option>
@@ -779,7 +778,7 @@ const AttendanceView = () => {
           
           return (
             <div className="px-6 py-4 border-t bg-muted/50">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-3 justify-between items-center">
                 <div className="flex items-center space-x-4">
                   <div className="text-sm text-muted-foreground">
                     Hiển thị <span className="font-semibold">{((page - 1) * pageSize) + 1}</span> đến <span className="font-semibold">{Math.min(page * pageSize, totalRecords)}</span> trong tổng số <span className="font-semibold">{totalRecords}</span> bản ghi
@@ -792,7 +791,7 @@ const AttendanceView = () => {
                         setPageSize(Number(e.target.value));
                         setPage(1);
                       }}
-                      className="flex h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex px-2 py-1 w-16 h-8 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <option value={10}>10</option>
                       <option value={20}>20</option>
