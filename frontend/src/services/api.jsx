@@ -334,6 +334,12 @@ class ApiService {
     });
   }
 
+  async restoreStudent(id) {
+    return this.request(`/students/${id}/restore`, {
+      method: 'PUT',
+    });
+  }
+
   // Attendance (deprecated - use getAttendanceRecords instead)
   async getAttendance(date = null) {
     // Redirect to new method

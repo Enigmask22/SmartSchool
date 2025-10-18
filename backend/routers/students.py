@@ -275,6 +275,43 @@ async def delete_student(
         logger.error(f"ERROR: Error deleting student {student_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
+@router.put("/{student_id}/restore", response_model=ResponseModel)
+async def restore_student(
+    student_id: int,
+    db=Depends(get_db)
+):
+    """Khôi phục học sinh đã bị xóa"""
+    try:
+        # Kiểm tra student tồn tại
+        existing = db.table("students").select("id, is_active").eq("id", student_id).execute()
+        
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
+        
+        # Kiểm tra student đã bị xóa chưa
+        if existing.data[0].get("is_active", True):
+            raise HTTPException(status_code=400, detail="Học sinh chưa bị xóa")
+        
+        # Restore student
+        response = db.table("students").update({
+            "is_active": True,
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", student_id).execute()
+        
+        if response.data:
+            return ResponseModel(
+                success=True,
+                message="Khôi phục học sinh thành công"
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Lỗi khôi phục học sinh")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error restoring student {student_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
 @router.post("/{student_id}/upload-image", response_model=ResponseModel)
 async def upload_student_image(
     student_id: int,

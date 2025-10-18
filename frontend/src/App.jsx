@@ -18,9 +18,11 @@ import Login from './components/Login';
 import GradeManagement from './components/GradeManagement';
 import HomeroomDashboard from './components/HomeroomDashboard';
 import AdminManagement from './components/AdminManagement';
+import AdminDashboard from './components/AdminDashboard';
 import ClassManagement from './components/ClassManagement';
 import SubjectTeacherDashboard from './components/SubjectTeacherDashboard';
 import DashboardSelector from './components/DashboardSelector';
+import UIDemo from './components/UIDemo';
 
 function AppContent() {
   const { user, loading, isAuthenticated, isHomeroomTeacher, isSubjectTeacher, isAdmin } = useContext(AuthContext);
@@ -90,7 +92,7 @@ function AppContent() {
     if (selectedDashboardType === 'admin' || isAdmin()) {
       switch (currentView) {
         case 'dashboard':
-          return <Dashboard setCurrentView={setCurrentView} />;
+          return <AdminDashboard />;
         // Ẩn các tab không cần thiết cho Admin
         // case 'students':
         //   return <StudentList />;
@@ -110,6 +112,8 @@ function AppContent() {
         //   return <GradeManagement />;
         case 'admin-management':
           return <AdminManagement />;
+        case 'ui-demo':
+          return <UIDemo />;
         default:
           return <Dashboard setCurrentView={setCurrentView} />;
       }
@@ -214,7 +218,7 @@ function AppContent() {
         onDashboardSwitch={handleDashboardSwitch}
       />
       <main className={`
-        flex-1 transition-all duration-300 overflow-auto
+        flex-1 transition-all duration-300 overflow-auto bg-white
         ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'}
         ml-0
       `}>

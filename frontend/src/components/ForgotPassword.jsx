@@ -1,4 +1,9 @@
 import React, { useState } from 'react';
+import { ArrowLeft, Mail, Key, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
 import api from '../services/api';
 
 const ForgotPassword = ({ onBackToLogin }) => {
@@ -181,8 +186,8 @@ const ForgotPassword = ({ onBackToLogin }) => {
   const renderStep1 = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Quên mật khẩu?</h2>
-        <p className="mt-2 text-sm text-gray-600">
+        <h2 className="text-2xl font-bold text-white">Quên mật khẩu?</h2>
+        <p className="mt-2 text-sm text-white/90">
           Nhập username đăng nhập và email nhận OTP để đặt lại mật khẩu
         </p>
       </div>
@@ -250,9 +255,9 @@ const ForgotPassword = ({ onBackToLogin }) => {
   const renderStep2 = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Nhập mã OTP</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Mã OTP đã được gửi đến <strong>{formData.otpEmail}</strong>
+        <h2 className="text-2xl font-bold text-white">Nhập mã OTP</h2>
+        <p className="mt-2 text-sm text-white/90">
+          Mã OTP đã được gửi đến <strong className="text-white">{formData.otpEmail}</strong>
         </p>
       </div>
 
@@ -306,9 +311,9 @@ const ForgotPassword = ({ onBackToLogin }) => {
   const renderStep3 = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Đặt mật khẩu mới</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Nhập mật khẩu mới cho tài khoản <strong>{formData.username}</strong>
+        <h2 className="text-2xl font-bold text-white">Đặt mật khẩu mới</h2>
+        <p className="mt-2 text-sm text-white/90">
+          Nhập mật khẩu mới cho tài khoản <strong className="text-white">{formData.username}</strong>
         </p>
       </div>
 
@@ -370,62 +375,64 @@ const ForgotPassword = ({ onBackToLogin }) => {
   );
 
   return (
-    <div className="flex justify-center items-center p-4 min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="space-y-8 w-full max-w-md">
+    <div 
+      className="flex justify-center items-center p-4 min-h-screen bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: 'url(/background_login.png)',
+      }}
+    >
+      {/* Overlay để làm mờ background */}
+      <div className="absolute inset-0 bg-black/40"></div>
+      
+      <div className="relative z-10 space-y-8 w-full max-w-md">
         {/* Header */}
-        <div className="text-center">
-          <div className="flex justify-center items-center mx-auto w-16 h-16 bg-indigo-600 rounded-full">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <h1 className="mt-6 text-3xl font-extrabold text-gray-900">
-          SynapseS
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Đặt lại mật khẩu
-          </p>
-        </div>
+        <Card>
+          <CardHeader className="text-center">
+            <div className="flex justify-center items-center mx-auto w-16 h-16 bg-primary rounded-full">
+              <Key className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <CardTitle className="text-3xl font-extrabold">
+              SynapseS
+            </CardTitle>
+            <CardDescription>
+              Đặt lại mật khẩu
+            </CardDescription>
+          </CardHeader>
+        </Card>
 
         {/* Form */}
-        <div className="p-8 bg-white rounded-xl shadow-lg">
-          {/* Error Message */}
-          {error && (
-            <div className="p-4 mb-4 bg-red-50 rounded-md border border-red-200">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-800">{error}</p>
+        <Card>
+          <CardContent className="p-6">
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 mb-4 bg-destructive/10 rounded-md border border-destructive/20">
+                <div className="flex">
+                  <AlertCircle className="w-5 h-5 text-destructive" />
+                  <div className="ml-3">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Success Message */}
-          {success && (
-            <div className="p-4 mb-4 bg-green-50 rounded-md border border-green-200">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-green-800">{success}</p>
+            {/* Success Message */}
+            {success && (
+              <div className="p-4 mb-4 bg-green-50 rounded-md border border-green-200">
+                <div className="flex">
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  <div className="ml-3">
+                    <p className="text-sm text-green-800">{success}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Step Content */}
-          {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
-          {step === 3 && renderStep3()}
-        </div>
+            {/* Step Content */}
+            {step === 1 && renderStep1()}
+            {step === 2 && renderStep2()}
+            {step === 3 && renderStep3()}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

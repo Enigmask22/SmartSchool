@@ -1,4 +1,12 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { GraduationCap, Users, Settings, Plus, Download, Upload, FileText, AlertCircle, Loader2, Edit, Trash2, Save, X } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Label } from './ui/label';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
 import * as XLSX from 'xlsx';
@@ -474,9 +482,8 @@ const GradeManagement = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="spinner-dual">
-          <div className="spinner-primary"></div>
-          <div className="spinner-secondary"></div>
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
         </div>
       </div>
     );
@@ -485,7 +492,7 @@ const GradeManagement = () => {
   if (!teacherInfo) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="p-8 text-center bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl border border-red-200">
+        <div className="p-8 text-center bg-destructive/5 rounded-2xl border border-destructive/20">
           <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full">
             <span className="text-2xl text-red-600">⚠️</span>
           </div>
@@ -496,133 +503,157 @@ const GradeManagement = () => {
   }
 
   return (
-    <div className="p-6 min-h-screen bg-gray-50">
+    <div className="space-y-6 p-6 min-h-screen bg-gray-50">
       <div className="mx-auto space-y-6 max-w-7xl">
         {/* Header Card */}
-        <div className="p-6 bg-white rounded-lg border-l-4 border-blue-600 shadow-md">
-          <div className="flex items-center space-x-4">
-            <div className="flex justify-center items-center w-14 h-14 bg-blue-100 rounded-lg">
-              <span className="text-3xl">📊</span>
-            </div>
-            <div>
-              <h1 className="mb-1 text-2xl font-bold text-gray-800">Quản lý điểm số</h1>
-              <p className="text-gray-600">Chào mừng {teacherInfo.teacher.full_name}</p>
-              <div className="flex items-center mt-2 space-x-3 text-sm text-gray-500">
-                <span className="px-3 py-1 bg-gray-100 rounded-full">📅 {academicYear}</span>
-                <span className="px-3 py-1 bg-gray-100 rounded-full">📚 {semester}</span>
+        <Card className="border-l-4 border-l-primary">
+          <CardHeader>
+            <div className="flex items-center space-x-4">
+              <div className="flex justify-center items-center w-14 h-14 bg-primary/10 rounded-lg">
+                <GraduationCap className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-bold">Quản lý điểm số</CardTitle>
+                <CardDescription className="text-lg">
+                  Chào mừng {teacherInfo.teacher.full_name}
+                </CardDescription>
+                <div className="flex items-center mt-2 space-x-3">
+                  <Badge variant="secondary" className="text-sm">
+                    📅 {academicYear}
+                  </Badge>
+                  <Badge variant="secondary" className="text-sm">
+                    📚 {semester}
+                  </Badge>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </CardHeader>
+        </Card>
 
         {!selectedClassSubject ? (
-          <div className="p-6 bg-white rounded-lg shadow-md">
-            <div className="mb-6 text-center">
-              <h2 className="mb-2 text-xl font-bold text-gray-800">Chọn lớp - môn học</h2>
-              <p className="text-gray-600">Lựa chọn lớp và môn học để bắt đầu quản lý điểm số</p>
-            </div>
-            
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {teacherInfo.assigned_classes.map(classSubject => (
-                <div
-                  key={classSubject.id}
-                  onClick={() => handleClassSubjectSelect(classSubject)}
-                  className="p-5 bg-white rounded-lg border border-gray-200 transition-all duration-200 cursor-pointer group hover:shadow-lg hover:border-blue-400"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex justify-center items-center w-11 h-11 text-lg font-bold text-white bg-blue-600 rounded-lg">
-                      {classSubject.classes.class_name.charAt(0)}
-                    </div>
-                    <div className="flex justify-center items-center w-7 h-7 bg-gray-100 rounded-full transition-colors group-hover:bg-blue-100">
-                      <span className="text-gray-400 group-hover:text-blue-600">→</span>
-                    </div>
-                  </div>
-                  
-                  <h3 className="mb-1 text-base font-bold text-gray-800">
-                    {classSubject.classes.class_name}
-                  </h3>
-                  <p className="mb-3 font-medium text-blue-600">
-                    {classSubject.subjects.subject_name}
-                  </p>
-                  
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span className="px-2 py-1 text-xs bg-gray-100 rounded-md">
-                      Khối {classSubject.classes.grade}
-                    </span>
-                    <span className="text-xs">{academicYear}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <div className="text-center">
+                <CardTitle className="text-xl font-bold">Chọn lớp - môn học</CardTitle>
+                <CardDescription>
+                  Lựa chọn lớp và môn học để bắt đầu quản lý điểm số
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {teacherInfo.assigned_classes.map(classSubject => (
+                  <Card
+                    key={classSubject.id}
+                    onClick={() => handleClassSubjectSelect(classSubject)}
+                    className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary group"
+                  >
+                    <CardContent className="p-5">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex justify-center items-center w-11 h-11 text-lg font-bold text-primary-foreground bg-primary rounded-lg">
+                          {classSubject.classes.class_name.charAt(0)}
+                        </div>
+                        <div className="flex justify-center items-center w-7 h-7 bg-muted rounded-full transition-colors group-hover:bg-primary/10">
+                          <span className="text-muted-foreground group-hover:text-primary">→</span>
+                        </div>
+                      </div>
+                      
+                      <h3 className="mb-1 text-base font-bold text-foreground">
+                        {classSubject.classes.class_name}
+                      </h3>
+                      <p className="mb-3 font-medium text-primary">
+                        {classSubject.subjects.subject_name}
+                      </p>
+                      
+                      <div className="flex justify-between items-center text-sm text-muted-foreground">
+                        <Badge variant="outline" className="text-xs">
+                          Khối {classSubject.classes.grade}
+                        </Badge>
+                        <span className="text-xs">{academicYear}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           <div className="space-y-6">
             {/* Navigation and Header */}
-            <div className="p-5 bg-white rounded-lg shadow-md">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center space-x-4">
-                    <button
-                      onClick={() => setSelectedClassSubject(null)}
-                      className="flex items-center px-4 py-2 space-x-2 font-medium text-blue-600 bg-blue-50 rounded-lg transition-colors hover:bg-blue-100"
-                    >
-                      <span>←</span>
-                      <span>Quay lại</span>
-                    </button>
-                    <div className="w-px h-8 bg-gray-300"></div>
-                    <div>
-                      <h2 className="text-lg font-bold text-gray-800">
-                        {selectedClassSubject.classes.class_name} - {selectedClassSubject.subjects.subject_name}
-                      </h2>
-                      <p className="text-sm text-gray-500">Khối {selectedClassSubject.classes.grade}</p>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center space-x-4">
+                      <Button
+                        onClick={() => setSelectedClassSubject(null)}
+                        variant="outline"
+                        className="flex items-center space-x-2"
+                      >
+                        <span>←</span>
+                        <span>Quay lại</span>
+                      </Button>
+                      <div className="w-px h-8 bg-border"></div>
+                      <div>
+                        <h2 className="text-lg font-bold text-foreground">
+                          {selectedClassSubject.classes.class_name} - {selectedClassSubject.subjects.subject_name}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">Khối {selectedClassSubject.classes.grade}</p>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <button
-                    onClick={handleShowConfigEditor}
-                    className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
-                  >
-                    <span>⚙️</span>
-                    <span>Cấu hình cột điểm</span>
-                  </button>
-                </div>
-
-                {/* Import/Export Buttons */}
-                {gradeConfig && (
-                  <div className="flex flex-wrap gap-3 items-center pt-3 border-t border-gray-200">
-                    <button
-                      onClick={handleDownloadTemplate}
-                      className="flex items-center px-4 py-2 space-x-2 font-medium text-white bg-green-600 rounded-lg shadow-sm transition-colors hover:bg-green-700 hover:shadow-md"
-                    >
-                      <span>📥</span>
-                      <span>Tải template</span>
-                    </button>
                     
-                    <label className="flex items-center px-4 py-2 space-x-2 font-medium text-white bg-purple-600 rounded-lg shadow-sm transition-colors cursor-pointer hover:bg-purple-700 hover:shadow-md">
-                      <span>📤</span>
-                      <span>Nhập điểm từ file</span>
-                      <input
-                        type="file"
-                        accept=".xlsx,.xls,.csv"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                    </label>
-
-                    <OCRGradeSheet 
-                      selectedClassSubject={selectedClassSubject}
-                      academicYear={academicYear}
-                      semester={semester}
-                      onImportSuccess={() => handleClassSubjectSelect(selectedClassSubject)}
-                    />
-
-                    <div className="px-3 py-2 text-sm text-gray-500 bg-blue-50 rounded-lg border border-blue-200">
-                      <span className="font-medium">💡 Hỗ trợ:</span> Excel (.xlsx, .xls), CSV, và ảnh bảng điểm
-                    </div>
+                    <Button
+                      onClick={handleShowConfigEditor}
+                      className="flex items-center space-x-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Cấu hình cột điểm</span>
+                    </Button>
                   </div>
-                )}
-              </div>
-            </div>
+
+                  {/* Import/Export Buttons */}
+                  {gradeConfig && (
+                    <div className="flex flex-wrap gap-3 items-center pt-3 border-t border-border">
+                      <Button
+                        onClick={handleDownloadTemplate}
+                        className="flex items-center space-x-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Tải template</span>
+                      </Button>
+                      
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="flex items-center space-x-2"
+                      >
+                        <label className="cursor-pointer">
+                          <Upload className="w-4 h-4" />
+                          <span>Nhập điểm từ file</span>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </Button>
+
+                      <OCRGradeSheet 
+                        selectedClassSubject={selectedClassSubject}
+                        academicYear={academicYear}
+                        semester={semester}
+                        onImportSuccess={() => handleClassSubjectSelect(selectedClassSubject)}
+                      />
+
+                      <div className="px-3 py-2 text-sm text-muted-foreground bg-primary/5 rounded-lg border border-primary/20">
+                        <span className="font-medium">💡 Hỗ trợ:</span> Excel (.xlsx, .xls), CSV, và ảnh bảng điểm
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Config Editor Modal */}
             {showConfigEditor && (
