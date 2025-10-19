@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { Search, RefreshCw, Users, UserPlus, Edit, Trash2, Eye, Camera, Upload, Download, AlertCircle, Loader2, X, Mail, Phone, BookOpen, MessageCircle, Images, BarChart3, GraduationCap } from 'lucide-react';
+import { Search, RefreshCw, Users, UserPlus, Edit, Trash2, Eye, Camera, Upload, Download, AlertCircle, Loader2, X, Mail, Phone, BookOpen, MessageCircle, Images, BarChart3, GraduationCap, Target, Check, ClipboardList, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -1369,12 +1369,12 @@ const StudentList = () => {
                       <h3 className="text-lg font-bold truncate">{student.full_name}</h3>
                       <p className="font-mono text-sm text-primary-foreground/80">{student.student_id}</p>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="secondary" className="text-xs text-white bg-white/20 border-white/30">
+                        <Badge variant="secondary" className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50">
                           <GraduationCap className="mr-1 w-3 h-3" />
                           {student.class_name}
                         </Badge>
                         {student.gender && (
-                          <Badge variant="secondary" className="text-xs text-white bg-white/20 border-white/30">
+                          <Badge variant="secondary" className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50">
                             <Users className="mr-1 w-3 h-3" />
                             {student.gender}
                           </Badge>
@@ -2108,7 +2108,9 @@ const StudentList = () => {
         <Dialog open={showGradesModal} onOpenChange={(open) => !open && closeGradesModal()}>
           <DialogContent className="max-w-6xl">
             <DialogHeader>
-              <DialogTitle>📊 Bảng điểm</DialogTitle>
+              <DialogTitle className="flex gap-2 items-center">
+                <BarChart3 className="w-5 h-5 text-primary" /> Bảng điểm
+              </DialogTitle>
               <DialogDescription>
                 {selectedStudentForGrades.full_name} - {selectedStudentForGrades.student_id} | Lớp {selectedStudentForGrades.class_name} - Khối {selectedStudentForGrades.grade}
               </DialogDescription>
@@ -2268,7 +2270,9 @@ const StudentList = () => {
 
                   {/* Summary */}
                   <div className="p-6 rounded-lg bg-muted/50">
-                    <h4 className="mb-3 font-medium text-gray-900">📈 Tổng kết</h4>
+                    <h4 className="flex gap-2 items-center mb-3 font-medium text-gray-900">
+                      <TrendingUp className="w-5 h-5 text-gray-700" /> Tổng kết
+                    </h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Điểm trung bình chung</p>
@@ -2312,7 +2316,9 @@ const StudentList = () => {
         <Dialog open={showFeedbackModal} onOpenChange={(open) => !open && closeFeedbackModal()}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>💬 Tạo nhận xét học sinh</DialogTitle>
+              <DialogTitle className="flex gap-2 items-center">
+                <MessageCircle className="w-5 h-5 text-primary" /> Tạo nhận xét học sinh
+              </DialogTitle>
               <DialogDescription>
                 {selectedStudentForFeedback.full_name} - {selectedStudentForFeedback.student_id} | Lớp {selectedStudentForFeedback.class_name} - Khối {selectedStudentForFeedback.grade}
               </DialogDescription>
@@ -2324,7 +2330,7 @@ const StudentList = () => {
               {feedbackError && (
                 <div className="p-4 mb-4 bg-red-50 rounded-md border border-red-200">
                   <div className="flex">
-                    <div className="w-5 h-5 text-red-400">⚠️</div>
+                    <AlertCircle className="w-5 h-5 text-red-500" />
                     <div className="ml-3">
                       <p className="text-sm text-red-800">{feedbackError}</p>
                     </div>
@@ -2336,7 +2342,7 @@ const StudentList = () => {
               {feedbackSuccess && (
                 <div className="p-4 mb-4 bg-green-50 rounded-md border border-green-200">
                   <div className="flex">
-                    <div className="w-5 h-5 text-green-400">✅</div>
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <div className="ml-3">
                       <p className="text-sm text-green-800">Tạo nhận xét thành công!</p>
                     </div>
@@ -2487,7 +2493,8 @@ const StudentList = () => {
                         </>
                       ) : (
                         <>
-                          💬 Tạo Nhận Xét
+                          <MessageCircle className="mr-2 w-4 h-4" />
+                          <span>Tạo Nhận Xét</span>
                         </>
                       )}
                     </button>
@@ -2504,7 +2511,7 @@ const StudentList = () => {
                       <div className="space-y-4">
                         <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
                           <div className="flex gap-3 items-start">
-                            <div className="flex-shrink-0 mt-1 w-5 h-5 text-indigo-600">💬</div>
+                            <MessageCircle className="flex-shrink-0 mt-1 w-5 h-5 text-indigo-600" />
                             <div>
                               <h4 className="mb-2 font-medium text-indigo-900">
                                 Nhận xét cho {feedbackForm.student_name}:
@@ -2539,7 +2546,7 @@ const StudentList = () => {
                       </div>
                     ) : (
                       <div className="py-12 text-center text-gray-500">
-                        <div className="mb-4 text-6xl">💬</div>
+                        <MessageCircle className="mx-auto mb-4 w-12 h-12 text-indigo-400" />
                         <p>Nhấn "Tạo nhận xét" để AI tự động tạo nhận xét cho học sinh</p>
                       </div>
                     )}
@@ -2563,7 +2570,9 @@ const StudentList = () => {
         <Dialog open={showSubjectModal} onOpenChange={(open) => !open && closeSubjectModal()}>
           <DialogContent className="max-w-4xl">
             <DialogHeader>
-              <DialogTitle>📚 Chọn môn học</DialogTitle>
+              <DialogTitle className="flex gap-2 items-center">
+                <BookOpen className="w-5 h-5 text-primary" /> Chọn môn học
+              </DialogTitle>
               <DialogDescription>
                 {selectedStudentForSubject.full_name} - {selectedStudentForSubject.student_id} | Lớp {selectedStudentForSubject.class_name} - Khối {selectedStudentForSubject.grade}
               </DialogDescription>
@@ -2575,7 +2584,9 @@ const StudentList = () => {
                 {/* Core Subjects */}
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">📖 Môn học chính (3 môn)</h3>
+                  <h3 className="flex gap-2 items-center text-lg font-medium text-gray-900">
+                    <BookOpen className="w-5 h-5 text-blue-600" /> Môn học chính (3 môn)
+                  </h3>
                     <p className="text-sm text-gray-600">Bắt buộc: Toán, Văn, Anh</p>
                   </div>
                   <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
@@ -2593,7 +2604,7 @@ const StudentList = () => {
                           {subject.subject_name} ({subject.subject_code})
                         </span>
                         {selectedSubjects.core_subjects.includes(subject.subject_code) && (
-                          <span className="text-xs font-medium text-blue-600">✓</span>
+                          <Check className="w-4 h-4 text-blue-600" />
                         )}
                       </label>
                     ))}
@@ -2608,7 +2619,9 @@ const StudentList = () => {
                 {/* Elective Subjects */}
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">🎯 Môn tự chọn (3 môn)</h3>
+                    <h3 className="flex gap-2 items-center text-lg font-medium text-gray-900">
+                      <Target className="w-5 h-5 text-green-600" /> Môn tự chọn (3 môn)
+                    </h3>
                     <p className="text-sm text-gray-600">Chọn 3 môn từ danh sách</p>
                   </div>
                   <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
@@ -2626,7 +2639,7 @@ const StudentList = () => {
                           {subject.subject_name} ({subject.subject_code})
                         </span>
                         {selectedSubjects.elective_subjects.includes(subject.subject_code) && (
-                          <span className="text-xs font-medium text-green-600">✓</span>
+                          <Check className="w-4 h-4 text-green-600" />
                         )}
                       </label>
                     ))}
@@ -2641,7 +2654,9 @@ const StudentList = () => {
 
               {/* Current Selection Summary */}
               <div className="p-4 mt-6 bg-gray-50 rounded-lg">
-                <h4 className="mb-3 font-medium text-gray-900">📋 Tóm tắt lựa chọn:</h4>
+                <h4 className="flex gap-2 items-center mb-3 font-medium text-gray-900">
+                  <ClipboardList className="w-5 h-5 text-gray-700" /> Tóm tắt lựa chọn:
+                </h4>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <p className="text-sm font-medium text-blue-700">Môn chính:</p>
