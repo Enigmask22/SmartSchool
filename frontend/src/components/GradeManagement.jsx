@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { GraduationCap, Settings, Plus, Download, Upload, AlertCircle, Trash2, Save, BarChart3, FileEdit, Scale, Key, Lightbulb, Star, Zap, Pencil, FileText, Clipboard, Calendar, BookOpen } from 'lucide-react';
+import { GraduationCap, Settings, Plus, Download, Upload, AlertCircle, Trash2, Save, BarChart3, FileEdit, Scale, Key, Lightbulb, Star, Zap, Pencil, FileText, Clipboard, Calendar, BookOpen, Users, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -852,7 +852,7 @@ const GradeManagement = () => {
                 <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                   <div className="flex flex-wrap gap-3 justify-between items-center">
                     <div className="flex items-center space-x-3">
-                      <span className="text-xl">👥</span>
+                      <Users className="w-5 h-5 text-gray-700" />
                       <h3 className="text-lg font-bold text-gray-800">Danh sách học sinh</h3>
                       <span className="px-3 py-1 text-sm font-medium text-blue-800 bg-blue-100 rounded-full">
                         {students.length} học sinh
@@ -883,7 +883,7 @@ const GradeManagement = () => {
                       <tr className="bg-gray-50">
                         <th className="px-5 py-3 text-left">
                           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
-                            <span>👤</span>
+                            <User className="w-4 h-4" />
                             <span>Học sinh</span>
                           </span>
                         </th>

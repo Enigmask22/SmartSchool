@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Users, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const AttendanceView = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
@@ -479,7 +480,7 @@ const AttendanceView = () => {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="p-3 rounded-full text-primary bg-primary/10">
-                  👥
+                  <Users className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Tổng học sinh</p>
@@ -493,7 +494,7 @@ const AttendanceView = () => {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="p-3 text-green-600 bg-green-100 rounded-full">
-                  ✅
+                  <CheckCircle className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Có mặt</p>
@@ -507,7 +508,7 @@ const AttendanceView = () => {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="p-3 rounded-full text-destructive bg-destructive/10">
-                  ❌
+                  <XCircle className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Vắng mặt</p>
@@ -521,7 +522,7 @@ const AttendanceView = () => {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="p-3 text-yellow-600 bg-yellow-100 rounded-full">
-                  ⏰
+                  <Clock className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-muted-foreground">Muộn</p>
