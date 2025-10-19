@@ -1922,19 +1922,12 @@ const StudentList = () => {
 
       {/* Edit Student Modal */}
       {showEditModal && selectedStudentForEdit && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="overflow-y-auto p-6 mx-4 w-full max-w-2xl max-h-screen bg-white rounded-lg">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Sửa thông tin học sinh
-              </h3>
-              <button
-                onClick={closeEditModal}
-                className="text-2xl text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
-            </div>
+        <Dialog open={showEditModal} onOpenChange={(open) => !open && closeEditModal()}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Sửa thông tin học sinh</DialogTitle>
+              <DialogDescription />
+            </DialogHeader>
 
             <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2086,25 +2079,14 @@ const StudentList = () => {
               </div>
 
               <div className="flex justify-end pt-4 space-x-3 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors hover:bg-gray-200"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={submitEditForm}
-                  disabled={editLoading}
-                  className="px-6 py-2 font-medium text-white bg-blue-600 rounded-lg transition-colors hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {editLoading ? '⏳ Đang lưu...' : '💾 Lưu thay đổi'}
-                </button>
+                <Button type="button" variant="outline" onClick={closeEditModal}>Hủy</Button>
+                <Button type="button" onClick={submitEditForm} disabled={editLoading}>
+                  {editLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Multiple Face Registration Modal */}
@@ -2123,28 +2105,14 @@ const StudentList = () => {
 
       {/* Student Grades Modal */}
       {showGradesModal && selectedStudentForGrades && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="overflow-y-auto mx-4 w-full max-w-6xl max-h-screen bg-white rounded-lg">
-            {/* Modal Header */}
-            <div className="p-6 rounded-t-lg text-primary-foreground bg-primary">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-2xl font-bold">📊 Bảng điểm</h3>
-                  <p className="mt-1 text-primary-foreground/80">
-                    {selectedStudentForGrades.full_name} - {selectedStudentForGrades.student_id}
-                  </p>
-                  <p className="text-sm text-primary-foreground/80">
-                    Lớp {selectedStudentForGrades.class_name} - Khối {selectedStudentForGrades.grade}
-                  </p>
-                </div>
-                <button
-                  onClick={closeGradesModal}
-                  className="text-3xl font-bold text-white hover:text-purple-200"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+        <Dialog open={showGradesModal} onOpenChange={(open) => !open && closeGradesModal()}>
+          <DialogContent className="max-w-6xl">
+            <DialogHeader>
+              <DialogTitle>📊 Bảng điểm</DialogTitle>
+              <DialogDescription>
+                {selectedStudentForGrades.full_name} - {selectedStudentForGrades.student_id} | Lớp {selectedStudentForGrades.class_name} - Khối {selectedStudentForGrades.grade}
+              </DialogDescription>
+            </DialogHeader>
 
             {/* Modal Content */}
             <div className="p-6">
@@ -2332,42 +2300,23 @@ const StudentList = () => {
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
               <div className="flex justify-end">
-                <button
-                  onClick={closeGradesModal}
-                  className="px-6 py-2 font-medium text-white bg-gray-600 rounded-lg transition-colors hover:bg-gray-700"
-                >
-                  Đóng
-                </button>
+                <Button variant="secondary" onClick={closeGradesModal}>Đóng</Button>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Feedback Modal */}
       {showFeedbackModal && selectedStudentForFeedback && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
-            {/* Modal Header */}
-            <div className="p-6 rounded-t-lg text-primary-foreground bg-primary">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-2xl font-bold">💬 Tạo nhận xét học sinh</h3>
-                  <p className="mt-1 text-primary-foreground/80">
-                    {selectedStudentForFeedback.full_name} - {selectedStudentForFeedback.student_id}
-                  </p>
-                  <p className="text-sm text-primary-foreground/80">
-                    Lớp {selectedStudentForFeedback.class_name} - Khối {selectedStudentForFeedback.grade}
-                  </p>
-                </div>
-                <button
-                  onClick={closeFeedbackModal}
-                  className="text-3xl font-bold text-white hover:text-indigo-200"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+        <Dialog open={showFeedbackModal} onOpenChange={(open) => !open && closeFeedbackModal()}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>💬 Tạo nhận xét học sinh</DialogTitle>
+              <DialogDescription>
+                {selectedStudentForFeedback.full_name} - {selectedStudentForFeedback.student_id} | Lớp {selectedStudentForFeedback.class_name} - Khối {selectedStudentForFeedback.grade}
+              </DialogDescription>
+            </DialogHeader>
 
             {/* Modal Content */}
             <div className="p-6">
@@ -2602,42 +2551,23 @@ const StudentList = () => {
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
               <div className="flex justify-end">
-                <button
-                  onClick={closeFeedbackModal}
-                  className="px-6 py-2 font-medium text-white bg-gray-600 rounded-lg transition-colors hover:bg-gray-700"
-                >
-                  Đóng
-                </button>
+                <Button variant="secondary" onClick={closeFeedbackModal}>Đóng</Button>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Subject Selection Modal */}
       {showSubjectModal && selectedStudentForSubject && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
-            {/* Modal Header */}
-            <div className="p-6 rounded-t-lg text-primary-foreground bg-primary">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-2xl font-bold">📚 Chọn môn học</h3>
-                  <p className="mt-1 text-primary-foreground/80">
-                    {selectedStudentForSubject.full_name} - {selectedStudentForSubject.student_id}
-                  </p>
-                  <p className="text-sm text-primary-foreground/80">
-                    Lớp {selectedStudentForSubject.class_name} - Khối {selectedStudentForSubject.grade}
-                  </p>
-                </div>
-                <button
-                  onClick={closeSubjectModal}
-                  className="text-3xl font-bold text-white hover:text-blue-200"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+        <Dialog open={showSubjectModal} onOpenChange={(open) => !open && closeSubjectModal()}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>📚 Chọn môn học</DialogTitle>
+              <DialogDescription>
+                {selectedStudentForSubject.full_name} - {selectedStudentForSubject.student_id} | Lớp {selectedStudentForSubject.class_name} - Khối {selectedStudentForSubject.grade}
+              </DialogDescription>
+            </DialogHeader>
 
             {/* Modal Content */}
             <div className="p-6">
@@ -2737,24 +2667,11 @@ const StudentList = () => {
 
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={closeSubjectModal}
-                  className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-lg transition-colors hover:bg-gray-200"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={saveSubjectSelection}
-                  disabled={subjectLoading || selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3}
-                  className={`px-6 py-2 font-medium text-white rounded-lg transition-colors ${
-                    subjectLoading || selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {subjectLoading ? '⏳ Đang lưu...' : '💾 Lưu môn học'}
-                </button>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={closeSubjectModal}>Hủy</Button>
+                <Button onClick={saveSubjectSelection} disabled={subjectLoading || selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3}>
+                  {subjectLoading ? 'Đang lưu...' : 'Lưu môn học'}
+                </Button>
               </div>
               {selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3 ? (
                 <p className="mt-2 text-xs text-center text-red-600">
@@ -2762,8 +2679,8 @@ const StudentList = () => {
                 </p>
               ) : null}
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
