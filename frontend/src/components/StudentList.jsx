@@ -76,6 +76,11 @@ const StudentList = () => {
   const [feedbackError, setFeedbackError] = useState('');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
+  
+  // Grade trend analysis states
+  const [gradeTrendData, setGradeTrendData] = useState(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendError, setTrendError] = useState('');
 
   // Subject selection states
   const [showSubjectModal, setShowSubjectModal] = useState(false);
@@ -797,12 +802,58 @@ const StudentList = () => {
     setStudentGrades([]);
   };
 
+  // Grade trend analysis function
+  const fetchGradeTrend = async (studentId, classSubjectId) => {
+    setTrendLoading(true);
+    setTrendError('');
+    setGradeTrendData(null);
+    
+    try {
+      const token = localStorage.getItem('access_token');
+      console.log('🔑 Token from localStorage:', token ? 'Present' : 'Missing');
+      console.log('🔑 Token length:', token ? token.length : 0);
+      
+      const url = `${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=2024-2025&semester=HK1`;
+      console.log('🌐 Making request to:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const result = await response.json();
+      console.log('📊 Response data:', result);
+      
+      if (result.success && result.data) {
+        setGradeTrendData(result.data);
+        return result.data;
+      } else {
+        setTrendError(result.message || 'Không thể phân tích xu hướng điểm');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching grade trend:', error);
+      setTrendError('Lỗi kết nối server khi phân tích xu hướng');
+      return null;
+    } finally {
+      setTrendLoading(false);
+    }
+  };
+
   // Feedback functions
   const handleFeedbackClick = async (student) => {
     setSelectedStudentForFeedback(student);
     setGeneratedFeedback('');
     setFeedbackError('');
     setFeedbackSuccess(false);
+    setGradeTrendData(null);
+    setTrendError('');
     
     // Initialize form with student name first
     let initialForm = {
@@ -813,7 +864,7 @@ const StudentList = () => {
       notes: ''
     };
     
-    // Fetch student's average grade (use same calculation as in grades modal)
+    // Fetch student's average grade and grade trend analysis
     try {
       console.log('🎯 Fetching grades for feedback form for student:', student);
       const gradesResponse = await ApiService.getStudentGrades(student.id);
@@ -837,6 +888,24 @@ const StudentList = () => {
             console.log('📊 Calculated average score for feedback:', avgScore);
             
             initialForm.score = avgScore;
+            
+            // Try to get grade trend for the first subject (if available)
+            const firstGrade = validGrades[0];
+            if (firstGrade && firstGrade.class_subject_id) {
+              console.log('🔍 Fetching grade trend for class_subject_id:', firstGrade.class_subject_id);
+              console.log('🔍 Student ID:', student.id);
+              console.log('🔍 API URL will be:', `${API_BASE_URL}/grades/grade-trend/${student.id}/${firstGrade.class_subject_id}?academic_year=2024-2025&semester=HK1`);
+              
+              const trendData = await fetchGradeTrend(student.id, firstGrade.class_subject_id);
+              if (trendData) {
+                console.log('📈 Grade trend data:', trendData);
+                initialForm.score_trend = trendData.label.toLowerCase(); // "tăng", "giảm", "ổn định"
+              } else {
+                console.log('❌ No trend data returned');
+              }
+            } else {
+              console.log('⚠️ No class_subject_id found in first grade:', firstGrade);
+            }
           } else {
             console.log('⚠️ No valid final_grade found in grades');
           }
@@ -852,7 +921,7 @@ const StudentList = () => {
       console.error('Error fetching student grades:', error);
     }
     
-    // Set form with calculated score
+    // Set form with calculated score and trend
     console.log('📝 Setting feedback form:', initialForm);
     setFeedbackForm(initialForm);
     setShowFeedbackModal(true);
@@ -871,6 +940,8 @@ const StudentList = () => {
     setGeneratedFeedback('');
     setFeedbackError('');
     setFeedbackSuccess(false);
+    setGradeTrendData(null);
+    setTrendError('');
   };
 
   const handleFeedbackFormChange = (field, value) => {
@@ -1123,14 +1194,14 @@ const StudentList = () => {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          <div className="w-16 h-16 rounded-full border-4 border-blue-200 animate-spin border-t-blue-600"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6 min-h-screen bg-gray-50">
+    <div className="p-6 space-y-6 min-h-screen bg-gray-50">
       {/* Header Section */}
       <Card>
         <CardHeader>
@@ -1144,7 +1215,7 @@ const StudentList = () => {
         </CardHeader>
         {error && (
           <CardContent>
-            <div className="flex items-center space-x-2 p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+            <div className="flex items-center p-4 space-x-2 rounded-lg border bg-destructive/10 border-destructive/20">
               <AlertCircle className="w-5 h-5 text-destructive" />
               <p className="text-destructive">{error}</p>
             </div>
@@ -1162,7 +1233,7 @@ const StudentList = () => {
             <div className="space-y-2">
               <Label htmlFor="search">Tìm kiếm</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 w-4 h-4 transform -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="search"
                   type="text"
@@ -1180,7 +1251,7 @@ const StudentList = () => {
                 id="class-select"
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                className="px-3 py-2 w-full rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
               >
                 {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
                 {isHomeroomTeacher() ? (
@@ -1203,7 +1274,7 @@ const StudentList = () => {
                     id="show-inactive"
                     checked={showInactive}
                     onChange={(e) => setShowInactive(e.target.checked)}
-                    className="w-4 h-4 text-primary bg-background border-input rounded focus:ring-2 focus:ring-ring"
+                    className="w-4 h-4 rounded text-primary bg-background border-input focus:ring-2 focus:ring-ring"
                   />
                   <Label htmlFor="show-inactive" className="cursor-pointer">
                     Đã xóa
@@ -1240,7 +1311,7 @@ const StudentList = () => {
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="py-1 pr-8 pl-3 text-sm bg-background rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="py-1 pr-8 pl-3 text-sm rounded-md border bg-background border-input focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value={6}>6</option>
                   <option value={12}>12</option>
@@ -1258,7 +1329,7 @@ const StudentList = () => {
         {filteredStudents.length === 0 ? (
           <Card className="col-span-full">
             <CardContent className="py-12 text-center">
-              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-muted rounded-full">
+              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-muted">
                 <Users className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="mb-2 text-lg font-medium text-foreground">
@@ -1282,29 +1353,29 @@ const StudentList = () => {
                   ? 'bg-destructive text-destructive-foreground' 
                   : 'bg-gradient-to-r from-primary to-primary/80 text-primary-foreground'
               }`}>
-                <div className="flex items-center justify-between">
+                <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-4">
                     <div className="relative">
-                      <div className="flex justify-center items-center w-16 h-16 text-2xl font-bold rounded-full bg-white/20 backdrop-blur-sm">
+                      <div className="flex justify-center items-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
                         {student.full_name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                       {student.is_active === false && (
-                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-destructive rounded-full flex items-center justify-center">
+                        <div className="flex absolute -top-1 -right-1 justify-center items-center w-6 h-6 rounded-full bg-destructive">
                           <X className="w-3 h-3 text-destructive-foreground" />
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-bold truncate">{student.full_name}</h3>
-                      <p className="text-sm text-primary-foreground/80 font-mono">{student.student_id}</p>
+                      <p className="font-mono text-sm text-primary-foreground/80">{student.student_id}</p>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
-                          <GraduationCap className="w-3 h-3 mr-1" />
+                        <Badge variant="secondary" className="text-xs text-white bg-white/20 border-white/30">
+                          <GraduationCap className="mr-1 w-3 h-3" />
                           {student.class_name}
                         </Badge>
                         {student.gender && (
-                          <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
-                            <Users className="w-3 h-3 mr-1" />
+                          <Badge variant="secondary" className="text-xs text-white bg-white/20 border-white/30">
+                            <Users className="mr-1 w-3 h-3" />
                             {student.gender}
                           </Badge>
                         )}
@@ -1318,7 +1389,7 @@ const StudentList = () => {
                       onClick={() => handleEdit(student)}
                       variant="outline"
                       size="sm"
-                      className="flex items-center space-x-1 text-xs bg-white/20 text-white border-white/30 hover:bg-white/30 hover:border-white/50"
+                      className="flex items-center space-x-1 text-xs text-white bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
                     >
                       <Edit className="w-3 h-3" />
                       <span>Sửa</span>
@@ -1330,7 +1401,7 @@ const StudentList = () => {
               {/* Student info */}
               <CardContent className="p-4">
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-3 p-2 rounded-lg bg-muted/30">
+                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
                     <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
                       <Mail className="w-4 h-4 text-primary" />
                     </div>
@@ -1340,7 +1411,7 @@ const StudentList = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-3 p-2 rounded-lg bg-muted/30">
+                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
                     <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
                       <Phone className="w-4 h-4 text-primary" />
                     </div>
@@ -1350,7 +1421,7 @@ const StudentList = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-3 p-2 rounded-lg bg-muted/30">
+                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
                     <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
                       <BookOpen className="w-4 h-4 text-primary" />
                     </div>
@@ -1365,7 +1436,7 @@ const StudentList = () => {
                 <div className="pt-4 border-t border-border/50">
                   {student.is_active === false ? (
                     // Actions for deleted students (limited)
-                    <div className="text-center space-y-3">
+                    <div className="space-y-3 text-center">
                       <Button
                         onClick={() => handleRestore(student)}
                         disabled={restoreLoading}
@@ -1374,12 +1445,12 @@ const StudentList = () => {
                       >
                         {restoreLoading ? (
                           <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            <Loader2 className="mr-2 w-4 h-4 animate-spin" />
                             <span>Đang khôi phục...</span>
                           </>
                         ) : (
                           <>
-                            <RefreshCw className="w-4 h-4 mr-2" />
+                            <RefreshCw className="mr-2 w-4 h-4" />
                             <span>Khôi phục học sinh</span>
                           </>
                         )}
@@ -2055,7 +2126,7 @@ const StudentList = () => {
         <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
           <div className="overflow-y-auto mx-4 w-full max-w-6xl max-h-screen bg-white rounded-lg">
             {/* Modal Header */}
-            <div className="p-6 text-primary-foreground bg-primary rounded-t-lg">
+            <div className="p-6 rounded-t-lg text-primary-foreground bg-primary">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold">📊 Bảng điểm</h3>
@@ -2132,7 +2203,7 @@ const StudentList = () => {
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="flex items-center">
-                                <div className="flex justify-center items-center w-10 h-10 text-sm font-bold text-primary-foreground bg-primary rounded-full">
+                                <div className="flex justify-center items-center w-10 h-10 text-sm font-bold rounded-full text-primary-foreground bg-primary">
                                   {gradeRecord.subject_name?.charAt(0)?.toUpperCase() || '?'}
                                 </div>
                                 <div className="ml-4">
@@ -2195,7 +2266,7 @@ const StudentList = () => {
                   </div>
 
                   {/* Summary */}
-                  <div className="p-6 bg-muted/50 rounded-lg">
+                  <div className="p-6 rounded-lg bg-muted/50">
                     <h4 className="mb-3 font-medium text-gray-900">📈 Tổng kết</h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="text-center">
@@ -2245,7 +2316,7 @@ const StudentList = () => {
         <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
           <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
             {/* Modal Header */}
-            <div className="p-6 text-primary-foreground bg-primary rounded-t-lg">
+            <div className="p-6 rounded-t-lg text-primary-foreground bg-primary">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold">💬 Tạo nhận xét học sinh</h3>
@@ -2336,18 +2407,54 @@ const StudentList = () => {
                     <div>
                       <label htmlFor="score_trend" className="block mb-1 text-sm font-medium text-gray-700">
                         Xu Hướng Điểm Số
+                        {trendLoading && (
+                          <span className="ml-2 text-xs text-blue-600">
+                            <Loader2 className="inline w-3 h-3 animate-spin" />
+                            Đang phân tích...
+                          </span>
+                        )}
                       </label>
                       <select
                         id="score_trend"
                         value={feedbackForm.score_trend}
                         onChange={(e) => handleFeedbackFormChange('score_trend', e.target.value)}
                         className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={trendLoading}
                       >
                         <option value="">Chọn xu hướng</option>
                         <option value="tăng">Tăng</option>
                         <option value="giảm">Giảm</option>
                         <option value="ổn định">Ổn định</option>
                       </select>
+                      
+                      {/* Grade Trend Analysis Result */}
+                      {gradeTrendData && (
+                        <div className="p-3 mt-2 rounded-md border" style={{ backgroundColor: gradeTrendData.color + '10', borderColor: gradeTrendData.color + '40' }}>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                              <span 
+                                className="px-2 py-1 text-xs font-medium text-white rounded-full"
+                                style={{ backgroundColor: gradeTrendData.color }}
+                              >
+                                {gradeTrendData.label}
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                Độ tin cậy: {Math.round(gradeTrendData.confidence * 100)}%
+                              </span>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-sm" style={{ color: gradeTrendData.color }}>
+                            {gradeTrendData.reason}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Trend Error */}
+                      {trendError && (
+                        <div className="p-2 mt-2 text-xs text-red-600 bg-red-50 rounded border border-red-200">
+                          ⚠️ {trendError}
+                        </div>
+                      )}
                     </div>
 
                     {/* Attendance Rate */}
@@ -2479,7 +2586,7 @@ const StudentList = () => {
         <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
           <div className="overflow-y-auto mx-4 w-full max-w-4xl max-h-screen bg-white rounded-lg">
             {/* Modal Header */}
-            <div className="p-6 text-primary-foreground bg-primary rounded-t-lg">
+            <div className="p-6 rounded-t-lg text-primary-foreground bg-primary">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold">📚 Chọn môn học</h3>

@@ -107,6 +107,133 @@ def calculate_final_grade(grade_data: dict, grade_config: dict) -> float:
         logger.error(f"Error calculating final grade: {str(e)}")
         return 0.0
 
+def _infer_column_stage_priority(column_key: str, column_label: str = "") -> int:
+    """Gán mức ưu tiên theo giai đoạn kiểm tra để sắp xếp chuỗi thời gian.
+    Giá trị nhỏ hơn xuất hiện sớm hơn trong học kỳ.
+    """
+    key = (column_key or "").lower()
+    label = (column_label or "").lower()
+    text = f"{key} {label}"
+    # Ưu tiên theo từ khóa phổ biến trong tên cột
+    # 0-1: thường xuyên/miệng/15p, 2: giữa kỳ, 3: cuối kỳ/học kỳ
+    if any(k in text for k in ["thuong", "tx", "mieng", "15", "kiem_tra_ngan", "practice"]):
+        return 0
+    if any(k in text for k in ["giua", "giuaki", "mid"]):
+        return 2
+    if any(k in text for k in ["cuoi", "cuoiki", "hk", "final", "tong_ket"]):
+        return 3
+    # Mặc định coi là điểm quá trình
+    return 1
+
+def _extract_ordered_points(grade_data: dict, grade_config: Optional[dict]) -> List[dict]:
+    """Trả về danh sách điểm đã sắp theo thời gian với trọng số.
+    Mỗi phần tử: {name, score, weight, stage}
+    - Nếu không có grade_config, cố gắng lấy He_so từ grade_data.
+    - Bỏ qua cột thiếu điểm hoặc không phải số.
+    """
+    points = []
+    for column_name, value in (grade_data or {}).items():
+        try:
+            if not isinstance(value, dict) or "Diem" not in value:
+                continue
+            score = float(value.get("Diem"))
+            if score is None:
+                continue
+            weight = None
+            label = ""
+            if grade_config and column_name in grade_config:
+                cfg = grade_config.get(column_name) or {}
+                weight = cfg.get("he_so")
+                label = cfg.get("label", "")
+            if weight is None:
+                weight = value.get("He_so", 1)
+            weight = float(weight) if weight is not None else 1.0
+            stage = _infer_column_stage_priority(column_name, label)
+            points.append({
+                "name": column_name,
+                "score": score,
+                "weight": weight,
+                "stage": stage
+            })
+        except Exception:
+            continue
+    # Sắp xếp theo stage rồi tới tên cột (ổn định kết quả)
+    points.sort(key=lambda p: (p["stage"], p["name"]))
+    return points
+
+def analyze_grade_trend(grade_data: dict, grade_config: Optional[dict] = None) -> dict:
+    """Phân tích xu hướng điểm trong một môn dựa trên chuỗi cột điểm.
+
+    Thuật toán: hồi quy tuyến tính có trọng số (x = 1..n, y = điểm, w = hệ số).
+    - slope > +epsilon  => xu hướng tăng
+    - slope < -epsilon  => xu hướng giảm
+    - |slope| <= epsilon => ổn định
+
+    Trả về: {
+        direction: up|down|stable,
+        slope: float,
+        confidence: float (0..1),
+        ordered_points: [...],
+        reason: str
+    }
+    """
+    points = _extract_ordered_points(grade_data, grade_config)
+    n = len(points)
+    if n < 2:
+        return {
+            "direction": "stable",
+            "slope": 0.0,
+            "confidence": 0.0,
+            "ordered_points": points,
+            "reason": "Không đủ dữ liệu để xác định xu hướng"
+        }
+
+    # Chuẩn bị dữ liệu hồi quy
+    xs = [i + 1 for i in range(n)]
+    ys = [p["score"] for p in points]
+    ws = [max(float(p["weight"]), 0.0001) for p in points]
+
+    # Tính slope theo công thức hồi quy tuyến tính có trọng số
+    W = sum(ws)
+    x_bar = sum(w * x for w, x in zip(ws, xs)) / W
+    y_bar = sum(w * y for w, y in zip(ws, ys)) / W
+    s_xx = sum(w * (x - x_bar) * (x - x_bar) for w, x in zip(ws, xs))
+    s_xy = sum(w * (x - x_bar) * (y - y_bar) for w, x, y in zip(ws, xs, ys))
+    slope = s_xy / s_xx if s_xx != 0 else 0.0
+
+    # Ước lượng độ tin cậy: dựa vào tương quan tuyến tính (R^2) và số điểm
+    ss_tot = sum(w * (y - y_bar) * (y - y_bar) for w, y in zip(ws, ys))
+    ss_res = sum(w * (y - (y_bar + slope * (x - x_bar))) ** 2 for w, x, y in zip(ws, xs, ys))
+    r2 = 0.0 if ss_tot == 0 else max(0.0, 1.0 - (ss_res / ss_tot))
+    confidence = max(0.0, min(1.0, 0.4 + 0.5 * r2 + 0.1 * (n - 2)))  # Heuristic nhẹ
+
+    epsilon = 0.15  # Ngưỡng để coi là tăng/giảm có ý nghĩa
+    if slope > epsilon:
+        direction = "up"
+    elif slope < -epsilon:
+        direction = "down"
+    else:
+        direction = "stable"
+
+    # Sinh mô tả ngắn gọn
+    first_avg = ys[0]
+    last_avg = ys[-1]
+    delta = last_avg - first_avg
+    if direction == "up":
+        reason = f"Điểm tăng từ {round(first_avg, 2)} lên {round(last_avg, 2)} (Δ={round(delta, 2)}); các cột sau có xu hướng cao hơn."
+    elif direction == "down":
+        reason = f"Điểm giảm từ {round(first_avg, 2)} xuống {round(last_avg, 2)} (Δ={round(delta, 2)}); các cột sau có xu hướng thấp hơn."
+    else:
+        reason = f"Điểm ổn định quanh {round(y_bar, 2)}; biến động nhỏ giữa các cột."
+
+    return {
+        "direction": direction,
+        "slope": round(float(slope), 3),
+        "confidence": round(float(confidence), 2),
+        "ordered_points": points,
+        "reason": reason
+    }
+
 # ===============================================
 # TEACHER INFORMATION ENDPOINTS
 # ===============================================
@@ -649,6 +776,7 @@ async def get_student_grades(
                 
                 student_grades.append({
                     "id": grade_record["id"],
+                    "class_subject_id": class_subject.get("id"),
                     "subject_name": subject.get("subject_name", "N/A"),
                     "class_name": class_info.get("class_name", "N/A"),
                     "teacher_name": teacher.get("full_name", "N/A"),
@@ -1383,6 +1511,77 @@ async def parse_grade_sheet_from_image(
             detail=f"Lỗi upload ảnh: {str(e)}"
         )
 
+
+@router.get("/grade-trend/{student_id}/{class_subject_id}", response_model=ResponseModel)
+async def get_student_grade_trend(
+    student_id: int,
+    class_subject_id: int,
+    academic_year: str,
+    semester: str,
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Phân tích xu hướng điểm cho một học sinh trong một môn.
+
+    Dựa trên dữ liệu `grade_data` và `grade_config` của môn để ước lượng
+    xu hướng tăng/giảm/ổn định, trả về cả mô tả ngắn gọn cho UI.
+    """
+    try:
+        # Quyền truy cập
+        class_subject = db.table("class_subjects").select("*").eq("id", class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
+        if not class_subject.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền xem điểm của lớp này"
+            )
+
+        # Lấy điểm và cấu hình cột điểm
+        grade_resp = db.table("grades").select("*").eq("student_id", student_id).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+        if not grade_resp.data:
+            return ResponseModel(
+                success=True,
+                message="Chưa có điểm",
+                data={
+                    "direction": "stable",
+                    "slope": 0,
+                    "confidence": 0,
+                    "reason": "Chưa có dữ liệu điểm"
+                }
+            )
+
+        subject_id = class_subject.data[0]["subject_id"]
+        config_resp = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+        grade_config = config_resp.data[0]["grade_column_config"] if config_resp.data else None
+
+        grade_record = grade_resp.data[0]
+        trend = analyze_grade_trend(grade_record.get("grade_data", {}), grade_config)
+
+        # Chuẩn hóa payload cho UI
+        color = "#16A34A" if trend["direction"] == "up" else ("#DC2626" if trend["direction"] == "down" else "#6B7280")
+        label = "Tăng" if trend["direction"] == "up" else ("Giảm" if trend["direction"] == "down" else "Ổn định")
+
+        return ResponseModel(
+            success=True,
+            message="Phân tích xu hướng thành công",
+            data={
+                "direction": trend["direction"],
+                "label": label,
+                "color": color,
+                "slope": trend["slope"],
+                "confidence": trend["confidence"],
+                "reason": trend["reason"],
+                "ordered_points": trend["ordered_points"],
+                "final_grade": grade_record.get("final_grade")
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error analyzing grade trend: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi phân tích xu hướng: {str(e)}"
+        )
 
 @router.get("/ocr/status/{request_id}", response_model=ResponseModel)
 async def get_ocr_status(
