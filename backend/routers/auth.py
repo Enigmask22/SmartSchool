@@ -445,6 +445,13 @@ async def forgot_password(
         
         user = user_response.data[0]
         
+        # Kiểm tra xem email nhận OTP có khớp với email của username không
+        if user["email"].lower() != request.otp_email.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email nhận OTP không khớp với email của tài khoản này. Vui lòng nhập đúng email đã đăng ký."
+            )
+        
         # Kiểm tra xem SMTP đã được cấu hình chưa
         if not email_service.is_smtp_configured():
             logger.warning("SMTP chưa được cấu hình, sử dụng OTP giả lập")

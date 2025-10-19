@@ -10,10 +10,11 @@ Chức năng quên mật khẩu cho phép người dùng đặt lại mật kh�
 - Từ trang đăng nhập, người dùng nhấn nút "Quên mật khẩu?"
 - Chuyển sang form nhập email
 
-### 2. Nhập email đăng nhập và email nhận OTP
-- **Email đăng nhập**: Email tài khoản trong hệ thống
-- **Email nhận OTP**: Email để nhận mã OTP (có thể khác email đăng nhập)
-- Hệ thống kiểm tra email đăng nhập có tồn tại không
+### 2. Nhập username và email nhận OTP
+- **Username**: Tên đăng nhập của tài khoản trong hệ thống
+- **Email nhận OTP**: Email để nhận mã OTP (phải khớp với email đã đăng ký của tài khoản)
+- Hệ thống kiểm tra username có tồn tại không
+- Hệ thống kiểm tra email nhận OTP có khớp với email của username không
 - Tạo mã OTP 6 số ngẫu nhiên
 - Lưu OTP tạm thời với thời hạn 10 phút
 
@@ -49,17 +50,17 @@ Chức năng quên mật khẩu cho phép người dùng đặt lại mật kh�
 ```
 POST /api/auth/forgot-password
 - Gửi OTP qua email
-- Body: {email, otp_email}
+- Body: {username, otp_email}
 
 POST /api/auth/verify-otp  
 - Xác thực mã OTP
-- Body: {email, otp}
+- Body: {username, otp}
 
 POST /api/auth/reset-password
 - Đặt lại mật khẩu mới
-- Body: {email, otp, new_password, confirm_password}
+- Body: {username, otp, new_password, confirm_password}
 
-GET /api/auth/otp-status/{email}
+GET /api/auth/otp-status/{username}
 - Lấy trạng thái OTP
 ```
 
@@ -80,15 +81,15 @@ GET /api/auth/otp-status/{email}
 ### Schemas (`backend/models/schemas.py`)
 ```python
 class ForgotPasswordRequest(BaseModel):
-    email: str
+    username: str
     otp_email: str
 
 class VerifyOTPRequest(BaseModel):
-    email: str
+    username: str
     otp: str
 
 class ResetPasswordRequest(BaseModel):
-    email: str
+    username: str
     otp: str
     new_password: str
     confirm_password: str
@@ -111,10 +112,10 @@ class ResetPasswordRequest(BaseModel):
 ### API Service (`frontend/src/services/api.jsx`)
 ```javascript
 // Forgot Password API methods
-forgotPassword(email, otpEmail)
-verifyOTP(email, otp)
-resetPassword(email, otp, newPassword, confirmPassword)
-getOTPStatus(email)
+forgotPassword(username, otpEmail)
+verifyOTP(username, otp)
+resetPassword(username, otp, newPassword, confirmPassword)
+getOTPStatus(username)
 ```
 
 ## Cấu hình
@@ -142,6 +143,7 @@ Xem file `backend/EMAIL_SETUP_GUIDE.md` để biết cách cấu hình SMTP.
 - ✅ Giới hạn số lần thử (3 lần)
 - ✅ Hash mật khẩu với bcrypt
 - ✅ Xóa OTP sau khi sử dụng
+- ✅ Kiểm tra email nhận OTP phải khớp với email đã đăng ký của tài khoản
 - ✅ Validation đầu vào
 - ✅ Rate limiting (có thể thêm)
 

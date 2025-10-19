@@ -425,8 +425,8 @@ async def get_student_stats(db=Depends(get_db)):
         active_response = db.table("students").select("count", count="exact").eq("is_active", True).execute()
         active_students = active_response.count if active_response.count else 0
         
-        # Students with face encoding
-        encoded_response = db.table("students").select("count", count="exact").not_.is_("face_encoding", "null").execute()
+        # Students with InsightFace encoding
+        encoded_response = db.table("students").select("count", count="exact").not_.is_("insightface_encoding", "null").execute()
         encoded_students = encoded_response.count if encoded_response.count else 0
         
         # By grade
