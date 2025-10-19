@@ -6,7 +6,8 @@ import {
   GraduationCap,
   MessageSquare,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -30,6 +31,44 @@ const AIFeedback = () => {
   const [success, setSuccess] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [batchStudents, setBatchStudents] = useState([]);
+  
+  // Grade trend analysis states
+  const [gradeTrendData, setGradeTrendData] = useState(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendError, setTrendError] = useState('');
+
+  // Grade trend analysis function
+  const fetchGradeTrend = async (studentId, classSubjectId) => {
+    setTrendLoading(true);
+    setTrendError('');
+    setGradeTrendData(null);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=2024-2025&semester=HK1`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setGradeTrendData(result.data);
+        return result.data;
+      } else {
+        setTrendError(result.message || 'Không thể phân tích xu hướng điểm');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching grade trend:', error);
+      setTrendError('Lỗi kết nối server khi phân tích xu hướng');
+      return null;
+    } finally {
+      setTrendLoading(false);
+    }
+  };
 
   // Reset form
   const resetForm = () => {
@@ -43,6 +82,8 @@ const AIFeedback = () => {
     setFeedback('');
     setError('');
     setSuccess(false);
+    setGradeTrendData(null);
+    setTrendError('');
   };
 
   // Handle input change
@@ -242,7 +283,7 @@ const AIFeedback = () => {
 
       {/* Success Alert */}
       {success && (
-        <Card className="border-green-200 bg-green-50">
+        <Card className="bg-green-50 border-green-200">
           <CardContent className="p-4">
             <div className="flex">
               <CheckCircle className="w-5 h-5 text-green-400" />
@@ -296,20 +337,72 @@ const AIFeedback = () => {
 
             {/* Score Trend */}
             <div>
-              <label htmlFor="score_trend" className="block mb-1 text-sm font-medium">
-                Xu Hướng Điểm Số
-              </label>
+              <div className="flex justify-between items-center mb-1">
+                <label htmlFor="score_trend" className="block text-sm font-medium">
+                  Xu Hướng Điểm Số
+                  {trendLoading && (
+                    <span className="ml-2 text-xs text-blue-600">
+                      <Loader2 className="inline w-3 h-3 animate-spin" />
+                      Đang phân tích...
+                    </span>
+                  )}
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Note: This would need student ID and class subject ID to work
+                    // For now, just show a message that this feature needs student context
+                    setTrendError('Tính năng này cần được sử dụng từ danh sách học sinh để có đầy đủ thông tin');
+                  }}
+                  disabled={trendLoading}
+                  className="text-xs"
+                >
+                  🔍 Phân tích AI
+                </Button>
+              </div>
               <select
                 id="score_trend"
                 value={formData.score_trend}
                 onChange={(e) => handleInputChange('score_trend', e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={trendLoading}
               >
                 <option value="">Chọn xu hướng</option>
                 <option value="tăng">Tăng</option>
                 <option value="giảm">Giảm</option>
                 <option value="ổn định">Ổn định</option>
               </select>
+              
+              {/* Grade Trend Analysis Result */}
+              {gradeTrendData && (
+                <div className="p-3 mt-2 rounded-md border" style={{ backgroundColor: gradeTrendData.color + '10', borderColor: gradeTrendData.color + '40' }}>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      <span 
+                        className="px-2 py-1 text-xs font-medium text-white rounded-full"
+                        style={{ backgroundColor: gradeTrendData.color }}
+                      >
+                        {gradeTrendData.label}
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        Độ tin cậy: {Math.round(gradeTrendData.confidence * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-sm" style={{ color: gradeTrendData.color }}>
+                    {gradeTrendData.reason}
+                  </p>
+                </div>
+              )}
+              
+              {/* Trend Error */}
+              {trendError && (
+                <div className="p-2 mt-2 text-xs text-red-600 bg-red-50 rounded border border-red-200">
+                  ⚠️ {trendError}
+                </div>
+              )}
             </div>
 
             {/* Attendance Rate */}
@@ -454,7 +547,7 @@ const AIFeedback = () => {
                               onClick={() => removeFromBatch(index)}
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                              className="p-0 w-6 h-6 text-destructive hover:text-destructive"
                             >
                               <X className="w-4 h-4" />
                             </Button>
@@ -464,7 +557,7 @@ const AIFeedback = () => {
                             Chuyên cần: {student.attendance_rate}%
                           </div>
                           {student.feedback && (
-                            <div className="p-2 text-sm bg-muted rounded border">
+                            <div className="p-2 text-sm rounded border bg-muted">
                               <strong>Nhận xét:</strong> {student.feedback}
                             </div>
                           )}
