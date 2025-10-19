@@ -632,10 +632,21 @@ const AdminManagement = () => {
                         {field === 'username' ? 'USERNAME' :
                          field === 'full_name' ? 'HỌ TÊN' :
                          field === 'is_active' ? 'TRẠNG THÁI' :
+                         field === 'subject_code' ? 'MÃ MÔN HỌC' :
+                         field === 'subject_name' ? 'TÊN MÔN HỌC' :
+                         field === 'description' ? 'MÔ TẢ' :
+                         field === 'class_name' ? 'TÊN LỚP' :
+                         field === 'grade' ? 'KHỐI' :
+                         field === 'homeroom_teacher' ? 'GIÁO VIÊN CHỦ NHIỆM' :
+                         field === 'room_number' ? 'SỐ PHÒNG' :
+                         field === 'academic_year' ? 'NĂM HỌC' :
+                         field === 'total_students' ? 'TỔNG SỐ HỌC SINH' :
+                         field === 'teacher_name' ? 'TÊN GIÁO VIÊN' :
+                         field === 'semester' ? 'HỌC KỲ' :
                          field.replace(/_/g, ' ').toUpperCase()}
                       </TableHead>
                     ))}
-                    <TableHead>Thao tác</TableHead>
+                    <TableHead>THAO TÁC</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
