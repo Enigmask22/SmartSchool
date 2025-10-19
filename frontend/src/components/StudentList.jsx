@@ -2228,12 +2228,44 @@ const StudentList = () => {
                             
                             <td className="px-6 py-4">
                               <div className="flex flex-wrap gap-2 justify-center">
-                                {gradeRecord.grade_data && Object.keys(gradeRecord.grade_data).filter(key => 
-                                  key !== 'Mon_hoc' && gradeRecord.grade_data[key]?.Diem
-                                ).map(columnName => (
+                                {gradeRecord.grade_data && (() => {
+                                  // Sắp xếp các cột điểm theo: trọng số tăng dần, rồi theo giai đoạn (thường xuyên -> giữa kì -> cuối kì)
+                                  const getPriority = (name) => {
+                                    const s = String(name || '').toLowerCase();
+                                    if (s.includes('thuong')) return 0; // thường xuyên
+                                    if (s.includes('giua')) return 1;   // giữa kì
+                                    if (s.includes('cuoi') || s.includes('hk') || s.includes('final')) return 2; // cuối kì
+                                    return 99;
+                                  };
+                                  const keys = Object.keys(gradeRecord.grade_data)
+                                    .filter(key => key !== 'Mon_hoc' && gradeRecord.grade_data[key]?.Diem)
+                                    .sort((a, b) => {
+                                      const wa = Number(gradeRecord.grade_data[a]?.He_so ?? 1);
+                                      const wb = Number(gradeRecord.grade_data[b]?.He_so ?? 1);
+                                      if (wa !== wb) return wa - wb;
+                                      return getPriority(a) - getPriority(b);
+                                    });
+                                  const LABEL_MAP = {
+                                    'Diem_thuong_xuyen': 'Điểm thường xuyên',
+                                    'Diem_thi_giua_ki': 'Điểm thi giữa kì',
+                                    'Diem_thi_cuoi_ki': 'Điểm thi cuối kì'
+                                  };
+                                  const formatLabel = (key) => {
+                                    if (LABEL_MAP[key]) return LABEL_MAP[key];
+                                    // Fallback: chuyển đổi gần đúng từ khóa ASCII sang có dấu
+                                    let text = String(key || '').replace(/_/g, ' ');
+                                    text = text.replace(/Diem/g, 'Điểm');
+                                    text = text.replace(/thuong/g, 'thường');
+                                    text = text.replace(/xuyen/g, 'xuyên');
+                                    text = text.replace(/giua/g, 'giữa');
+                                    text = text.replace(/cuoi/g, 'cuối');
+                                    text = text.replace(/ki\b/g, 'kì');
+                                    return text;
+                                  };
+                                  return keys.map(columnName => (
                                   <div key={columnName} className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-200">
                                     <div className="text-xs font-medium text-blue-600">
-                                      {columnName.replace(/_/g, ' ').replace(/Diem/g, 'Điểm')}
+                                      {formatLabel(columnName)}
                                     </div>
                                     <div className="text-sm font-bold text-blue-800">
                                       {gradeRecord.grade_data[columnName]?.Diem}
@@ -2242,7 +2274,8 @@ const StudentList = () => {
                                       </span>
                                     </div>
                                   </div>
-                                ))}
+                                  ));
+                                })()}
                               </div>
                             </td>
                             
