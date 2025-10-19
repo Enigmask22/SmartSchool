@@ -45,7 +45,6 @@ class HomeroomStudent(BaseModel):
     profile_image: Optional[str]
     student_active: bool
     recognition_enabled: bool
-    last_recognized: Optional[datetime]
     face_samples_count: int
     encoding_type: str
 
@@ -288,12 +287,10 @@ async def get_homeroom_students(
             class_name,
             grade,
             gender,
-            face_encoding,
             insightface_encoding,
             face_samples_count,
             encoding_version,
             recognition_enabled,
-            last_recognized,
             subject_selected
         """).in_("class_name", managed_classes)
 
@@ -321,12 +318,10 @@ async def get_homeroom_students(
                     "class_name": student["class_name"],
                     "grade": student["grade"],
                     "gender": student["gender"],
-                    "face_encoding": student["face_encoding"],
                     "insightface_encoding": student["insightface_encoding"],
                     "face_samples_count": student["face_samples_count"],
                     "encoding_version": student["encoding_version"],
                     "recognition_enabled": student["recognition_enabled"],
-                    "last_recognized": student["last_recognized"],
                     "subject_selected": student["subject_selected"]
                 })
 
@@ -378,8 +373,6 @@ async def update_student_face_encoding(
         
         if "insightface_encoding" in encoding_data:
             update_data["insightface_encoding"] = encoding_data["insightface_encoding"]
-        if "face_encoding" in encoding_data:
-            update_data["face_encoding"] = encoding_data["face_encoding"]
         if "face_samples_count" in encoding_data:
             update_data["face_samples_count"] = encoding_data["face_samples_count"]
 

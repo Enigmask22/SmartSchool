@@ -71,7 +71,7 @@ class StudentUpdate(BaseModel):
 
 class Student(StudentBase):
     id: int
-    face_encoding: Optional[str] = None
+    insightface_encoding: Optional[str] = None
     profile_image: Optional[str] = None
     is_active: bool = True
     created_at: datetime

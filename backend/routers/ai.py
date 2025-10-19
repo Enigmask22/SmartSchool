@@ -100,8 +100,9 @@ async def sync_face_encoding_to_db(student_id: int, result: dict, db):
             face_features = ACTIVE_SERVICE.face_database.get(student_id_str)
             field_name = "insightface_encoding"
         else:
-            face_features = ACTIVE_SERVICE.face_database.get(student_id_str)
-            field_name = "face_encoding"
+            # MediaPipe service is deprecated - only use InsightFace
+            logger.warning(f"[DB Sync] MediaPipe service is deprecated. Only InsightFace is supported.")
+            return
         
         face_data = {}
         if face_features and isinstance(face_features, list):
@@ -747,11 +748,8 @@ async def get_ai_status(db=Depends(get_db)):
         # Thống kê AI service
         local_count = len(ACTIVE_SERVICE.face_database)
         
-        # Thống kê database - Check both encoding types
-        if ACTIVE_SERVICE_NAME == "InsightFace (ArcFace)":
-            db_response = db.table("students").select("id, full_name, insightface_encoding").not_.is_("insightface_encoding", "null").execute()
-        else:
-            db_response = db.table("students").select("id, full_name, face_encoding").not_.is_("face_encoding", "null").execute()
+        # Thống kê database - Only check InsightFace encoding
+        db_response = db.table("students").select("id, full_name, insightface_encoding").not_.is_("insightface_encoding", "null").execute()
         database_count = len(db_response.data) if db_response.data else 0
         
         # Chi tiết
@@ -813,17 +811,12 @@ async def delete_student_encoding(
         ai_result = await ACTIVE_SERVICE.delete_student_face(student_id)
         
         # Xóa face encoding từ database - Delete correct field based on active service
-        if ACTIVE_SERVICE_NAME == "InsightFace (ArcFace)":
-            db_response = db.table("students").update({
-                "insightface_encoding": None,
-                "face_samples_count": 0,
-                "updated_at": "now()"
-            }).eq("id", student_id).execute()
-        else:
-            db_response = db.table("students").update({
-                "face_encoding": None,
-                "updated_at": "now()"
-            }).eq("id", student_id).execute()
+        # Clear InsightFace encoding from database
+        db_response = db.table("students").update({
+            "insightface_encoding": None,
+            "face_samples_count": 0,
+            "updated_at": "now()"
+        }).eq("id", student_id).execute()
         
         if db_response.data:
             logger.info(f"✅ Face encoding deleted for student {student_id}")

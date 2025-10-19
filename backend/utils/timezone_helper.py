@@ -94,7 +94,7 @@ def fix_student_timestamps(student_record: Dict[str, Any]) -> Dict[str, Any]:
     if not student_record:
         return student_record
     
-    timestamp_fields = ['last_recognized', 'created_at', 'updated_at']
+    timestamp_fields = ['created_at', 'updated_at']
     fixed_record = student_record.copy()
     
     for field in timestamp_fields:
@@ -126,7 +126,7 @@ def fix_database_response_timestamps(response_data) -> Any:
             # Recursive fix cho nested objects
             fixed_dict = {}
             for key, value in response_data.items():
-                if key in ['check_in_time', 'check_out_time', 'recognition_time', 'created_at', 'updated_at', 'last_recognized'] and value:
+                if key in ['check_in_time', 'check_out_time', 'recognition_time', 'created_at', 'updated_at'] and value:
                     fixed_dict[key] = convert_utc_to_vietnam(value)
                 else:
                     fixed_dict[key] = fix_database_response_timestamps(value)
