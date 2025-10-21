@@ -1,31 +1,77 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Users, Download, Shuffle, Eye, EyeOff, User, GraduationCap, BookOpen, School, UserCheck, Building } from 'lucide-react';
-import api from '../services/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X,
+  Search,
+  Users,
+  Download,
+  Shuffle,
+  Eye,
+  EyeOff,
+  User,
+  GraduationCap,
+  BookOpen,
+  School,
+  UserCheck,
+  Building,
+  FileX,
+} from "lucide-react";
+import api from "../services/api";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 const AdminManagement = () => {
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState("users");
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({});
   const [showPassword, setShowPassword] = useState(false);
-  
+
+  // Soft delete state
+  const [showDeleted, setShowDeleted] = useState(false);
+
   // Reference data cho dropdowns
   const [teachers, setTeachers] = useState([]);
   const [homeroomTeachers, setHomeroomTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
   const [users, setUsers] = useState([]);
-  
+
+  // Filtered teachers based on selected subject (for subject_teachers tab)
+  const [filteredTeachers, setFilteredTeachers] = useState([]);
+  const [subjectTeachersData, setSubjectTeachersData] = useState([]); // Dữ liệu từ bảng subject_teachers
+
   // Import từ Users modal state
   const [showImportModal, setShowImportModal] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
@@ -35,58 +81,113 @@ const AdminManagement = () => {
   // Configuration cho từng tab
   const tabConfig = {
     users: {
-      title: 'Quản lý người dùng',
-      fields: ['email', 'username', 'full_name', 'password', 'role'],
-      displayFields: ['id', 'email', 'username', 'full_name', 'role', 'is_active'],
-      endpoint: '/admin/users'
+      title: "Quản lý người dùng",
+      fields: ["email", "username", "full_name", "password", "role"],
+      displayFields: [
+        "id",
+        "email",
+        "username",
+        "full_name",
+        "role",
+        "is_active",
+      ],
+      endpoint: "/admin/users",
     },
     teachers: {
-      title: 'Quản lý giáo viên',
-      fields: ['teacher_code', 'full_name', 'email', 'phone'],
-      displayFields: ['id', 'teacher_code', 'full_name', 'email', 'phone', 'is_active'],
-      endpoint: '/admin/teachers'
+      title: "Quản lý giáo viên",
+      fields: ["teacher_code", "full_name", "email", "phone"],
+      displayFields: [
+        "id",
+        "teacher_code",
+        "full_name",
+        "email",
+        "phone",
+        "is_active",
+      ],
+      endpoint: "/admin/teachers",
     },
     subjects: {
-      title: 'Quản lý môn học',
-      fields: ['subject_code', 'subject_name', 'description'],
-      displayFields: ['id', 'subject_code', 'subject_name', 'description', 'is_active'],
-      endpoint: '/admin/subjects'
+      title: "Quản lý môn học",
+      fields: ["subject_code", "subject_name", "description"],
+      displayFields: [
+        "id",
+        "subject_code",
+        "subject_name",
+        "description",
+        "is_active",
+      ],
+      endpoint: "/admin/subjects",
     },
     classes: {
-      title: 'Quản lý lớp học',
-      fields: ['class_name', 'grade', 'homeroom_teacher_id', 'room_number', 'academic_year'],
-      displayFields: ['id', 'class_name', 'grade', 'homeroom_teacher', 'room_number', 'academic_year', 'total_students'],
-      endpoint: '/admin/classes'
+      title: "Quản lý lớp học",
+      fields: [
+        "class_name",
+        "grade",
+        "homeroom_teacher_id",
+        "room_number",
+        "academic_year",
+      ],
+      displayFields: [
+        "id",
+        "class_name",
+        "grade",
+        "homeroom_teacher",
+        "room_number",
+        "academic_year",
+        "total_students",
+      ],
+      endpoint: "/admin/classes",
     },
     subject_teachers: {
-      title: 'Quản lý giáo viên - môn học',
-      fields: ['teacher_id', 'subject_id', 'academic_year'],
-      displayFields: ['id', 'teacher_name', 'subject_name', 'academic_year', 'is_active'],
-      endpoint: '/admin/subject-teachers'
+      title: "Quản lý giáo viên - môn học",
+      fields: ["teacher_id", "subject_id", "academic_year"], // Giữ nguyên: giáo viên trước, môn học sau
+      displayFields: [
+        "id",
+        "teacher_name",
+        "subject_name",
+        "academic_year",
+        "is_active",
+      ],
+      endpoint: "/admin/subject-teachers",
     },
     class_subjects: {
-      title: 'Quản lý lớp - môn học',
-      fields: ['class_id', 'subject_id', 'teacher_id', 'academic_year', 'semester'],
-      displayFields: ['id', 'class_name', 'subject_name', 'teacher_name', 'academic_year', 'semester', 'is_active'],
-      endpoint: '/admin/class-subjects'
-    }
+      title: "Quản lý lớp - môn học",
+      fields: [
+        "class_id",
+        "subject_id",
+        "teacher_id",
+        "academic_year",
+        "semester",
+      ],
+      displayFields: [
+        "id",
+        "class_name",
+        "subject_name",
+        "teacher_name",
+        "academic_year",
+        "semester",
+        "is_active",
+      ],
+      endpoint: "/admin/class-subjects",
+    },
   };
 
   const tabs = [
-    { id: 'users', label: 'Người dùng', icon: User },
-    { id: 'teachers', label: 'Giáo viên', icon: GraduationCap },
-    { id: 'subjects', label: 'Môn học', icon: BookOpen },
-    { id: 'classes', label: 'Lớp học', icon: School },
-    { id: 'subject_teachers', label: 'GV-Môn học', icon: UserCheck },
-    { id: 'class_subjects', label: 'GV-Lớp học', icon: Building }
+    { id: "users", label: "Người dùng", icon: User },
+    { id: "teachers", label: "Giáo viên", icon: GraduationCap },
+    { id: "subjects", label: "Môn học", icon: BookOpen },
+    { id: "classes", label: "Lớp học", icon: School },
+    { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck },
+    { id: "class_subjects", label: "GV-Lớp học", icon: Building },
   ];
 
   const currentConfig = tabConfig[activeTab];
 
   // Function để generate password
   const generatePassword = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let password = '';
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    let password = "";
     for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
@@ -95,46 +196,88 @@ const AdminManagement = () => {
 
   const handleGeneratePassword = () => {
     const newPassword = generatePassword();
-    setFormData(prev => ({ ...prev, password: newPassword }));
+    setFormData((prev) => ({ ...prev, password: newPassword }));
   };
 
   const loadData = useCallback(async () => {
     if (!currentConfig?.endpoint) return;
-    
+
     setLoading(true);
     setError(null);
     try {
-      const response = await api.request(currentConfig.endpoint);
+      // Thêm query param cho các endpoints có hỗ trợ server-side filtering
+      let endpoint = currentConfig.endpoint;
+      const tabsWithServerFiltering = [
+        "subjects",
+        "subject_teachers",
+        "class_subjects",
+      ];
+
+      if (tabsWithServerFiltering.includes(activeTab) && showDeleted) {
+        endpoint = `${endpoint}?show_deleted=true`;
+      }
+
+      const response = await api.request(endpoint);
       if (response.success) {
-        setData(response.data || []);
+        let items = response.data || [];
+
+        // Filter theo trạng thái active/inactive
+        if (tabsWithServerFiltering.includes(activeTab)) {
+          // Các tabs có server-side filtering
+          if (showDeleted) {
+            items = items.filter((item) => item.is_active === false);
+          } else {
+            items = items.filter((item) => item.is_active !== false);
+          }
+        } else {
+          // Các tabs khác dùng client-side filtering
+          if (showDeleted) {
+            items = items.filter((item) => item.is_active === false);
+          } else {
+            items = items.filter((item) => item.is_active !== false);
+          }
+        }
+
+        setData(items);
       } else {
-        setError(response.message || 'Không thể tải dữ liệu');
+        setError(response.message || "Không thể tải dữ liệu");
       }
     } catch (err) {
-      setError('Lỗi khi tải dữ liệu: ' + err.message);
+      setError("Lỗi khi tải dữ liệu: " + err.message);
     } finally {
       setLoading(false);
     }
-  }, [currentConfig?.endpoint]);
+  }, [currentConfig?.endpoint, showDeleted, activeTab]);
 
   // Load reference data cho dropdowns
   const loadReferenceData = useCallback(async () => {
     try {
-      const [teachersRes, homeroomTeachersRes, subjectsRes, classesRes, usersRes] = await Promise.all([
-        api.request('/admin/teachers'),
-        api.request('/admin/teachers/homeroom'),
-        api.request('/admin/subjects'),
-        api.request('/admin/classes'),
-        api.request('/admin/users')
+      const [
+        teachersRes,
+        homeroomTeachersRes,
+        subjectsRes,
+        classesRes,
+        usersRes,
+        subjectTeachersRes,
+      ] = await Promise.all([
+        api.request("/admin/teachers"),
+        api.request("/admin/teachers/homeroom"),
+        api.request("/admin/subjects"),
+        api.request("/admin/classes"),
+        api.request("/admin/users"),
+        api.request("/admin/subject-teachers"), // Load subject_teachers data
       ]);
 
       if (teachersRes.success) setTeachers(teachersRes.data || []);
-      if (homeroomTeachersRes.success) setHomeroomTeachers(homeroomTeachersRes.data || []);
+      if (homeroomTeachersRes.success)
+        setHomeroomTeachers(homeroomTeachersRes.data || []);
       if (subjectsRes.success) setSubjects(subjectsRes.data || []);
       if (classesRes.success) setClasses(classesRes.data || []);
       if (usersRes.success) setUsers(usersRes.data || []);
+      if (subjectTeachersRes.success)
+        setSubjectTeachersData(subjectTeachersRes.data || []);
     } catch (err) {
-      console.error('Error loading reference data:', err);
+      console.error("Error loading reference data:", err);
     }
   }, []);
 
@@ -144,101 +287,210 @@ const AdminManagement = () => {
     loadReferenceData();
   }, [activeTab, loadData, loadReferenceData]);
 
+  // Auto-filter teachers when editing class_subjects with existing subject_id
+  useEffect(() => {
+    if (
+      activeTab === "class_subjects" &&
+      formData.subject_id &&
+      subjectTeachersData.length > 0 &&
+      teachers.length > 0
+    ) {
+      const teachersForSubject = subjectTeachersData
+        .filter(
+          (st) =>
+            st.subject_id === formData.subject_id && st.is_active !== false
+        )
+        .map((st) => st.teacher_id);
+
+      const filtered = teachers.filter((t) =>
+        teachersForSubject.includes(t.id)
+      );
+      setFilteredTeachers(filtered);
+    }
+  }, [activeTab, formData.subject_id, subjectTeachersData, teachers]);
+
   const handleCreate = async (data) => {
     if (!currentConfig?.endpoint) return;
-    
+
     try {
       const response = await api.request(currentConfig.endpoint, {
-        method: 'POST',
-        body: JSON.stringify(data)
+        method: "POST",
+        body: JSON.stringify(data),
       });
 
       if (response.success) {
         setShowAddForm(false);
         setFormData({});
         loadData();
-        alert('Tạo thành công!');
+        alert("Tạo thành công!");
       } else {
-        setError(response.message || 'Không thể tạo bản ghi');
+        setError(response.message || "Không thể tạo bản ghi");
       }
     } catch (err) {
-      setError('Lỗi khi tạo: ' + err.message);
+      setError("Lỗi khi tạo: " + err.message);
     }
   };
 
   const handleUpdate = async (id, data) => {
     if (!currentConfig?.endpoint) return;
-    
+
     try {
       const response = await api.request(`${currentConfig.endpoint}/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data)
+        method: "PUT",
+        body: JSON.stringify(data),
       });
 
       if (response.success) {
         setEditingItem(null);
         setFormData({});
         loadData();
-        alert('Cập nhật thành công!');
+        alert("Cập nhật thành công!");
       } else {
-        setError(response.message || 'Không thể cập nhật');
+        setError(response.message || "Không thể cập nhật");
       }
     } catch (err) {
-      setError('Lỗi khi cập nhật: ' + err.message);
+      setError("Lỗi khi cập nhật: " + err.message);
     }
   };
 
   const handleDelete = async (id) => {
     if (!currentConfig?.endpoint) return;
-    
-    if (!window.confirm('Bạn có chắc muốn xóa bản ghi này?')) return;
-    
+
+    if (!window.confirm("Bạn có chắc muốn xóa tạm thời bản ghi này?")) return;
+
     try {
       const response = await api.request(`${currentConfig.endpoint}/${id}`, {
-        method: 'DELETE'
+        method: "DELETE",
       });
 
       if (response.success) {
         loadData();
-        alert('Xóa thành công!');
+        alert(
+          'Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".'
+        );
       } else {
-        setError(response.message || 'Không thể xóa');
+        setError(response.message || "Không thể xóa");
       }
     } catch (err) {
-      setError('Lỗi khi xóa: ' + err.message);
+      setError("Lỗi khi xóa: " + err.message);
+    }
+  };
+
+  const handleRestore = async (id) => {
+    if (!currentConfig?.endpoint) return;
+
+    if (!window.confirm("Bạn có chắc muốn khôi phục bản ghi này?")) return;
+
+    try {
+      const response = await api.request(
+        `${currentConfig.endpoint}/${id}/restore`,
+        {
+          method: "POST",
+        }
+      );
+
+      if (response.success) {
+        loadData();
+        alert("Khôi phục thành công!");
+      } else {
+        setError(response.message || "Không thể khôi phục");
+      }
+    } catch (err) {
+      setError("Lỗi khi khôi phục: " + err.message);
+    }
+  };
+
+  const handlePermanentDelete = async (id) => {
+    if (!currentConfig?.endpoint) return;
+
+    if (
+      !window.confirm(
+        "⚠️ CẢNH BÁO: Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!"
+      )
+    )
+      return;
+
+    try {
+      const response = await api.request(
+        `${currentConfig.endpoint}/${id}/permanent`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.success) {
+        loadData();
+        alert("Xóa vĩnh viễn thành công!");
+      } else {
+        setError(response.message || "Không thể xóa vĩnh viễn");
+      }
+    } catch (err) {
+      setError("Lỗi khi xóa vĩnh viễn: " + err.message);
     }
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
+
+    // Khi chọn môn học ở tab class_subjects, filter danh sách giáo viên
+    // Chỉ hiển thị giáo viên đã được phân công dạy môn học đó
+    if (field === "subject_id" && activeTab === "class_subjects") {
+      // Reset teacher_id khi thay đổi môn học
+      setFormData((prev) => ({ ...prev, [field]: value, teacher_id: null }));
+
+      if (value) {
+        // Lọc giáo viên đã được phân công dạy môn này (từ subject_teachers)
+        console.log("=== DEBUG: Filter Teachers for Subject ===");
+        console.log("Selected subject_id:", value);
+        console.log("subjectTeachersData:", subjectTeachersData);
+
+        const teachersForSubject = subjectTeachersData
+          .filter(
+            (st) => st.subject_id === parseInt(value) && st.is_active !== false
+          )
+          .map((st) => st.teacher_id);
+
+        console.log("teachersForSubject (IDs):", teachersForSubject);
+        console.log("All teachers:", teachers);
+
+        const filtered = teachers.filter((t) =>
+          teachersForSubject.includes(t.id)
+        );
+
+        console.log("Filtered teachers:", filtered);
+        setFilteredTeachers(filtered);
+      } else {
+        setFilteredTeachers([]);
+      }
+    }
   };
 
   // Load available users for import
   const loadAvailableUsers = async () => {
     try {
-      const response = await api.request('/admin/users/teachers');
+      const response = await api.request("/admin/users/teachers");
       if (response.success) {
         setAvailableUsers(response.data || []);
       } else {
-        setError(response.message || 'Không thể tải danh sách users');
+        setError(response.message || "Không thể tải danh sách users");
       }
     } catch (err) {
-      setError('Lỗi khi tải danh sách users: ' + err.message);
+      setError("Lỗi khi tải danh sách users: " + err.message);
     }
   };
 
   // Handle import teachers from users
   const handleImportTeachers = async () => {
     if (selectedUserIds.length === 0) {
-      alert('Vui lòng chọn ít nhất một user để tạo giáo viên');
+      alert("Vui lòng chọn ít nhất một user để tạo giáo viên");
       return;
     }
 
     setImportLoading(true);
     try {
-      const response = await api.request('/admin/teachers/import-from-users', {
-        method: 'POST',
-        body: JSON.stringify(selectedUserIds)
+      const response = await api.request("/admin/teachers/import-from-users", {
+        method: "POST",
+        body: JSON.stringify(selectedUserIds),
       });
 
       if (response.success) {
@@ -247,10 +499,10 @@ const AdminManagement = () => {
         loadData(); // Reload teachers list
         alert(`Tạo thành công ${response.data.length} giáo viên!`);
       } else {
-        setError(response.message || 'Không thể tạo giáo viên');
+        setError(response.message || "Không thể tạo giáo viên");
       }
     } catch (err) {
-      setError('Lỗi khi tạo giáo viên: ' + err.message);
+      setError("Lỗi khi tạo giáo viên: " + err.message);
     } finally {
       setImportLoading(false);
     }
@@ -258,9 +510,9 @@ const AdminManagement = () => {
 
   // Handle user selection
   const handleUserSelect = (userId) => {
-    setSelectedUserIds(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
+    setSelectedUserIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
         : [...prev, userId]
     );
   };
@@ -270,137 +522,194 @@ const AdminManagement = () => {
     if (selectedUserIds.length === availableUsers.length) {
       setSelectedUserIds([]);
     } else {
-      setSelectedUserIds(availableUsers.map(user => user.id));
+      setSelectedUserIds(availableUsers.map((user) => user.id));
     }
   };
 
-  const filteredData = data.filter(item => {
+  const filteredData = data.filter((item) => {
     const searchLower = searchTerm.toLowerCase();
-    return Object.values(item).some(value => 
+    return Object.values(item).some((value) =>
       String(value).toLowerCase().includes(searchLower)
     );
   });
 
   const renderForm = (isEdit = false, item = null) => {
-    
     return (
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        if (isEdit) {
-          handleUpdate(item.id, formData);
-        } else {
-          handleCreate(formData);
-        }
-      }} className="space-y-4">
-        {currentConfig?.fields?.map(field => (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (isEdit) {
+            handleUpdate(item.id, formData);
+          } else {
+            handleCreate(formData);
+          }
+        }}
+        className="space-y-4"
+      >
+        {currentConfig?.fields?.map((field) => (
           <div key={field}>
             <label className="block mb-2 text-sm font-semibold text-gray-800">
-              {field === 'password' ? 'Mật khẩu' : 
-               field === 'full_name' ? 'Họ tên' :
-               field === 'username' ? 'Tên đăng nhập' :
-               field === 'email' ? 'Email' :
-               field === 'role' ? 'Vai trò' :
-               field === 'teacher_code' ? 'Mã giáo viên' :
-               field === 'subject_code' ? 'Mã môn học' :
-               field === 'subject_name' ? 'Tên môn học' :
-               field === 'class_name' ? 'Tên lớp' :
-               field === 'room_number' ? 'Số phòng' :
-               field === 'academic_year' ? 'Năm học' :
-               field === 'teacher_id' ? 'Giáo viên' :
-               field === 'subject_id' ? 'Môn học' :
-               field === 'class_id' ? 'Lớp học' :
-               field === 'homeroom_teacher_id' ? 'Giáo viên chủ nhiệm' :
-               field === 'phone' ? 'Số điện thoại' :
-               field === 'description' ? 'Mô tả' :
-               field === 'grade' ? 'Khối' :
-               field === 'semester' ? 'Học kỳ' :
-               field.replace(/_/g, ' ')}
-              {field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username' ? ' *' : ''}
+              {field === "password"
+                ? "Mật khẩu"
+                : field === "full_name"
+                ? "Họ tên"
+                : field === "username"
+                ? "Tên đăng nhập"
+                : field === "email"
+                ? "Email"
+                : field === "role"
+                ? "Vai trò"
+                : field === "teacher_code"
+                ? "Mã giáo viên"
+                : field === "subject_code"
+                ? "Mã môn học"
+                : field === "subject_name"
+                ? "Tên môn học"
+                : field === "class_name"
+                ? "Tên lớp"
+                : field === "room_number"
+                ? "Số phòng"
+                : field === "academic_year"
+                ? "Năm học"
+                : field === "teacher_id"
+                ? "Giáo viên"
+                : field === "subject_id"
+                ? "Môn học"
+                : field === "class_id"
+                ? "Lớp học"
+                : field === "homeroom_teacher_id"
+                ? "Giáo viên chủ nhiệm"
+                : field === "phone"
+                ? "Số điện thoại"
+                : field === "description"
+                ? "Mô tả"
+                : field === "grade"
+                ? "Khối"
+                : field === "semester"
+                ? "Học kỳ"
+                : field.replace(/_/g, " ")}
+              {field !== "description" &&
+              field !== "phone" &&
+              field !== "homeroom_teacher_id" &&
+              field !== "user_id" &&
+              field !== "username"
+                ? " *"
+                : ""}
             </label>
-            
-            {field === 'role' ? (
+
+            {field === "role" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
+                value={formData[field] || item?.[field] || ""}
                 onChange={(e) => handleChange(field, e.target.value)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn vai trò</option>
                 <option value="teacher">Giáo viên</option>
               </select>
-            ) : field === 'teacher_id' ? (
+            ) : field === "teacher_id" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
-                onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={formData[field] || item?.[field] || ""}
+                onChange={(e) =>
+                  handleChange(
+                    field,
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
+                disabled={
+                  activeTab === "class_subjects" && !formData.subject_id
+                }
               >
-                <option value="">Chọn giáo viên</option>
-                {teachers.map(teacher => (
+                <option value="">
+                  {activeTab === "class_subjects" && !formData.subject_id
+                    ? "Vui lòng chọn môn học trước"
+                    : "Chọn giáo viên"}
+                </option>
+                {(activeTab === "class_subjects"
+                  ? filteredTeachers
+                  : teachers
+                ).map((teacher) => (
                   <option key={teacher.id} value={teacher.id}>
                     {teacher.teacher_code} - {teacher.full_name}
                   </option>
                 ))}
               </select>
-            ) : field === 'subject_id' ? (
+            ) : field === "subject_id" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
-                onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={formData[field] || item?.[field] || ""}
+                onChange={(e) =>
+                  handleChange(
+                    field,
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn môn học</option>
-                {subjects.map(subject => (
+                {subjects.map((subject) => (
                   <option key={subject.id} value={subject.id}>
                     {subject.subject_code} - {subject.subject_name}
                   </option>
                 ))}
               </select>
-            ) : field === 'class_id' ? (
+            ) : field === "class_id" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
+                value={formData[field] || item?.[field] || ""}
                 onChange={(e) => handleChange(field, parseInt(e.target.value))}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn lớp</option>
-                {classes.map(cls => (
+                {classes.map((cls) => (
                   <option key={cls.id} value={cls.id}>
                     {cls.class_name} - {cls.grade}
                   </option>
                 ))}
               </select>
-            ) : field === 'homeroom_teacher_id' ? (
+            ) : field === "homeroom_teacher_id" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
-                onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={formData[field] || item?.[field] || ""}
+                onChange={(e) =>
+                  handleChange(
+                    field,
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Chọn GVCN (tùy chọn)</option>
-                {homeroomTeachers.map(teacher => (
+                {homeroomTeachers.map((teacher) => (
                   <option key={teacher.id} value={teacher.id}>
                     {teacher.teacher_code} - {teacher.full_name}
                   </option>
                 ))}
               </select>
-            ) : field === 'user_id' ? (
+            ) : field === "user_id" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
-                onChange={(e) => handleChange(field, e.target.value ? parseInt(e.target.value) : null)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={formData[field] || item?.[field] || ""}
+                onChange={(e) =>
+                  handleChange(
+                    field,
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Chọn người dùng (tùy chọn)</option>
-                {users.map(user => (
+                {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.email} - {user.full_name}
                   </option>
                 ))}
               </select>
-            ) : field === 'semester' ? (
+            ) : field === "semester" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
+                value={formData[field] || item?.[field] || ""}
                 onChange={(e) => handleChange(field, e.target.value)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn học kỳ</option>
@@ -408,11 +717,11 @@ const AdminManagement = () => {
                 <option value="HK2">Học kỳ 2</option>
                 <option value="HK3">Học kỳ 3</option>
               </select>
-            ) : field === 'grade' ? (
+            ) : field === "grade" ? (
               <select
-                value={formData[field] || item?.[field] || ''}
+                value={formData[field] || item?.[field] || ""}
                 onChange={(e) => handleChange(field, e.target.value)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="">Chọn khối</option>
@@ -420,35 +729,54 @@ const AdminManagement = () => {
                 <option value="11">Khối 11</option>
                 <option value="12">Khối 12</option>
               </select>
-            ) : field.includes('description') ? (
+            ) : field.includes("description") ? (
               <textarea
-                value={formData[field] || item?.[field] || ''}
+                value={formData[field] || item?.[field] || ""}
                 onChange={(e) => handleChange(field, e.target.value)}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 rows="3"
               />
-            ) : field === 'password' && isEdit ? (
+            ) : field === "password" && isEdit ? (
               // Bỏ trường password khi edit
-              <div className="flex items-center px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-muted text-muted-foreground">
-                Mật khẩu không thể thay đổi ở đây. Người dùng có thể tự đổi mật khẩu trong phần cài đặt.
+              <div className="flex items-center w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-muted text-muted-foreground">
+                Mật khẩu không thể thay đổi ở đây. Người dùng có thể tự đổi mật
+                khẩu trong phần cài đặt.
               </div>
             ) : (
               <div className="relative">
                 <Input
-                  type={field.includes('email') ? 'email' : field.includes('phone') ? 'tel' : field === 'password' ? (showPassword ? 'text' : 'password') : 'text'}
-                  value={formData[field] || item?.[field] || ''}
+                  type={
+                    field.includes("email")
+                      ? "email"
+                      : field.includes("phone")
+                      ? "tel"
+                      : field === "password"
+                      ? showPassword
+                        ? "text"
+                        : "password"
+                      : "text"
+                  }
+                  value={formData[field] || item?.[field] || ""}
                   onChange={(e) => handleChange(field, e.target.value)}
-                  placeholder={field === 'username' ? 'ho_va_ten.ten_truong.ten_tinh' : ''}
-                  required={field !== 'description' && field !== 'phone' && field !== 'homeroom_teacher_id' && field !== 'user_id' && field !== 'username'}
+                  placeholder={
+                    field === "username" ? "ho_va_ten.ten_truong.ten_tinh" : ""
+                  }
+                  required={
+                    field !== "description" &&
+                    field !== "phone" &&
+                    field !== "homeroom_teacher_id" &&
+                    field !== "user_id" &&
+                    field !== "username"
+                  }
                 />
-                {field === 'password' && !isEdit && (
-                  <div className="flex absolute right-2 top-1/2 space-x-1 transform -translate-y-1/2">
+                {field === "password" && !isEdit && (
+                  <div className="absolute flex space-x-1 transform -translate-y-1/2 right-2 top-1/2">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={handleGeneratePassword}
-                      className="p-0 w-6 h-6 text-green-700 hover:bg-green-100"
+                      className="w-6 h-6 p-0 text-green-700 hover:bg-green-100"
                       title="Tạo mật khẩu tự động"
                     >
                       <Shuffle className="w-3 h-3" />
@@ -458,24 +786,29 @@ const AdminManagement = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="p-0 w-6 h-6 text-blue-700 hover:bg-blue-100"
+                      className="w-6 h-6 p-0 text-blue-700 hover:bg-blue-100"
                       title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                     >
-                      {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      {showPassword ? (
+                        <EyeOff className="w-3 h-3" />
+                      ) : (
+                        <Eye className="w-3 h-3" />
+                      )}
                     </Button>
                   </div>
                 )}
               </div>
             )}
-            
-            {field === 'username' && (
+
+            {field === "username" && (
               <p className="mt-1 text-xs text-gray-500">
-                Tùy chọn. Format: tên.school.province (VD: nguyen_thi_lan.chuyen_le_quy_don.tphcm)
+                Tùy chọn. Format: tên.school.province (VD:
+                nguyen_thi_lan.chuyen_le_quy_don.tphcm)
               </p>
             )}
           </div>
         ))}
-        
+
         <div className="flex justify-end pt-6 mt-8 space-x-4 border-t border-border">
           <Button
             type="button"
@@ -484,18 +817,18 @@ const AdminManagement = () => {
               if (isEdit) {
                 setEditingItem(null);
               } else {
-              setShowAddForm(false);
-            }
-            setFormData({});
-            setShowPassword(false);
+                setShowAddForm(false);
+              }
+              setFormData({});
+              setShowPassword(false);
             }}
           >
-            <X className="mr-2 w-4 h-4" />
+            <X className="w-4 h-4 mr-2" />
             Hủy
           </Button>
           <Button type="submit">
-            <Save className="mr-2 w-4 h-4" />
-            {isEdit ? 'Cập nhật' : 'Tạo mới'}
+            <Save className="w-4 h-4 mr-2" />
+            {isEdit ? "Cập nhật" : "Tạo mới"}
           </Button>
         </div>
       </form>
@@ -503,13 +836,17 @@ const AdminManagement = () => {
   };
 
   return (
-    <div className="p-6 min-h-screen bg-background">
+    <div className="min-h-screen p-6 bg-background">
       {/* Header Section */}
       <div className="mb-8">
         <Card>
           <CardHeader>
-            <CardTitle className="text-4xl font-bold text-primary">Quản trị hệ thống</CardTitle>
-            <CardDescription className="text-lg">Quản lý người dùng, lớp học, môn học và cấu hình hệ thống</CardDescription>
+            <CardTitle className="text-4xl font-bold text-primary">
+              Quản trị hệ thống
+            </CardTitle>
+            <CardDescription className="text-lg">
+              Quản lý người dùng, lớp học, môn học và cấu hình hệ thống
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -518,7 +855,7 @@ const AdminManagement = () => {
       <div className="mb-8">
         <Card>
           <CardContent className="p-0">
-            <nav className="flex overflow-x-auto space-x-0">
+            <nav className="flex space-x-0 overflow-x-auto">
               {tabs.map((tab) => (
                 <Button
                   key={tab.id}
@@ -526,14 +863,14 @@ const AdminManagement = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center px-6 py-4 font-medium text-sm transition-all duration-200 ${
                     activeTab === tab.id
-                      ? 'bg-primary text-primary-foreground shadow-lg'
-                      : 'text-muted-foreground hover:text-primary hover:bg-muted'
+                      ? "bg-primary text-primary-foreground shadow-lg"
+                      : "text-muted-foreground hover:text-primary hover:bg-muted"
                   }`}
                 >
-                  <tab.icon className="mr-3 w-5 h-5" />
+                  <tab.icon className="w-5 h-5 mr-3" />
                   {tab.label}
                   {activeTab === tab.id && (
-                    <div className="ml-2 w-2 h-2 rounded-full animate-pulse bg-primary-foreground"></div>
+                    <div className="w-2 h-2 ml-2 rounded-full animate-pulse bg-primary-foreground"></div>
                   )}
                 </Button>
               ))}
@@ -546,15 +883,17 @@ const AdminManagement = () => {
       <Card>
         {/* Enhanced Header */}
         <CardHeader className="bg-muted/50">
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-2xl font-bold">
-                {currentConfig?.title || 'Quản lý'}
+                {currentConfig?.title || "Quản lý"}
               </CardTitle>
-              <CardDescription>Quản lý và cấu hình dữ liệu hệ thống</CardDescription>
+              <CardDescription>
+                Quản lý và cấu hình dữ liệu hệ thống
+              </CardDescription>
             </div>
             <div className="flex space-x-3">
-              {activeTab === 'teachers' && (
+              {activeTab === "teachers" && (
                 <Button
                   onClick={() => {
                     setShowImportModal(true);
@@ -562,21 +901,21 @@ const AdminManagement = () => {
                   }}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  <Download className="mr-2 w-5 h-5" />
+                  <Download className="w-5 h-5 mr-2" />
                   Import từ Users
                 </Button>
               )}
               <Button onClick={() => setShowAddForm(true)}>
-                <Plus className="mr-2 w-5 h-5" />
+                <Plus className="w-5 h-5 mr-2" />
                 Thêm mới
               </Button>
             </div>
           </div>
 
           {/* Enhanced Search */}
-          <div className="mt-6">
-            <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 w-5 h-5 transform -translate-y-1/2 text-muted-foreground" />
+          <div className="flex items-center justify-between gap-4 mt-6">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute w-5 h-5 transform -translate-y-1/2 left-4 top-1/2 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Tìm kiếm..."
@@ -585,6 +924,29 @@ const AdminManagement = () => {
                 className="pl-12"
               />
             </div>
+
+            {/* Checkbox hiển thị đã xóa - chỉ hiện cho Users, Teachers và Subjects */}
+            {(activeTab === "users" ||
+              activeTab === "teachers" ||
+              activeTab === "subjects" ||
+              activeTab === "subject_teachers" ||
+              activeTab === "class_subjects") && (
+              <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
+                <input
+                  type="checkbox"
+                  id="showDeleted"
+                  checked={showDeleted}
+                  onChange={(e) => setShowDeleted(e.target.checked)}
+                  className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary"
+                />
+                <label
+                  htmlFor="showDeleted"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Hiển thị đã xóa tạm thời
+                </label>
+              </div>
+            )}
           </div>
         </CardHeader>
 
@@ -593,7 +955,9 @@ const AdminManagement = () => {
           <CardContent className="border-b bg-muted/30">
             <div className="mb-4">
               <h3 className="mb-2 text-lg font-semibold">Thông tin mới</h3>
-              <p className="text-sm text-muted-foreground">Nhập thông tin để tạo bản ghi mới</p>
+              <p className="text-sm text-muted-foreground">
+                Nhập thông tin để tạo bản ghi mới
+              </p>
             </div>
             {renderForm()}
           </CardContent>
@@ -603,48 +967,64 @@ const AdminManagement = () => {
         <CardContent>
           {loading ? (
             <div className="py-16 text-center">
-              <div className="mx-auto w-12 h-12 rounded-full border-4 animate-spin border-primary/20 border-t-primary"></div>
-              <p className="mt-4 font-medium text-muted-foreground">Đang tải dữ liệu...</p>
+              <div className="w-12 h-12 mx-auto border-4 rounded-full animate-spin border-primary/20 border-t-primary"></div>
+              <p className="mt-4 font-medium text-muted-foreground">
+                Đang tải dữ liệu...
+              </p>
             </div>
           ) : error ? (
             <div className="py-16 text-center">
-              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10">
                 <span className="text-2xl text-destructive">⚠️</span>
               </div>
               <p className="mb-4 font-medium text-destructive">{error}</p>
-              <Button onClick={loadData}>
-                Thử lại
-              </Button>
+              <Button onClick={loadData}>Thử lại</Button>
             </div>
           ) : filteredData.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-muted">
-                <span className="text-2xl text-muted-foreground">📋</span>
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
+                <FileX className="w-8 h-8 text-muted-foreground" />
               </div>
-              <p className="font-medium text-muted-foreground">Không có dữ liệu</p>
+              <p className="font-medium text-muted-foreground">
+                Không có dữ liệu
+              </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {currentConfig?.displayFields?.map(field => (
+                    {currentConfig?.displayFields?.map((field) => (
                       <TableHead key={field}>
-                        {field === 'username' ? 'USERNAME' :
-                         field === 'full_name' ? 'HỌ TÊN' :
-                         field === 'is_active' ? 'TRẠNG THÁI' :
-                         field === 'subject_code' ? 'MÃ MÔN HỌC' :
-                         field === 'subject_name' ? 'TÊN MÔN HỌC' :
-                         field === 'description' ? 'MÔ TẢ' :
-                         field === 'class_name' ? 'TÊN LỚP' :
-                         field === 'grade' ? 'KHỐI' :
-                         field === 'homeroom_teacher' ? 'GIÁO VIÊN CHỦ NHIỆM' :
-                         field === 'room_number' ? 'SỐ PHÒNG' :
-                         field === 'academic_year' ? 'NĂM HỌC' :
-                         field === 'total_students' ? 'TỔNG SỐ HỌC SINH' :
-                         field === 'teacher_name' ? 'TÊN GIÁO VIÊN' :
-                         field === 'semester' ? 'HỌC KỲ' :
-                         field.replace(/_/g, ' ').toUpperCase()}
+                        {field === "username"
+                          ? "USERNAME"
+                          : field === "full_name"
+                          ? "HỌ TÊN"
+                          : field === "is_active"
+                          ? "TRẠNG THÁI"
+                          : field === "subject_code"
+                          ? "MÃ MÔN HỌC"
+                          : field === "subject_name"
+                          ? "TÊN MÔN HỌC"
+                          : field === "description"
+                          ? "MÔ TẢ"
+                          : field === "class_name"
+                          ? "TÊN LỚP"
+                          : field === "grade"
+                          ? "KHỐI"
+                          : field === "homeroom_teacher"
+                          ? "GIÁO VIÊN CHỦ NHIỆM"
+                          : field === "room_number"
+                          ? "SỐ PHÒNG"
+                          : field === "academic_year"
+                          ? "NĂM HỌC"
+                          : field === "total_students"
+                          ? "TỔNG SỐ HỌC SINH"
+                          : field === "teacher_name"
+                          ? "TÊN GIÁO VIÊN"
+                          : field === "semester"
+                          ? "HỌC KỲ"
+                          : field.replace(/_/g, " ").toUpperCase()}
                       </TableHead>
                     ))}
                     <TableHead>THAO TÁC</TableHead>
@@ -653,53 +1033,117 @@ const AdminManagement = () => {
                 <TableBody>
                   {filteredData.map((item, index) => (
                     <React.Fragment key={item.id}>
-                      <TableRow className={index % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
-                        {currentConfig?.displayFields?.map(field => (
+                      <TableRow
+                        className={
+                          index % 2 === 0 ? "bg-background" : "bg-muted/50"
+                        }
+                      >
+                        {currentConfig?.displayFields?.map((field) => (
                           <TableCell key={field}>
-                            {typeof item[field] === 'boolean' ? 
-                              (item[field] ? (
-                                <Badge variant="default" className="text-green-800 bg-green-100">
+                            {typeof item[field] === "boolean" ? (
+                              item[field] ? (
+                                <Badge
+                                  variant="default"
+                                  className="text-green-800 bg-green-100"
+                                >
                                   Có
                                 </Badge>
                               ) : (
-                                <Badge variant="destructive">
-                                  Không
-                                </Badge>
-                              )) : 
-                              item[field] || '-'
-                            }
+                                <Badge variant="destructive">Không</Badge>
+                              )
+                            ) : (
+                              item[field] || "-"
+                            )}
                           </TableCell>
                         ))}
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingItem(item.id);
-                                setFormData(item);
-                              }}
-                              className="text-primary hover:bg-primary/10"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDelete(item.id)}
-                              className="text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {showDeleted ? (
+                              // Buttons cho items đã xóa
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRestore(item.id)}
+                                  className="text-green-600 border-green-200 hover:bg-green-50"
+                                  title="Khôi phục"
+                                >
+                                  <Save className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handlePermanentDelete(item.id)}
+                                  className="text-red-600 border-red-200 hover:bg-red-50"
+                                  title="Xóa vĩnh viễn"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              // Buttons bình thường
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingItem(item.id);
+                                    setFormData(item);
+
+                                    // Auto-filter teachers for class_subjects when editing
+                                    if (
+                                      activeTab === "class_subjects" &&
+                                      item.subject_id
+                                    ) {
+                                      const teachersForSubject =
+                                        subjectTeachersData
+                                          .filter(
+                                            (st) =>
+                                              st.subject_id ===
+                                                item.subject_id &&
+                                              st.is_active !== false
+                                          )
+                                          .map((st) => st.teacher_id);
+                                      const filtered = teachers.filter((t) =>
+                                        teachersForSubject.includes(t.id)
+                                      );
+                                      setFilteredTeachers(filtered);
+                                    }
+                                  }}
+                                  className="text-primary hover:bg-primary/10"
+                                  title="Chỉnh sửa"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDelete(item.id)}
+                                  className="text-destructive hover:bg-destructive/10"
+                                  title="Xóa tạm thời"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
                       {editingItem === item.id && (
                         <TableRow>
-                          <TableCell colSpan={(currentConfig?.displayFields?.length || 0) + 1} className="bg-muted/30">
+                          <TableCell
+                            colSpan={
+                              (currentConfig?.displayFields?.length || 0) + 1
+                            }
+                            className="bg-muted/30"
+                          >
                             <div className="mb-4">
-                              <h3 className="mb-2 text-lg font-semibold">Chỉnh sửa thông tin</h3>
-                              <p className="text-sm text-muted-foreground">Cập nhật thông tin cho bản ghi này</p>
+                              <h3 className="mb-2 text-lg font-semibold">
+                                Chỉnh sửa thông tin
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Cập nhật thông tin cho bản ghi này
+                              </p>
                             </div>
                             {renderForm(true, item)}
                           </TableCell>
@@ -720,89 +1164,112 @@ const AdminManagement = () => {
           <DialogHeader>
             <DialogTitle>Import giáo viên từ Users</DialogTitle>
             <DialogDescription>
-              Chọn những user có role teacher hoặc homeroom_teacher để tạo thành giáo viên
+              Chọn những user có role teacher hoặc homeroom_teacher để tạo thành
+              giáo viên
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[60vh] overflow-y-auto">
-              {availableUsers.length === 0 ? (
-                <div className="py-12 text-center">
-                  <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-gray-100 rounded-full">
-                    <Users className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <p className="font-medium text-gray-500">Không có user nào có thể import</p>
-                  <p className="mt-2 text-sm text-gray-400">
-                    Tất cả users có role teacher/homeroom_teacher đã được tạo thành giáo viên
-                  </p>
+            {availableUsers.length === 0 ? (
+              <div className="py-12 text-center">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+                  <Users className="w-8 h-8 text-gray-400" />
                 </div>
-              ) : (
-                <>
-                  {/* Select All */}
-                  <div className="p-3 mb-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.length === availableUsers.length && availableUsers.length > 0}
-                        onChange={handleSelectAllUsers}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500 focus:ring-2"
-                      />
-                      <span className="ml-3 font-medium text-blue-800">
-                        Chọn tất cả ({availableUsers.length} users)
-                      </span>
-                    </label>
-                  </div>
+                <p className="font-medium text-gray-500">
+                  Không có user nào có thể import
+                </p>
+                <p className="mt-2 text-sm text-gray-400">
+                  Tất cả users có role teacher/homeroom_teacher đã được tạo
+                  thành giáo viên
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Select All */}
+                <div className="p-3 mb-4 border border-blue-200 rounded-lg bg-blue-50">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedUserIds.length === availableUsers.length &&
+                        availableUsers.length > 0
+                      }
+                      onChange={handleSelectAllUsers}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                    <span className="ml-3 font-medium text-blue-800">
+                      Chọn tất cả ({availableUsers.length} users)
+                    </span>
+                  </label>
+                </div>
 
-                  {/* Users List */}
-                  <div className="space-y-2">
-                    {availableUsers.map((user) => (
-                      <div
-                        key={user.id}
-                        className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                          selectedUserIds.includes(user.id)
-                            ? 'border-green-500 bg-green-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                        onClick={() => handleUserSelect(user.id)}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center space-x-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedUserIds.includes(user.id)}
-                              onChange={() => handleUserSelect(user.id)}
-                              className="w-4 h-4 text-green-600 bg-gray-100 rounded border-gray-300 focus:ring-green-500 focus:ring-2"
-                            />
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <h4 className="font-medium text-gray-900">{user.full_name}</h4>
-                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                  user.role === 'teacher' 
-                                    ? 'bg-blue-100 text-blue-800' 
-                                    : 'bg-purple-100 text-purple-800'
-                                }`}>
-                                  {user.role === 'teacher' ? 'Teacher' : 'Homeroom Teacher'}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-600">{user.email}</p>
-                              {user.username && (
-                                <p className="text-xs text-gray-500">@{user.username}</p>
-                              )}
+                {/* Users List */}
+                <div className="space-y-2">
+                  {availableUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                        selectedUserIds.includes(user.id)
+                          ? "border-green-500 bg-green-50"
+                          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                      onClick={() => handleUserSelect(user.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedUserIds.includes(user.id)}
+                            onChange={() => handleUserSelect(user.id)}
+                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                          />
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h4 className="font-medium text-gray-900">
+                                {user.full_name}
+                              </h4>
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  user.role === "teacher"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-purple-100 text-purple-800"
+                                }`}
+                              >
+                                {user.role === "teacher"
+                                  ? "Teacher"
+                                  : "Homeroom Teacher"}
+                              </span>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">ID: {user.id}</p>
+                            <p className="text-sm text-gray-600">
+                              {user.email}
+                            </p>
+                            {user.username && (
+                              <p className="text-xs text-gray-500">
+                                @{user.username}
+                              </p>
+                            )}
                           </div>
                         </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900">
+                            ID: {user.id}
+                          </p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
 
-          <DialogFooter className="flex justify-between items-center">
+          <DialogFooter className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              Đã chọn: <span className="font-semibold text-green-600">{selectedUserIds.length}</span> users
+              Đã chọn:{" "}
+              <span className="font-semibold text-green-600">
+                {selectedUserIds.length}
+              </span>{" "}
+              users
             </div>
             <div className="flex space-x-3">
               <Button
@@ -820,12 +1287,12 @@ const AdminManagement = () => {
               >
                 {importLoading ? (
                   <>
-                    <div className="mr-2 w-4 h-4 rounded-full border-2 border-white animate-spin border-t-transparent"></div>
+                    <div className="w-4 h-4 mr-2 border-2 border-white rounded-full animate-spin border-t-transparent"></div>
                     Đang tạo...
                   </>
                 ) : (
                   <>
-                    <Download className="mr-2 w-4 h-4" />
+                    <Download className="w-4 h-4 mr-2" />
                     Tạo {selectedUserIds.length} giáo viên
                   </>
                 )}

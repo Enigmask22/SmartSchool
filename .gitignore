@@ -324,6 +324,7 @@ error.log
 access.log
 debug.log
 backend/temp_otp
+backend_modular/temp_otp
 # ================
 # IDE & EDITORS
 # ================
@@ -481,6 +482,7 @@ recognition_cache/
 setup_complete.flag
 installation.log
 
-Fix_UI_Instructions.md
-why_smart.md
-Upgrade_to_ModularMonolothic.md
+# Other generated files
+instruction_md/
+llm_gen/
+build_wheel/

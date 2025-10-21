@@ -167,14 +167,21 @@ class SchoolDatabaseManager:
         Returns: school_name.province
         """
         try:
+            logger.info(f"=== PARSE USERNAME ===")
+            logger.info(f"Input username: {username}")
+            
             parts = username.split('.')
+            logger.info(f"Parts after split: {parts}")
+            
             if len(parts) < 3:
-                logger.warning(f"Username format không đúng: {username}")
+                logger.warning(f"Username format không đúng: {username}, using default: {self._default_school}")
                 return self._default_school
             
             # Lấy phần school_name.province (bỏ phần user_name đầu tiên)
             school_key = '.'.join(parts[1:])
-            logger.debug(f"Parsed school key: {school_key} from username: {username}")
+            logger.info(f"Parsed school key: {school_key} from username: {username}")
+            logger.info(f"Available schools: {list(self._school_configs.keys())}")
+            
             return school_key
             
         except Exception as e:

@@ -1,27 +1,75 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
-import { Search, RefreshCw, Users, UserPlus, Edit, Trash2, Eye, Camera, Upload, Download, AlertCircle, Loader2, X, Mail, Phone, BookOpen, MessageCircle, Images, BarChart3, GraduationCap, Target, Check, ClipboardList, TrendingUp, CheckCircle2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import { Label } from './ui/label';
-import ApiService from '../services/api';
-import MultipleFaceRegistration from './MultipleFaceRegistration';
-import { AuthContext } from '../contexts/AuthContext';
+import React, { useState, useEffect, useRef, useContext } from "react";
+import {
+  Search,
+  RefreshCw,
+  Users,
+  UserPlus,
+  Edit,
+  Trash2,
+  Eye,
+  Camera,
+  Upload,
+  Download,
+  AlertCircle,
+  Loader2,
+  X,
+  Mail,
+  Phone,
+  BookOpen,
+  MessageCircle,
+  Images,
+  BarChart3,
+  GraduationCap,
+  Target,
+  Check,
+  ClipboardList,
+  TrendingUp,
+  CheckCircle2,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Label } from "./ui/label";
+import ApiService from "../services/api";
+import MultipleFaceRegistration from "./MultipleFaceRegistration";
+import { AuthContext } from "../contexts/AuthContext";
 
 // API Configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
 const StudentList = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClass, setSelectedClass] = useState('');
-  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClass, setSelectedClass] = useState("");
+  const [availableClasses, setAvailableClasses] = useState([]);
+
   // Face registration states
   const [showFaceModal, setShowFaceModal] = useState(false);
   const [selectedStudentForFace, setSelectedStudentForFace] = useState(null);
@@ -29,69 +77,73 @@ const StudentList = () => {
   const [cameraStream, setCameraStream] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
-  const [registrationMode, setRegistrationMode] = useState('camera'); // 'camera' or 'upload' or 'multiple'
+  const [registrationMode, setRegistrationMode] = useState("camera"); // 'camera' or 'upload' or 'multiple'
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState(null);
-  
+
   // Multiple samples states
   const [multipleFiles, setMultipleFiles] = useState([]);
   const [multipleResults, setMultipleResults] = useState([]);
-  
+
   // Multiple Face Registration Modal
   const [showMultipleModal, setShowMultipleModal] = useState(false);
-  const [selectedStudentForMultiple, setSelectedStudentForMultiple] = useState(null);
-  
+  const [selectedStudentForMultiple, setSelectedStudentForMultiple] =
+    useState(null);
+
   // Edit student states
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  
+
   // Show inactive students option
   const [showInactive, setShowInactive] = useState(false);
-  
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12); // 12 students per page (3x4 grid)
-  
+
   // View grades states
   const [showGradesModal, setShowGradesModal] = useState(false);
-  const [selectedStudentForGrades, setSelectedStudentForGrades] = useState(null);
+  const [selectedStudentForGrades, setSelectedStudentForGrades] =
+    useState(null);
   const [studentGrades, setStudentGrades] = useState([]);
   const [gradesLoading, setGradesLoading] = useState(false);
-  
+
   // Feedback states
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [selectedStudentForFeedback, setSelectedStudentForFeedback] = useState(null);
+  const [selectedStudentForFeedback, setSelectedStudentForFeedback] =
+    useState(null);
   const [feedbackForm, setFeedbackForm] = useState({
-    student_name: '',
-    score: '',
-    score_trend: '',
-    attendance_rate: '',
-    notes: ''
+    student_name: "",
+    score: "",
+    score_trend: "",
+    attendance_rate: "",
+    notes: "",
   });
-  const [generatedFeedback, setGeneratedFeedback] = useState('');
+  const [generatedFeedback, setGeneratedFeedback] = useState("");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [feedbackError, setFeedbackError] = useState('');
+  const [feedbackError, setFeedbackError] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
-  
+
   // Grade trend analysis states
   const [gradeTrendData, setGradeTrendData] = useState(null);
   const [trendLoading, setTrendLoading] = useState(false);
-  const [trendError, setTrendError] = useState('');
+  const [trendError, setTrendError] = useState("");
 
   // Subject selection states
   const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [selectedStudentForSubject, setSelectedStudentForSubject] = useState(null);
+  const [selectedStudentForSubject, setSelectedStudentForSubject] =
+    useState(null);
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [selectedSubjects, setSelectedSubjects] = useState({
-    core_subjects: ['TOAN', 'VAN', 'ANH'], // Mặc định 3 môn chính
-    elective_subjects: [] // Môn tự chọn
+    core_subjects: ["TOAN", "VAN", "ANH"], // Mặc định 3 môn chính
+    elective_subjects: [], // Môn tự chọn
   });
   const [subjectLoading, setSubjectLoading] = useState(false);
-  
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -101,7 +153,7 @@ const StudentList = () => {
   useEffect(() => {
     return () => {
       if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream.getTracks().forEach((track) => track.stop());
       }
     };
   }, [cameraStream]);
@@ -118,15 +170,15 @@ const StudentList = () => {
 
     const handleVideoError = () => {
       setCameraReady(false);
-      setCameraError('Camera không thể khởi động');
+      setCameraError("Camera không thể khởi động");
     };
 
-    video.addEventListener('loadedmetadata', handleVideoReady);
-    video.addEventListener('error', handleVideoError);
+    video.addEventListener("loadedmetadata", handleVideoReady);
+    video.addEventListener("error", handleVideoError);
 
     return () => {
-      video.removeEventListener('loadedmetadata', handleVideoReady);
-      video.removeEventListener('error', handleVideoError);
+      video.removeEventListener("loadedmetadata", handleVideoReady);
+      video.removeEventListener("error", handleVideoError);
     };
   }, [showFaceModal, registrationMode]);
 
@@ -134,7 +186,7 @@ const StudentList = () => {
   useEffect(() => {
     fetchAvailableClasses();
   }, []);
-  
+
   useEffect(() => {
     fetchStudents();
   }, [selectedClass]);
@@ -143,17 +195,30 @@ const StudentList = () => {
     fetchAvailableClasses();
   }, [user]);
 
+  // Auto-select first class for homeroom teachers
+  useEffect(() => {
+    if (isHomeroomTeacher() && availableClasses.length > 0 && !selectedClass) {
+      console.log(
+        "🎯 Auto-selecting first homeroom class:",
+        availableClasses[0]
+      );
+      setSelectedClass(availableClasses[0]);
+    }
+  }, [availableClasses, isHomeroomTeacher, selectedClass]);
+
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       let response;
-      
+
       if (isHomeroomTeacher()) {
         // If homeroom teacher but no class selected, don't fetch
         if (!selectedClass) {
-          console.log('🚫 No class selected for homeroom teacher, skipping fetch');
+          console.log(
+            "🚫 No class selected for homeroom teacher, skipping fetch"
+          );
           setStudents([]);
           setLoading(false);
           return;
@@ -165,51 +230,53 @@ const StudentList = () => {
         // Frontend sẽ filter theo showInactive
         response = await ApiService.getStudents({});
       }
-      
-      console.log('Students API response:', response);
-      
+
+      console.log("Students API response:", response);
+
       if (response.success && response.data) {
         setStudents(Array.isArray(response.data) ? response.data : []);
       } else {
-        console.warn('Invalid response structure:', response);
+        console.warn("Invalid response structure:", response);
         setStudents([]);
       }
     } catch (error) {
-      console.error('Error fetching students:', error);
-      setError('Không thể tải danh sách học sinh từ server. Hiển thị dữ liệu mẫu.');
-      
+      console.error("Error fetching students:", error);
+      setError(
+        "Không thể tải danh sách học sinh từ server. Hiển thị dữ liệu mẫu."
+      );
+
       // Mock data fallback
       setStudents([
         {
           id: 1,
-          student_id: '250001',
-          full_name: 'Nguyễn Văn An',
-          class_name: '10A1',
-          grade: '10',
-          email: 'an.nguyen@student.edu.vn',
-          phone: '0123456789',
-          gender: 'Nam'
+          student_id: "250001",
+          full_name: "Nguyễn Văn An",
+          class_name: "10A1",
+          grade: "10",
+          email: "an.nguyen@student.edu.vn",
+          phone: "0123456789",
+          gender: "Nam",
         },
         {
           id: 2,
-          student_id: '250002',
-          full_name: 'Trần Thị Bình',
-          class_name: '10A1',
-          grade: '10',
-          email: 'binh.tran@student.edu.vn',
-          phone: '0123456790',
-          gender: 'Nữ'
+          student_id: "250002",
+          full_name: "Trần Thị Bình",
+          class_name: "10A1",
+          grade: "10",
+          email: "binh.tran@student.edu.vn",
+          phone: "0123456790",
+          gender: "Nữ",
         },
         {
           id: 3,
-          student_id: '250003',
-          full_name: 'Lê Minh Châu',
-          class_name: '10A2',
-          grade: '10',
-          email: 'chau.le@student.edu.vn',
-          phone: '0123456791',
-          gender: 'Nữ'
-        }
+          student_id: "250003",
+          full_name: "Lê Minh Châu",
+          class_name: "10A2",
+          grade: "10",
+          email: "chau.le@student.edu.vn",
+          phone: "0123456791",
+          gender: "Nữ",
+        },
       ]);
     } finally {
       setLoading(false);
@@ -217,28 +284,38 @@ const StudentList = () => {
   };
 
   // Filter and sort students based on search, class, and active status - với safety check
-  const filteredStudents = Array.isArray(students) ? students.filter(student => {
-    const matchesSearch = student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.student_id?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesClass = selectedClass === '' || student.class_name === selectedClass;
-    
-    // Filter theo trạng thái is_active
-    let matchesActiveStatus = true;
-    if (showInactive) {
-      // Nếu tick "Đã xóa", chỉ hiển thị học sinh is_active = false
-      matchesActiveStatus = student.is_active === false;
-    } else {
-      // Nếu không tick "Đã xóa", chỉ hiển thị học sinh is_active = true hoặc null (mặc định là active)
-      matchesActiveStatus = student.is_active !== false;
-    }
-    
-    return matchesSearch && matchesClass && matchesActiveStatus;
-  }).sort((a, b) => {
-    // Sắp xếp theo student_id tăng dần (250001, 250002, 250003...)
-    const aId = parseInt(a.student_id) || 0;
-    const bId = parseInt(b.student_id) || 0;
-    return aId - bId;
-  }) : [];
+  const filteredStudents = Array.isArray(students)
+    ? students
+        .filter((student) => {
+          const matchesSearch =
+            student.full_name
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            student.student_id
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase());
+          const matchesClass =
+            selectedClass === "" || student.class_name === selectedClass;
+
+          // Filter theo trạng thái is_active
+          let matchesActiveStatus = true;
+          if (showInactive) {
+            // Nếu tick "Đã xóa", chỉ hiển thị học sinh is_active = false
+            matchesActiveStatus = student.is_active === false;
+          } else {
+            // Nếu không tick "Đã xóa", chỉ hiển thị học sinh is_active = true hoặc null (mặc định là active)
+            matchesActiveStatus = student.is_active !== false;
+          }
+
+          return matchesSearch && matchesClass && matchesActiveStatus;
+        })
+        .sort((a, b) => {
+          // Sắp xếp theo student_id tăng dần (250001, 250002, 250003...)
+          const aId = parseInt(a.student_id) || 0;
+          const bId = parseInt(b.student_id) || 0;
+          return aId - bId;
+        })
+    : [];
 
   // Calculate pagination
   const totalStudents = filteredStudents.length;
@@ -252,60 +329,79 @@ const StudentList = () => {
     setCurrentPage(1);
   }, [searchTerm, selectedClass, showInactive]);
 
-  // State for available classes
-  const [availableClasses, setAvailableClasses] = useState([]);
-
   // Fetch available classes based on user role
   const fetchAvailableClasses = async () => {
     try {
-      console.log('👤 User role check:', {
+      console.log("👤 User role check:", {
         user,
         isHomeroomTeacher: isHomeroomTeacher(),
-        userRole: user?.role
+        userRole: user?.role,
       });
 
       let classesResponse;
-      
+
       if (isHomeroomTeacher()) {
-        console.log('📚 Fetching homeroom classes...');
+        console.log("📚 Fetching homeroom classes...");
         // If homeroom teacher, only get their homeroom classes
         classesResponse = await ApiService.getHomeroomClasses();
-        
+
         if (classesResponse.success && classesResponse.data) {
-          const classNames = classesResponse.data.map(cls => cls.class_name).sort();
-          console.log('📚 Setting homeroom classes:', classNames);
+          // Deduplicate class names using Set
+          const classNames = [
+            ...new Set(
+              classesResponse.data
+                .map((cls) => cls.class_name)
+                .filter((name) => name) // Remove null/undefined
+            ),
+          ].sort();
+          console.log("📚 Setting homeroom classes:", classNames);
           setAvailableClasses(classNames);
         } else {
-          console.warn('📚 Invalid homeroom classes response:', classesResponse);
+          console.warn(
+            "📚 Invalid homeroom classes response:",
+            classesResponse
+          );
           setAvailableClasses([]);
         }
       } else {
-        console.log('📚 Fetching all students to extract classes for admin...');
+        console.log("📚 Fetching all students to extract classes for admin...");
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
-        
+
         if (studentsResponse.success && studentsResponse.data) {
           // Extract unique class names from students
-          const uniqueClasses = [...new Set(
-            studentsResponse.data
-              .map(student => student.class_name)
-              .filter(className => className) // Remove null/undefined
-          )].sort();
-          
-          console.log('📚 Extracted unique classes from students:', uniqueClasses);
+          const uniqueClasses = [
+            ...new Set(
+              studentsResponse.data
+                .map((student) => student.class_name)
+                .filter((className) => className) // Remove null/undefined
+            ),
+          ].sort();
+
+          console.log(
+            "📚 Extracted unique classes from students:",
+            uniqueClasses
+          );
           setAvailableClasses(uniqueClasses);
         } else {
-          console.warn('📚 Invalid students response for classes:', studentsResponse);
+          console.warn(
+            "📚 Invalid students response for classes:",
+            studentsResponse
+          );
           setAvailableClasses([]);
         }
       }
     } catch (error) {
-      console.error('Error fetching available classes:', error);
+      console.error("Error fetching available classes:", error);
       // Fallback: get unique classes from students data
-      const fallbackClasses = Array.isArray(students) ? 
-        [...new Set(students.map(student => student.class_name).filter(Boolean))].sort() : 
-        [];
-      console.log('📚 Using fallback classes:', fallbackClasses);
+      const fallbackClasses = Array.isArray(students)
+        ? [
+            ...new Set(
+              students.map((student) => student.class_name).filter(Boolean)
+            ),
+          ].sort()
+        : [];
+      console.log("📚 Using fallback classes:", fallbackClasses);
       setAvailableClasses(fallbackClasses);
     }
   };
@@ -319,44 +415,45 @@ const StudentList = () => {
     setShowFaceModal(true);
     setCapturedImage(null);
     setUploadedImage(null);
-    setRegistrationMode('camera');
+    setRegistrationMode("camera");
     setCameraReady(false);
     setCameraError(null);
-    
+
     // Cleanup any existing stream first
     if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
+      cameraStream.getTracks().forEach((track) => track.stop());
       setCameraStream(null);
     }
-    
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
-          facingMode: 'user'
-        } 
+          facingMode: "user",
+        },
       });
-      
+
       setCameraStream(stream);
-      
+
       // Wait for video element to be available
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       }, 100);
-      
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      setCameraError('Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập.');
-      setRegistrationMode('upload'); // Chuyển sang upload mode nếu không có camera
+      console.error("Error accessing camera:", error);
+      setCameraError(
+        "Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập."
+      );
+      setRegistrationMode("upload"); // Chuyển sang upload mode nếu không có camera
     }
   };
 
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) {
-      alert('Camera chưa sẵn sàng. Vui lòng thử lại.');
+      alert("Camera chưa sẵn sàng. Vui lòng thử lại.");
       return;
     }
 
@@ -365,44 +462,43 @@ const StudentList = () => {
 
     // Check if video is ready
     if (video.readyState < 2) {
-      alert('Video chưa sẵn sàng. Vui lòng đợi một chút và thử lại.');
+      alert("Video chưa sẵn sàng. Vui lòng đợi một chút và thử lại.");
       return;
     }
 
     // Check if video has actual dimensions
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-      alert('Camera chưa sẵn sàng. Vui lòng thử lại.');
+      alert("Camera chưa sẵn sàng. Vui lòng thử lại.");
       return;
     }
 
     try {
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext("2d");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
+
       // Clear canvas first
       context.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       // Draw video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
+
       // Convert to image data URL
-      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      const imageDataUrl = canvas.toDataURL("image/jpeg", 0.8);
       setCapturedImage(imageDataUrl);
-      
     } catch (error) {
-      console.error('Error capturing photo:', error);
-      alert('Có lỗi khi chụp ảnh. Vui lòng thử lại.');
+      console.error("Error capturing photo:", error);
+      alert("Có lỗi khi chụp ảnh. Vui lòng thử lại.");
     }
   };
 
   const resetCamera = async () => {
     setCameraReady(false);
     setCameraError(null);
-    
+
     // Stop existing stream
     if (cameraStream) {
-      cameraStream.getTracks().forEach(track => {
+      cameraStream.getTracks().forEach((track) => {
         track.stop();
         track.enabled = false;
       });
@@ -416,25 +512,26 @@ const StudentList = () => {
 
     // Restart camera
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
-          facingMode: 'user'
-        } 
+          facingMode: "user",
+        },
       });
-      
+
       setCameraStream(stream);
-      
+
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       }, 100);
-      
     } catch (error) {
-      console.error('Error restarting camera:', error);
-      setCameraError('Không thể khởi động lại camera. Vui lòng kiểm tra quyền truy cập.');
+      console.error("Error restarting camera:", error);
+      setCameraError(
+        "Không thể khởi động lại camera. Vui lòng kiểm tra quyền truy cập."
+      );
     }
   };
 
@@ -443,8 +540,8 @@ const StudentList = () => {
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Vui lòng chọn file ảnh (JPG, PNG, etc.)');
+    if (!file.type.startsWith("image/")) {
+      alert("Vui lòng chọn file ảnh (JPG, PNG, etc.)");
       return;
     }
 
@@ -456,40 +553,48 @@ const StudentList = () => {
 
   const submitFaceRegistration = async () => {
     if ((!capturedImage && !uploadedImage) || !selectedStudentForFace) return;
-    
+
     setFaceRegistrationLoading(true);
     try {
       let response;
-      
-      if (registrationMode === 'upload' && uploadedImage) {
+
+      if (registrationMode === "upload" && uploadedImage) {
         // Use FormData for file upload
         const formData = new FormData();
-        formData.append('file', uploadedImage.file);
-        
-        response = await fetch(`${API_BASE_URL}/ai/register/${selectedStudentForFace.id}`, {
-          method: 'POST',
-          body: formData
-        });
+        formData.append("file", uploadedImage.file);
+
+        response = await fetch(
+          `${API_BASE_URL}/ai/register/${selectedStudentForFace.id}`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
       } else if (capturedImage) {
         // Use base64 for camera capture
-        const base64Image = capturedImage.split(',')[1];
-        
-        response = await fetch(`${API_BASE_URL}/ai/register-base64/${selectedStudentForFace.id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image_base64: base64Image,
-            confidence_threshold: 0.6
-          })
-        });
+        const base64Image = capturedImage.split(",")[1];
+
+        response = await fetch(
+          `${API_BASE_URL}/ai/register-base64/${selectedStudentForFace.id}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              image_base64: base64Image,
+              confidence_threshold: 0.6,
+            }),
+          }
+        );
       }
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
-        alert(`Đăng ký khuôn mặt thành công cho ${selectedStudentForFace.full_name}!`);
+        alert(
+          `Đăng ký khuôn mặt thành công cho ${selectedStudentForFace.full_name}!`
+        );
         closeFaceModal();
         // Refresh students list to show updated status
         fetchStudents();
@@ -497,8 +602,8 @@ const StudentList = () => {
         alert(`Lỗi: ${result.message}`);
       }
     } catch (error) {
-      console.error('Error registering face:', error);
-      alert('Có lỗi xảy ra khi đăng ký khuôn mặt');
+      console.error("Error registering face:", error);
+      alert("Có lỗi xảy ra khi đăng ký khuôn mặt");
     } finally {
       setFaceRegistrationLoading(false);
     }
@@ -509,13 +614,13 @@ const StudentList = () => {
     setSelectedStudentForFace(null);
     setCapturedImage(null);
     setUploadedImage(null);
-    setRegistrationMode('camera');
+    setRegistrationMode("camera");
     setCameraReady(false);
     setCameraError(null);
-    
+
     // Stop camera stream with proper cleanup
     if (cameraStream) {
-      cameraStream.getTracks().forEach(track => {
+      cameraStream.getTracks().forEach((track) => {
         track.stop();
         track.enabled = false;
       });
@@ -529,52 +634,52 @@ const StudentList = () => {
 
     // Reset file input
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
 
     // Clean up uploaded image URL
     if (uploadedImage?.previewUrl) {
       URL.revokeObjectURL(uploadedImage.previewUrl);
     }
-    
+
     // Clean up multiple files
-    multipleFiles.forEach(file => {
+    multipleFiles.forEach((file) => {
       if (file.previewUrl) {
         URL.revokeObjectURL(file.previewUrl);
       }
     });
     setMultipleFiles([]);
     setMultipleResults([]);
-    
+
     // Reset multiple file input
     if (multipleFileInputRef.current) {
-      multipleFileInputRef.current.value = '';
+      multipleFileInputRef.current.value = "";
     }
   };
 
   const handleMultipleFileSelect = (event) => {
     const files = Array.from(event.target.files);
     if (files.length > 10) {
-      alert('Tối đa 10 ảnh mỗi lần');
+      alert("Tối đa 10 ảnh mỗi lần");
       return;
     }
-    
+
     const fileObjects = files.map((file, index) => ({
       file,
       id: index,
       name: file.name,
       previewUrl: URL.createObjectURL(file),
-      status: 'pending' // pending, success, error
+      status: "pending", // pending, success, error
     }));
-    
+
     setMultipleFiles(fileObjects);
   };
 
   const removeMultipleFile = (fileId) => {
-    setMultipleFiles(prev => {
-      const updated = prev.filter(f => f.id !== fileId);
+    setMultipleFiles((prev) => {
+      const updated = prev.filter((f) => f.id !== fileId);
       // Revoke URL for removed file
-      const removedFile = prev.find(f => f.id === fileId);
+      const removedFile = prev.find((f) => f.id === fileId);
       if (removedFile) {
         URL.revokeObjectURL(removedFile.previewUrl);
       }
@@ -584,42 +689,49 @@ const StudentList = () => {
 
   const submitMultipleFaceRegistration = async () => {
     if (multipleFiles.length === 0 || !selectedStudentForFace) return;
-    
+
     setFaceRegistrationLoading(true);
     setMultipleResults([]);
-    
+
     try {
       const formData = new FormData();
-      multipleFiles.forEach(fileObj => {
-        formData.append('files', fileObj.file);
+      multipleFiles.forEach((fileObj) => {
+        formData.append("files", fileObj.file);
       });
-      
-      const response = await fetch(`${API_BASE_URL}/ai/register-multiple/${selectedStudentForFace.id}`, {
-        method: 'POST',
-        body: formData
-      });
-      
+
+      const response = await fetch(
+        `${API_BASE_URL}/ai/register-multiple/${selectedStudentForFace.id}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
       const result = await response.json();
-      
+
       if (result.success) {
         setMultipleResults(result.data.results || []);
-        alert(`Đăng ký thành công ${result.data.successful_registrations}/${result.data.total_images} ảnh cho ${selectedStudentForFace.full_name}!`);
-        
+        alert(
+          `Đăng ký thành công ${result.data.successful_registrations}/${result.data.total_images} ảnh cho ${selectedStudentForFace.full_name}!`
+        );
+
         // Update file statuses
-        setMultipleFiles(prev => prev.map((file, index) => ({
-          ...file,
-          status: result.data.results[index]?.success ? 'success' : 'error',
-          message: result.data.results[index]?.message || ''
-        })));
-        
+        setMultipleFiles((prev) =>
+          prev.map((file, index) => ({
+            ...file,
+            status: result.data.results[index]?.success ? "success" : "error",
+            message: result.data.results[index]?.message || "",
+          }))
+        );
+
         // Refresh students list
         fetchStudents();
       } else {
         alert(`Lỗi: ${result.message}`);
       }
     } catch (error) {
-      console.error('Error registering multiple faces:', error);
-      alert('Có lỗi xảy ra khi đăng ký nhiều khuôn mặt');
+      console.error("Error registering multiple faces:", error);
+      alert("Có lỗi xảy ra khi đăng ký nhiều khuôn mặt");
     } finally {
       setFaceRegistrationLoading(false);
     }
@@ -628,71 +740,77 @@ const StudentList = () => {
   const handleEdit = (student) => {
     setSelectedStudentForEdit(student);
     setEditForm({
-      full_name: student.full_name || '',
-      email: student.email || '',
-      phone: student.phone || '',
-      class_name: student.class_name || '',
-      grade: student.grade || '',
-      date_of_birth: student.date_of_birth || '',
-      address: student.address || '',
-      parent_name: student.parent_name || '',
-      parent_phone: student.parent_phone || '',
-      gender: student.gender || 'Nam'
+      full_name: student.full_name || "",
+      email: student.email || "",
+      phone: student.phone || "",
+      class_name: student.class_name || "",
+      grade: student.grade || "",
+      date_of_birth: student.date_of_birth || "",
+      address: student.address || "",
+      parent_name: student.parent_name || "",
+      parent_phone: student.parent_phone || "",
+      gender: student.gender || "Nam",
     });
     setShowEditModal(true);
   };
 
   const handleEditFormChange = (field, value) => {
-    setEditForm(prev => ({
+    setEditForm((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const submitEditForm = async () => {
     if (!selectedStudentForEdit || !editForm.full_name.trim()) {
-      alert('Vui lòng nhập đầy đủ thông tin bắt buộc');
+      alert("Vui lòng nhập đầy đủ thông tin bắt buộc");
       return;
     }
 
     // Filter out empty strings and convert to null for optional fields
     const cleanFormData = {};
-    Object.keys(editForm).forEach(key => {
+    Object.keys(editForm).forEach((key) => {
       const value = editForm[key];
-      if (value !== '' && value !== null && value !== undefined) {
+      if (value !== "" && value !== null && value !== undefined) {
         cleanFormData[key] = value;
       }
     });
 
-
     setEditLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/students/${selectedStudentForEdit.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(cleanFormData)
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/students/${selectedStudentForEdit.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(cleanFormData),
+        }
+      );
 
       if (response.ok) {
-        alert('Cập nhật thông tin học sinh thành công!');
-        
+        alert("Cập nhật thông tin học sinh thành công!");
+
         // Fetch students để cập nhật danh sách
         await fetchStudents();
-        
+
         // Đóng modal sau khi đã fetch xong
         setShowEditModal(false);
         setSelectedStudentForEdit(null);
         setEditForm({});
       } else {
         const errorData = await response.json();
-        console.error('API Error Response:', errorData);
-        throw new Error(`Failed to update student: ${response.status} - ${JSON.stringify(errorData)}`);
+        console.error("API Error Response:", errorData);
+        throw new Error(
+          `Failed to update student: ${response.status} - ${JSON.stringify(
+            errorData
+          )}`
+        );
       }
     } catch (error) {
-      console.error('Error updating student:', error);
-      alert('Có lỗi xảy ra khi cập nhật thông tin học sinh');
+      console.error("Error updating student:", error);
+      alert("Có lỗi xảy ra khi cập nhật thông tin học sinh");
     } finally {
       setEditLoading(false);
     }
@@ -704,39 +822,42 @@ const StudentList = () => {
     setEditForm({});
   };
 
-
   const handleRestore = async (student) => {
-    console.log('Restore button clicked for student:', student);
-    
-    if (window.confirm(`Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`)) {
+    console.log("Restore button clicked for student:", student);
+
+    if (
+      window.confirm(
+        `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`
+      )
+    ) {
       setRestoreLoading(true);
       try {
-        console.log('Sending restore request for student ID:', student.id);
+        console.log("Sending restore request for student ID:", student.id);
         const response = await fetch(`${API_BASE_URL}/students/${student.id}`, {
-          method: 'PUT',
+          method: "PUT",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            is_active: true
-          })
+            is_active: true,
+          }),
         });
 
-        console.log('Restore response status:', response.status);
-        
+        console.log("Restore response status:", response.status);
+
         if (response.ok) {
           const result = await response.json();
-          console.log('Restore successful:', result);
-          alert('Khôi phục học sinh thành công!');
+          console.log("Restore successful:", result);
+          alert("Khôi phục học sinh thành công!");
           fetchStudents(); // Refresh danh sách
         } else {
           const errorData = await response.json();
-          console.error('API Error Response:', errorData);
-          alert(`Lỗi khi khôi phục: ${errorData.detail || 'Unknown error'}`);
+          console.error("API Error Response:", errorData);
+          alert(`Lỗi khi khôi phục: ${errorData.detail || "Unknown error"}`);
         }
       } catch (error) {
-        console.error('Error restoring student:', error);
-        alert('Có lỗi xảy ra khi khôi phục học sinh: ' + error.message);
+        console.error("Error restoring student:", error);
+        alert("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
       } finally {
         setRestoreLoading(false);
       }
@@ -752,44 +873,44 @@ const StudentList = () => {
     try {
       // Get all grades for this student across all subjects
       const response = await ApiService.getStudentGrades(student.id);
-      
+
       if (response.success) {
         setStudentGrades(response.data?.grades || []);
       } else {
-        console.error('Failed to fetch grades:', response.message);
+        console.error("Failed to fetch grades:", response.message);
         setStudentGrades([]);
       }
     } catch (error) {
-      console.error('Error fetching student grades:', error);
+      console.error("Error fetching student grades:", error);
       // Mock data for demonstration
       setStudentGrades([
         {
-          subject_name: 'Toán',
+          subject_name: "Toán",
           class_name: student.class_name,
-          academic_year: '2024-2025',
-          semester: 'HK1',
+          academic_year: "2024-2025",
+          semester: "HK1",
           grade_data: {
-            'Diem_thuong_xuyen': { Diem: 8.5, He_so: 1 },
-            'Diem_thi_giua_ki': { Diem: 9.0, He_so: 2 },
-            'Diem_thi_cuoi_ki': { Diem: 8.0, He_so: 3 }
+            Diem_thuong_xuyen: { Diem: 8.5, He_so: 1 },
+            Diem_thi_giua_ki: { Diem: 9.0, He_so: 2 },
+            Diem_thi_cuoi_ki: { Diem: 8.0, He_so: 3 },
           },
           final_grade: 8.4,
-          teacher_name: 'Nguyễn Thị Lan'
+          teacher_name: "Nguyễn Thị Lan",
         },
         {
-          subject_name: 'Ngữ Văn', 
+          subject_name: "Ngữ Văn",
           class_name: student.class_name,
-          academic_year: '2024-2025',
-          semester: 'HK1',
+          academic_year: "2024-2025",
+          semester: "HK1",
           grade_data: {
-            'Diem_mieng': { Diem: 7.5, He_so: 1 },
-            'Diem_15_phut': { Diem: 8.0, He_so: 1 },
-            'Diem_1_tiet': { Diem: 8.5, He_so: 2 },
-            'Diem_cuoi_ki': { Diem: 8.0, He_so: 3 }
+            Diem_mieng: { Diem: 7.5, He_so: 1 },
+            Diem_15_phut: { Diem: 8.0, He_so: 1 },
+            Diem_1_tiet: { Diem: 8.5, He_so: 2 },
+            Diem_cuoi_ki: { Diem: 8.0, He_so: 3 },
           },
           final_grade: 8.1,
-          teacher_name: 'Trần Văn Nam'
-        }
+          teacher_name: "Trần Văn Nam",
+        },
       ]);
     } finally {
       setGradesLoading(false);
@@ -805,41 +926,44 @@ const StudentList = () => {
   // Grade trend analysis function
   const fetchGradeTrend = async (studentId, classSubjectId) => {
     setTrendLoading(true);
-    setTrendError('');
+    setTrendError("");
     setGradeTrendData(null);
-    
+
     try {
-      const token = localStorage.getItem('access_token');
-      console.log('🔑 Token from localStorage:', token ? 'Present' : 'Missing');
-      console.log('🔑 Token length:', token ? token.length : 0);
-      
+      const token = localStorage.getItem("access_token");
+      console.log("🔑 Token from localStorage:", token ? "Present" : "Missing");
+      console.log("🔑 Token length:", token ? token.length : 0);
+
       const url = `${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=2024-2025&semester=HK1`;
-      console.log('🌐 Making request to:', url);
-      
+      console.log("🌐 Making request to:", url);
+
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-      
+
+      console.log("📡 Response status:", response.status);
+      console.log(
+        "📡 Response headers:",
+        Object.fromEntries(response.headers.entries())
+      );
+
       const result = await response.json();
-      console.log('📊 Response data:', result);
-      
+      console.log("📊 Response data:", result);
+
       if (result.success && result.data) {
         setGradeTrendData(result.data);
         return result.data;
       } else {
-        setTrendError(result.message || 'Không thể phân tích xu hướng điểm');
+        setTrendError(result.message || "Không thể phân tích xu hướng điểm");
         return null;
       }
     } catch (error) {
-      console.error('❌ Error fetching grade trend:', error);
-      setTrendError('Lỗi kết nối server khi phân tích xu hướng');
+      console.error("❌ Error fetching grade trend:", error);
+      setTrendError("Lỗi kết nối server khi phân tích xu hướng");
       return null;
     } finally {
       setTrendLoading(false);
@@ -849,80 +973,100 @@ const StudentList = () => {
   // Feedback functions
   const handleFeedbackClick = async (student) => {
     setSelectedStudentForFeedback(student);
-    setGeneratedFeedback('');
-    setFeedbackError('');
+    setGeneratedFeedback("");
+    setFeedbackError("");
     setFeedbackSuccess(false);
     setGradeTrendData(null);
-    setTrendError('');
-    
+    setTrendError("");
+
     // Initialize form with student name first
     let initialForm = {
       student_name: student.full_name,
-      score: '',
-      score_trend: '',
-      attendance_rate: '',
-      notes: ''
+      score: "",
+      score_trend: "",
+      attendance_rate: "",
+      notes: "",
     };
-    
+
     // Fetch student's average grade and grade trend analysis
     try {
-      console.log('🎯 Fetching grades for feedback form for student:', student);
+      console.log("🎯 Fetching grades for feedback form for student:", student);
       const gradesResponse = await ApiService.getStudentGrades(student.id);
-      console.log('📊 Grades response for feedback:', gradesResponse);
-      
+      console.log("📊 Grades response for feedback:", gradesResponse);
+
       if (gradesResponse.success && gradesResponse.data) {
         const responseData = gradesResponse.data;
         const grades = responseData.grades; // Access the grades array from the response object
-        console.log('📋 Full response data:', responseData);
-        console.log('📋 Grades array:', grades);
-        console.log('📏 Grades array length:', grades?.length);
-        console.log('🔍 First grade object:', grades?.[0]);
-        
+        console.log("📋 Full response data:", responseData);
+        console.log("📋 Grades array:", grades);
+        console.log("📏 Grades array length:", grades?.length);
+        console.log("🔍 First grade object:", grades?.[0]);
+
         if (Array.isArray(grades) && grades.length > 0) {
           // Use final_grade (điểm trung bình môn) instead of individual scores
-          const validGrades = grades.filter(grade => grade.final_grade !== null && grade.final_grade !== undefined);
-          console.log('✅ Valid grades with final_grade:', validGrades);
-          
+          const validGrades = grades.filter(
+            (grade) =>
+              grade.final_grade !== null && grade.final_grade !== undefined
+          );
+          console.log("✅ Valid grades with final_grade:", validGrades);
+
           if (validGrades.length > 0) {
-            const avgScore = (validGrades.reduce((sum, grade) => sum + (grade.final_grade || 0), 0) / validGrades.length).toFixed(1);
-            console.log('📊 Calculated average score for feedback:', avgScore);
-            
+            const avgScore = (
+              validGrades.reduce(
+                (sum, grade) => sum + (grade.final_grade || 0),
+                0
+              ) / validGrades.length
+            ).toFixed(1);
+            console.log("📊 Calculated average score for feedback:", avgScore);
+
             initialForm.score = avgScore;
-            
+
             // Try to get grade trend for the first subject (if available)
             const firstGrade = validGrades[0];
             if (firstGrade && firstGrade.class_subject_id) {
-              console.log('🔍 Fetching grade trend for class_subject_id:', firstGrade.class_subject_id);
-              console.log('🔍 Student ID:', student.id);
-              console.log('🔍 API URL will be:', `${API_BASE_URL}/grades/grade-trend/${student.id}/${firstGrade.class_subject_id}?academic_year=2024-2025&semester=HK1`);
-              
-              const trendData = await fetchGradeTrend(student.id, firstGrade.class_subject_id);
+              console.log(
+                "🔍 Fetching grade trend for class_subject_id:",
+                firstGrade.class_subject_id
+              );
+              console.log("🔍 Student ID:", student.id);
+              console.log(
+                "🔍 API URL will be:",
+                `${API_BASE_URL}/grades/grade-trend/${student.id}/${firstGrade.class_subject_id}?academic_year=2024-2025&semester=HK1`
+              );
+
+              const trendData = await fetchGradeTrend(
+                student.id,
+                firstGrade.class_subject_id
+              );
               if (trendData) {
-                console.log('📈 Grade trend data:', trendData);
+                console.log("📈 Grade trend data:", trendData);
                 initialForm.score_trend = trendData.label.toLowerCase(); // "tăng", "giảm", "ổn định"
               } else {
-                console.log('❌ No trend data returned');
+                console.log("❌ No trend data returned");
               }
             } else {
-              console.log('⚠️ No class_subject_id found in first grade:', firstGrade);
+              console.log(
+                "⚠️ No class_subject_id found in first grade:",
+                firstGrade
+              );
             }
           } else {
-            console.log('⚠️ No valid final_grade found in grades');
+            console.log("⚠️ No valid final_grade found in grades");
           }
         } else {
-          console.log('⚠️ No grades found for student - not an array or empty');
-          console.log('📋 Grades type:', typeof grades);
-          console.log('📋 Is array:', Array.isArray(grades));
+          console.log("⚠️ No grades found for student - not an array or empty");
+          console.log("📋 Grades type:", typeof grades);
+          console.log("📋 Is array:", Array.isArray(grades));
         }
       } else {
-        console.log('❌ Failed to fetch grades:', gradesResponse);
+        console.log("❌ Failed to fetch grades:", gradesResponse);
       }
     } catch (error) {
-      console.error('Error fetching student grades:', error);
+      console.error("Error fetching student grades:", error);
     }
-    
+
     // Set form with calculated score and trend
-    console.log('📝 Setting feedback form:', initialForm);
+    console.log("📝 Setting feedback form:", initialForm);
     setFeedbackForm(initialForm);
     setShowFeedbackModal(true);
   };
@@ -931,53 +1075,53 @@ const StudentList = () => {
     setShowFeedbackModal(false);
     setSelectedStudentForFeedback(null);
     setFeedbackForm({
-      student_name: '',
-      score: '',
-      score_trend: '',
-      attendance_rate: '',
-      notes: ''
+      student_name: "",
+      score: "",
+      score_trend: "",
+      attendance_rate: "",
+      notes: "",
     });
-    setGeneratedFeedback('');
-    setFeedbackError('');
+    setGeneratedFeedback("");
+    setFeedbackError("");
     setFeedbackSuccess(false);
     setGradeTrendData(null);
-    setTrendError('');
+    setTrendError("");
   };
 
   const handleFeedbackFormChange = (field, value) => {
-    setFeedbackForm(prev => ({
+    setFeedbackForm((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
-    setFeedbackError('');
+    setFeedbackError("");
     setFeedbackSuccess(false);
   };
 
   const validateFeedbackForm = () => {
     const { student_name, score, score_trend, attendance_rate } = feedbackForm;
-    
+
     if (!student_name.trim()) {
-      setFeedbackError('Vui lòng nhập tên học sinh');
+      setFeedbackError("Vui lòng nhập tên học sinh");
       return false;
     }
-    
+
     const scoreNum = parseFloat(score);
     if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
-      setFeedbackError('Điểm số phải từ 0 đến 10');
+      setFeedbackError("Điểm số phải từ 0 đến 10");
       return false;
     }
-    
+
     if (!score_trend) {
-      setFeedbackError('Vui lòng chọn xu hướng điểm số');
+      setFeedbackError("Vui lòng chọn xu hướng điểm số");
       return false;
     }
-    
+
     const attendanceNum = parseInt(attendance_rate);
     if (isNaN(attendanceNum) || attendanceNum < 0 || attendanceNum > 100) {
-      setFeedbackError('Tỷ lệ chuyên cần phải từ 0 đến 100%');
+      setFeedbackError("Tỷ lệ chuyên cần phải từ 0 đến 100%");
       return false;
     }
-    
+
     return true;
   };
 
@@ -985,23 +1129,26 @@ const StudentList = () => {
     if (!validateFeedbackForm()) return;
 
     setFeedbackLoading(true);
-    setFeedbackError('');
-    setGeneratedFeedback('');
+    setFeedbackError("");
+    setGeneratedFeedback("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/feedback/generate-feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          student_name: feedbackForm.student_name,
-          score: parseFloat(feedbackForm.score),
-          score_trend: feedbackForm.score_trend,
-          attendance_rate: parseInt(feedbackForm.attendance_rate),
-          notes: feedbackForm.notes
-        })
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/feedback/generate-feedback`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            student_name: feedbackForm.student_name,
+            score: parseFloat(feedbackForm.score),
+            score_trend: feedbackForm.score_trend,
+            attendance_rate: parseInt(feedbackForm.attendance_rate),
+            notes: feedbackForm.notes,
+          }),
+        }
+      );
 
       const result = await response.json();
 
@@ -1009,11 +1156,11 @@ const StudentList = () => {
         setGeneratedFeedback(result.feedback);
         setFeedbackSuccess(true);
       } else {
-        setFeedbackError(result.error || 'Không thể tạo nhận xét');
+        setFeedbackError(result.error || "Không thể tạo nhận xét");
       }
     } catch (err) {
-      console.error('Error generating feedback:', err);
-      setFeedbackError('Lỗi kết nối server. Vui lòng thử lại.');
+      console.error("Error generating feedback:", err);
+      setFeedbackError("Lỗi kết nối server. Vui lòng thử lại.");
     } finally {
       setFeedbackLoading(false);
     }
@@ -1021,28 +1168,30 @@ const StudentList = () => {
 
   const sendSMS = async () => {
     if (!generatedFeedback || !selectedStudentForFeedback) {
-      setFeedbackError('Không có nhận xét để gửi');
+      setFeedbackError("Không có nhận xét để gửi");
       return;
     }
 
     setSmsLoading(true);
-    setFeedbackError('');
+    setFeedbackError("");
 
     try {
       const response = await ApiService.sendSMSFeedback({
         student_id: selectedStudentForFeedback.id,
         feedback: generatedFeedback,
-        parent_phone: selectedStudentForFeedback.parent_phone || selectedStudentForFeedback.phone
+        parent_phone:
+          selectedStudentForFeedback.parent_phone ||
+          selectedStudentForFeedback.phone,
       });
 
       if (response.success) {
-        alert('Gửi SMS thành công!');
+        alert("Gửi SMS thành công!");
       } else {
-        setFeedbackError(response.error || 'Không thể gửi SMS');
+        setFeedbackError(response.error || "Không thể gửi SMS");
       }
     } catch (error) {
-      console.error('Error sending SMS:', error);
-      setFeedbackError('Lỗi kết nối server khi gửi SMS');
+      console.error("Error sending SMS:", error);
+      setFeedbackError("Lỗi kết nối server khi gửi SMS");
     } finally {
       setSmsLoading(false);
     }
@@ -1051,92 +1200,103 @@ const StudentList = () => {
   // Subject selection functions
   const fetchAvailableSubjects = async () => {
     try {
-      const response = await ApiService.getSubjectsAdmin();
+      console.log("🔍 Fetching subjects from API...");
+      const response = await ApiService.getSubjectsForSelection();
+      console.log("📦 API Response:", response);
+
       if (response.success && response.data) {
+        console.log("✅ Setting subjects from API:", response.data);
         setAvailableSubjects(response.data);
+      } else {
+        console.warn("⚠️ API response invalid, using fallback");
+        throw new Error("Invalid API response");
       }
     } catch (error) {
-      console.error('Error fetching subjects:', error);
+      console.error("❌ Error fetching subjects:", error);
+      console.log("📋 Using fallback subject data");
       // Fallback data nếu API không hoạt động
       setAvailableSubjects([
-        { subject_code: 'TOAN', subject_name: 'Toán' },
-        { subject_code: 'VAN', subject_name: 'Ngữ Văn' },
-        { subject_code: 'ANH', subject_name: 'Tiếng Anh' },
-        { subject_code: 'LY', subject_name: 'Vật Lý' },
-        { subject_code: 'HOA', subject_name: 'Hóa Học' },
-        { subject_code: 'SINH', subject_name: 'Sinh Học' },
-        { subject_code: 'SU', subject_name: 'Lịch Sử' },
-        { subject_code: 'DIA', subject_name: 'Địa Lý' },
-        { subject_code: 'GDCD', subject_name: 'Giáo Dục Công Dân' },
-        { subject_code: 'CNTT', subject_name: 'Tin Học' }
+        { subject_code: "TOAN", subject_name: "Toán" },
+        { subject_code: "VAN", subject_name: "Ngữ Văn" },
+        { subject_code: "ANH", subject_name: "Tiếng Anh" },
+        { subject_code: "LY", subject_name: "Vật Lý" },
+        { subject_code: "HOA", subject_name: "Hóa Học" },
+        { subject_code: "SINH", subject_name: "Sinh Học" },
+        { subject_code: "SU", subject_name: "Lịch Sử" },
+        { subject_code: "DIA", subject_name: "Địa Lý" },
+        { subject_code: "GDCD", subject_name: "Giáo Dục Công Dân" },
+        { subject_code: "CNTT", subject_name: "Tin Học" },
+        { subject_code: "CONG_NGHE", subject_name: "Công Nghệ" },
       ]);
     }
   };
 
   const handleSubjectSelection = (student) => {
     setSelectedStudentForSubject(student);
-    
+
     // Debug log để kiểm tra dữ liệu
-    console.log('=== DEBUG SUBJECT SELECTION ===');
-    console.log('Student data:', student);
-    console.log('Subject selected:', student.subject_selected);
-    console.log('Subject selected type:', typeof student.subject_selected);
-    
+    console.log("=== DEBUG SUBJECT SELECTION ===");
+    console.log("Student data:", student);
+    console.log("Subject selected:", student.subject_selected);
+    console.log("Subject selected type:", typeof student.subject_selected);
+
     // Load existing subject selection nếu có
     if (student.subject_selected) {
       // Parse JSON nếu là string
       let subjectData = student.subject_selected;
-      if (typeof subjectData === 'string') {
+      if (typeof subjectData === "string") {
         try {
           subjectData = JSON.parse(subjectData);
         } catch (e) {
-          console.error('Error parsing subject_selected:', e);
+          console.error("Error parsing subject_selected:", e);
           subjectData = null;
         }
       }
-      
-      if (subjectData && typeof subjectData === 'object') {
-        console.log('Setting selected subjects:', subjectData);
+
+      if (subjectData && typeof subjectData === "object") {
+        console.log("Setting selected subjects:", subjectData);
         setSelectedSubjects(subjectData);
       } else {
         // Reset về mặc định nếu data không hợp lệ
         setSelectedSubjects({
-          core_subjects: ['TOAN', 'VAN', 'ANH'],
-          elective_subjects: []
+          core_subjects: ["TOAN", "VAN", "ANH"],
+          elective_subjects: [],
         });
       }
     } else {
       // Reset về mặc định
       setSelectedSubjects({
-        core_subjects: ['TOAN', 'VAN', 'ANH'],
-        elective_subjects: []
+        core_subjects: ["TOAN", "VAN", "ANH"],
+        elective_subjects: [],
       });
     }
-    
+
     setShowSubjectModal(true);
     fetchAvailableSubjects();
   };
 
   const toggleSubjectSelection = (subjectCode, type) => {
-    setSelectedSubjects(prev => {
+    setSelectedSubjects((prev) => {
       const currentSubjects = prev[type] || [];
       const isSelected = currentSubjects.includes(subjectCode);
-      
+
       if (isSelected) {
         // Remove subject
         return {
           ...prev,
-          [type]: currentSubjects.filter(code => code !== subjectCode)
+          [type]: currentSubjects.filter((code) => code !== subjectCode),
         };
       } else {
         // Add subject (max 3 cho mỗi loại)
         if (currentSubjects.length >= 3) {
-          alert(`Tối đa 3 môn ${type === 'core_subjects' ? 'chính' : 'tự chọn'}`);
+          alert(
+            `Tối đa 3 môn ${type === "core_subjects" ? "chính" : "tự chọn"}`
+          );
           return prev;
         }
         return {
           ...prev,
-          [type]: [...currentSubjects, subjectCode]
+          [type]: [...currentSubjects, subjectCode],
         };
       }
     });
@@ -1147,35 +1307,38 @@ const StudentList = () => {
 
     setSubjectLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/students/${selectedStudentForSubject.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subject_selected: selectedSubjects
-        })
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/students/${selectedStudentForSubject.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            subject_selected: selectedSubjects,
+          }),
+        }
+      );
 
       if (response.ok) {
-        alert('Lưu môn học thành công!');
+        alert("Lưu môn học thành công!");
         setShowSubjectModal(false);
-        
+
         // Cập nhật dữ liệu học sinh trong state để không cần refresh
-        setStudents(prevStudents => 
-          prevStudents.map(student => 
-            student.id === selectedStudentForSubject.id 
+        setStudents((prevStudents) =>
+          prevStudents.map((student) =>
+            student.id === selectedStudentForSubject.id
               ? { ...student, subject_selected: selectedSubjects }
               : student
           )
         );
       } else {
         const errorData = await response.json();
-        alert(`Lỗi khi lưu môn học: ${errorData.detail || 'Unknown error'}`);
+        alert(`Lỗi khi lưu môn học: ${errorData.detail || "Unknown error"}`);
       }
     } catch (error) {
-      console.error('Error saving subject selection:', error);
-      alert('Có lỗi xảy ra khi lưu môn học');
+      console.error("Error saving subject selection:", error);
+      alert("Có lỗi xảy ra khi lưu môn học");
     } finally {
       setSubjectLoading(false);
     }
@@ -1185,8 +1348,8 @@ const StudentList = () => {
     setShowSubjectModal(false);
     setSelectedStudentForSubject(null);
     setSelectedSubjects({
-      core_subjects: ['TOAN', 'VAN', 'ANH'],
-      elective_subjects: []
+      core_subjects: ["TOAN", "VAN", "ANH"],
+      elective_subjects: [],
     });
   };
 
@@ -1244,7 +1407,7 @@ const StudentList = () => {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="class-select">Lớp</Label>
               <select
@@ -1259,8 +1422,10 @@ const StudentList = () => {
                 ) : (
                   <option value="">Tất cả lớp</option>
                 )}
-                {availableClasses.map(className => (
-                  <option key={className} value={className}>{className}</option>
+                {availableClasses.map((className) => (
+                  <option key={className} value={className}>
+                    {className}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1301,7 +1466,13 @@ const StudentList = () => {
           <CardContent className="py-4">
             <div className="flex flex-wrap gap-3 justify-between items-center">
               <div className="text-sm text-muted-foreground">
-                Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalStudents)}</span> trong tổng số <span className="font-semibold">{totalStudents}</span> học sinh
+                Hiển thị <span className="font-semibold">{startIndex + 1}</span>{" "}
+                đến{" "}
+                <span className="font-semibold">
+                  {Math.min(endIndex, totalStudents)}
+                </span>{" "}
+                trong tổng số{" "}
+                <span className="font-semibold">{totalStudents}</span> học sinh
               </div>
               <div className="flex items-center space-x-2">
                 <Label className="text-sm">Số lượng/trang:</Label>
@@ -1333,31 +1504,40 @@ const StudentList = () => {
                 <Users className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="mb-2 text-lg font-medium text-foreground">
-                {searchTerm || selectedClass ? 'Không tìm thấy học sinh nào' : 'Chưa có học sinh nào'}
+                {searchTerm || selectedClass
+                  ? "Không tìm thấy học sinh nào"
+                  : "Chưa có học sinh nào"}
               </h3>
               <p className="text-muted-foreground">
-                {searchTerm || selectedClass ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm' : 'Hãy thêm học sinh mới để bắt đầu'}
+                {searchTerm || selectedClass
+                  ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
+                  : "Hãy thêm học sinh mới để bắt đầu"}
               </p>
             </CardContent>
           </Card>
         ) : (
           paginatedStudents.map((student) => (
-            <Card key={student.id} className={`group transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-              student.is_active === false 
-                ? 'border-destructive/50 bg-destructive/5 opacity-75' 
-                : 'hover:border-primary/50'
-            }`}>
+            <Card
+              key={student.id}
+              className={`group transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
+                student.is_active === false
+                  ? "border-destructive/50 bg-destructive/5 opacity-75"
+                  : "hover:border-primary/50"
+              }`}
+            >
               {/* Header with avatar and basic info */}
-              <CardHeader className={`${
-                student.is_active === false 
-                  ? 'bg-destructive text-destructive-foreground' 
-                  : 'bg-gradient-to-r from-primary to-primary/80 text-primary-foreground'
-              }`}>
+              <CardHeader
+                className={`${
+                  student.is_active === false
+                    ? "bg-destructive text-destructive-foreground"
+                    : "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground"
+                }`}
+              >
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-4">
                     <div className="relative">
                       <div className="flex justify-center items-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
-                        {student.full_name?.charAt(0)?.toUpperCase() || '?'}
+                        {student.full_name?.charAt(0)?.toUpperCase() || "?"}
                       </div>
                       {student.is_active === false && (
                         <div className="flex absolute -top-1 -right-1 justify-center items-center w-6 h-6 rounded-full bg-destructive">
@@ -1366,15 +1546,25 @@ const StudentList = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold truncate">{student.full_name}</h3>
-                      <p className="font-mono text-sm text-primary-foreground/80">{student.student_id}</p>
+                      <h3 className="text-lg font-bold truncate">
+                        {student.full_name}
+                      </h3>
+                      <p className="font-mono text-sm text-primary-foreground/80">
+                        {student.student_id}
+                      </p>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="secondary" className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50">
+                        <Badge
+                          variant="secondary"
+                          className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
+                        >
                           <GraduationCap className="mr-1 w-3 h-3" />
                           {student.class_name}
                         </Badge>
                         {student.gender && (
-                          <Badge variant="secondary" className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50">
+                          <Badge
+                            variant="secondary"
+                            className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
+                          >
                             <Users className="mr-1 w-3 h-3" />
                             {student.gender}
                           </Badge>
@@ -1382,7 +1572,7 @@ const StudentList = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Edit button in top right corner */}
                   {student.is_active !== false && (
                     <Button
@@ -1407,27 +1597,35 @@ const StudentList = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="text-sm font-medium truncate">{student.email || 'Chưa có email'}</p>
+                      <p className="text-sm font-medium truncate">
+                        {student.email || "Chưa có email"}
+                      </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
                     <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
                       <Phone className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Số điện thoại</p>
-                      <p className="text-sm font-medium">{student.phone || 'Chưa có SĐT'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Số điện thoại
+                      </p>
+                      <p className="text-sm font-medium">
+                        {student.phone || "Chưa có SĐT"}
+                      </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
                     <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
                       <BookOpen className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground">Khối</p>
-                      <p className="text-sm font-medium">Khối {student.grade || 'N/A'}</p>
+                      <p className="text-sm font-medium">
+                        Khối {student.grade || "N/A"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1455,7 +1653,9 @@ const StudentList = () => {
                           </>
                         )}
                       </Button>
-                      <p className="text-xs text-muted-foreground">Học sinh đã bị xóa</p>
+                      <p className="text-xs text-muted-foreground">
+                        Học sinh đã bị xóa
+                      </p>
                     </div>
                   ) : (
                     // Actions for active students (full)
@@ -1470,7 +1670,7 @@ const StudentList = () => {
                           <MessageCircle className="w-4 h-4" />
                           <span>Nhận xét</span>
                         </Button>
-                        
+
                         <Button
                           onClick={() => {
                             setSelectedStudentForMultiple(student);
@@ -1484,7 +1684,7 @@ const StudentList = () => {
                           <span>Nhiều ảnh</span>
                         </Button>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-2">
                         <Button
                           onClick={() => handleViewGrades(student)}
@@ -1495,7 +1695,7 @@ const StudentList = () => {
                           <BarChart3 className="w-4 h-4" />
                           <span>Điểm số</span>
                         </Button>
-                        
+
                         <Button
                           onClick={() => handleSubjectSelection(student)}
                           variant="outline"
@@ -1506,7 +1706,7 @@ const StudentList = () => {
                           <span>Môn học</span>
                         </Button>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-2">
                         {/* Edit button moved to header */}
                       </div>
@@ -1525,45 +1725,62 @@ const StudentList = () => {
           <CardContent className="py-4">
             <div className="flex justify-center items-center space-x-2">
               <Button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
                 variant="outline"
                 size="sm"
               >
                 ← Trước
               </Button>
-              
+
               <div className="flex items-center space-x-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                  // Show first page, last page, current page, and pages around current
-                  const showPage = 
-                    pageNum === 1 || 
-                    pageNum === totalPages || 
-                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
-                  
-                  if (!showPage) {
-                    // Show ellipsis for skipped pages
-                    if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                      return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (pageNum) => {
+                    // Show first page, last page, current page, and pages around current
+                    const showPage =
+                      pageNum === 1 ||
+                      pageNum === totalPages ||
+                      (pageNum >= currentPage - 1 &&
+                        pageNum <= currentPage + 1);
+
+                    if (!showPage) {
+                      // Show ellipsis for skipped pages
+                      if (
+                        pageNum === currentPage - 2 ||
+                        pageNum === currentPage + 2
+                      ) {
+                        return (
+                          <span
+                            key={pageNum}
+                            className="px-2 text-muted-foreground"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
                     }
-                    return null;
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        variant={
+                          currentPage === pageNum ? "default" : "outline"
+                        }
+                        size="sm"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
                   }
-                  
-                  return (
-                    <Button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
+                )}
               </div>
-              
+
               <Button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
                 disabled={currentPage === totalPages}
                 variant="outline"
                 size="sm"
@@ -1575,319 +1792,343 @@ const StudentList = () => {
         </Card>
       )}
 
-        {/* Face Registration Modal */}
-        <Dialog open={showFaceModal} onOpenChange={setShowFaceModal}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                Đăng ký khuôn mặt - {selectedStudentForFace?.full_name}
-              </DialogTitle>
-            </DialogHeader>
+      {/* Face Registration Modal */}
+      <Dialog open={showFaceModal} onOpenChange={setShowFaceModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Đăng ký khuôn mặt - {selectedStudentForFace?.full_name}
+            </DialogTitle>
+          </DialogHeader>
 
-            <div className="space-y-4">
-              {/* Mode Selection */}
-              <div className="flex gap-2 p-1 bg-muted rounded-lg">
-                <Button
-                  variant={registrationMode === 'camera' ? 'default' : 'ghost'}
-                  onClick={() => setRegistrationMode('camera')}
-                  className="flex-1"
-                >
-                  📷 Camera
-                </Button>
-                <Button
-                  variant={registrationMode === 'upload' ? 'default' : 'ghost'}
-                  onClick={() => setRegistrationMode('upload')}
-                  className="flex-1"
-                >
-                  📁 Upload
-                </Button>
-                <Button
-                  variant={registrationMode === 'multiple' ? 'default' : 'ghost'}
-                  onClick={() => setRegistrationMode('multiple')}
-                  className="flex-1"
-                >
-                  📸 Nhiều ảnh
-                </Button>
-              </div>
+          <div className="space-y-4">
+            {/* Mode Selection */}
+            <div className="flex gap-2 p-1 bg-muted rounded-lg">
+              <Button
+                variant={registrationMode === "camera" ? "default" : "ghost"}
+                onClick={() => setRegistrationMode("camera")}
+                className="flex-1"
+              >
+                📷 Camera
+              </Button>
+              <Button
+                variant={registrationMode === "upload" ? "default" : "ghost"}
+                onClick={() => setRegistrationMode("upload")}
+                className="flex-1"
+              >
+                📁 Upload
+              </Button>
+              <Button
+                variant={registrationMode === "multiple" ? "default" : "ghost"}
+                onClick={() => setRegistrationMode("multiple")}
+                className="flex-1"
+              >
+                📸 Nhiều ảnh
+              </Button>
+            </div>
 
-                {/* Camera Mode */}
-                {registrationMode === 'camera' && (
-                  <>
-                    {!capturedImage ? (
-                      <div className="text-center">
-                        {cameraError ? (
-                          <div className="p-6 bg-red-50 rounded-lg border border-red-200">
-                            <div className="mb-2 text-lg text-red-600">❌</div>
-                            <p className="font-medium text-red-700">{cameraError}</p>
-                            <div className="mt-3 space-x-2">
-                              <button
-                                onClick={resetCamera}
-                                className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                              >
-                                🔄 Thử lại Camera
-                              </button>
-                              <button
-                                onClick={() => setRegistrationMode('upload')}
-                                className="px-4 py-2 text-white bg-purple-600 rounded-md hover:bg-purple-700"
-                              >
-                                📁 Chuyển sang Upload
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="relative">
-                              <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="mx-auto w-full max-w-md rounded-lg border"
-                              />
-                              {!cameraReady && (
-                                <div className="flex absolute inset-0 justify-center items-center bg-gray-200 rounded-lg">
-                                  <div className="text-center">
-                                    <div className="mx-auto mb-2 w-8 h-8 rounded-full border-b-2 border-blue-600 animate-spin"></div>
-                                    <p className="text-gray-600">Đang khởi động camera...</p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            <div className="mt-4">
-                              <button
-                                onClick={capturePhoto}
-                                disabled={!cameraReady}
-                                className={`px-6 py-2 rounded-md transition-colors ${
-                                  cameraReady 
-                                    ? 'text-white bg-blue-600 hover:bg-blue-700' 
-                                    : 'text-gray-500 bg-gray-300 cursor-not-allowed'
-                                }`}
-                              >
-                                📸 Chụp ảnh
-                              </button>
-                            </div>
-                            <p className="mt-2 text-sm text-gray-600">
-                              {cameraReady 
-                                ? 'Hãy nhìn thẳng vào camera và bấm "Chụp ảnh"'
-                                : 'Đang chuẩn bị camera, vui lòng đợi...'
-                              }
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <img
-                          src={capturedImage}
-                          alt="Captured face"
-                          className="mx-auto w-full max-w-md rounded-lg border"
-                        />
-                        <div className="mt-4 space-x-2">
+            {/* Camera Mode */}
+            {registrationMode === "camera" && (
+              <>
+                {!capturedImage ? (
+                  <div className="text-center">
+                    {cameraError ? (
+                      <div className="p-6 bg-red-50 rounded-lg border border-red-200">
+                        <div className="mb-2 text-lg text-red-600">❌</div>
+                        <p className="font-medium text-red-700">
+                          {cameraError}
+                        </p>
+                        <div className="mt-3 space-x-2">
                           <button
-                            onClick={() => setCapturedImage(null)}
-                            className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
+                            onClick={resetCamera}
+                            className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
                           >
-                            🔄 Chụp lại
+                            🔄 Thử lại Camera
                           </button>
                           <button
-                            onClick={submitFaceRegistration}
-                            disabled={faceRegistrationLoading}
-                            className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                            onClick={() => setRegistrationMode("upload")}
+                            className="px-4 py-2 text-white bg-purple-600 rounded-md hover:bg-purple-700"
                           >
-                            {faceRegistrationLoading ? '⏳ Đang xử lý...' : '✅ Đăng ký'}
+                            📁 Chuyển sang Upload
                           </button>
                         </div>
                       </div>
-                    )}
-                  </>
-                )}
-
-                {/* Upload Mode */}
-                {registrationMode === 'upload' && (
-                  <>
-                    {!uploadedImage ? (
-                      <div className="text-center">
-                        <div className="p-8 rounded-lg border-2 border-gray-300 border-dashed">
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                            className="hidden"
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="mx-auto w-full max-w-md rounded-lg border"
                           />
-                          <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-6 py-3 text-white bg-purple-600 rounded-md hover:bg-purple-700"
-                          >
-                            📁 Chọn ảnh từ máy tính
-                          </button>
-                          <p className="mt-2 text-sm text-gray-600">
-                            Chọn ảnh khuôn mặt rõ ràng, đủ sáng
-                          </p>
+                          {!cameraReady && (
+                            <div className="flex absolute inset-0 justify-center items-center bg-gray-200 rounded-lg">
+                              <div className="text-center">
+                                <div className="mx-auto mb-2 w-8 h-8 rounded-full border-b-2 border-blue-600 animate-spin"></div>
+                                <p className="text-gray-600">
+                                  Đang khởi động camera...
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <img
-                          src={uploadedImage.previewUrl}
-                          alt="Uploaded face"
-                          className="mx-auto w-full max-w-md rounded-lg border"
-                        />
-                        <div className="mt-4 space-x-2">
+                        <div className="mt-4">
                           <button
-                            onClick={() => {
-                              URL.revokeObjectURL(uploadedImage.previewUrl);
-                              setUploadedImage(null);
-                              if (fileInputRef.current) {
-                                fileInputRef.current.value = '';
-                              }
-                            }}
-                            className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
+                            onClick={capturePhoto}
+                            disabled={!cameraReady}
+                            className={`px-6 py-2 rounded-md transition-colors ${
+                              cameraReady
+                                ? "text-white bg-blue-600 hover:bg-blue-700"
+                                : "text-gray-500 bg-gray-300 cursor-not-allowed"
+                            }`}
                           >
-                            🔄 Chọn lại
-                          </button>
-                          <button
-                            onClick={submitFaceRegistration}
-                            disabled={faceRegistrationLoading}
-                            className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
-                          >
-                            {faceRegistrationLoading ? '⏳ Đang xử lý...' : '✅ Đăng ký'}
+                            📸 Chụp ảnh
                           </button>
                         </div>
-                      </div>
+                        <p className="mt-2 text-sm text-gray-600">
+                          {cameraReady
+                            ? 'Hãy nhìn thẳng vào camera và bấm "Chụp ảnh"'
+                            : "Đang chuẩn bị camera, vui lòng đợi..."}
+                        </p>
+                      </>
                     )}
-                  </>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <img
+                      src={capturedImage}
+                      alt="Captured face"
+                      className="mx-auto w-full max-w-md rounded-lg border"
+                    />
+                    <div className="mt-4 space-x-2">
+                      <button
+                        onClick={() => setCapturedImage(null)}
+                        className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
+                      >
+                        🔄 Chụp lại
+                      </button>
+                      <button
+                        onClick={submitFaceRegistration}
+                        disabled={faceRegistrationLoading}
+                        className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {faceRegistrationLoading
+                          ? "⏳ Đang xử lý..."
+                          : "✅ Đăng ký"}
+                      </button>
+                    </div>
+                  </div>
                 )}
+              </>
+            )}
 
-                {/* Multiple Mode */}
-                {registrationMode === 'multiple' && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <h4 className="mb-2 font-semibold text-blue-800">📸 Đăng ký nhiều ảnh (Độ chính xác cao)</h4>
-                      <p className="text-sm text-blue-700">
-                        Chụp 5-10 ảnh với góc độ khác nhau để đạt độ chính xác 90%+:
+            {/* Upload Mode */}
+            {registrationMode === "upload" && (
+              <>
+                {!uploadedImage ? (
+                  <div className="text-center">
+                    <div className="p-8 rounded-lg border-2 border-gray-300 border-dashed">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-6 py-3 text-white bg-purple-600 rounded-md hover:bg-purple-700"
+                      >
+                        📁 Chọn ảnh từ máy tính
+                      </button>
+                      <p className="mt-2 text-sm text-gray-600">
+                        Chọn ảnh khuôn mặt rõ ràng, đủ sáng
                       </p>
-                      <ul className="mt-2 space-y-1 text-xs text-blue-600">
-                        <li>• Nhìn thẳng, nghiêng trái/phải 15-30°</li>
-                        <li>• Cười và không cười</li>
-                        <li>• Ánh sáng tự nhiên và đèn</li>
-                        <li>• Khoảng cách gần và xa</li>
-                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <img
+                      src={uploadedImage.previewUrl}
+                      alt="Uploaded face"
+                      className="mx-auto w-full max-w-md rounded-lg border"
+                    />
+                    <div className="mt-4 space-x-2">
+                      <button
+                        onClick={() => {
+                          URL.revokeObjectURL(uploadedImage.previewUrl);
+                          setUploadedImage(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                        className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
+                      >
+                        🔄 Chọn lại
+                      </button>
+                      <button
+                        onClick={submitFaceRegistration}
+                        disabled={faceRegistrationLoading}
+                        className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {faceRegistrationLoading
+                          ? "⏳ Đang xử lý..."
+                          : "✅ Đăng ký"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Multiple Mode */}
+            {registrationMode === "multiple" && (
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="mb-2 font-semibold text-blue-800">
+                    📸 Đăng ký nhiều ảnh (Độ chính xác cao)
+                  </h4>
+                  <p className="text-sm text-blue-700">
+                    Chụp 5-10 ảnh với góc độ khác nhau để đạt độ chính xác 90%+:
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-blue-600">
+                    <li>• Nhìn thẳng, nghiêng trái/phải 15-30°</li>
+                    <li>• Cười và không cười</li>
+                    <li>• Ánh sáng tự nhiên và đèn</li>
+                    <li>• Khoảng cách gần và xa</li>
+                  </ul>
+                </div>
+
+                {multipleFiles.length === 0 ? (
+                  <div className="text-center">
+                    <div className="p-8 rounded-lg border-2 border-green-300 border-dashed">
+                      <input
+                        ref={multipleFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleMultipleFileSelect}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => multipleFileInputRef.current?.click()}
+                        className="px-6 py-3 text-white bg-green-600 rounded-md hover:bg-green-700"
+                      >
+                        📸 Chọn nhiều ảnh (tối đa 10)
+                      </button>
+                      <p className="mt-2 text-sm text-gray-600">
+                        Chọn 5-10 ảnh khuôn mặt với góc độ khác nhau
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <h5 className="font-medium">
+                        Đã chọn {multipleFiles.length} ảnh:
+                      </h5>
+                      <button
+                        onClick={() => multipleFileInputRef.current?.click()}
+                        className="px-3 py-1 text-sm text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                      >
+                        + Thêm ảnh
+                      </button>
                     </div>
 
-                    {multipleFiles.length === 0 ? (
-                      <div className="text-center">
-                        <div className="p-8 rounded-lg border-2 border-green-300 border-dashed">
-                          <input
-                            ref={multipleFileInputRef}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={handleMultipleFileSelect}
-                            className="hidden"
+                    <div className="grid overflow-y-auto grid-cols-3 gap-3 max-h-60">
+                      {multipleFiles.map((fileObj) => (
+                        <div key={fileObj.id} className="relative">
+                          <img
+                            src={fileObj.previewUrl}
+                            alt={fileObj.name}
+                            className="object-cover w-full h-24 rounded border"
                           />
                           <button
-                            onClick={() => multipleFileInputRef.current?.click()}
-                            className="px-6 py-3 text-white bg-green-600 rounded-md hover:bg-green-700"
+                            onClick={() => removeMultipleFile(fileObj.id)}
+                            className="absolute -top-2 -right-2 w-6 h-6 text-xs text-white bg-red-500 rounded-full hover:bg-red-600"
                           >
-                            📸 Chọn nhiều ảnh (tối đa 10)
+                            ×
                           </button>
-                          <p className="mt-2 text-sm text-gray-600">
-                            Chọn 5-10 ảnh khuôn mặt với góc độ khác nhau
-                          </p>
+                          {fileObj.status !== "pending" && (
+                            <div
+                              className={`absolute bottom-0 left-0 right-0 text-xs p-1 text-center ${
+                                fileObj.status === "success"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-red-500 text-white"
+                              }`}
+                            >
+                              {fileObj.status === "success" ? "✅" : "❌"}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex justify-between items-center mb-3">
-                          <h5 className="font-medium">Đã chọn {multipleFiles.length} ảnh:</h5>
-                          <button
-                            onClick={() => multipleFileInputRef.current?.click()}
-                            className="px-3 py-1 text-sm text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
-                          >
-                            + Thêm ảnh
-                          </button>
-                        </div>
-                        
-                        <div className="grid overflow-y-auto grid-cols-3 gap-3 max-h-60">
-                          {multipleFiles.map((fileObj) => (
-                            <div key={fileObj.id} className="relative">
-                              <img
-                                src={fileObj.previewUrl}
-                                alt={fileObj.name}
-                                className="object-cover w-full h-24 rounded border"
-                              />
-                              <button
-                                onClick={() => removeMultipleFile(fileObj.id)}
-                                className="absolute -top-2 -right-2 w-6 h-6 text-xs text-white bg-red-500 rounded-full hover:bg-red-600"
-                              >
-                                ×
-                              </button>
-                              {fileObj.status !== 'pending' && (
-                                <div className={`absolute bottom-0 left-0 right-0 text-xs p-1 text-center ${
-                                  fileObj.status === 'success' 
-                                    ? 'bg-green-500 text-white' 
-                                    : 'bg-red-500 text-white'
-                                }`}>
-                                  {fileObj.status === 'success' ? '✅' : '❌'}
-                                </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 space-x-2 text-center">
+                      <button
+                        onClick={() => {
+                          multipleFiles.forEach((file) =>
+                            URL.revokeObjectURL(file.previewUrl)
+                          );
+                          setMultipleFiles([]);
+                          setMultipleResults([]);
+                          if (multipleFileInputRef.current) {
+                            multipleFileInputRef.current.value = "";
+                          }
+                        }}
+                        className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
+                      >
+                        🔄 Chọn lại
+                      </button>
+                      <button
+                        onClick={submitMultipleFaceRegistration}
+                        disabled={
+                          faceRegistrationLoading || multipleFiles.length === 0
+                        }
+                        className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {faceRegistrationLoading
+                          ? "⏳ Đang xử lý..."
+                          : `✅ Đăng ký ${multipleFiles.length} ảnh`}
+                      </button>
+                    </div>
+
+                    {multipleResults.length > 0 && (
+                      <div className="p-3 mt-4 bg-gray-50 rounded">
+                        <h6 className="mb-2 font-medium">Kết quả:</h6>
+                        <div className="space-y-1 text-sm">
+                          {multipleResults.map((result, index) => (
+                            <div
+                              key={index}
+                              className={`flex items-center gap-2 ${
+                                result.success
+                                  ? "text-green-700"
+                                  : "text-red-700"
+                              }`}
+                            >
+                              <span>{result.success ? "✅" : "❌"}</span>
+                              <span>{result.message}</span>
+                              {result.detection_score && (
+                                <span className="text-xs text-gray-500">
+                                  ({(result.detection_score * 100).toFixed(1)}%)
+                                </span>
                               )}
                             </div>
                           ))}
                         </div>
-                        
-                        <div className="mt-4 space-x-2 text-center">
-                          <button
-                            onClick={() => {
-                              multipleFiles.forEach(file => URL.revokeObjectURL(file.previewUrl));
-                              setMultipleFiles([]);
-                              setMultipleResults([]);
-                              if (multipleFileInputRef.current) {
-                                multipleFileInputRef.current.value = '';
-                              }
-                            }}
-                            className="px-4 py-2 text-white bg-gray-500 rounded-md hover:bg-gray-600"
-                          >
-                            🔄 Chọn lại
-                          </button>
-                          <button
-                            onClick={submitMultipleFaceRegistration}
-                            disabled={faceRegistrationLoading || multipleFiles.length === 0}
-                            className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
-                          >
-                            {faceRegistrationLoading ? '⏳ Đang xử lý...' : `✅ Đăng ký ${multipleFiles.length} ảnh`}
-                          </button>
-                        </div>
-                        
-                        {multipleResults.length > 0 && (
-                          <div className="p-3 mt-4 bg-gray-50 rounded">
-                            <h6 className="mb-2 font-medium">Kết quả:</h6>
-                            <div className="space-y-1 text-sm">
-                              {multipleResults.map((result, index) => (
-                                <div key={index} className={`flex items-center gap-2 ${
-                                  result.success ? 'text-green-700' : 'text-red-700'
-                                }`}>
-                                  <span>{result.success ? '✅' : '❌'}</span>
-                                  <span>{result.message}</span>
-                                  {result.detection_score && (
-                                    <span className="text-xs text-gray-500">
-                                      ({(result.detection_score * 100).toFixed(1)}%)
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
-          </DialogContent>
-        </Dialog>
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+        </DialogContent>
+      </Dialog>
 
       {/* Summary */}
       <div className="p-4 mt-6 bg-gray-50 rounded-lg">
@@ -1898,14 +2139,18 @@ const StudentList = () => {
           {showInactive && ` (chỉ hiển thị học sinh đã xóa)`}
         </p>
         <p className="mt-1 text-xs text-gray-500">
-          Tổng: {students.filter(s => s.is_active !== false).length} học sinh đang hoạt động, 
-          {students.filter(s => s.is_active === false).length} học sinh đã xóa
+          Tổng: {students.filter((s) => s.is_active !== false).length} học sinh
+          đang hoạt động,
+          {students.filter((s) => s.is_active === false).length} học sinh đã xóa
         </p>
       </div>
 
       {/* Edit Student Modal */}
       {showEditModal && selectedStudentForEdit && (
-        <Dialog open={showEditModal} onOpenChange={(open) => !open && closeEditModal()}>
+        <Dialog
+          open={showEditModal}
+          onOpenChange={(open) => !open && closeEditModal()}
+        >
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Sửa thông tin học sinh</DialogTitle>
@@ -1920,7 +2165,7 @@ const StudentList = () => {
                   </label>
                   <input
                     type="text"
-                    value={selectedStudentForEdit.student_id || ''}
+                    value={selectedStudentForEdit.student_id || ""}
                     className="px-3 py-2 w-full text-gray-500 bg-gray-50 rounded-lg border border-gray-300"
                     readOnly
                   />
@@ -1932,8 +2177,10 @@ const StudentList = () => {
                   </label>
                   <input
                     type="text"
-                    value={editForm.full_name || ''}
-                    onChange={(e) => handleEditFormChange('full_name', e.target.value)}
+                    value={editForm.full_name || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("full_name", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Nguyễn Văn An"
                   />
@@ -1945,8 +2192,10 @@ const StudentList = () => {
                   </label>
                   <input
                     type="email"
-                    value={editForm.email || ''}
-                    onChange={(e) => handleEditFormChange('email', e.target.value)}
+                    value={editForm.email || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("email", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: student@example.com"
                   />
@@ -1958,8 +2207,10 @@ const StudentList = () => {
                   </label>
                   <input
                     type="tel"
-                    value={editForm.phone || ''}
-                    onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                    value={editForm.phone || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("phone", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0123456789"
                   />
@@ -1971,8 +2222,10 @@ const StudentList = () => {
                   </label>
                   <input
                     type="text"
-                    value={editForm.class_name || ''}
-                    onChange={(e) => handleEditFormChange('class_name', e.target.value)}
+                    value={editForm.class_name || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("class_name", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 10A1"
                   />
@@ -1983,8 +2236,10 @@ const StudentList = () => {
                     Khối
                   </label>
                   <select
-                    value={editForm.grade || ''}
-                    onChange={(e) => handleEditFormChange('grade', e.target.value)}
+                    value={editForm.grade || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("grade", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Chọn khối</option>
@@ -1999,8 +2254,10 @@ const StudentList = () => {
                     Giới tính
                   </label>
                   <select
-                    value={editForm.gender || 'Nam'}
-                    onChange={(e) => handleEditFormChange('gender', e.target.value)}
+                    value={editForm.gender || "Nam"}
+                    onChange={(e) =>
+                      handleEditFormChange("gender", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="Nam">Nam</option>
@@ -2015,8 +2272,10 @@ const StudentList = () => {
                   </label>
                   <input
                     type="date"
-                    value={editForm.date_of_birth || ''}
-                    onChange={(e) => handleEditFormChange('date_of_birth', e.target.value)}
+                    value={editForm.date_of_birth || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("date_of_birth", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -2027,8 +2286,10 @@ const StudentList = () => {
                   </label>
                   <input
                     type="text"
-                    value={editForm.parent_name || ''}
-                    onChange={(e) => handleEditFormChange('parent_name', e.target.value)}
+                    value={editForm.parent_name || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("parent_name", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Nguyễn Văn Bình"
                   />
@@ -2040,8 +2301,10 @@ const StudentList = () => {
                   </label>
                   <input
                     type="tel"
-                    value={editForm.parent_phone || ''}
-                    onChange={(e) => handleEditFormChange('parent_phone', e.target.value)}
+                    value={editForm.parent_phone || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("parent_phone", e.target.value)
+                    }
                     className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0987654321"
                   />
@@ -2053,8 +2316,10 @@ const StudentList = () => {
                   Địa chỉ
                 </label>
                 <textarea
-                  value={editForm.address || ''}
-                  onChange={(e) => handleEditFormChange('address', e.target.value)}
+                  value={editForm.address || ""}
+                  onChange={(e) =>
+                    handleEditFormChange("address", e.target.value)
+                  }
                   rows={3}
                   className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
@@ -2062,9 +2327,19 @@ const StudentList = () => {
               </div>
 
               <div className="flex justify-end pt-4 space-x-3 border-t border-gray-200">
-                <Button type="button" variant="outline" onClick={closeEditModal}>Hủy</Button>
-                <Button type="button" onClick={submitEditForm} disabled={editLoading}>
-                  {editLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeEditModal}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitEditForm}
+                  disabled={editLoading}
+                >
+                  {editLoading ? "Đang lưu..." : "Lưu thay đổi"}
                 </Button>
               </div>
             </form>
@@ -2088,14 +2363,20 @@ const StudentList = () => {
 
       {/* Student Grades Modal */}
       {showGradesModal && selectedStudentForGrades && (
-        <Dialog open={showGradesModal} onOpenChange={(open) => !open && closeGradesModal()}>
+        <Dialog
+          open={showGradesModal}
+          onOpenChange={(open) => !open && closeGradesModal()}
+        >
           <DialogContent className="max-w-6xl">
             <DialogHeader>
               <DialogTitle className="flex gap-2 items-center">
                 <BarChart3 className="w-5 h-5 text-primary" /> Bảng điểm
               </DialogTitle>
               <DialogDescription>
-                {selectedStudentForGrades.full_name} - {selectedStudentForGrades.student_id} | Lớp {selectedStudentForGrades.class_name} - Khối {selectedStudentForGrades.grade}
+                {selectedStudentForGrades.full_name} -{" "}
+                {selectedStudentForGrades.student_id} | Lớp{" "}
+                {selectedStudentForGrades.class_name} - Khối{" "}
+                {selectedStudentForGrades.grade}
               </DialogDescription>
             </DialogHeader>
 
@@ -2104,7 +2385,9 @@ const StudentList = () => {
               {gradesLoading ? (
                 <div className="flex justify-center items-center h-64">
                   <div className="w-16 h-16 rounded-full border-b-2 border-purple-600 animate-spin"></div>
-                  <span className="ml-4 text-lg text-gray-600">Đang tải điểm số...</span>
+                  <span className="ml-4 text-lg text-gray-600">
+                    Đang tải điểm số...
+                  </span>
                 </div>
               ) : studentGrades.length === 0 ? (
                 <div className="py-12 text-center">
@@ -2122,12 +2405,16 @@ const StudentList = () => {
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="font-medium text-gray-900">Năm học: 2024-2025</h4>
+                        <h4 className="font-medium text-gray-900">
+                          Năm học: 2024-2025
+                        </h4>
                         <p className="text-sm text-gray-600">Học kỳ: HK1</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-600">Tổng số môn học</p>
-                        <p className="text-2xl font-bold text-purple-600">{studentGrades.length}</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {studentGrades.length}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -2157,7 +2444,9 @@ const StudentList = () => {
                             <td className="px-6 py-4">
                               <div className="flex items-center">
                                 <div className="flex justify-center items-center w-10 h-10 text-sm font-bold rounded-full text-primary-foreground bg-primary">
-                                  {gradeRecord.subject_name?.charAt(0)?.toUpperCase() || '?'}
+                                  {gradeRecord.subject_name
+                                    ?.charAt(0)
+                                    ?.toUpperCase() || "?"}
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900">
@@ -2169,79 +2458,115 @@ const StudentList = () => {
                                 </div>
                               </div>
                             </td>
-                            
+
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-900">
-                                {gradeRecord.teacher_name || 'Chưa có thông tin'}
+                                {gradeRecord.teacher_name ||
+                                  "Chưa có thông tin"}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {gradeRecord.academic_year} - {gradeRecord.semester}
+                                {gradeRecord.academic_year} -{" "}
+                                {gradeRecord.semester}
                               </div>
                             </td>
-                            
+
                             <td className="px-6 py-4">
                               <div className="flex flex-wrap gap-2 justify-center">
-                                {gradeRecord.grade_data && (() => {
-                                  // Sắp xếp các cột điểm theo: trọng số tăng dần, rồi theo giai đoạn (thường xuyên -> giữa kì -> cuối kì)
-                                  const getPriority = (name) => {
-                                    const s = String(name || '').toLowerCase();
-                                    if (s.includes('thuong')) return 0; // thường xuyên
-                                    if (s.includes('giua')) return 1;   // giữa kì
-                                    if (s.includes('cuoi') || s.includes('hk') || s.includes('final')) return 2; // cuối kì
-                                    return 99;
-                                  };
-                                  const keys = Object.keys(gradeRecord.grade_data)
-                                    .filter(key => key !== 'Mon_hoc' && gradeRecord.grade_data[key]?.Diem)
-                                    .sort((a, b) => {
-                                      const wa = Number(gradeRecord.grade_data[a]?.He_so ?? 1);
-                                      const wb = Number(gradeRecord.grade_data[b]?.He_so ?? 1);
-                                      if (wa !== wb) return wa - wb;
-                                      return getPriority(a) - getPriority(b);
-                                    });
-                                  const LABEL_MAP = {
-                                    'Diem_thuong_xuyen': 'Điểm thường xuyên',
-                                    'Diem_thi_giua_ki': 'Điểm thi giữa kì',
-                                    'Diem_thi_cuoi_ki': 'Điểm thi cuối kì'
-                                  };
-                                  const formatLabel = (key) => {
-                                    if (LABEL_MAP[key]) return LABEL_MAP[key];
-                                    // Fallback: chuyển đổi gần đúng từ khóa ASCII sang có dấu
-                                    let text = String(key || '').replace(/_/g, ' ');
-                                    text = text.replace(/Diem/g, 'Điểm');
-                                    text = text.replace(/thuong/g, 'thường');
-                                    text = text.replace(/xuyen/g, 'xuyên');
-                                    text = text.replace(/giua/g, 'giữa');
-                                    text = text.replace(/cuoi/g, 'cuối');
-                                    text = text.replace(/ki\b/g, 'kì');
-                                    return text;
-                                  };
-                                  return keys.map(columnName => (
-                                  <div key={columnName} className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-200">
-                                    <div className="text-xs font-medium text-blue-600">
-                                      {formatLabel(columnName)}
-                                    </div>
-                                    <div className="text-sm font-bold text-blue-800">
-                                      {gradeRecord.grade_data[columnName]?.Diem}
-                                      <span className="ml-1 text-xs text-blue-600">
-                                        (HS: {gradeRecord.grade_data[columnName]?.He_so})
-                                      </span>
-                                    </div>
-                                  </div>
-                                  ));
-                                })()}
+                                {gradeRecord.grade_data &&
+                                  (() => {
+                                    // Sắp xếp các cột điểm theo: trọng số tăng dần, rồi theo giai đoạn (thường xuyên -> giữa kì -> cuối kì)
+                                    const getPriority = (name) => {
+                                      const s = String(
+                                        name || ""
+                                      ).toLowerCase();
+                                      if (s.includes("thuong")) return 0; // thường xuyên
+                                      if (s.includes("giua")) return 1; // giữa kì
+                                      if (
+                                        s.includes("cuoi") ||
+                                        s.includes("hk") ||
+                                        s.includes("final")
+                                      )
+                                        return 2; // cuối kì
+                                      return 99;
+                                    };
+                                    const keys = Object.keys(
+                                      gradeRecord.grade_data
+                                    )
+                                      .filter(
+                                        (key) =>
+                                          key !== "Mon_hoc" &&
+                                          gradeRecord.grade_data[key]?.Diem
+                                      )
+                                      .sort((a, b) => {
+                                        const wa = Number(
+                                          gradeRecord.grade_data[a]?.He_so ?? 1
+                                        );
+                                        const wb = Number(
+                                          gradeRecord.grade_data[b]?.He_so ?? 1
+                                        );
+                                        if (wa !== wb) return wa - wb;
+                                        return getPriority(a) - getPriority(b);
+                                      });
+                                    const LABEL_MAP = {
+                                      Diem_thuong_xuyen: "Điểm thường xuyên",
+                                      Diem_thi_giua_ki: "Điểm thi giữa kì",
+                                      Diem_thi_cuoi_ki: "Điểm thi cuối kì",
+                                    };
+                                    const formatLabel = (key) => {
+                                      if (LABEL_MAP[key]) return LABEL_MAP[key];
+                                      // Fallback: chuyển đổi gần đúng từ khóa ASCII sang có dấu
+                                      let text = String(key || "").replace(
+                                        /_/g,
+                                        " "
+                                      );
+                                      text = text.replace(/Diem/g, "Điểm");
+                                      text = text.replace(/thuong/g, "thường");
+                                      text = text.replace(/xuyen/g, "xuyên");
+                                      text = text.replace(/giua/g, "giữa");
+                                      text = text.replace(/cuoi/g, "cuối");
+                                      text = text.replace(/ki\b/g, "kì");
+                                      return text;
+                                    };
+                                    return keys.map((columnName) => (
+                                      <div
+                                        key={columnName}
+                                        className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-200"
+                                      >
+                                        <div className="text-xs font-medium text-blue-600">
+                                          {formatLabel(columnName)}
+                                        </div>
+                                        <div className="text-sm font-bold text-blue-800">
+                                          {
+                                            gradeRecord.grade_data[columnName]
+                                              ?.Diem
+                                          }
+                                          <span className="ml-1 text-xs text-blue-600">
+                                            (HS:{" "}
+                                            {
+                                              gradeRecord.grade_data[columnName]
+                                                ?.He_so
+                                            }
+                                            )
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ));
+                                  })()}
                               </div>
                             </td>
-                            
+
                             <td className="px-6 py-4 text-center">
-                              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                gradeRecord.final_grade >= 8.0 
-                                  ? 'bg-green-100 text-green-800'
-                                  : gradeRecord.final_grade >= 6.5
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : gradeRecord.final_grade >= 5.0
-                                  ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
+                              <div
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                  gradeRecord.final_grade >= 8.0
+                                    ? "bg-green-100 text-green-800"
+                                    : gradeRecord.final_grade >= 6.5
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : gradeRecord.final_grade >= 5.0
+                                    ? "bg-orange-100 text-orange-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
                                 {gradeRecord.final_grade}
                               </div>
                             </td>
@@ -2258,24 +2583,41 @@ const StudentList = () => {
                     </h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="text-center">
-                        <p className="text-sm text-gray-600">Điểm trung bình chung</p>
+                        <p className="text-sm text-gray-600">
+                          Điểm trung bình chung
+                        </p>
                         <p className="text-2xl font-bold text-purple-600">
-                          {studentGrades.length > 0 
-                            ? (studentGrades.reduce((sum, grade) => sum + (grade.final_grade || 0), 0) / studentGrades.length).toFixed(2)
-                            : '0.00'
-                          }
+                          {studentGrades.length > 0
+                            ? (
+                                studentGrades.reduce(
+                                  (sum, grade) =>
+                                    sum + (grade.final_grade || 0),
+                                  0
+                                ) / studentGrades.length
+                              ).toFixed(2)
+                            : "0.00"}
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-sm text-gray-600">Số môn &gt;= 8.0</p>
+                        <p className="text-sm text-gray-600">
+                          Số môn &gt;= 8.0
+                        </p>
                         <p className="text-2xl font-bold text-green-600">
-                          {studentGrades.filter(grade => (grade.final_grade || 0) >= 8.0).length}
+                          {
+                            studentGrades.filter(
+                              (grade) => (grade.final_grade || 0) >= 8.0
+                            ).length
+                          }
                         </p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Số môn &lt; 5.0</p>
                         <p className="text-2xl font-bold text-red-600">
-                          {studentGrades.filter(grade => (grade.final_grade || 0) < 5.0).length}
+                          {
+                            studentGrades.filter(
+                              (grade) => (grade.final_grade || 0) < 5.0
+                            ).length
+                          }
                         </p>
                       </div>
                     </div>
@@ -2287,7 +2629,9 @@ const StudentList = () => {
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
               <div className="flex justify-end">
-                <Button variant="secondary" onClick={closeGradesModal}>Đóng</Button>
+                <Button variant="secondary" onClick={closeGradesModal}>
+                  Đóng
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -2296,14 +2640,21 @@ const StudentList = () => {
 
       {/* Feedback Modal */}
       {showFeedbackModal && selectedStudentForFeedback && (
-        <Dialog open={showFeedbackModal} onOpenChange={(open) => !open && closeFeedbackModal()}>
+        <Dialog
+          open={showFeedbackModal}
+          onOpenChange={(open) => !open && closeFeedbackModal()}
+        >
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex gap-2 items-center">
-                <MessageCircle className="w-5 h-5 text-primary" /> Tạo nhận xét học sinh
+                <MessageCircle className="w-5 h-5 text-primary" /> Tạo nhận xét
+                học sinh
               </DialogTitle>
               <DialogDescription>
-                {selectedStudentForFeedback.full_name} - {selectedStudentForFeedback.student_id} | Lớp {selectedStudentForFeedback.class_name} - Khối {selectedStudentForFeedback.grade}
+                {selectedStudentForFeedback.full_name} -{" "}
+                {selectedStudentForFeedback.student_id} | Lớp{" "}
+                {selectedStudentForFeedback.class_name} - Khối{" "}
+                {selectedStudentForFeedback.grade}
               </DialogDescription>
             </DialogHeader>
 
@@ -2327,7 +2678,9 @@ const StudentList = () => {
                   <div className="flex">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <div className="ml-3">
-                      <p className="text-sm text-green-800">Tạo nhận xét thành công!</p>
+                      <p className="text-sm text-green-800">
+                        Tạo nhận xét thành công!
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2337,19 +2690,29 @@ const StudentList = () => {
                 {/* Input Form */}
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">Thông Tin Học Sinh</h3>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Thông Tin Học Sinh
+                    </h3>
                   </div>
                   <div className="px-6 py-4 space-y-4">
                     {/* Student Name */}
                     <div>
-                      <label htmlFor="student_name" className="block mb-1 text-sm font-medium text-gray-700">
+                      <label
+                        htmlFor="student_name"
+                        className="block mb-1 text-sm font-medium text-gray-700"
+                      >
                         Tên Học Sinh
                       </label>
                       <input
                         id="student_name"
                         type="text"
                         value={feedbackForm.student_name}
-                        onChange={(e) => handleFeedbackFormChange('student_name', e.target.value)}
+                        onChange={(e) =>
+                          handleFeedbackFormChange(
+                            "student_name",
+                            e.target.value
+                          )
+                        }
                         placeholder="Nhập tên học sinh"
                         className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                         readOnly
@@ -2358,7 +2721,10 @@ const StudentList = () => {
 
                     {/* Score */}
                     <div>
-                      <label htmlFor="score" className="block mb-1 text-sm font-medium text-gray-700">
+                      <label
+                        htmlFor="score"
+                        className="block mb-1 text-sm font-medium text-gray-700"
+                      >
                         Điểm Số (0-10)
                       </label>
                       <input
@@ -2368,7 +2734,9 @@ const StudentList = () => {
                         max="10"
                         step="0.1"
                         value={feedbackForm.score}
-                        onChange={(e) => handleFeedbackFormChange('score', e.target.value)}
+                        onChange={(e) =>
+                          handleFeedbackFormChange("score", e.target.value)
+                        }
                         placeholder="8.5"
                         className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                       />
@@ -2376,7 +2744,10 @@ const StudentList = () => {
 
                     {/* Score Trend */}
                     <div>
-                      <label htmlFor="score_trend" className="block mb-1 text-sm font-medium text-gray-700">
+                      <label
+                        htmlFor="score_trend"
+                        className="block mb-1 text-sm font-medium text-gray-700"
+                      >
                         Xu Hướng Điểm Số
                         {trendLoading && (
                           <span className="ml-2 text-xs text-blue-600">
@@ -2388,7 +2759,12 @@ const StudentList = () => {
                       <select
                         id="score_trend"
                         value={feedbackForm.score_trend}
-                        onChange={(e) => handleFeedbackFormChange('score_trend', e.target.value)}
+                        onChange={(e) =>
+                          handleFeedbackFormChange(
+                            "score_trend",
+                            e.target.value
+                          )
+                        }
                         className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                         disabled={trendLoading}
                       >
@@ -2397,29 +2773,41 @@ const StudentList = () => {
                         <option value="giảm">Giảm</option>
                         <option value="ổn định">Ổn định</option>
                       </select>
-                      
+
                       {/* Grade Trend Analysis Result */}
                       {gradeTrendData && (
-                        <div className="p-3 mt-2 rounded-md border" style={{ backgroundColor: gradeTrendData.color + '10', borderColor: gradeTrendData.color + '40' }}>
+                        <div
+                          className="p-3 mt-2 rounded-md border"
+                          style={{
+                            backgroundColor: gradeTrendData.color + "10",
+                            borderColor: gradeTrendData.color + "40",
+                          }}
+                        >
                           <div className="flex justify-between items-center">
                             <div className="flex items-center space-x-2">
-                              <span 
+                              <span
                                 className="px-2 py-1 text-xs font-medium text-white rounded-full"
-                                style={{ backgroundColor: gradeTrendData.color }}
+                                style={{
+                                  backgroundColor: gradeTrendData.color,
+                                }}
                               >
                                 {gradeTrendData.label}
                               </span>
                               <span className="text-xs text-gray-600">
-                                Độ tin cậy: {Math.round(gradeTrendData.confidence * 100)}%
+                                Độ tin cậy:{" "}
+                                {Math.round(gradeTrendData.confidence * 100)}%
                               </span>
                             </div>
                           </div>
-                          <p className="mt-2 text-sm" style={{ color: gradeTrendData.color }}>
+                          <p
+                            className="mt-2 text-sm"
+                            style={{ color: gradeTrendData.color }}
+                          >
                             {gradeTrendData.reason}
                           </p>
                         </div>
                       )}
-                      
+
                       {/* Trend Error */}
                       {trendError && (
                         <div className="p-2 mt-2 text-xs text-red-600 bg-red-50 rounded border border-red-200">
@@ -2430,7 +2818,10 @@ const StudentList = () => {
 
                     {/* Attendance Rate */}
                     <div>
-                      <label htmlFor="attendance_rate" className="block mb-1 text-sm font-medium text-gray-700">
+                      <label
+                        htmlFor="attendance_rate"
+                        className="block mb-1 text-sm font-medium text-gray-700"
+                      >
                         Tỷ Lệ Chuyên Cần (%)
                       </label>
                       <input
@@ -2439,7 +2830,12 @@ const StudentList = () => {
                         min="0"
                         max="100"
                         value={feedbackForm.attendance_rate}
-                        onChange={(e) => handleFeedbackFormChange('attendance_rate', e.target.value)}
+                        onChange={(e) =>
+                          handleFeedbackFormChange(
+                            "attendance_rate",
+                            e.target.value
+                          )
+                        }
                         placeholder="95"
                         className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                       />
@@ -2447,13 +2843,18 @@ const StudentList = () => {
 
                     {/* Notes */}
                     <div>
-                      <label htmlFor="notes" className="block mb-1 text-sm font-medium text-gray-700">
+                      <label
+                        htmlFor="notes"
+                        className="block mb-1 text-sm font-medium text-gray-700"
+                      >
                         Ghi Chú Thêm (Tùy chọn)
                       </label>
                       <textarea
                         id="notes"
                         value={feedbackForm.notes}
-                        onChange={(e) => handleFeedbackFormChange('notes', e.target.value)}
+                        onChange={(e) =>
+                          handleFeedbackFormChange("notes", e.target.value)
+                        }
                         placeholder="Ví dụ: Học sinh rất tích cực tham gia hoạt động lớp..."
                         rows={3}
                         className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
@@ -2461,16 +2862,32 @@ const StudentList = () => {
                     </div>
 
                     {/* Generate Button */}
-                    <button 
-                      onClick={generateFeedback} 
+                    <button
+                      onClick={generateFeedback}
                       disabled={feedbackLoading}
                       className="flex justify-center items-center px-4 py-2 w-full font-medium text-white bg-indigo-600 rounded-md transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
                     >
                       {feedbackLoading ? (
                         <>
-                          <svg className="mr-2 -ml-1 w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <svg
+                            className="mr-2 -ml-1 w-4 h-4 text-white animate-spin"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
                           </svg>
                           Đang tạo...
                         </>
@@ -2487,7 +2904,9 @@ const StudentList = () => {
                 {/* Result Display */}
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">Nhận Xét Được Tạo</h3>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Nhận Xét Được Tạo
+                    </h3>
                   </div>
                   <div className="px-6 py-4">
                     {generatedFeedback ? (
@@ -2505,32 +2924,49 @@ const StudentList = () => {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* SMS Button */}
-                        <button 
+                        <button
                           onClick={sendSMS}
                           disabled={smsLoading}
                           className="flex justify-center items-center px-4 py-2 w-full font-medium text-white bg-green-600 rounded-md transition-colors hover:bg-green-700 disabled:bg-gray-400"
                         >
                           {smsLoading ? (
                             <>
-                              <svg className="mr-2 -ml-1 w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              <svg
+                                className="mr-2 -ml-1 w-4 h-4 text-white animate-spin"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                ></circle>
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
                               </svg>
                               Đang gửi...
                             </>
                           ) : (
-                            <>
-                              📱 Gửi SMS cho phụ huynh
-                            </>
+                            <>📱 Gửi SMS cho phụ huynh</>
                           )}
                         </button>
                       </div>
                     ) : (
                       <div className="py-12 text-center text-gray-500">
                         <MessageCircle className="mx-auto mb-4 w-12 h-12 text-indigo-400" />
-                        <p>Nhấn "Tạo nhận xét" để AI tự động tạo nhận xét cho học sinh</p>
+                        <p>
+                          Nhấn "Tạo nhận xét" để AI tự động tạo nhận xét cho học
+                          sinh
+                        </p>
                       </div>
                     )}
                   </div>
@@ -2541,7 +2977,9 @@ const StudentList = () => {
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
               <div className="flex justify-end">
-                <Button variant="secondary" onClick={closeFeedbackModal}>Đóng</Button>
+                <Button variant="secondary" onClick={closeFeedbackModal}>
+                  Đóng
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -2550,14 +2988,20 @@ const StudentList = () => {
 
       {/* Subject Selection Modal */}
       {showSubjectModal && selectedStudentForSubject && (
-        <Dialog open={showSubjectModal} onOpenChange={(open) => !open && closeSubjectModal()}>
+        <Dialog
+          open={showSubjectModal}
+          onOpenChange={(open) => !open && closeSubjectModal()}
+        >
           <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle className="flex gap-2 items-center">
                 <BookOpen className="w-5 h-5 text-primary" /> Chọn môn học
               </DialogTitle>
               <DialogDescription>
-                {selectedStudentForSubject.full_name} - {selectedStudentForSubject.student_id} | Lớp {selectedStudentForSubject.class_name} - Khối {selectedStudentForSubject.grade}
+                {selectedStudentForSubject.full_name} -{" "}
+                {selectedStudentForSubject.student_id} | Lớp{" "}
+                {selectedStudentForSubject.class_name} - Khối{" "}
+                {selectedStudentForSubject.grade}
               </DialogDescription>
             </DialogHeader>
 
@@ -2567,34 +3011,50 @@ const StudentList = () => {
                 {/* Core Subjects */}
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="flex gap-2 items-center text-lg font-medium text-gray-900">
-                    <BookOpen className="w-5 h-5 text-blue-600" /> Môn học chính (3 môn)
-                  </h3>
-                    <p className="text-sm text-gray-600">Bắt buộc: Toán, Văn, Anh</p>
+                    <h3 className="flex gap-2 items-center text-lg font-medium text-gray-900">
+                      <BookOpen className="w-5 h-5 text-blue-600" /> Môn học
+                      chính (3 môn)
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Bắt buộc: Toán, Văn, Anh
+                    </p>
                   </div>
                   <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
                     {availableSubjects
-                      .filter(subject => ['TOAN', 'VAN', 'ANH'].includes(subject.subject_code))
+                      .filter((subject) =>
+                        ["TOAN", "VAN", "ANH"].includes(subject.subject_code)
+                      )
                       .map((subject) => (
-                      <label key={subject.subject_code} className="flex items-center space-x-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedSubjects.core_subjects.includes(subject.subject_code)}
-                          onChange={() => toggleSubjectSelection(subject.subject_code, 'core_subjects')}
-                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm font-medium text-gray-900">
-                          {subject.subject_name} ({subject.subject_code})
-                        </span>
-                        {selectedSubjects.core_subjects.includes(subject.subject_code) && (
-                          <Check className="w-4 h-4 text-blue-600" />
-                        )}
-                      </label>
-                    ))}
+                        <label
+                          key={subject.subject_code}
+                          className="flex items-center space-x-3 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedSubjects.core_subjects.includes(
+                              subject.subject_code
+                            )}
+                            onChange={() =>
+                              toggleSubjectSelection(
+                                subject.subject_code,
+                                "core_subjects"
+                              )
+                            }
+                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium text-gray-900">
+                            {subject.subject_name} ({subject.subject_code})
+                          </span>
+                          {selectedSubjects.core_subjects.includes(
+                            subject.subject_code
+                          ) && <Check className="w-4 h-4 text-blue-600" />}
+                        </label>
+                      ))}
                   </div>
                   <div className="px-6 py-3 bg-blue-50 border-t border-gray-200">
                     <p className="text-xs text-blue-700">
-                      Đã chọn: {selectedSubjects.core_subjects.length}/3 môn chính
+                      Đã chọn: {selectedSubjects.core_subjects.length}/3 môn
+                      chính
                     </p>
                   </div>
                 </div>
@@ -2603,33 +3063,50 @@ const StudentList = () => {
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-200">
                     <h3 className="flex gap-2 items-center text-lg font-medium text-gray-900">
-                      <Target className="w-5 h-5 text-green-600" /> Môn tự chọn (3 môn)
+                      <Target className="w-5 h-5 text-green-600" /> Môn tự chọn
+                      (3 môn)
                     </h3>
-                    <p className="text-sm text-gray-600">Chọn 3 môn từ danh sách</p>
+                    <p className="text-sm text-gray-600">
+                      Chọn 3 môn từ danh sách
+                    </p>
                   </div>
                   <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
                     {availableSubjects
-                      .filter(subject => !['TOAN', 'VAN', 'ANH'].includes(subject.subject_code))
+                      .filter(
+                        (subject) =>
+                          !["TOAN", "VAN", "ANH"].includes(subject.subject_code)
+                      )
                       .map((subject) => (
-                      <label key={subject.subject_code} className="flex items-center space-x-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedSubjects.elective_subjects.includes(subject.subject_code)}
-                          onChange={() => toggleSubjectSelection(subject.subject_code, 'elective_subjects')}
-                          className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
-                        />
-                        <span className="text-sm font-medium text-gray-900">
-                          {subject.subject_name} ({subject.subject_code})
-                        </span>
-                        {selectedSubjects.elective_subjects.includes(subject.subject_code) && (
-                          <Check className="w-4 h-4 text-green-600" />
-                        )}
-                      </label>
-                    ))}
+                        <label
+                          key={subject.subject_code}
+                          className="flex items-center space-x-3 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedSubjects.elective_subjects.includes(
+                              subject.subject_code
+                            )}
+                            onChange={() =>
+                              toggleSubjectSelection(
+                                subject.subject_code,
+                                "elective_subjects"
+                              )
+                            }
+                            className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                          />
+                          <span className="text-sm font-medium text-gray-900">
+                            {subject.subject_name} ({subject.subject_code})
+                          </span>
+                          {selectedSubjects.elective_subjects.includes(
+                            subject.subject_code
+                          ) && <Check className="w-4 h-4 text-green-600" />}
+                        </label>
+                      ))}
                   </div>
                   <div className="px-6 py-3 bg-green-50 border-t border-gray-200">
                     <p className="text-xs text-green-700">
-                      Đã chọn: {selectedSubjects.elective_subjects.length}/3 môn tự chọn
+                      Đã chọn: {selectedSubjects.elective_subjects.length}/3 môn
+                      tự chọn
                     </p>
                   </div>
                 </div>
@@ -2638,25 +3115,28 @@ const StudentList = () => {
               {/* Current Selection Summary */}
               <div className="p-4 mt-6 bg-gray-50 rounded-lg">
                 <h4 className="flex gap-2 items-center mb-3 font-medium text-gray-900">
-                  <ClipboardList className="w-5 h-5 text-gray-700" /> Tóm tắt lựa chọn:
+                  <ClipboardList className="w-5 h-5 text-gray-700" /> Tóm tắt
+                  lựa chọn:
                 </h4>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <p className="text-sm font-medium text-blue-700">Môn chính:</p>
+                    <p className="text-sm font-medium text-blue-700">
+                      Môn chính:
+                    </p>
                     <p className="text-sm text-gray-600">
-                      {selectedSubjects.core_subjects.length > 0 
-                        ? selectedSubjects.core_subjects.join(', ') 
-                        : 'Chưa chọn môn nào'
-                      }
+                      {selectedSubjects.core_subjects.length > 0
+                        ? selectedSubjects.core_subjects.join(", ")
+                        : "Chưa chọn môn nào"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-green-700">Môn tự chọn:</p>
+                    <p className="text-sm font-medium text-green-700">
+                      Môn tự chọn:
+                    </p>
                     <p className="text-sm text-gray-600">
-                      {selectedSubjects.elective_subjects.length > 0 
-                        ? selectedSubjects.elective_subjects.join(', ') 
-                        : 'Chưa chọn môn nào'
-                      }
+                      {selectedSubjects.elective_subjects.length > 0
+                        ? selectedSubjects.elective_subjects.join(", ")
+                        : "Chưa chọn môn nào"}
                     </p>
                   </div>
                 </div>
@@ -2666,12 +3146,22 @@ const StudentList = () => {
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={closeSubjectModal}>Hủy</Button>
-                <Button onClick={saveSubjectSelection} disabled={subjectLoading || selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3}>
-                  {subjectLoading ? 'Đang lưu...' : 'Lưu môn học'}
+                <Button variant="outline" onClick={closeSubjectModal}>
+                  Hủy
+                </Button>
+                <Button
+                  onClick={saveSubjectSelection}
+                  disabled={
+                    subjectLoading ||
+                    selectedSubjects.core_subjects.length !== 3 ||
+                    selectedSubjects.elective_subjects.length !== 3
+                  }
+                >
+                  {subjectLoading ? "Đang lưu..." : "Lưu môn học"}
                 </Button>
               </div>
-              {selectedSubjects.core_subjects.length !== 3 || selectedSubjects.elective_subjects.length !== 3 ? (
+              {selectedSubjects.core_subjects.length !== 3 ||
+              selectedSubjects.elective_subjects.length !== 3 ? (
                 <p className="mt-2 text-xs text-center text-red-600">
                   ⚠️ Vui lòng chọn đúng 3 môn chính và 3 môn tự chọn
                 </p>
@@ -2684,4 +3174,4 @@ const StudentList = () => {
   );
 };
 
-export default StudentList; 
+export default StudentList;
