@@ -1323,198 +1323,194 @@ const ClassManagement = () => {
       </Dialog>
 
       {/* Edit Student Modal */}
-      {showEditModal && selectedStudentForEdit && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="overflow-y-auto p-6 mx-4 w-full max-w-2xl max-h-screen bg-white rounded-lg">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Sửa thông tin học sinh
-              </h3>
-              <button
-                onClick={closeEditModal}
-                className="text-2xl text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
-            </div>
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sửa thông tin học sinh</DialogTitle>
+            <DialogDescription>
+              Cập nhật thông tin học sinh trong hệ thống
+            </DialogDescription>
+          </DialogHeader>
 
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Mã học sinh (Không thể thay đổi)
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedStudentForEdit.student_id || ''}
-                    className="px-3 py-2 w-full text-gray-500 bg-gray-50 rounded-lg border border-gray-300"
-                    readOnly
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Họ và tên *
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.full_name || ''}
-                    onChange={(e) => handleEditFormChange('full_name', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: Nguyễn Văn An"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={editForm.email || ''}
-                    onChange={(e) => handleEditFormChange('email', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: student@example.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Số điện thoại
-                  </label>
-                  <input
-                    type="tel"
-                    value={editForm.phone || ''}
-                    onChange={(e) => handleEditFormChange('phone', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: 0123456789"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Lớp
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.class_name || ''}
-                    onChange={(e) => handleEditFormChange('class_name', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: 10A1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Khối
-                  </label>
-                  <select
-                    value={editForm.grade || ''}
-                    onChange={(e) => handleEditFormChange('grade', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Chọn khối</option>
-                    <option value="10">Khối 10</option>
-                    <option value="11">Khối 11</option>
-                    <option value="12">Khối 12</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Giới tính
-                  </label>
-                  <select
-                    value={editForm.gender || 'Nam'}
-                    onChange={(e) => handleEditFormChange('gender', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Nam">Nam</option>
-                    <option value="Nữ">Nữ</option>
-                    <option value="Khác">Khác</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Ngày sinh
-                  </label>
-                  <input
-                    type="date"
-                    value={editForm.date_of_birth || ''}
-                    onChange={(e) => handleEditFormChange('date_of_birth', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Tên phụ huynh
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.parent_name || ''}
-                    onChange={(e) => handleEditFormChange('parent_name', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: Nguyễn Văn Bố"
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700">
-                    Số điện thoại phụ huynh
-                  </label>
-                  <input
-                    type="tel"
-                    value={editForm.parent_phone || ''}
-                    onChange={(e) => handleEditFormChange('parent_phone', e.target.value)}
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: 0987654321"
-                  />
-                </div>
-              </div>
-
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-700">
-                  Địa chỉ
-                </label>
-                <textarea
-                  value={editForm.address || ''}
-                  onChange={(e) => handleEditFormChange('address', e.target.value)}
-                  rows={3}
-                  className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
+                <Label htmlFor="edit-student-id">
+                  Mã học sinh (Không thể thay đổi)
+                </Label>
+                <Input
+                  id="edit-student-id"
+                  type="text"
+                  value={selectedStudentForEdit?.student_id || ''}
+                  className="text-muted-foreground bg-muted"
+                  readOnly
                 />
               </div>
 
-              <div className="flex justify-end pt-4 space-x-3">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={submitEditForm}
-                  disabled={editLoading}
-                  className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {editLoading ? (
-                    <>
-                      <Loader2 className="mr-2 w-4 h-4 animate-spin" />
-                      Đang cập nhật...
-                    </>
-                  ) : (
-                    'Cập nhật'
-                  )}
-                </button>
+              <div>
+                <Label htmlFor="edit-full-name">
+                  Họ và tên *
+                </Label>
+                <Input
+                  id="edit-full-name"
+                  type="text"
+                  value={editForm.full_name || ''}
+                  onChange={(e) => handleEditFormChange('full_name', e.target.value)}
+                  placeholder="VD: Nguyễn Văn An"
+                />
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+
+              <div>
+                <Label htmlFor="edit-email">
+                  Email
+                </Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email || ''}
+                  onChange={(e) => handleEditFormChange('email', e.target.value)}
+                  placeholder="VD: student@example.com"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-phone">
+                  Số điện thoại
+                </Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  value={editForm.phone || ''}
+                  onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                  placeholder="VD: 0123456789"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-class-name">
+                  Lớp
+                </Label>
+                <Input
+                  id="edit-class-name"
+                  type="text"
+                  value={editForm.class_name || ''}
+                  onChange={(e) => handleEditFormChange('class_name', e.target.value)}
+                  placeholder="VD: 10A1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-grade">
+                  Khối
+                </Label>
+                <select
+                  id="edit-grade"
+                  value={editForm.grade || ''}
+                  onChange={(e) => handleEditFormChange('grade', e.target.value)}
+                  className="px-3 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                >
+                  <option value="">Chọn khối</option>
+                  <option value="10">Khối 10</option>
+                  <option value="11">Khối 11</option>
+                  <option value="12">Khối 12</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-gender">
+                  Giới tính
+                </Label>
+                <select
+                  id="edit-gender"
+                  value={editForm.gender || 'Nam'}
+                  onChange={(e) => handleEditFormChange('gender', e.target.value)}
+                  className="px-3 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                >
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-date-of-birth">
+                  Ngày sinh
+                </Label>
+                <Input
+                  id="edit-date-of-birth"
+                  type="date"
+                  value={editForm.date_of_birth || ''}
+                  onChange={(e) => handleEditFormChange('date_of_birth', e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-parent-name">
+                  Tên phụ huynh
+                </Label>
+                <Input
+                  id="edit-parent-name"
+                  type="text"
+                  value={editForm.parent_name || ''}
+                  onChange={(e) => handleEditFormChange('parent_name', e.target.value)}
+                  placeholder="VD: Nguyễn Văn Bố"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-parent-phone">
+                  Số điện thoại phụ huynh
+                </Label>
+                <Input
+                  id="edit-parent-phone"
+                  type="tel"
+                  value={editForm.parent_phone || ''}
+                  onChange={(e) => handleEditFormChange('parent_phone', e.target.value)}
+                  placeholder="VD: 0987654321"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-address">
+                Địa chỉ
+              </Label>
+              <textarea
+                id="edit-address"
+                value={editForm.address || ''}
+                onChange={(e) => handleEditFormChange('address', e.target.value)}
+                rows={3}
+                className="px-3 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeEditModal}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                onClick={submitEditForm}
+                disabled={editLoading}
+              >
+                {editLoading ? (
+                  <>
+                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    Đang cập nhật...
+                  </>
+                ) : (
+                  'Cập nhật'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
