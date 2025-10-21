@@ -774,6 +774,10 @@ async def get_students_by_grade(grade: str, db=Depends(get_db)):
 async def create_student(student_data: dict, db=Depends(get_db)):
     """Tạo học sinh mới"""
     try:
+        # Validate required fields
+        if not student_data.get('grade'):
+            raise HTTPException(status_code=400, detail="Trường 'grade' là bắt buộc")
+        
         data = {
             "student_id": student_data['student_id'],
             "full_name": student_data['full_name'],

@@ -1,0 +1,45 @@
+"""
+Pydantic models cho Feedback module
+"""
+
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+class StudentFeedbackRequest(BaseModel):
+    student_name: str = Field(..., description="Tên học sinh")
+    score: float = Field(..., ge=0, le=10, description="Điểm số (0-10)")
+    score_trend: str = Field(..., description="Xu hướng: tăng, giảm, ổn định")
+    attendance_rate: int = Field(..., ge=0, le=100, description="Tỷ lệ chuyên cần (%)")
+    notes: Optional[str] = Field(default="", description="Ghi chú thêm")
+
+class StudentFeedbackResponse(BaseModel):
+    success: bool
+    student_name: str
+    feedback: Optional[str] = None
+    error: Optional[str] = None
+
+class BatchFeedbackRequest(BaseModel):
+    students: List[StudentFeedbackRequest] = Field(..., description="Danh sách học sinh")
+
+class FeedbackResult(BaseModel):
+    student_name: str
+    feedback: str
+    success: bool
+    error: Optional[str] = None
+
+class BatchFeedbackResponse(BaseModel):
+    success: bool
+    success_count: int
+    failed_count: int
+    failed_students: List[str]
+    feedbacks: List[FeedbackResult]
+
+class SMSFeedbackRequest(BaseModel):
+    student_id: int = Field(..., description="ID học sinh")
+    feedback: str = Field(..., description="Nội dung nhận xét")
+    parent_phone: str = Field(..., description="Số điện thoại phụ huynh")
+
+class ResponseModel(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None

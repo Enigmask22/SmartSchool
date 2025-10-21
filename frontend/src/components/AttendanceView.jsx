@@ -1,12 +1,25 @@
-import React, { useState, useEffect, useContext } from 'react';
-import ApiService from '../services/api';
-import { AuthContext } from '../contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Users, CheckCircle, XCircle, Clock } from 'lucide-react';
+import React, { useState, useEffect, useContext } from "react";
+import ApiService from "../services/api";
+import { AuthContext } from "../contexts/AuthContext";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import { Users, CheckCircle, XCircle, Clock } from "lucide-react";
 
 const AttendanceView = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
@@ -14,25 +27,27 @@ const AttendanceView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
-  
+
   // Filter states
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
   const [classes, setClasses] = useState([]);
-  
+
   // Pagination
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
-  
+
   // Edit states
   const [editingRecord, setEditingRecord] = useState(null);
-  const [editStatus, setEditStatus] = useState('');
-  const [editNotes, setEditNotes] = useState('');
+  const [editStatus, setEditStatus] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const [updating, setUpdating] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
-  
+
   // View mode toggle
   const [showFullList, setShowFullList] = useState(true);
 
@@ -51,51 +66,80 @@ const AttendanceView = () => {
     loadClasses();
   }, []);
 
+  // Auto-select first class for homeroom teachers
+  useEffect(() => {
+    if (isHomeroomTeacher() && classes.length > 0 && !selectedClass) {
+      console.log(
+        "🎯 Auto-selecting first homeroom class for attendance:",
+        classes[0]
+      );
+      setSelectedClass(classes[0]);
+    }
+  }, [classes, isHomeroomTeacher, selectedClass]);
+
   const loadClasses = async () => {
     try {
-      console.log('📚 Loading classes for attendance filter...', {
+      console.log("📚 Loading classes for attendance filter...", {
         user,
         isHomeroomTeacher: isHomeroomTeacher(),
-        userRole: user?.role
+        userRole: user?.role,
       });
 
       let classesResponse;
-      
+
       if (isHomeroomTeacher()) {
-        console.log('📚 Fetching homeroom classes for attendance...');
+        console.log("📚 Fetching homeroom classes for attendance...");
         // If homeroom teacher, only get their homeroom classes
         classesResponse = await ApiService.getHomeroomClasses();
-        
+
         if (classesResponse.success && classesResponse.data) {
-          const classNames = classesResponse.data.map(cls => cls.class_name).sort();
-          console.log('📚 Setting homeroom classes:', classNames);
+          // Deduplicate class names using Set
+          const classNames = [
+            ...new Set(
+              classesResponse.data
+                .map((cls) => cls.class_name)
+                .filter((name) => name) // Remove null/undefined
+            ),
+          ].sort();
+          console.log("📚 Setting homeroom classes:", classNames);
           setClasses(classNames);
         } else {
-          console.warn('📚 Invalid homeroom classes response:', classesResponse);
+          console.warn(
+            "📚 Invalid homeroom classes response:",
+            classesResponse
+          );
           setClasses([]);
         }
       } else {
-        console.log('📚 Fetching all students to extract classes for admin...');
+        console.log("📚 Fetching all students to extract classes for admin...");
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
-        
+
         if (studentsResponse.success && studentsResponse.data) {
           // Extract unique class names from students
-          const uniqueClasses = [...new Set(
-            studentsResponse.data
-              .map(student => student.class_name)
-              .filter(className => className) // Remove null/undefined
-          )].sort();
-          
-          console.log('📚 Extracted unique classes from students:', uniqueClasses);
+          const uniqueClasses = [
+            ...new Set(
+              studentsResponse.data
+                .map((student) => student.class_name)
+                .filter((className) => className) // Remove null/undefined
+            ),
+          ].sort();
+
+          console.log(
+            "📚 Extracted unique classes from students:",
+            uniqueClasses
+          );
           setClasses(uniqueClasses);
         } else {
-          console.warn('📚 Invalid students response for classes:', studentsResponse);
+          console.warn(
+            "📚 Invalid students response for classes:",
+            studentsResponse
+          );
           setClasses([]);
         }
       }
     } catch (error) {
-      console.error('Error loading classes:', error);
+      console.error("Error loading classes:", error);
       setClasses([]);
     }
   };
@@ -106,37 +150,55 @@ const AttendanceView = () => {
     setAttendanceRecords([]);
     setError(null);
     setSuccessMessage(null);
-    
-    console.log('🔍 Loading attendance data...', { selectedDate, selectedClass, selectedStatus, page, showFullList });
+
+    console.log("🔍 Loading attendance data...", {
+      selectedDate,
+      selectedClass,
+      selectedStatus,
+      page,
+      showFullList,
+    });
     try {
       // If homeroom teacher but no class selected, don't fetch
       if (isHomeroomTeacher() && !selectedClass) {
-        console.log('🚫 No class selected for homeroom teacher, skipping attendance fetch');
+        console.log(
+          "🚫 No class selected for homeroom teacher, skipping attendance fetch"
+        );
         setAttendanceRecords([]);
-        setStats({ total_students: 0, present_count: 0, absent_count: 0, late_count: 0 });
+        setStats({
+          total_students: 0,
+          present_count: 0,
+          absent_count: 0,
+          late_count: 0,
+        });
         setLoading(false);
         return;
       }
-      
+
       if (showFullList) {
         // Use full list API - shows all students with their attendance status
-        const response = await ApiService.getFullAttendanceList(selectedDate, selectedClass);
+        const response = await ApiService.getFullAttendanceList(
+          selectedDate,
+          selectedClass
+        );
         if (response.success) {
           let filteredData = response.data || [];
-          
+
           // Apply status filter if specified
           if (selectedStatus) {
-            filteredData = filteredData.filter(record => record.status === selectedStatus);
+            filteredData = filteredData.filter(
+              (record) => record.status === selectedStatus
+            );
           }
-          
+
           setAttendanceRecords(filteredData);
           setTotal(filteredData.length);
-          
+
           // Calculate stats from full list data - but use full data not filtered data
           const fullData = response.data || [];
-          console.log('📊 Calculating stats from full data:', fullData);
+          console.log("📊 Calculating stats from full data:", fullData);
           const calculatedStats = calculateStatsFromData(fullData);
-          console.log('📊 Calculated stats:', calculatedStats);
+          console.log("📊 Calculated stats:", calculatedStats);
           setStats(calculatedStats);
         }
       } else {
@@ -151,15 +213,17 @@ const AttendanceView = () => {
         if (selectedClass) {
           // For class filter, we need to use today's attendance endpoint
           // because the main endpoint doesn't have direct class filtering
-          if (selectedDate === new Date().toISOString().split('T')[0]) {
+          if (selectedDate === new Date().toISOString().split("T")[0]) {
             const response = await ApiService.getTodayAttendance(selectedClass);
             if (response.success) {
               let filteredData = response.data || [];
-              
+
               if (selectedStatus) {
-                filteredData = filteredData.filter(record => record.status === selectedStatus);
+                filteredData = filteredData.filter(
+                  (record) => record.status === selectedStatus
+                );
               }
-              
+
               setAttendanceRecords(filteredData);
               setTotal(filteredData.length);
             }
@@ -168,17 +232,21 @@ const AttendanceView = () => {
             const response = await ApiService.getAttendanceRecords(params);
             if (response.success) {
               let filteredData = response.data || [];
-              
+
               if (selectedClass) {
-                filteredData = filteredData.filter(record => 
-                  record.students && record.students.class_name === selectedClass
+                filteredData = filteredData.filter(
+                  (record) =>
+                    record.students &&
+                    record.students.class_name === selectedClass
                 );
               }
-              
+
               if (selectedStatus) {
-                filteredData = filteredData.filter(record => record.status === selectedStatus);
+                filteredData = filteredData.filter(
+                  (record) => record.status === selectedStatus
+                );
               }
-              
+
               setAttendanceRecords(filteredData);
               setTotal(filteredData.length);
             }
@@ -187,9 +255,9 @@ const AttendanceView = () => {
           if (selectedStatus) {
             params.status = selectedStatus;
           }
-          
+
           const response = await ApiService.getAttendanceRecords(params);
-          console.log('📡 API Response:', response);
+          console.log("📡 API Response:", response);
           if (response.success) {
             setAttendanceRecords(response.data || []);
             setTotal(response.total || 0);
@@ -197,8 +265,8 @@ const AttendanceView = () => {
         }
       }
     } catch (error) {
-      console.error('Error loading attendance:', error);
-      setError('Không thể tải dữ liệu điểm danh');
+      console.error("Error loading attendance:", error);
+      setError("Không thể tải dữ liệu điểm danh");
     } finally {
       setLoading(false);
     }
@@ -214,19 +282,31 @@ const AttendanceView = () => {
         }
       }
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error("Error loading stats:", error);
     }
   };
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      present: { variant: 'default', className: 'bg-green-100 text-green-800', label: 'Có mặt' },
-      absent: { variant: 'destructive', className: '', label: 'Vắng mặt' },
-      late: { variant: 'secondary', className: 'bg-yellow-100 text-yellow-800', label: 'Muộn' }
+      present: {
+        variant: "default",
+        className: "bg-green-100 text-green-800",
+        label: "Có mặt",
+      },
+      absent: { variant: "destructive", className: "", label: "Vắng mặt" },
+      late: {
+        variant: "secondary",
+        className: "bg-yellow-100 text-yellow-800",
+        label: "Muộn",
+      },
     };
 
-    const config = statusConfig[status] || { variant: 'outline', className: '', label: status };
-    
+    const config = statusConfig[status] || {
+      variant: "outline",
+      className: "",
+      label: status,
+    };
+
     return (
       <Badge variant={config.variant} className={config.className}>
         {config.label}
@@ -235,13 +315,13 @@ const AttendanceView = () => {
   };
 
   const formatTime = (timeString) => {
-    if (!timeString) return '-';
+    if (!timeString) return "-";
     try {
       const date = new Date(timeString);
-      return date.toLocaleTimeString('vi-VN', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        timeZone: 'Asia/Ho_Chi_Minh'  // Đảm bảo hiển thị theo giờ Việt Nam
+      return date.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Ho_Chi_Minh", // Đảm bảo hiển thị theo giờ Việt Nam
       });
     } catch {
       return timeString;
@@ -249,11 +329,11 @@ const AttendanceView = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return '-';
+    if (!dateString) return "-";
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('vi-VN', {
-        timeZone: 'Asia/Ho_Chi_Minh'  // Đảm bảo hiển thị theo giờ Việt Nam
+      return date.toLocaleDateString("vi-VN", {
+        timeZone: "Asia/Ho_Chi_Minh", // Đảm bảo hiển thị theo giờ Việt Nam
       });
     } catch {
       return dateString;
@@ -262,35 +342,40 @@ const AttendanceView = () => {
 
   const resetFilters = () => {
     // Clear tất cả filters và data để tránh duplicate
-    setSelectedDate(new Date().toISOString().split('T')[0]);
-    setSelectedClass('');
-    setSelectedStatus('');
+    setSelectedDate(new Date().toISOString().split("T")[0]);
+    setSelectedClass("");
+    setSelectedStatus("");
     setPage(1);
-    
+
     // Clear data states
     setAttendanceRecords([]);
     setStats(null);
     setError(null);
     setSuccessMessage(null);
-    
+
     // Clear editing states
     setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
+    setEditStatus("");
+    setEditNotes("");
   };
 
   const calculateStatsFromData = (data) => {
     const totalStudents = data.length;
-    const presentCount = data.filter(record => record.status === 'present').length;
-    const lateCount = data.filter(record => record.status === 'late').length;
+    const presentCount = data.filter(
+      (record) => record.status === "present"
+    ).length;
+    const lateCount = data.filter((record) => record.status === "late").length;
     const absentCount = totalStudents - presentCount - lateCount; // Đơn giản hơn!
-    
+
     return {
       total_students: totalStudents,
       present_count: presentCount,
       late_count: lateCount,
       absent_count: absentCount,
-      attendance_rate: totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100 * 10) / 10 : 0
+      attendance_rate:
+        totalStudents > 0
+          ? Math.round((presentCount / totalStudents) * 100 * 10) / 10
+          : 0,
     };
   };
 
@@ -301,15 +386,15 @@ const AttendanceView = () => {
     setStats(null);
     setError(null);
     setSuccessMessage(null);
-    
+
     // Reset về trang đầu tiên
     setPage(1);
-    
+
     // Clear editing states
     setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    
+    setEditStatus("");
+    setEditNotes("");
+
     // Set ngày mới
     setSelectedDate(newDate);
   };
@@ -322,12 +407,12 @@ const AttendanceView = () => {
     setError(null);
     setSuccessMessage(null);
     setPage(1);
-    
+
     // Clear editing states
     setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    
+    setEditStatus("");
+    setEditNotes("");
+
     // Set lớp mới
     setSelectedClass(newClass);
   };
@@ -337,12 +422,12 @@ const AttendanceView = () => {
     // Clear data và reset page
     setAttendanceRecords([]);
     setPage(1);
-    
+
     // Clear editing states
     setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    
+    setEditStatus("");
+    setEditNotes("");
+
     // Set trạng thái mới
     setSelectedStatus(newStatus);
   };
@@ -355,12 +440,12 @@ const AttendanceView = () => {
     setError(null);
     setSuccessMessage(null);
     setPage(1);
-    
+
     // Clear editing states
     setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    
+    setEditStatus("");
+    setEditNotes("");
+
     // Set chế độ xem mới
     setShowFullList(showFullListMode);
   };
@@ -368,22 +453,22 @@ const AttendanceView = () => {
   const handleEditRecord = (record) => {
     setEditingRecord(record);
     setEditStatus(record.status);
-    setEditNotes(record.notes || '');
+    setEditNotes(record.notes || "");
   };
 
   const handleCancelEdit = () => {
     setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
+    setEditStatus("");
+    setEditNotes("");
   };
 
   const handleSaveEdit = async () => {
     if (!editingRecord) return;
-    
+
     setUpdating(true);
     try {
       let response;
-      
+
       if (editingRecord.id === null) {
         // Create new attendance record for student who hasn't been marked
         response = await ApiService.markAttendance({
@@ -391,7 +476,7 @@ const AttendanceView = () => {
           date: selectedDate,
           status: editStatus,
           notes: editNotes,
-          method: 'manual'
+          method: "manual",
         });
       } else {
         // Update existing attendance record
@@ -401,42 +486,48 @@ const AttendanceView = () => {
           editNotes
         );
       }
-      
+
       if (response.success) {
         // Update the record in the local state
-        const updatedRecords = attendanceRecords.map(record =>
+        const updatedRecords = attendanceRecords.map((record) =>
           record.student_id === editingRecord.student_id
-            ? { ...record, status: editStatus, notes: editNotes, id: response.data?.id || record.id }
+            ? {
+                ...record,
+                status: editStatus,
+                notes: editNotes,
+                id: response.data?.id || record.id,
+              }
             : record
         );
         setAttendanceRecords(updatedRecords);
-        
+
         // Update stats if in full list mode
         if (showFullList) {
           setStats(calculateStatsFromData(updatedRecords));
         }
-        
+
         // Close edit mode
         handleCancelEdit();
-        
+
         // Reload stats for other modes
         if (!showFullList) {
           loadStats();
         }
-        
+
         // Show success message
         setError(null);
-        setSuccessMessage(editingRecord.id === null ? 
-          'Tạo mới điểm danh thành công!' : 
-          'Cập nhật trạng thái điểm danh thành công!'
+        setSuccessMessage(
+          editingRecord.id === null
+            ? "Tạo mới điểm danh thành công!"
+            : "Cập nhật trạng thái điểm danh thành công!"
         );
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        setError(response.message || 'Lỗi cập nhật trạng thái');
+        setError(response.message || "Lỗi cập nhật trạng thái");
       }
     } catch (error) {
-      console.error('Error updating attendance:', error);
-      setError('Không thể cập nhật trạng thái điểm danh');
+      console.error("Error updating attendance:", error);
+      setError("Không thể cập nhật trạng thái điểm danh");
     } finally {
       setUpdating(false);
     }
@@ -483,7 +574,9 @@ const AttendanceView = () => {
                   <Users className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Tổng học sinh</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Tổng học sinh
+                  </p>
                   <p className="text-2xl font-bold">{stats.total_students}</p>
                 </div>
               </div>
@@ -497,8 +590,12 @@ const AttendanceView = () => {
                   <CheckCircle className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Có mặt</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.present_count}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Có mặt
+                  </p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {stats.present_count}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -511,8 +608,12 @@ const AttendanceView = () => {
                   <XCircle className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Vắng mặt</p>
-                  <p className="text-2xl font-bold text-destructive">{stats.absent_count}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Vắng mặt
+                  </p>
+                  <p className="text-2xl font-bold text-destructive">
+                    {stats.absent_count}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -525,8 +626,12 @@ const AttendanceView = () => {
                   <Clock className="w-5 h-5" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Muộn</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.late_count}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Muộn
+                  </p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {stats.late_count}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -558,9 +663,7 @@ const AttendanceView = () => {
         <CardContent>
           <div className="flex flex-col gap-4 md:flex-row md:items-end">
             <div className="flex-1 max-w-[160px]">
-              <label className="block mb-2 text-sm font-medium">
-                Ngày
-              </label>
+              <label className="block mb-2 text-sm font-medium">Ngày</label>
               <Input
                 type="date"
                 value={selectedDate}
@@ -568,11 +671,9 @@ const AttendanceView = () => {
                 className="w-full"
               />
             </div>
-            
+
             <div className="flex-1 max-w-[200px]">
-              <label className="block mb-2 text-sm font-medium">
-                Lớp
-              </label>
+              <label className="block mb-2 text-sm font-medium">Lớp</label>
               <select
                 value={selectedClass}
                 onChange={(e) => handleClassChange(e.target.value)}
@@ -584,7 +685,7 @@ const AttendanceView = () => {
                 ) : (
                   <option value="">Tất cả lớp</option>
                 )}
-                {classes.map(className => (
+                {classes.map((className) => (
                   <option key={className} value={className}>
                     {className}
                   </option>
@@ -609,17 +710,10 @@ const AttendanceView = () => {
             </div>
 
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={resetFilters}
-              >
+              <Button variant="outline" onClick={resetFilters}>
                 Đặt lại
               </Button>
-              <Button
-                onClick={loadAttendanceData}
-              >
-                Tìm kiếm
-              </Button>
+              <Button onClick={loadAttendanceData}>Tìm kiếm</Button>
             </div>
           </div>
         </CardContent>
@@ -629,13 +723,13 @@ const AttendanceView = () => {
       <Card>
         <CardHeader>
           <CardTitle>
-            Danh sách điểm danh {selectedDate && `- ${formatDate(selectedDate)}`}
+            Danh sách điểm danh{" "}
+            {selectedDate && `- ${formatDate(selectedDate)}`}
           </CardTitle>
           <CardDescription>
-            {showFullList ? 
-              `Hiển thị ${attendanceRecords.length} học sinh (bao gồm cả học sinh chưa điểm danh)` :
-              `Hiển thị ${attendanceRecords.length} bản ghi điểm danh`
-            }
+            {showFullList
+              ? `Hiển thị ${attendanceRecords.length} học sinh (bao gồm cả học sinh chưa điểm danh)`
+              : `Hiển thị ${attendanceRecords.length} bản ghi điểm danh`}
             {selectedClass && ` - Lớp ${selectedClass}`}
           </CardDescription>
         </CardHeader>
@@ -653,7 +747,9 @@ const AttendanceView = () => {
                   <TableHead className="w-[100px]">Trạng thái</TableHead>
                   <TableHead className="w-[100px]">Độ chính xác</TableHead>
                   <TableHead className="w-[150px]">Ghi chú</TableHead>
-                  <TableHead className="w-[120px] text-center">Thao tác</TableHead>
+                  <TableHead className="w-[120px] text-center">
+                    Thao tác
+                  </TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -666,7 +762,7 @@ const AttendanceView = () => {
                           <div className="w-8 h-8 rounded-full border-b-2 animate-spin border-primary"></div>
                         </div>
                       ) : (
-                        'Không có dữ liệu điểm danh'
+                        "Không có dữ liệu điểm danh"
                       )}
                     </TableCell>
                   </TableRow>
@@ -675,19 +771,27 @@ const AttendanceView = () => {
                     // Apply frontend pagination
                     const startIndex = (page - 1) * pageSize;
                     const endIndex = startIndex + pageSize;
-                    const paginatedRecords = attendanceRecords.slice(startIndex, endIndex);
-                    
+                    const paginatedRecords = attendanceRecords.slice(
+                      startIndex,
+                      endIndex
+                    );
+
                     return paginatedRecords.map((record) => (
                       <TableRow key={record.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium">
-                          {record.students?.student_id || 'N/A'}
+                          {record.students?.student_id || "N/A"}
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{record.students?.full_name || 'Không xác định'}</div>
+                          <div className="font-medium">
+                            {record.students?.full_name || "Không xác định"}
+                          </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-blue-800 bg-blue-100">
-                            {record.students?.class_name || 'N/A'}
+                          <Badge
+                            variant="outline"
+                            className="text-blue-800 bg-blue-100"
+                          >
+                            {record.students?.class_name || "N/A"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -712,7 +816,11 @@ const AttendanceView = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {record.confidence_score ? `${(record.confidence_score * 100 * 2).toFixed(1)}%` : '-'}
+                          {record.confidence_score
+                            ? `${(record.confidence_score * 100 * 2).toFixed(
+                                1
+                              )}%`
+                            : "-"}
                         </TableCell>
                         <TableCell>
                           {editingRecord?.id === record.id ? (
@@ -724,8 +832,11 @@ const AttendanceView = () => {
                               className="h-8 text-xs"
                             />
                           ) : (
-                            <span className="truncate" title={record.notes || ''}>
-                              {record.notes || '-'}
+                            <span
+                              className="truncate"
+                              title={record.notes || ""}
+                            >
+                              {record.notes || "-"}
                             </span>
                           )}
                         </TableCell>
@@ -738,7 +849,7 @@ const AttendanceView = () => {
                                 disabled={updating}
                                 className="h-8 text-xs"
                               >
-                                {updating ? '...' : 'Lưu'}
+                                {updating ? "..." : "Lưu"}
                               </Button>
                               <Button
                                 size="sm"
@@ -774,18 +885,30 @@ const AttendanceView = () => {
         {(() => {
           const totalRecords = attendanceRecords.length;
           const totalPages = Math.ceil(totalRecords / pageSize);
-          
+
           if (totalPages <= 1) return null;
-          
+
           return (
             <div className="px-6 py-4 border-t bg-muted/50">
               <div className="flex flex-wrap gap-3 justify-between items-center">
                 <div className="flex items-center space-x-4">
                   <div className="text-sm text-muted-foreground">
-                    Hiển thị <span className="font-semibold">{((page - 1) * pageSize) + 1}</span> đến <span className="font-semibold">{Math.min(page * pageSize, totalRecords)}</span> trong tổng số <span className="font-semibold">{totalRecords}</span> bản ghi
+                    Hiển thị{" "}
+                    <span className="font-semibold">
+                      {(page - 1) * pageSize + 1}
+                    </span>{" "}
+                    đến{" "}
+                    <span className="font-semibold">
+                      {Math.min(page * pageSize, totalRecords)}
+                    </span>{" "}
+                    trong tổng số{" "}
+                    <span className="font-semibold">{totalRecords}</span> bản
+                    ghi
                   </div>
                   <div className="flex items-center space-x-2">
-                    <label className="text-sm text-muted-foreground">Số lượng/trang:</label>
+                    <label className="text-sm text-muted-foreground">
+                      Số lượng/trang:
+                    </label>
                     <select
                       value={pageSize}
                       onChange={(e) => {
@@ -801,7 +924,7 @@ const AttendanceView = () => {
                     </select>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="outline"
@@ -811,34 +934,43 @@ const AttendanceView = () => {
                   >
                     ← Trước
                   </Button>
-                  
+
                   <div className="flex items-center space-x-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                      const showPage = 
-                        pageNum === 1 || 
-                        pageNum === totalPages || 
-                        (pageNum >= page - 1 && pageNum <= page + 1);
-                      
-                      if (!showPage) {
-                        if (pageNum === page - 2 || pageNum === page + 2) {
-                          return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (pageNum) => {
+                        const showPage =
+                          pageNum === 1 ||
+                          pageNum === totalPages ||
+                          (pageNum >= page - 1 && pageNum <= page + 1);
+
+                        if (!showPage) {
+                          if (pageNum === page - 2 || pageNum === page + 2) {
+                            return (
+                              <span
+                                key={pageNum}
+                                className="px-2 text-muted-foreground"
+                              >
+                                ...
+                              </span>
+                            );
+                          }
+                          return null;
                         }
-                        return null;
+
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={page === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setPage(pageNum)}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
                       }
-                      
-                      return (
-                        <Button
-                          key={pageNum}
-                          variant={page === pageNum ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setPage(pageNum)}
-                        >
-                          {pageNum}
-                        </Button>
-                      );
-                    })}
+                    )}
                   </div>
-                  
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -858,8 +990,8 @@ const AttendanceView = () => {
       <Card className="mt-6">
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">
-            {selectedDate === new Date().toISOString().split('T')[0] 
-              ? 'Dữ liệu điểm danh hôm nay' 
+            {selectedDate === new Date().toISOString().split("T")[0]
+              ? "Dữ liệu điểm danh hôm nay"
               : `Dữ liệu điểm danh ngày ${formatDate(selectedDate)}`}
             {selectedClass && ` - Lớp ${selectedClass}`}
             {selectedStatus && ` - Trạng thái: ${selectedStatus}`}
@@ -870,4 +1002,4 @@ const AttendanceView = () => {
   );
 };
 
-export default AttendanceView; 
+export default AttendanceView;
