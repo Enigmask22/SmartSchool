@@ -4,6 +4,7 @@ import api from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { 
   Users, 
   CheckCircle, 
@@ -12,16 +13,14 @@ import {
   BarChart3, 
   Calendar,
   Eye,
-  EyeOff,
   ChevronLeft,
   ChevronRight,
-  GraduationCap,
   UserCheck,
   UserX
 } from 'lucide-react';
 
 const HomeroomDashboard = () => {
-  const { isHomeroomTeacher } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const [homeroomInfo, setHomeroomInfo] = useState(null);
   const [students, setStudents] = useState([]);
   const [attendanceStats, setAttendanceStats] = useState(null);
@@ -347,27 +346,16 @@ const HomeroomDashboard = () => {
       </Card>
 
       {/* All Students Modal */}
-      {showAllStudents && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Tất cả học sinh lớp {homeroomInfo?.class_name}</CardTitle>
-                  <CardDescription>
-                    Tổng cộng {students.length} học sinh
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCloseAllStudents}
-                >
-                  <EyeOff className="w-5 h-5" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="overflow-y-auto max-h-[60vh]">
+      <Dialog open={showAllStudents} onOpenChange={(open) => !open && handleCloseAllStudents()}>
+        <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Tất cả học sinh lớp {homeroomInfo?.class_name}</DialogTitle>
+            <DialogDescription>
+              Tổng cộng {students.length} học sinh
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-y-auto max-h-[60vh]">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {students.map((student) => {
                   const status = getAttendanceStatus(student);
@@ -396,10 +384,9 @@ const HomeroomDashboard = () => {
                   );
                 })}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

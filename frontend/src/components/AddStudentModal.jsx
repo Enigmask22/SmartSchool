@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { X, Loader2, UserPlus } from 'lucide-react';
 
 const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
@@ -23,8 +24,6 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
   
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-
-  if (!isOpen) return null;
 
   const handleChange = (field, value) => {
     setFormData(prev => ({
@@ -136,31 +135,19 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
   };
 
   return (
-    <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-      <Card className="overflow-y-auto p-6 mx-4 w-full max-w-4xl max-h-screen">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <UserPlus className="w-6 h-6" />
-                <span>Thêm học sinh mới</span>
-              </CardTitle>
-              <CardDescription>
-                Điền thông tin để đăng ký học sinh mới vào hệ thống
-              </CardDescription>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-6 h-6" />
-            </Button>
-          </div>
-        </CardHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2">
+            <UserPlus className="w-6 h-6" />
+            <span>Thêm học sinh mới</span>
+          </DialogTitle>
+          <DialogDescription>
+            Điền thông tin để đăng ký học sinh mới vào hệ thống
+          </DialogDescription>
+        </DialogHeader>
 
-        <CardContent>
+        <div>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Mã học sinh */}
@@ -367,9 +354,9 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

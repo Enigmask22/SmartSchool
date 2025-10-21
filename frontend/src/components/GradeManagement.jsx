@@ -915,7 +915,6 @@ const GradeManagement = () => {
                       {(() => {
                         // Calculate pagination
                         const totalStudents = students.length;
-                        const totalPages = Math.ceil(totalStudents / pageSize);
                         const startIndex = (currentPage - 1) * pageSize;
                         const endIndex = startIndex + pageSize;
                         const paginatedStudents = students.slice(startIndex, endIndex);
@@ -1063,215 +1062,179 @@ const GradeManagement = () => {
         )}
 
         {/* Grade Edit Modal */}
-        {editingStudent && gradeConfig && (
-          <div 
-            className="flex fixed top-0 right-0 bottom-0 left-0 z-50 justify-center items-center p-4"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              width: '100vw',
-              height: '100vh',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              backdropFilter: 'blur(4px)',
-              margin: 0,
-              zIndex: 9999
-            }}
-            onClick={(e) => e.target === e.currentTarget && setEditingStudent(null)}
-          >
-            <div className="overflow-hidden w-full max-w-lg bg-white rounded-xl shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <div className="p-5 text-white bg-blue-600 border-b border-blue-700">
-                <h3 className="flex items-center space-x-2 text-lg font-bold">
-                  <Pencil className="w-4 h-4" />
-                  <span>Nhập điểm cho {editingStudent.student.full_name}</span>
-                </h3>
-                <p className="mt-1 text-sm text-blue-100">Mã số: {editingStudent.student.student_id}</p>
-              </div>
-              
-              <div className="p-5 space-y-4">
-                {getSortedColumnNames(gradeConfig.grade_column_config).map(columnName => (
-                  <div key={columnName} className="p-4 bg-gray-50 rounded-lg">
-                    <label className="block mb-2 text-sm font-medium text-gray-700">
-                      <span className="flex justify-between items-center">
-                        <span>{gradeConfig.grade_column_config[columnName].label}</span>
-                        <span className="px-2 py-1 text-xs text-blue-600 bg-blue-100 rounded-md">
-                          Hệ số: {gradeConfig.grade_column_config[columnName].he_so}
-                        </span>
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      value={gradeForm[columnName]?.Diem || ''}
-                      onChange={(e) => handleGradeInputChange(columnName, e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-lg font-semibold"
-                      placeholder="0.0"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-end p-5 space-x-2 bg-gray-50 border-t">
-                <button
-                  onClick={() => setEditingStudent(null)}
-                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleSaveGrade}
-                  className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
-                >
-                  💾 Lưu điểm
-                </button>
-              </div>
+        <Dialog open={!!editingStudent} onOpenChange={() => setEditingStudent(null)}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Pencil className="w-4 h-4" />
+                <span>Nhập điểm cho {editingStudent?.student?.full_name}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Mã số: {editingStudent?.student?.student_id}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {editingStudent && gradeConfig && getSortedColumnNames(gradeConfig.grade_column_config).map(columnName => (
+                <div key={columnName} className="p-4 bg-muted rounded-lg">
+                  <Label className="block mb-2 text-sm font-medium">
+                    <span className="flex justify-between items-center">
+                      <span>{gradeConfig.grade_column_config[columnName].label}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        Hệ số: {gradeConfig.grade_column_config[columnName].he_so}
+                      </Badge>
+                    </span>
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    value={gradeForm[columnName]?.Diem || ''}
+                    onChange={(e) => handleGradeInputChange(columnName, e.target.value)}
+                    className="text-center text-lg font-semibold"
+                    placeholder="0.0"
+                  />
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditingStudent(null)}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSaveGrade}
+              >
+                💾 Lưu điểm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Import Preview Modal */}
-        {showImportModal && (
-          <div 
-            className="flex fixed top-0 right-0 bottom-0 left-0 z-50 justify-center items-center p-4"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              width: '100vw',
-              height: '100vh',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              backdropFilter: 'blur(4px)',
-              margin: 0,
-              zIndex: 9999
-            }}
-            onClick={(e) => e.target === e.currentTarget && setShowImportModal(false)}
-          >
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 text-white bg-purple-600 border-b border-purple-700">
-                <h3 className="flex items-center space-x-2 text-xl font-bold">
-                  <Clipboard className="w-4 h-4" />
-                  <span>Xem trước dữ liệu import</span>
-                </h3>
-                <p className="mt-1 text-sm text-purple-100">
-                  Kiểm tra kỹ thông tin trước khi cập nhật điểm • {importedData.length} học sinh
-                </p>
+        <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Clipboard className="w-4 h-4" />
+                <span>Xem trước dữ liệu import</span>
+              </DialogTitle>
+              <DialogDescription>
+                Kiểm tra kỹ thông tin trước khi cập nhật điểm • {importedData.length} học sinh
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="max-h-[60vh] overflow-y-auto">
+              {importErrors.length > 0 && (
+                <div className="p-4 mb-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <h4 className="mb-2 font-bold text-destructive flex items-center space-x-1">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Có {importErrors.length} lỗi:</span>
+                  </h4>
+                  <ul className="space-y-1 text-sm list-disc list-inside text-destructive">
+                    {importErrors.slice(0, 10).map((error, idx) => (
+                      <li key={idx}>{error}</li>
+                    ))}
+                    {importErrors.length > 10 && (
+                      <li className="font-medium text-destructive">... và {importErrors.length - 10} lỗi khác</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>STT</TableHead>
+                      <TableHead>Mã HS</TableHead>
+                      <TableHead>Họ và tên</TableHead>
+                      <TableHead className="text-center">Điểm TX</TableHead>
+                      <TableHead className="text-center">Điểm GK</TableHead>
+                      <TableHead className="text-center">Điểm CK</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importedData.map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium text-primary">{row.student_id}</TableCell>
+                        <TableCell>{row.ho_va_ten}</TableCell>
+                        <TableCell className="text-center">
+                          {row.diem_thuong_xuyen !== null && row.diem_thuong_xuyen !== undefined ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700">
+                              {row.diem_thuong_xuyen}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {row.diem_thi_giua_ki !== null && row.diem_thi_giua_ki !== undefined ? (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                              {row.diem_thi_giua_ki}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {row.diem_thi_cuoi_ki !== null && row.diem_thi_cuoi_ki !== undefined ? (
+                            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                              {row.diem_thi_cuoi_ki}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              
-              <div className="p-6 max-h-[60vh] overflow-y-auto">
-                {importErrors.length > 0 && (
-                  <div className="p-4 mb-4 bg-red-50 rounded-lg border border-red-200">
-                    <h4 className="mb-2 font-bold text-red-800 flex items-center space-x-1">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Có {importErrors.length} lỗi:</span>
-                    </h4>
-                    <ul className="space-y-1 text-sm list-disc list-inside text-red-700">
-                      {importErrors.slice(0, 10).map((error, idx) => (
-                        <li key={idx}>{error}</li>
-                      ))}
-                      {importErrors.length > 10 && (
-                        <li className="font-medium text-red-600">... và {importErrors.length - 10} lỗi khác</li>
-                      )}
-                    </ul>
+
+              {importedData.length === 0 && (
+                <div className="py-12 text-center">
+                  <div className="flex justify-center items-center mx-auto mb-4 w-20 h-20 bg-muted rounded-full">
+                    <FileText className="w-8 h-8 text-muted-foreground" />
                   </div>
-                )}
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full rounded-lg border border-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-xs font-semibold text-left text-gray-600 uppercase border-b">STT</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-left text-gray-600 uppercase border-b">Mã HS</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-left text-gray-600 uppercase border-b">Họ và tên</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-center text-gray-600 uppercase border-b">Điểm TX</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-center text-gray-600 uppercase border-b">Điểm GK</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-center text-gray-600 uppercase border-b">Điểm CK</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {importedData.map((row, index) => (
-                        <tr key={index} className="transition-colors hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-blue-600">{row.student_id}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{row.ho_va_ten}</td>
-                          <td className="px-4 py-3 text-center">
-                            {row.diem_thuong_xuyen !== null && row.diem_thuong_xuyen !== undefined ? (
-                              <span className="inline-block bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
-                                {row.diem_thuong_xuyen}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {row.diem_thi_giua_ki !== null && row.diem_thi_giua_ki !== undefined ? (
-                              <span className="inline-block bg-blue-100 text-blue-700 px-2.5 py-1 rounded-md text-sm font-medium">
-                                {row.diem_thi_giua_ki}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {row.diem_thi_cuoi_ki !== null && row.diem_thi_cuoi_ki !== undefined ? (
-                              <span className="inline-block bg-purple-100 text-purple-700 px-2.5 py-1 rounded-md text-sm font-medium">
-                                {row.diem_thi_cuoi_ki}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <p className="text-muted-foreground">Không có dữ liệu hợp lệ</p>
                 </div>
-
-                {importedData.length === 0 && (
-                  <div className="py-12 text-center">
-                    <div className="flex justify-center items-center mx-auto mb-4 w-20 h-20 bg-gray-100 rounded-full">
-                      <FileText className="w-8 h-8" />
-                    </div>
-                    <p className="text-gray-500">Không có dữ liệu hợp lệ</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-between items-center p-6 bg-gray-50 border-t">
-                <div className="text-sm text-gray-600">
-                  <span className="font-semibold">{importedData.length}</span> bản ghi sẽ được cập nhật
-                  {importErrors.length > 0 && (
-                    <span className="ml-2 text-red-600">• <span className="font-semibold">{importErrors.length}</span> lỗi</span>
-                  )}
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => {
-                      setShowImportModal(false);
-                      setImportedData([]);
-                      setImportErrors([]);
-                    }}
-                    className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleConfirmImport}
-                    disabled={importedData.length === 0 || importErrors.length > 0}
-                    className="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ✅ Cập nhật điểm
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
-          </div>
-        )}
+
+            <DialogFooter className="flex justify-between items-center">
+              <div className="text-sm text-muted-foreground">
+                <span className="font-semibold">{importedData.length}</span> bản ghi sẽ được cập nhật
+                {importErrors.length > 0 && (
+                  <span className="ml-2 text-destructive">• <span className="font-semibold">{importErrors.length}</span> lỗi</span>
+                )}
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportedData([]);
+                    setImportErrors([]);
+                  }}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleConfirmImport}
+                  disabled={importedData.length === 0 || importErrors.length > 0}
+                >
+                  ✅ Cập nhật điểm
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

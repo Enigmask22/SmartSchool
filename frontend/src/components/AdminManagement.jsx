@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 const AdminManagement = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -714,30 +715,16 @@ const AdminManagement = () => {
       </Card>
 
       {/* Import từ Users Modal */}
-      {showImportModal && (
-        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-xl shadow-2xl">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b bg-muted/50">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Import giáo viên từ Users</h3>
-                  <p className="text-sm text-gray-600">Chọn những user có role teacher hoặc homeroom_teacher để tạo thành giáo viên</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowImportModal(false);
-                    setSelectedUserIds([]);
-                  }}
-                  className="p-2 text-gray-400 rounded-lg transition-colors hover:text-gray-600 hover:bg-gray-100"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Import giáo viên từ Users</DialogTitle>
+            <DialogDescription>
+              Chọn những user có role teacher hoặc homeroom_teacher để tạo thành giáo viên
+            </DialogDescription>
+          </DialogHeader>
 
-            {/* Modal Content */}
-            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[60vh] overflow-y-auto">
               {availableUsers.length === 0 ? (
                 <div className="py-12 text-center">
                   <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-gray-100 rounded-full">
@@ -813,45 +800,40 @@ const AdminManagement = () => {
               )}
             </div>
 
-            {/* Modal Footer */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">
-                  Đã chọn: <span className="font-medium text-green-600">{selectedUserIds.length}</span> users
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowImportModal(false);
-                      setSelectedUserIds([]);
-                    }}
-                    className="px-4 py-2 font-medium text-gray-700 bg-white rounded-lg border border-gray-300 transition-colors hover:bg-gray-50"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleImportTeachers}
-                    disabled={selectedUserIds.length === 0 || importLoading}
-                    className="flex items-center px-6 py-2 font-medium text-white bg-green-600 rounded-lg transition-colors hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  >
-                    {importLoading ? (
-                      <>
-                        <div className="mr-2 w-4 h-4 rounded-full border-2 border-white animate-spin border-t-transparent"></div>
-                        Đang tạo...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="mr-2 w-4 h-4" />
-                        Tạo {selectedUserIds.length} giáo viên
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+          <DialogFooter className="flex justify-between items-center">
+            <div className="text-sm text-muted-foreground">
+              Đã chọn: <span className="font-semibold text-green-600">{selectedUserIds.length}</span> users
             </div>
-          </div>
-        </div>
-      )}
+            <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setSelectedUserIds([]);
+                }}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleImportTeachers}
+                disabled={selectedUserIds.length === 0 || importLoading}
+              >
+                {importLoading ? (
+                  <>
+                    <div className="mr-2 w-4 h-4 rounded-full border-2 border-white animate-spin border-t-transparent"></div>
+                    Đang tạo...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 w-4 h-4" />
+                    Tạo {selectedUserIds.length} giáo viên
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

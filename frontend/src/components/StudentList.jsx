@@ -1576,55 +1576,39 @@ const StudentList = () => {
       )}
 
         {/* Face Registration Modal */}
-        {showFaceModal && (
-          <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-            <div className="p-6 mx-4 w-full max-w-2xl bg-white rounded-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">
-                  Đăng ký khuôn mặt - {selectedStudentForFace?.full_name}
-                </h3>
-                <button
-                  onClick={closeFaceModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
+        <Dialog open={showFaceModal} onOpenChange={setShowFaceModal}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Đăng ký khuôn mặt - {selectedStudentForFace?.full_name}
+              </DialogTitle>
+            </DialogHeader>
 
-              <div className="space-y-4">
-                {/* Mode Selection */}
-                <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-                  <button
-                    onClick={() => setRegistrationMode('camera')}
-                    className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      registrationMode === 'camera'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    📷 Camera
-                  </button>
-                  <button
-                    onClick={() => setRegistrationMode('upload')}
-                    className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      registrationMode === 'upload'
-                        ? 'bg-white text-purple-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    📁 Upload
-                  </button>
-                  <button
-                    onClick={() => setRegistrationMode('multiple')}
-                    className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      registrationMode === 'multiple'
-                        ? 'bg-white text-green-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    📸 Nhiều ảnh
-                  </button>
-                </div>
+            <div className="space-y-4">
+              {/* Mode Selection */}
+              <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                <Button
+                  variant={registrationMode === 'camera' ? 'default' : 'ghost'}
+                  onClick={() => setRegistrationMode('camera')}
+                  className="flex-1"
+                >
+                  📷 Camera
+                </Button>
+                <Button
+                  variant={registrationMode === 'upload' ? 'default' : 'ghost'}
+                  onClick={() => setRegistrationMode('upload')}
+                  className="flex-1"
+                >
+                  📁 Upload
+                </Button>
+                <Button
+                  variant={registrationMode === 'multiple' ? 'default' : 'ghost'}
+                  onClick={() => setRegistrationMode('multiple')}
+                  className="flex-1"
+                >
+                  📸 Nhiều ảnh
+                </Button>
+              </div>
 
                 {/* Camera Mode */}
                 {registrationMode === 'camera' && (
@@ -1902,9 +1886,8 @@ const StudentList = () => {
               </div>
 
               <canvas ref={canvasRef} style={{ display: 'none' }} />
-            </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
 
       {/* Summary */}
       <div className="p-4 mt-6 bg-gray-50 rounded-lg">
