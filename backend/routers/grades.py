@@ -270,6 +270,180 @@ async def get_teacher_info(
             detail=f"Lỗi server: {str(e)}"
         )
 
+# ===============================================
+# PERSONAL INFO MANAGEMENT ENDPOINTS
+# ===============================================
+
+@router.put("/teacher/profile", response_model=ResponseModel)
+async def update_teacher_profile(
+    profile_data: dict,
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Cập nhật thông tin cá nhân của giáo viên"""
+    try:
+        # Validate input data
+        allowed_fields = ['full_name', 'email', 'phone']
+        update_data = {}
+        
+        for field in allowed_fields:
+            if field in profile_data:
+                update_data[field] = profile_data[field]
+        
+        if not update_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không có trường nào để cập nhật"
+            )
+        
+        # Add updated_at timestamp
+        update_data['updated_at'] = datetime.now().isoformat()
+        
+        # Update teacher record
+        response = db.table("teachers").update(update_data).eq("id", current_teacher["id"]).execute()
+        
+        if response.data:
+            return ResponseModel(
+                success=True,
+                message="Cập nhật thông tin cá nhân thành công",
+                data=response.data[0]
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy thông tin giáo viên"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error updating teacher profile: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.get("/teacher/homeroom-classes", response_model=ResponseModel)
+async def get_homeroom_classes(
+    current_user=Depends(get_current_user),
+    db=Depends(get_db)
+):
+    """Lấy danh sách lớp chủ nhiệm của giáo viên"""
+    try:
+        # Lấy thông tin giáo viên
+        teacher_response = db.table("teachers").select("*").eq("user_id", current_user["id"]).execute()
+        
+        if not teacher_response.data:
+            return ResponseModel(
+                success=True,
+                message="Không phải là giáo viên",
+                data=[]
+            )
+        
+        teacher = teacher_response.data[0]
+        
+        # Lấy các lớp chủ nhiệm
+        homeroom_classes = db.table("classes").select("*").eq("homeroom_teacher_id", teacher["id"]).eq("is_active", True).execute()
+        
+        return ResponseModel(
+            success=True,
+            message="Lấy danh sách lớp chủ nhiệm thành công",
+            data=homeroom_classes.data
+        )
+        
+    except Exception as e:
+        logger.error(f"ERROR: Error getting homeroom classes: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.get("/teacher/subject-classes", response_model=ResponseModel)
+async def get_subject_classes(
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Lấy danh sách lớp và môn học mà giáo viên đang dạy"""
+    try:
+        # Lấy các lớp-môn mà giáo viên được phân công
+        class_subjects = db.table("class_subjects").select("""
+            *,
+            classes:class_id(id, class_name, grade),
+            subjects:subject_id(id, subject_code, subject_name)
+        """).eq("teacher_id", current_teacher["id"]).eq("is_active", True).execute()
+        
+        return ResponseModel(
+            success=True,
+            message="Lấy danh sách lớp-môn dạy thành công",
+            data=class_subjects.data
+        )
+        
+    except Exception as e:
+        logger.error(f"ERROR: Error getting subject classes: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+@router.get("/teacher/personal-info", response_model=ResponseModel)
+async def get_personal_info(
+    current_user=Depends(get_current_user),
+    db=Depends(get_db)
+):
+    """Lấy thông tin cá nhân đầy đủ của giáo viên"""
+    try:
+        # Lấy thông tin user
+        user_info = {
+            "id": current_user["id"],
+            "email": current_user["email"],
+            "username": current_user["username"],
+            "full_name": current_user["full_name"],
+            "role": current_user["role"]
+        }
+        
+        # Lấy thông tin teacher
+        teacher_response = db.table("teachers").select("*").eq("user_id", current_user["id"]).execute()
+        
+        teacher_info = None
+        if teacher_response.data:
+            teacher_info = teacher_response.data[0]
+        
+        # Lấy lớp chủ nhiệm nếu có
+        homeroom_classes = []
+        if teacher_info:
+            homeroom_response = db.table("classes").select("*").eq("homeroom_teacher_id", teacher_info["id"]).eq("is_active", True).execute()
+            homeroom_classes = homeroom_response.data
+        
+        # Lấy lớp-môn dạy nếu có
+        subject_classes = []
+        if teacher_info:
+            subject_response = db.table("class_subjects").select("""
+                *,
+                classes:class_id(id, class_name, grade),
+                subjects:subject_id(id, subject_code, subject_name)
+            """).eq("teacher_id", teacher_info["id"]).eq("is_active", True).execute()
+            subject_classes = subject_response.data
+        
+        personal_info = {
+            "user": user_info,
+            "teacher": teacher_info,
+            "homeroom_classes": homeroom_classes,
+            "subject_classes": subject_classes
+        }
+        
+        return ResponseModel(
+            success=True,
+            message="Lấy thông tin cá nhân thành công",
+            data=personal_info
+        )
+        
+    except Exception as e:
+        logger.error(f"ERROR: Error getting personal info: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
 @router.get("/teacher/students/{class_subject_id}", response_model=ResponseModel)
 async def get_students_by_class_subject(
     class_subject_id: int,

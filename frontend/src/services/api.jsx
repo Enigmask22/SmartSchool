@@ -347,16 +347,6 @@ class ApiService {
     return this.getAttendanceRecords(params);
   }
 
-  async markAttendance(studentId, status, notes = '') {
-    return this.request('/attendance', {
-      method: 'POST',
-      body: JSON.stringify({
-        student_id: studentId,
-        status,
-        notes,
-      }),
-    });
-  }
 
   // This method is deprecated, redirect to the new one above
   async getAttendanceStatsOld(date = null) {
@@ -736,6 +726,27 @@ class ApiService {
     return this.request(`/admin/teachers/${teacherId}`, {
       method: 'DELETE',
     });
+  }
+
+  // ===============================================
+  // PERSONAL INFO MANAGEMENT METHODS
+  // ===============================================
+
+  // Personal Info
+  async getPersonalInfo() {
+    return this.request('/grades/teacher/personal-info');
+  }
+
+  async updateTeacherProfile(profileData) {
+    return this.request('/grades/teacher/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+  }
+
+
+  async getTeacherClasses() {
+    return this.request('/grades/teacher/subject-classes');
   }
 
   // Subjects Management

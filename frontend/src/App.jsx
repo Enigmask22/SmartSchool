@@ -9,10 +9,8 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import StudentList from './components/StudentList';
 import AttendanceView from './components/AttendanceView';
-import AICamera from './components/AICamera';
 import FaceManagement from './components/FaceManagement';
 import ContinuousRecognition from './components/ContinuousRecognition';
-import AIFeedback from './components/AIFeedback';
 import SchoolDaysConfig from './components/SchoolDaysConfig';
 import Login from './components/Login';
 import GradeManagement from './components/GradeManagement';
@@ -23,6 +21,7 @@ import ClassManagement from './components/ClassManagement';
 import SubjectTeacherDashboard from './components/SubjectTeacherDashboard';
 import DashboardSelector from './components/DashboardSelector';
 import UIDemo from './components/UIDemo';
+import PersonalInfo from './components/PersonalInfo';
 
 function AppContent() {
   const { user, loading, isAuthenticated, isHomeroomTeacher, isSubjectTeacher, isAdmin } = useContext(AuthContext);
@@ -60,7 +59,7 @@ function AppContent() {
       }
       setHasRedirected(true);
     }
-  }, [user?.id, hasRedirected, selectedDashboardType, isAdmin]); // Include role functions as dependencies
+  }, [user, hasRedirected, selectedDashboardType, isAdmin]); // Include user as dependency
 
   // Handle dashboard selection
   const handleDashboardSelect = (type) => {
@@ -91,8 +90,11 @@ function AppContent() {
     // Admin có dashboard riêng - không cần chọn
     if (selectedDashboardType === 'admin' || isAdmin()) {
       switch (currentView) {
+      
         case 'dashboard':
           return <AdminDashboard />;
+        case 'personal-info':
+          return <PersonalInfo />;
         // Ẩn các tab không cần thiết cho Admin
         // case 'students':
         //   return <StudentList />;
@@ -123,8 +125,11 @@ function AppContent() {
     if (selectedDashboardType === 'homeroom') {
       // Homeroom dashboard view
       switch (currentView) {
+        
         case 'dashboard':
           return <HomeroomDashboard />;
+        case 'personal-info':
+          return <PersonalInfo />;
         case 'students':
           return <StudentList isHomeroom={true} />;
         case 'attendance':
@@ -141,8 +146,11 @@ function AppContent() {
     } else if (selectedDashboardType === 'subject') {
       // Subject teacher dashboard view
       switch (currentView) {
+        
         case 'dashboard':
           return <SubjectTeacherDashboard />;
+        case 'personal-info':
+          return <PersonalInfo />;
         case 'grades':
           return <GradeManagement />;
         default:
@@ -154,8 +162,11 @@ function AppContent() {
     if (isHomeroomTeacher()) {
       // Giáo viên chủ nhiệm - tất cả components được filter theo lớp chủ nhiệm
       switch (currentView) {
+        
         case 'dashboard':
           return <HomeroomDashboard />;
+        case 'personal-info':
+          return <PersonalInfo />;
         case 'students':
           return <StudentList isHomeroom={true} />;
         case 'attendance':
@@ -174,8 +185,11 @@ function AppContent() {
     } else if (isSubjectTeacher()) {
       // Giáo viên bộ môn - mặc định vào trang Dashboard Analytics
       switch (currentView) {
+       
         case 'dashboard':
           return <SubjectTeacherDashboard />;
+        case 'personal-info':
+          return <PersonalInfo />;
         case 'grades':
           return <GradeManagement />;
         default:
