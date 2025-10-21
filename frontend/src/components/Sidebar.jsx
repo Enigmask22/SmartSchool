@@ -5,27 +5,20 @@ import { Card } from './ui/card';
 import { 
   Home, 
   Users, 
-  GraduationCap, 
-  BarChart3, 
   Camera,
   Settings,
   LogOut,
   Menu,
-  X,
-  User,
   FileText,
   ClipboardList,
   Smile,
   MessageCircle,
-  Calendar,
-  Building,
-  BookOpen,
-  PieChart,
   Cog,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  School
+  School,
+  UserCircle
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -75,6 +68,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
   const getIcon = (iconName) => {
     const iconMap = {
       'dashboard': Home,
+      'personal-info': UserCircle,
       'students': Users,
       'attendance': ClipboardList,
       'continuous': Camera,
@@ -94,13 +88,15 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
   // Menu items based on selected dashboard type (ưu tiên selectedDashboardType hơn role functions)
   const getMenuItems = () => {
     const baseItems = [
-      { id: 'dashboard', label: 'Trang chủ', icon: 'dashboard' }
+      { id: 'dashboard', label: 'Trang chủ', icon: 'dashboard' },
+      { id: 'personal-info', label: 'Thông tin cá nhân', icon: 'personal-info' }
     ];
 
     if (isAdmin()) {
       // Admin chỉ có các menu cấu hình và quản trị
       return [
         { id: 'dashboard', label: 'Dashboard Thống Kê', icon: 'dashboard' },
+        { id: 'personal-info', label: 'Thông tin cá nhân', icon: 'personal-info' },
         { id: 'continuous', label: 'Điểm danh tự động', icon: 'continuous' },
         { id: 'school-config', label: 'Cấu hình học tập', icon: 'school-config' },
         { id: 'class-management', label: 'Quản trị lớp học', icon: 'class-management' },
@@ -119,6 +115,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
       // Dashboard bộ môn - chỉ hiển thị menu bộ môn
       return [
         { id: 'dashboard', label: 'Dashboard Phân Tích', icon: 'dashboard' },
+        { id: 'personal-info', label: 'Thông tin cá nhân', icon: 'personal-info' },
         { id: 'grades', label: 'Quản lý điểm', icon: 'grades' }
       ];
     } else {
@@ -134,6 +131,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
       } else if (isSubjectTeacher()) {
         return [
           { id: 'dashboard', label: 'Dashboard Phân Tích', icon: 'dashboard' },
+          { id: 'personal-info', label: 'Thông tin cá nhân', icon: 'personal-info' },
           { id: 'grades', label: 'Quản lý điểm', icon: 'grades' }
         ];
       } else {
@@ -184,7 +182,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
       `}>
         
         {/* Header */}
-        <div className="flex justify-between items-center p-4 bg-blue-600 text-white">
+        <div className="flex justify-between items-center p-4 text-white bg-blue-600">
           {isOpen && (
             <div className="flex items-center space-x-2">
               <School className="w-6 h-6" />
@@ -314,7 +312,7 @@ const Sidebar = ({ currentView, setCurrentView, user, isOpen, setIsOpen, selecte
         <Button
           size="icon"
           onClick={() => setIsOpen(true)}
-          className="fixed top-4 left-4 z-30 bg-blue-600 hover:bg-blue-700 text-white shadow-lg lg:hidden"
+          className="fixed top-4 left-4 z-30 text-white bg-blue-600 shadow-lg hover:bg-blue-700 lg:hidden"
         >
           <Menu className="w-5 h-5" />
         </Button>
