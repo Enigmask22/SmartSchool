@@ -757,14 +757,24 @@ class ApiService {
     });
   }
 
+  // Teacher Classes List (for dropdown filter)
+  async getTeacherClasses(academicYear = "2024-2025", semester = "HK1") {
+    return this.request(
+      `/grades/teacher/classes?academic_year=${academicYear}&semester=${semester}`
+    );
+  }
+
   // Teacher Dashboard Analytics
   async getTeacherDashboardAnalytics(
     academicYear = "2024-2025",
-    semester = "HK1"
+    semester = "HK1",
+    classId = null
   ) {
-    return this.request(
-      `/grades/teacher/dashboard/analytics?academic_year=${academicYear}&semester=${semester}`
-    );
+    let url = `/grades/teacher/dashboard/analytics?academic_year=${academicYear}&semester=${semester}`;
+    if (classId) {
+      url += `&class_id=${classId}`;
+    }
+    return this.request(url);
   }
 
   // ===============================================

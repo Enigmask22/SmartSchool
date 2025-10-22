@@ -1212,24 +1212,98 @@ async def get_student_grade_trend(
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-@router.get("/teacher/dashboard/analytics")
-async def get_teacher_dashboard_analytics(
+@router.get("/teacher/classes")
+async def get_teacher_classes(
     academic_year: str = "2024-2025",
     semester: str = "HK1",
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
     """
-    Lấy dữ liệu phân tích tổng hợp cho dashboard giáo viên bộ môn
-    Bao gồm: tổng quan, phân nhóm học lực, xu hướng, top students, etc.
+    Lấy danh sách các lớp mà giáo viên đang dạy
+    Dùng để tạo dropdown filter cho dashboard
     """
     try:
-        # Lấy các lớp-môn mà giáo viên dạy
         class_subjects = db.table("class_subjects").select("""
             *,
             classes:class_id(id, class_name, grade),
             subjects:subject_id(id, subject_code, subject_name)
         """).eq("teacher_id", current_teacher["id"]).eq("is_active", True).eq("academic_year", academic_year).eq("semester", semester).execute()
+        
+        logger.info(f"Class subjects raw data: {class_subjects.data}")
+        
+        if not class_subjects.data:
+            return {
+                "success": True,
+                "message": "Chưa có lớp được phân công",
+                "data": []
+            }
+        
+        # Tạo danh sách unique classes
+        classes_dict = {}
+        for cs in class_subjects.data:
+            logger.info(f"Processing class_subject: {cs}")
+            if cs.get("classes"):
+                class_id = cs["classes"]["id"]
+                if class_id not in classes_dict:
+                    classes_dict[class_id] = {
+                        "class_id": class_id,
+                        "class_name": cs["classes"]["class_name"],
+                        "grade": cs["classes"]["grade"],
+                        "subjects": []
+                    }
+                
+                # Thêm môn học vào lớp
+                if cs.get("subjects"):
+                    classes_dict[class_id]["subjects"].append({
+                        "subject_id": cs["subjects"]["id"],
+                        "subject_name": cs["subjects"]["subject_name"],
+                        "subject_code": cs["subjects"]["subject_code"]
+                    })
+        
+        classes_list = sorted(list(classes_dict.values()), key=lambda x: (x["grade"], x["class_name"]))
+        
+        logger.info(f"Final classes list: {classes_list}")
+        
+        return {
+            "success": True,
+            "message": f"Lấy danh sách lớp-môn dạy thành công",
+            "data": class_subjects.data  # Trả về raw data để frontend tự xử lý
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting teacher classes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+
+
+@router.get("/teacher/dashboard/analytics")
+async def get_teacher_dashboard_analytics(
+    academic_year: str = "2024-2025",
+    semester: str = "HK1",
+    class_id: Optional[int] = None,  # Thêm tham số filter theo lớp
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """
+    Lấy dữ liệu phân tích tổng hợp cho dashboard giáo viên bộ môn
+    Bao gồm: tổng quan, phân nhóm học lực, xu hướng, top students, etc.
+    
+    Parameters:
+    - class_id (optional): Filter theo lớp cụ thể. Nếu không truyền, hiển thị tất cả các lớp
+    """
+    try:
+        # Lấy các lớp-môn mà giáo viên dạy
+        query = db.table("class_subjects").select("""
+            *,
+            classes:class_id(id, class_name, grade),
+            subjects:subject_id(id, subject_code, subject_name)
+        """).eq("teacher_id", current_teacher["id"]).eq("is_active", True).eq("academic_year", academic_year).eq("semester", semester)
+        
+        # Filter theo class_id nếu có
+        if class_id:
+            query = query.eq("class_id", class_id)
+        
+        class_subjects = query.execute()
         
         if not class_subjects.data:
             return {
@@ -1404,6 +1478,7 @@ async def get_teacher_dashboard_analytics(
         analytics_data = {
             "academic_year": academic_year,
             "semester": semester,
+            "class_filter": class_id,  # Thêm thông tin về class filter
             "total_classes": len(class_subjects.data),
             "total_students": total_students_count,
             "students_with_grades": total_students_with_grades,
@@ -1421,7 +1496,15 @@ async def get_teacher_dashboard_analytics(
             "class_comparison": class_comparison,
             "students_need_attention": students_need_attention[:20],  # Top 20
             "top_students": top_students,
-            "subjects": list(set([cs["subjects"]["subject_name"] for cs in class_subjects.data if cs.get("subjects")]))
+            "subjects": list(set([cs["subjects"]["subject_name"] for cs in class_subjects.data if cs.get("subjects")])),
+            "classes_list": [  # Thêm danh sách các lớp để frontend tạo dropdown filter
+                {
+                    "class_id": cs["classes"]["id"],
+                    "class_name": cs["classes"]["class_name"],
+                    "grade": cs["classes"]["grade"]
+                }
+                for cs in class_subjects.data if cs.get("classes")
+            ] if not class_id else None  # Chỉ trả về khi xem tổng hợp
         }
         
         return {
@@ -1498,11 +1581,11 @@ async def download_grade_template(
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         worksheet = workbook.add_worksheet('Bảng điểm')
         
-        # Định dạng
+        # Định dạng - Toàn bộ trắng để dễ OCR
         header_format = workbook.add_format({
             'bold': True,
-            'bg_color': '#4472C4',
-            'font_color': 'white',
+            'bg_color': 'white',
+            'font_color': 'black',
             'border': 1,
             'align': 'center',
             'valign': 'vcenter'
@@ -1511,7 +1594,8 @@ async def download_grade_template(
         cell_format = workbook.add_format({
             'border': 1,
             'align': 'center',
-            'valign': 'vcenter'
+            'valign': 'vcenter',
+            'bg_color': 'white'
         })
         
         # Header

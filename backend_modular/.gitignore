@@ -1,0 +1,195 @@
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# ==========================================
+# IDE & Editor
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.vim/
+
+# ==========================================
+# Environment & Configuration
+# ==========================================
+.env
+.env.local
+.env.*.local
+*.local
+config.local.py
+.env.example.local
+
+# ==========================================
+# Sensitive/Encoded Files (Database configs)
+# ==========================================
+
+school_databases.json
+# Giữ file example để tham khảo
+!school_databases.json.example
+
+# ==========================================
+# Logs
+# ==========================================
+logs/
+*.log
+*.log.*
+*.pid
+
+# ==========================================
+# Temporary Files
+# ==========================================
+temp_otp/
+*.tmp
+*.temp
+*.cache
+.cache/
+
+# ==========================================
+# Uploads & Media
+# ==========================================
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.mp4
+*.pdf
+*.zip
+*.tar.gz
+
+# ==========================================
+# Database Files
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+*.pkl
+*.pickle
+
+# ==========================================
+# Dependencies & Packages
+# ==========================================
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==========================================
+# OS & System Files
+# ==========================================
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+*.bak
+
+# ==========================================
+# Testing & Coverage
+# ==========================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+
+# ==========================================
+# Jupyter & Notebooks
+# ==========================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ==========================================
+# OCR Models & Large Files (AI Models)
+# ==========================================
+ai_models/
+models/
+*.onnx
+*.pt
+*.pth
+*.h5
+*.keras
+model_*.pkl
+
+# ==========================================
+# schema files
+# ==========================================
+core/schema/
+# ==========================================
+# Docker Build Files (khi chạy locally)
+# ==========================================
+docker_build/
+.dockerignore
+
+# ==========================================
+# FastAPI Generated
+# ==========================================
+.fastapi_cache/
+
+# ==========================================
+# OS Temp Files
+# ==========================================
+.tmp/
+temp/
+tmp/
+
+# ==========================================
+# Node modules (nếu có frontend)
+# ==========================================
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ==========================================
+# CI/CD & Git
+# ==========================================
+.github/workflows/private_*
+.gitlab-ci.local.yml
+
+# ==========================================
+# IDE Caches
+# ==========================================
+*.vscode-unsupported
+*.iml
+.gradle/
+.m2/
