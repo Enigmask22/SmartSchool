@@ -1,4 +1,4 @@
-# Python 3.13 Compatible Requirements for Render
+# Python 3.12 Compatible Requirements for Render
 # Sử dụng pre-built wheels từ PyPI
 
 # ============================================
