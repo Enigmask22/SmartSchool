@@ -72,6 +72,10 @@ const AdminManagement = () => {
   const [filteredTeachers, setFilteredTeachers] = useState([]);
   const [subjectTeachersData, setSubjectTeachersData] = useState([]); // Dữ liệu từ bảng subject_teachers
 
+  // Teacher subjects state (for integrated subject management in teachers tab)
+  const [selectedSubjects, setSelectedSubjects] = useState([]); // Danh sách môn học được chọn cho giáo viên
+  const [teacherSubjects, setTeacherSubjects] = useState({}); // Map teacher_id -> [subject_ids]
+
   // Import từ Users modal state
   const [showImportModal, setShowImportModal] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
@@ -102,6 +106,7 @@ const AdminManagement = () => {
         "full_name",
         "email",
         "phone",
+        "subjects", // Thêm cột môn học
         "is_active",
       ],
       endpoint: "/admin/teachers",
@@ -177,7 +182,7 @@ const AdminManagement = () => {
     { id: "teachers", label: "Giáo viên", icon: GraduationCap },
     { id: "subjects", label: "Môn học", icon: BookOpen },
     { id: "classes", label: "Lớp học", icon: School },
-    { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck },
+    // { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck }, // Đã tích hợp vào tab Giáo viên
     { id: "class_subjects", label: "GV-Lớp học", icon: Building },
   ];
 
@@ -274,8 +279,21 @@ const AdminManagement = () => {
       if (subjectsRes.success) setSubjects(subjectsRes.data || []);
       if (classesRes.success) setClasses(classesRes.data || []);
       if (usersRes.success) setUsers(usersRes.data || []);
-      if (subjectTeachersRes.success)
+      if (subjectTeachersRes.success) {
         setSubjectTeachersData(subjectTeachersRes.data || []);
+
+        // Build teacherSubjects map (teacher_id -> [subject_ids])
+        const teacherSubjectsMap = {};
+        (subjectTeachersRes.data || []).forEach((st) => {
+          if (st.is_active !== false) {
+            if (!teacherSubjectsMap[st.teacher_id]) {
+              teacherSubjectsMap[st.teacher_id] = [];
+            }
+            teacherSubjectsMap[st.teacher_id].push(st.subject_id);
+          }
+        });
+        setTeacherSubjects(teacherSubjectsMap);
+      }
     } catch (err) {
       console.error("Error loading reference data:", err);
     }
@@ -309,22 +327,85 @@ const AdminManagement = () => {
     }
   }, [activeTab, formData.subject_id, subjectTeachersData, teachers]);
 
+  // Load môn học của giáo viên khi edit trong tab teachers
+  useEffect(() => {
+    if (activeTab === "teachers" && editingItem) {
+      // editingItem là id của giáo viên
+      const teacherSubjectIds = teacherSubjects[editingItem] || [];
+      setSelectedSubjects(teacherSubjectIds);
+    } else if (activeTab === "teachers" && showAddForm) {
+      // Reset khi thêm mới
+      setSelectedSubjects([]);
+    }
+  }, [activeTab, editingItem, showAddForm, teacherSubjects]);
+
   const handleCreate = async (data) => {
     if (!currentConfig?.endpoint) return;
 
     try {
-      const response = await api.request(currentConfig.endpoint, {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      // Xử lý đặc biệt cho teachers: tạo teacher + subject_teachers
+      if (activeTab === "teachers") {
+        // 1. Tạo teacher trước
+        const teacherResponse = await api.request(currentConfig.endpoint, {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
 
-      if (response.success) {
+        if (!teacherResponse.success) {
+          setError(teacherResponse.message || "Không thể tạo giáo viên");
+          return;
+        }
+
+        const newTeacher = teacherResponse.data;
+        const newTeacherId = newTeacher.id;
+
+        // 2. Tạo các subject_teachers nếu có môn học được chọn
+        if (selectedSubjects.length > 0) {
+          const currentYear = new Date().getFullYear();
+          const academicYear = `${currentYear}-${currentYear + 1}`;
+
+          const subjectTeacherPromises = selectedSubjects.map((subjectId) =>
+            api.request("/admin/subject-teachers", {
+              method: "POST",
+              body: JSON.stringify({
+                teacher_id: newTeacherId,
+                subject_id: subjectId,
+                academic_year: academicYear,
+                is_active: true,
+              }),
+            })
+          );
+
+          await Promise.all(subjectTeacherPromises);
+        }
+
         setShowAddForm(false);
         setFormData({});
+        setSelectedSubjects([]);
         loadData();
-        alert("Tạo thành công!");
+        loadReferenceData(); // Reload để cập nhật teacherSubjects map
+        alert(
+          `Tạo giáo viên thành công${
+            selectedSubjects.length > 0
+              ? ` và phân công ${selectedSubjects.length} môn học!`
+              : "!"
+          }`
+        );
       } else {
-        setError(response.message || "Không thể tạo bản ghi");
+        // Xử lý bình thường cho các tab khác
+        const response = await api.request(currentConfig.endpoint, {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+
+        if (response.success) {
+          setShowAddForm(false);
+          setFormData({});
+          loadData();
+          alert("Tạo thành công!");
+        } else {
+          setError(response.message || "Không thể tạo bản ghi");
+        }
       }
     } catch (err) {
       setError("Lỗi khi tạo: " + err.message);
@@ -335,18 +416,92 @@ const AdminManagement = () => {
     if (!currentConfig?.endpoint) return;
 
     try {
-      const response = await api.request(`${currentConfig.endpoint}/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
+      // Xử lý đặc biệt cho teachers: update teacher + subject_teachers
+      if (activeTab === "teachers") {
+        // 1. Update teacher trước
+        const teacherResponse = await api.request(
+          `${currentConfig.endpoint}/${id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        );
 
-      if (response.success) {
+        if (!teacherResponse.success) {
+          setError(teacherResponse.message || "Không thể cập nhật giáo viên");
+          return;
+        }
+
+        // 2. Xử lý subject_teachers
+        // Lấy danh sách môn học hiện tại của giáo viên
+        const currentSubjectIds = teacherSubjects[id] || [];
+
+        // Tìm môn học cần thêm và môn học cần xóa
+        const subjectsToAdd = selectedSubjects.filter(
+          (sid) => !currentSubjectIds.includes(sid)
+        );
+        const subjectsToRemove = currentSubjectIds.filter(
+          (sid) => !selectedSubjects.includes(sid)
+        );
+
+        const currentYear = new Date().getFullYear();
+        const academicYear = `${currentYear}-${currentYear + 1}`;
+
+        // Thêm môn học mới
+        if (subjectsToAdd.length > 0) {
+          const addPromises = subjectsToAdd.map((subjectId) =>
+            api.request("/admin/subject-teachers", {
+              method: "POST",
+              body: JSON.stringify({
+                teacher_id: id,
+                subject_id: subjectId,
+                academic_year: academicYear,
+                is_active: true,
+              }),
+            })
+          );
+          await Promise.all(addPromises);
+        }
+
+        // Xóa môn học (soft delete)
+        if (subjectsToRemove.length > 0) {
+          // Tìm subject_teacher_ids cần xóa
+          const subjectTeachersToDelete = subjectTeachersData.filter(
+            (st) =>
+              st.teacher_id === id &&
+              subjectsToRemove.includes(st.subject_id) &&
+              st.is_active !== false
+          );
+
+          const deletePromises = subjectTeachersToDelete.map((st) =>
+            api.request(`/admin/subject-teachers/${st.id}`, {
+              method: "DELETE",
+            })
+          );
+          await Promise.all(deletePromises);
+        }
+
         setEditingItem(null);
         setFormData({});
+        setSelectedSubjects([]);
         loadData();
-        alert("Cập nhật thành công!");
+        loadReferenceData(); // Reload để cập nhật teacherSubjects map
+        alert(`Cập nhật giáo viên thành công!`);
       } else {
-        setError(response.message || "Không thể cập nhật");
+        // Xử lý bình thường cho các tab khác
+        const response = await api.request(`${currentConfig.endpoint}/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        });
+
+        if (response.success) {
+          setEditingItem(null);
+          setFormData({});
+          loadData();
+          alert("Cập nhật thành công!");
+        } else {
+          setError(response.message || "Không thể cập nhật");
+        }
       }
     } catch (err) {
       setError("Lỗi khi cập nhật: " + err.message);
@@ -809,6 +964,51 @@ const AdminManagement = () => {
           </div>
         ))}
 
+        {/* Multi-select môn học cho teachers */}
+        {activeTab === "teachers" && (
+          <div className="pt-4 mt-4 border-t border-gray-200">
+            <label className="block mb-3 text-sm font-semibold text-gray-800">
+              <BookOpen className="inline-block w-4 h-4 mr-1 mb-0.5" />
+              Môn học phụ trách
+            </label>
+            <p className="mb-3 text-xs text-gray-600">
+              Chọn các môn học mà giáo viên này sẽ giảng dạy (có thể chọn nhiều
+              môn)
+            </p>
+            <div className="grid grid-cols-2 gap-2 p-3 overflow-y-auto rounded-md bg-gray-50 max-h-60">
+              {subjects.map((subject) => (
+                <label
+                  key={subject.id}
+                  className="flex items-center p-2 space-x-2 transition-colors rounded cursor-pointer hover:bg-white"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedSubjects.includes(subject.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedSubjects([...selectedSubjects, subject.id]);
+                      } else {
+                        setSelectedSubjects(
+                          selectedSubjects.filter((id) => id !== subject.id)
+                        );
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    {subject.subject_code} - {subject.subject_name}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {selectedSubjects.length > 0 && (
+              <p className="mt-2 text-xs text-green-600">
+                ✓ Đã chọn {selectedSubjects.length} môn học
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-end pt-6 mt-8 space-x-4 border-t border-border">
           <Button
             type="button"
@@ -1002,6 +1202,8 @@ const AdminManagement = () => {
                           ? "HỌ TÊN"
                           : field === "is_active"
                           ? "TRẠNG THÁI"
+                          : field === "subjects"
+                          ? "MÔN HỌC PHỤ TRÁCH"
                           : field === "subject_code"
                           ? "MÃ MÔN HỌC"
                           : field === "subject_name"
@@ -1040,7 +1242,36 @@ const AdminManagement = () => {
                       >
                         {currentConfig?.displayFields?.map((field) => (
                           <TableCell key={field}>
-                            {typeof item[field] === "boolean" ? (
+                            {field === "subjects" ? (
+                              // Hiển thị môn học của giáo viên
+                              <div className="flex flex-wrap gap-1">
+                                {(() => {
+                                  const teacherSubjectIds =
+                                    teacherSubjects[item.id] || [];
+                                  if (teacherSubjectIds.length === 0) {
+                                    return (
+                                      <span className="text-xs italic text-gray-400">
+                                        Chưa phân công
+                                      </span>
+                                    );
+                                  }
+                                  return teacherSubjectIds.map((subjectId) => {
+                                    const subject = subjects.find(
+                                      (s) => s.id === subjectId
+                                    );
+                                    return subject ? (
+                                      <Badge
+                                        key={subjectId}
+                                        variant="outline"
+                                        className="text-xs text-blue-700 border-blue-200 bg-blue-50"
+                                      >
+                                        {subject.subject_code}
+                                      </Badge>
+                                    ) : null;
+                                  });
+                                })()}
+                              </div>
+                            ) : typeof item[field] === "boolean" ? (
                               item[field] ? (
                                 <Badge
                                   variant="default"
