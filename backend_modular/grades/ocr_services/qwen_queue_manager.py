@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 
-from ...core.logger import setup_logger
+from core.logger import setup_logger
 
 logger = setup_logger("qwen_queue")
 

@@ -1,17 +1,50 @@
-import React, { useState } from 'react';
-import { Upload, Camera, Loader2, CheckCircle, XCircle, AlertCircle, Eye, Download, BarChart3, FileText, Clock, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import api from '../services/api';
+import React, { useState } from "react";
+import {
+  Upload,
+  Camera,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Eye,
+  Download,
+  BarChart3,
+  FileText,
+  Clock,
+  RefreshCw,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import api from "../services/api";
 
-const OCRGradeSheet = ({ 
-  selectedClassSubject, 
-  academicYear, 
-  semester, 
-  onImportSuccess 
+const OCRGradeSheet = ({
+  selectedClassSubject,
+  academicYear,
+  semester,
+  onImportSuccess,
 }) => {
   const [showOCRModal, setShowOCRModal] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -19,14 +52,14 @@ const OCRGradeSheet = ({
   const [parsedData, setParsedData] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  
+
   // Queue management states
   const [requestId, setRequestId] = useState(null);
   const [ocrStatus, setOcrStatus] = useState(null); // 'queued', 'processing', 'completed', 'failed'
   const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('');
+  const [statusMessage, setStatusMessage] = useState("");
   const [queuePosition, setQueuePosition] = useState(null);
-  
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20); // 20 rows per page
@@ -34,6 +67,24 @@ const OCRGradeSheet = ({
   // Reset page when parsedData changes
   React.useEffect(() => {
     setCurrentPage(1);
+
+    // Auto scroll to bottom of dialog when data is parsed
+    if (
+      parsedData &&
+      parsedData.parsed_rows &&
+      parsedData.parsed_rows.length > 0
+    ) {
+      setTimeout(() => {
+        // Find the DialogContent and scroll to bottom
+        const dialogContent = document.querySelector('[role="dialog"]');
+        if (dialogContent) {
+          dialogContent.scrollTo({
+            top: dialogContent.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 500); // Increase delay to ensure content is fully rendered
+    }
   }, [parsedData]);
 
   const handleImageSelect = (event) => {
@@ -41,15 +92,15 @@ const OCRGradeSheet = ({
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('❌ Vui lòng chọn file ảnh (jpg, png, etc.)');
+    if (!file.type.startsWith("image/")) {
+      alert("❌ Vui lòng chọn file ảnh (jpg, png, etc.)");
       return;
     }
 
     // Validate file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
-      alert('❌ File ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 10MB.');
+      alert("❌ File ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 10MB.");
       return;
     }
 
@@ -62,80 +113,88 @@ const OCRGradeSheet = ({
     };
     reader.readAsDataURL(file);
 
-    event.target.value = ''; // Reset input
+    event.target.value = ""; // Reset input
   };
 
   // Poll status của OCR request
   const pollOCRStatus = async (reqId) => {
     try {
       const response = await api.getOCRStatus(reqId);
-      
+
       if (response.success) {
         const status = response.data.status;
         setOcrStatus(status);
         setProgress(response.data.progress || 0);
-        setStatusMessage(response.data.message || '');
-        
-        if (status === 'queued') {
+        setStatusMessage(response.data.message || "");
+
+        if (status === "queued") {
           setQueuePosition(response.data.position_in_queue);
           // Continue polling
           setTimeout(() => pollOCRStatus(reqId), 3000); // Poll every 3 seconds
-        } else if (status === 'processing') {
+        } else if (status === "processing") {
           setQueuePosition(null);
           // Continue polling
           setTimeout(() => pollOCRStatus(reqId), 2000); // Poll every 2 seconds when processing
-        } else if (status === 'completed') {
+        } else if (status === "completed") {
           // Parse completed!
           const result = response.data.result;
           setParsedData(result);
           setParsing(false);
           setUploading(false);
-          
+
           if (result.total_valid === 0) {
-            alert('⚠️ Không tìm thấy dữ liệu hợp lệ trong ảnh!\n\n' + 
-                  'Vui lòng kiểm tra:\n' +
-                  '- Ảnh có đủ sáng và rõ nét\n' +
-                  '- Bảng điểm có đúng format (id, họ và tên, điểm)');
+            alert(
+              "⚠️ Không tìm thấy dữ liệu hợp lệ trong ảnh!\n\n" +
+                "Vui lòng kiểm tra:\n" +
+                "- Ảnh có đủ sáng và rõ nét\n" +
+                "- Bảng điểm có đúng format (id, họ và tên, điểm)"
+            );
           } else if (result.total_errors > 0) {
-            alert(`⚠️ Phân tích thành công nhưng có ${result.total_errors} lỗi!\n\n` +
-                  `✅ Tìm thấy: ${result.total_valid} học sinh hợp lệ\n` +
-                  `❌ Lỗi: ${result.total_errors} dòng`);
+            alert(
+              `⚠️ Phân tích thành công nhưng có ${result.total_errors} lỗi!\n\n` +
+                `✅ Tìm thấy: ${result.total_valid} học sinh hợp lệ\n` +
+                `❌ Lỗi: ${result.total_errors} dòng`
+            );
           } else {
-            alert(`✅ Phân tích bảng điểm thành công!\n\n` +
-                  `Tìm thấy ${result.total_valid} học sinh.`);
+            alert(
+              `✅ Phân tích bảng điểm thành công!\n\n` +
+                `Tìm thấy ${result.total_valid} học sinh.`
+            );
           }
-        } else if (status === 'failed') {
+        } else if (status === "failed") {
           // Failed
           setParsing(false);
           setUploading(false);
-          alert('❌ Lỗi khi xử lý ảnh: ' + (response.data.error || 'Unknown error'));
+          alert(
+            "❌ Lỗi khi xử lý ảnh: " + (response.data.error || "Unknown error")
+          );
         }
       } else {
-        throw new Error(response.message || 'Failed to get status');
+        throw new Error(response.message || "Failed to get status");
       }
     } catch (error) {
-      console.error('Error polling OCR status:', error);
+      console.error("Error polling OCR status:", error);
       setParsing(false);
       setUploading(false);
-      alert('❌ Lỗi khi kiểm tra trạng thái OCR!');
+      alert("❌ Lỗi khi kiểm tra trạng thái OCR!");
     }
   };
 
   const handleUploadAndParse = async () => {
     if (!selectedImage) {
-      alert('❌ Vui lòng chọn ảnh bảng điểm!');
+      alert("❌ Vui lòng chọn ảnh bảng điểm!");
       return;
     }
 
     try {
       setUploading(true);
       setParsing(true);
-      setOcrStatus('uploading');
+      setOcrStatus("uploading");
       setProgress(0);
-      setStatusMessage('Đang upload ảnh...');
+      setStatusMessage("Đang upload ảnh...");
 
       const formData = new FormData();
-      formData.append('file', selectedImage);
+      formData.append("file", selectedImage);
 
       const response = await api.parseGradeSheetOCR(formData);
 
@@ -145,34 +204,39 @@ const OCRGradeSheet = ({
         setRequestId(reqId);
         setOcrStatus(response.data.status); // Should be 'queued'
         setQueuePosition(response.data.position_in_queue);
-        setStatusMessage('Đã thêm vào hàng chờ...');
-        
+        setStatusMessage("Đã thêm vào hàng chờ...");
+
         // Start polling status
         setTimeout(() => pollOCRStatus(reqId), 2000); // Start polling after 2s
       } else {
-        alert('❌ Lỗi khi upload ảnh: ' + response.message);
+        alert("❌ Lỗi khi upload ảnh: " + response.message);
         setUploading(false);
         setParsing(false);
       }
-
     } catch (error) {
-      console.error('Error uploading OCR:', error);
-      
+      console.error("Error uploading OCR:", error);
+
       // Check if queue is full (HTTP 503)
       if (error.response && error.response.status === 503) {
-        alert('⚠️ Hệ thống đang quá tải!\n\nHàng chờ đã đầy. Vui lòng thử lại sau vài phút.');
+        alert(
+          "⚠️ Hệ thống đang quá tải!\n\nHàng chờ đã đầy. Vui lòng thử lại sau vài phút."
+        );
       } else {
-        alert('❌ Lỗi khi xử lý ảnh! Vui lòng thử lại.');
+        alert("❌ Lỗi khi xử lý ảnh! Vui lòng thử lại.");
       }
-      
+
       setUploading(false);
       setParsing(false);
     }
   };
 
   const handleConfirmImport = async () => {
-    if (!parsedData || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0) {
-      alert('❌ Không có dữ liệu để import!');
+    if (
+      !parsedData ||
+      !parsedData.parsed_rows ||
+      parsedData.parsed_rows.length === 0
+    ) {
+      alert("❌ Không có dữ liệu để import!");
       return;
     }
 
@@ -180,58 +244,65 @@ const OCRGradeSheet = ({
       setUploading(true);
 
       // Convert parsed data to import format
-      const grades = parsedData.parsed_rows.map(row => ({
+      const grades = parsedData.parsed_rows.map((row) => ({
         student_id: row.student_id,
         diem_thuong_xuyen: row.diem_thuong_xuyen,
         diem_thi_giua_ki: row.diem_thi_giua_ki,
-        diem_thi_cuoi_ki: row.diem_thi_cuoi_ki
+        diem_thi_cuoi_ki: row.diem_thi_cuoi_ki,
       }));
 
       const importPayload = {
         class_subject_id: selectedClassSubject.id,
         academic_year: academicYear,
         semester: semester,
-        grades: grades
+        grades: grades,
       };
 
       const response = await api.bulkImportGrades(importPayload);
 
       if (response.success) {
-        alert(`✅ ${response.message}\n\n` +
-              `Thành công: ${response.data.success_count} bản ghi` +
-              (response.data.error_count > 0 ? `\nLỗi: ${response.data.error_count} bản ghi` : ''));
+        alert(
+          `✅ ${response.message}\n\n` +
+            `Thành công: ${response.data.success_count} bản ghi` +
+            (response.data.error_count > 0
+              ? `\nLỗi: ${response.data.error_count} bản ghi`
+              : "")
+        );
 
         // Reset and close
         handleCloseModal();
-        
+
         // Callback to refresh data
         if (onImportSuccess) {
           onImportSuccess();
         }
       } else {
-        alert('❌ Lỗi khi import điểm: ' + response.message);
+        alert("❌ Lỗi khi import điểm: " + response.message);
       }
-
     } catch (error) {
-      console.error('Error importing grades from OCR:', error);
-      alert('❌ Lỗi khi import điểm!');
+      console.error("Error importing grades from OCR:", error);
+      alert("❌ Lỗi khi import điểm!");
     } finally {
       setUploading(false);
     }
   };
 
   const handleExportToExcel = async () => {
-    if (!parsedData || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0) {
-      alert('❌ Không có dữ liệu để export!');
+    if (
+      !parsedData ||
+      !parsedData.parsed_rows ||
+      parsedData.parsed_rows.length === 0
+    ) {
+      alert("❌ Không có dữ liệu để export!");
       return;
     }
 
     try {
       await api.exportParsedOCRToExcel({ parsed_rows: parsedData.parsed_rows });
-      alert('✅ Tải file Excel thành công!');
+      alert("✅ Tải file Excel thành công!");
     } catch (error) {
-      console.error('Error exporting OCR data:', error);
-      alert('❌ Lỗi khi export file!');
+      console.error("Error exporting OCR data:", error);
+      alert("❌ Lỗi khi export file!");
     }
   };
 
@@ -240,12 +311,12 @@ const OCRGradeSheet = ({
     setParsedData(null);
     setSelectedImage(null);
     setImagePreview(null);
-    
+
     // Reset queue states
     setRequestId(null);
     setOcrStatus(null);
     setProgress(0);
-    setStatusMessage('');
+    setStatusMessage("");
     setQueuePosition(null);
   };
 
@@ -263,7 +334,7 @@ const OCRGradeSheet = ({
 
       {/* OCR Modal */}
       <Dialog open={showOCRModal} onOpenChange={setShowOCRModal}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Camera className="w-6 h-6 text-primary" />
@@ -275,7 +346,7 @@ const OCRGradeSheet = ({
           </DialogHeader>
 
           {/* Content */}
-          <div className="overflow-y-auto flex-1 p-6">
+          <div className="flex-1 p-6">
             {!parsedData ? (
               // Upload Section
               <div className="space-y-6">
@@ -290,7 +361,13 @@ const OCRGradeSheet = ({
                   <CardContent>
                     <ul className="space-y-2 text-sm text-muted-foreground">
                       <li>• Chụp ảnh bảng điểm rõ nét, đủ sáng</li>
-                      <li>• Bảng điểm phải có các cột: <strong>id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki</strong></li>
+                      <li>
+                        • Bảng điểm phải có các cột:{" "}
+                        <strong>
+                          id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki,
+                          diem_thi_cuoi_ki
+                        </strong>
+                      </li>
                       <li>• Viết tay hoặc in đều được hỗ trợ</li>
                       <li>• Định dạng ảnh: JPG, PNG (tối đa 10MB)</li>
                     </ul>
@@ -304,13 +381,14 @@ const OCRGradeSheet = ({
                       <CardTitle className="text-lg">Ảnh đã chọn</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview" 
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
                         className="mx-auto max-w-full max-h-96 rounded-lg shadow-md"
                       />
                       <p className="mt-2 text-xs text-center text-muted-foreground">
-                        {selectedImage.name} ({(selectedImage.size / 1024 / 1024).toFixed(2)} MB)
+                        {selectedImage.name} (
+                        {(selectedImage.size / 1024 / 1024).toFixed(2)} MB)
                       </p>
                     </CardContent>
                   </Card>
@@ -318,13 +396,12 @@ const OCRGradeSheet = ({
 
                 {/* Upload Button */}
                 <div className="flex flex-col items-center space-y-4">
-                  <Button
-                    asChild
-                    className="w-full max-w-md"
-                  >
+                  <Button asChild className="w-full max-w-md">
                     <label className="cursor-pointer">
                       <Upload className="w-5 h-5 mr-2" />
-                      <span>{selectedImage ? 'Chọn ảnh khác' : 'Chọn ảnh bảng điểm'}</span>
+                      <span>
+                        {selectedImage ? "Chọn ảnh khác" : "Chọn ảnh bảng điểm"}
+                      </span>
                       <input
                         type="file"
                         accept="image/*"
@@ -361,7 +438,7 @@ const OCRGradeSheet = ({
                       <CardHeader>
                         <CardTitle className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            {ocrStatus === 'queued' && (
+                            {ocrStatus === "queued" && (
                               <>
                                 <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
                                 <span className="font-semibold text-yellow-700 flex items-center space-x-2">
@@ -370,7 +447,7 @@ const OCRGradeSheet = ({
                                 </span>
                               </>
                             )}
-                            {ocrStatus === 'processing' && (
+                            {ocrStatus === "processing" && (
                               <>
                                 <Loader2 className="w-5 h-5 text-primary animate-spin" />
                                 <span className="font-semibold text-primary flex items-center space-x-2">
@@ -380,34 +457,44 @@ const OCRGradeSheet = ({
                               </>
                             )}
                           </div>
-                          <span className="text-2xl font-bold text-primary">{progress}%</span>
+                          <span className="text-2xl font-bold text-primary">
+                            {progress}%
+                          </span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         {/* Progress Bar */}
                         <div className="overflow-hidden mb-4 w-full h-3 bg-gray-200 rounded-full">
-                          <div 
+                          <div
                             className="h-3 bg-primary rounded-full transition-all duration-500 ease-out"
                             style={{ width: `${progress}%` }}
                           ></div>
                         </div>
 
                         {/* Status Message */}
-                        <p className="mb-2 text-sm font-medium text-muted-foreground">{statusMessage}</p>
+                        <p className="mb-2 text-sm font-medium text-muted-foreground">
+                          {statusMessage}
+                        </p>
 
                         {/* Queue Position */}
                         {queuePosition !== null && (
                           <div className="p-3 mt-3 bg-yellow-50 rounded-md border border-yellow-200">
                             <p className="text-xs text-yellow-800 flex items-center space-x-2">
                               <Clock className="w-4 h-4" />
-                              <span>Vị trí trong hàng chờ: <strong className="text-lg">#{queuePosition}</strong></span>
+                              <span>
+                                Vị trí trong hàng chờ:{" "}
+                                <strong className="text-lg">
+                                  #{queuePosition}
+                                </strong>
+                              </span>
                             </p>
                           </div>
                         )}
 
                         {/* Info */}
                         <p className="mt-3 text-xs italic text-muted-foreground">
-                          💡 Bạn có thể đóng cửa sổ này. Hệ thống sẽ tự động xử lý.
+                          💡 Bạn có thể đóng cửa sổ này. Hệ thống sẽ tự động xử
+                          lý.
                         </p>
                       </CardContent>
                     </Card>
@@ -416,16 +503,20 @@ const OCRGradeSheet = ({
               </div>
             ) : (
               // Results Section
-              <div className="space-y-6">
+              <div id="ocr-results-section" className="space-y-6">
                 {/* Summary */}
                 <div className="grid grid-cols-3 gap-4">
                   <Card className="border-green-200 bg-green-50">
                     <CardContent className="p-4">
                       <div className="flex items-center space-x-2 mb-2">
                         <CheckCircle className="w-5 h-5 text-green-600" />
-                        <p className="text-sm font-medium text-green-700">Hợp lệ</p>
+                        <p className="text-sm font-medium text-green-700">
+                          Hợp lệ
+                        </p>
                       </div>
-                      <p className="text-3xl font-bold text-green-900">{parsedData.total_valid}</p>
+                      <p className="text-3xl font-bold text-green-900">
+                        {parsedData.total_valid}
+                      </p>
                     </CardContent>
                   </Card>
                   <Card className="border-red-200 bg-red-50">
@@ -434,43 +525,55 @@ const OCRGradeSheet = ({
                         <XCircle className="w-5 h-5 text-red-600" />
                         <p className="text-sm font-medium text-red-700">Lỗi</p>
                       </div>
-                      <p className="text-3xl font-bold text-red-900">{parsedData.total_errors}</p>
+                      <p className="text-3xl font-bold text-red-900">
+                        {parsedData.total_errors}
+                      </p>
                     </CardContent>
                   </Card>
                   <Card className="border-blue-200 bg-blue-50">
                     <CardContent className="p-4">
                       <div className="flex items-center space-x-2 mb-2">
                         <BarChart3 className="w-5 h-5 text-blue-600" />
-                        <p className="text-sm font-medium text-blue-700">Tổng</p>
+                        <p className="text-sm font-medium text-blue-700">
+                          Tổng
+                        </p>
                       </div>
-                      <p className="text-3xl font-bold text-blue-900">{parsedData.total_parsed}</p>
+                      <p className="text-3xl font-bold text-blue-900">
+                        {parsedData.total_parsed}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
 
                 {/* Errors Display */}
-                {parsedData.validation_errors && parsedData.validation_errors.length > 0 && (
-                  <Card className="border-red-200 bg-red-50">
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2 text-red-900">
-                        <AlertCircle className="w-5 h-5" />
-                        <span>Lỗi validation</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-y-auto max-h-32">
-                        <ul className="space-y-2 text-sm text-red-800">
-                          {parsedData.validation_errors.map((error, idx) => (
-                            <li key={idx} className="flex items-start space-x-2">
-                              <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                              <span>Row {error.row}: {error.error}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                {parsedData.validation_errors &&
+                  parsedData.validation_errors.length > 0 && (
+                    <Card className="border-red-200 bg-red-50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2 text-red-900">
+                          <AlertCircle className="w-5 h-5" />
+                          <span>Lỗi validation</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-y-auto max-h-32">
+                          <ul className="space-y-2 text-sm text-red-800">
+                            {parsedData.validation_errors.map((error, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start space-x-2"
+                              >
+                                <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                <span>
+                                  Row {error.row}: {error.error}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                 {/* OCR Errors */}
                 {parsedData.ocr_errors && parsedData.ocr_errors.length > 0 && (
@@ -485,7 +588,10 @@ const OCRGradeSheet = ({
                       <div className="overflow-y-auto max-h-32">
                         <ul className="space-y-2 text-sm text-yellow-800">
                           {parsedData.ocr_errors.map((error, idx) => (
-                            <li key={idx} className="flex items-start space-x-2">
+                            <li
+                              key={idx}
+                              className="flex items-start space-x-2"
+                            >
                               <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                               <span>{error}</span>
                             </li>
@@ -502,17 +608,29 @@ const OCRGradeSheet = ({
                   const totalPages = Math.ceil(totalRows / pageSize);
                   const startIndex = (currentPage - 1) * pageSize;
                   const endIndex = startIndex + pageSize;
-                  
+
                   if (totalRows > pageSize) {
                     return (
                       <Card className="mb-4">
                         <CardContent className="p-4">
                           <div className="flex flex-wrap gap-3 justify-between items-center">
                             <div className="text-sm text-muted-foreground">
-                              Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến <span className="font-semibold">{Math.min(endIndex, totalRows)}</span> trong tổng số <span className="font-semibold">{totalRows}</span> bản ghi
+                              Hiển thị{" "}
+                              <span className="font-semibold">
+                                {startIndex + 1}
+                              </span>{" "}
+                              đến{" "}
+                              <span className="font-semibold">
+                                {Math.min(endIndex, totalRows)}
+                              </span>{" "}
+                              trong tổng số{" "}
+                              <span className="font-semibold">{totalRows}</span>{" "}
+                              bản ghi
                             </div>
                             <div className="flex items-center space-x-2">
-                              <label className="text-sm text-muted-foreground">Số lượng/trang:</label>
+                              <label className="text-sm text-muted-foreground">
+                                Số lượng/trang:
+                              </label>
                               <select
                                 value={pageSize}
                                 onChange={(e) => {
@@ -542,13 +660,27 @@ const OCRGradeSheet = ({
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="text-xs font-medium text-left">STT</TableHead>
-                            <TableHead className="text-xs font-medium text-left">Mã HS</TableHead>
-                            <TableHead className="text-xs font-medium text-left">Họ và tên</TableHead>
-                            <TableHead className="text-xs font-medium text-left">Lớp</TableHead>
-                            <TableHead className="text-xs font-medium text-center">ĐTX</TableHead>
-                            <TableHead className="text-xs font-medium text-center">ĐGK</TableHead>
-                            <TableHead className="text-xs font-medium text-center">ĐCK</TableHead>
+                            <TableHead className="text-xs font-medium text-left">
+                              STT
+                            </TableHead>
+                            <TableHead className="text-xs font-medium text-left">
+                              Mã HS
+                            </TableHead>
+                            <TableHead className="text-xs font-medium text-left">
+                              Họ và tên
+                            </TableHead>
+                            <TableHead className="text-xs font-medium text-left">
+                              Lớp
+                            </TableHead>
+                            <TableHead className="text-xs font-medium text-center">
+                              ĐTX
+                            </TableHead>
+                            <TableHead className="text-xs font-medium text-center">
+                              ĐGK
+                            </TableHead>
+                            <TableHead className="text-xs font-medium text-center">
+                              ĐCK
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -557,53 +689,82 @@ const OCRGradeSheet = ({
                             const startIndex = (currentPage - 1) * pageSize;
                             const endIndex = startIndex + pageSize;
                             // Sắp xếp theo student_id tăng dần trước khi phân trang
-                            const sortedRows = parsedData.parsed_rows.sort((a, b) => {
-                              const aId = parseInt(a.student_id) || 0;
-                              const bId = parseInt(b.student_id) || 0;
-                              return aId - bId;
-                            });
-                            const paginatedRows = sortedRows.slice(startIndex, endIndex);
-                            
+                            const sortedRows = parsedData.parsed_rows.sort(
+                              (a, b) => {
+                                const aId = parseInt(a.student_id) || 0;
+                                const bId = parseInt(b.student_id) || 0;
+                                return aId - bId;
+                              }
+                            );
+                            const paginatedRows = sortedRows.slice(
+                              startIndex,
+                              endIndex
+                            );
+
                             return paginatedRows.map((row, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="text-sm">{startIndex + idx + 1}</TableCell>
-                              <TableCell className="text-sm font-medium text-primary">{row.student_id}</TableCell>
-                              <TableCell className="text-sm">
-                                {row.full_name}
-                                {row.ocr_name && row.ocr_name !== row.full_name && (
-                                  <span className="block text-xs text-muted-foreground">OCR: {row.ocr_name}</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{row.class_name}</TableCell>
-                              <TableCell className="text-sm text-center">
-                                {row.diem_thuong_xuyen !== null ? (
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                                    {row.diem_thuong_xuyen}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-sm text-center">
-                                {row.diem_thi_giua_ki !== null ? (
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                                    {row.diem_thi_giua_ki}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-sm text-center">
-                                {row.diem_thi_cuoi_ki !== null ? (
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                                    {row.diem_thi_cuoi_ki}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ));
+                              <TableRow key={idx}>
+                                <TableCell className="text-sm">
+                                  {startIndex + idx + 1}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-primary">
+                                  {row.student_id}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {row.full_name}
+                                  {row.ocr_name &&
+                                    row.ocr_name !== row.full_name && (
+                                      <span className="block text-xs text-muted-foreground">
+                                        OCR: {row.ocr_name}
+                                      </span>
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {row.class_name}
+                                </TableCell>
+                                <TableCell className="text-sm text-center">
+                                  {row.diem_thuong_xuyen !== null ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-blue-100 text-blue-700"
+                                    >
+                                      {row.diem_thuong_xuyen}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      -
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-sm text-center">
+                                  {row.diem_thi_giua_ki !== null ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-blue-100 text-blue-700"
+                                    >
+                                      {row.diem_thi_giua_ki}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      -
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-sm text-center">
+                                  {row.diem_thi_cuoi_ki !== null ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-blue-100 text-blue-700"
+                                    >
+                                      {row.diem_thi_cuoi_ki}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      -
+                                    </span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ));
                           })()}
                         </TableBody>
                       </Table>
@@ -617,39 +778,57 @@ const OCRGradeSheet = ({
                   const totalPages = Math.ceil(totalRows / pageSize);
                   const startIndex = (currentPage - 1) * pageSize;
                   const endIndex = startIndex + pageSize;
-                  
+
                   if (totalPages <= 1) return null;
-                  
+
                   return (
                     <div className="flex justify-center items-center mt-4 space-x-2">
                       <Button
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        onClick={() =>
+                          setCurrentPage((prev) => Math.max(1, prev - 1))
+                        }
                         disabled={currentPage === 1}
                         variant="outline"
                         size="sm"
                       >
                         ← Trước
                       </Button>
-                      
+
                       <div className="flex items-center space-x-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                          const showPage = 
-                            pageNum === 1 || 
-                            pageNum === totalPages || 
-                            (pageNum >= currentPage - 1 && pageNum <= currentPage + 1);
-                          
+                        {Array.from(
+                          { length: totalPages },
+                          (_, i) => i + 1
+                        ).map((pageNum) => {
+                          const showPage =
+                            pageNum === 1 ||
+                            pageNum === totalPages ||
+                            (pageNum >= currentPage - 1 &&
+                              pageNum <= currentPage + 1);
+
                           if (!showPage) {
-                            if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                              return <span key={pageNum} className="px-2 text-muted-foreground">...</span>;
+                            if (
+                              pageNum === currentPage - 2 ||
+                              pageNum === currentPage + 2
+                            ) {
+                              return (
+                                <span
+                                  key={pageNum}
+                                  className="px-2 text-muted-foreground"
+                                >
+                                  ...
+                                </span>
+                              );
                             }
                             return null;
                           }
-                          
+
                           return (
                             <Button
                               key={pageNum}
                               onClick={() => setCurrentPage(pageNum)}
-                              variant={currentPage === pageNum ? "default" : "outline"}
+                              variant={
+                                currentPage === pageNum ? "default" : "outline"
+                              }
                               size="sm"
                             >
                               {pageNum}
@@ -657,9 +836,13 @@ const OCRGradeSheet = ({
                           );
                         })}
                       </div>
-                      
+
                       <Button
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        onClick={() =>
+                          setCurrentPage((prev) =>
+                            Math.min(totalPages, prev + 1)
+                          )
+                        }
                         disabled={currentPage === totalPages}
                         variant="outline"
                         size="sm"
@@ -685,17 +868,18 @@ const OCRGradeSheet = ({
                   </Button>
 
                   <div className="flex space-x-3">
-                    <Button
-                      onClick={handleExportToExcel}
-                      variant="outline"
-                    >
+                    <Button onClick={handleExportToExcel} variant="outline">
                       <Download className="w-4 h-4 mr-2" />
                       Tải Excel
                     </Button>
 
                     <Button
                       onClick={handleConfirmImport}
-                      disabled={uploading || !parsedData.parsed_rows || parsedData.parsed_rows.length === 0}
+                      disabled={
+                        uploading ||
+                        !parsedData.parsed_rows ||
+                        parsedData.parsed_rows.length === 0
+                      }
                     >
                       {uploading ? (
                         <>
@@ -721,4 +905,3 @@ const OCRGradeSheet = ({
 };
 
 export default OCRGradeSheet;
-

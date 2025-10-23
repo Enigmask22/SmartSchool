@@ -7,7 +7,7 @@ import os
 from enum import Enum
 from typing import Optional, Union
 
-from ...core.logger import setup_logger
+from core.logger import setup_logger
 
 logger = setup_logger("ocr_factory")
 
