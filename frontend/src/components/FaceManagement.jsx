@@ -283,16 +283,16 @@ const FaceManagement = () => {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          <div className="w-16 h-16 border-4 border-blue-200 rounded-full border-t-blue-600 animate-spin"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6 min-h-screen bg-gray-50">
+    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-gray-900 flex items-center space-x-2">
+        <h2 className="flex items-center space-x-2 text-3xl font-bold text-gray-900">
           <Camera className="w-8 h-8 text-primary" />
           <span>Quản lý khuôn mặt AI</span>
         </h2>
@@ -300,7 +300,7 @@ const FaceManagement = () => {
           Theo dõi và quản lý dữ liệu khuôn mặt đã đăng ký
         </p>
         {error && (
-          <div className="flex items-center space-x-2 p-3 mt-2 text-red-700 bg-red-100 rounded border border-red-400">
+          <div className="flex items-center p-3 mt-2 space-x-2 text-red-700 bg-red-100 border border-red-400 rounded">
             <AlertCircle className="w-5 h-5" />
             <span>{error}</span>
           </div>
@@ -320,7 +320,7 @@ const FaceManagement = () => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card className="border-green-200 bg-green-50">
                 <CardContent className="p-4">
-                  <div className="flex items-center space-x-2 mb-2">
+                  <div className="flex items-center mb-2 space-x-2">
                     <UserCheck className="w-5 h-5 text-green-600" />
                     <div className="text-2xl font-bold text-green-600">
                       {aiStatus.service_status === "active"
@@ -339,7 +339,7 @@ const FaceManagement = () => {
 
               <Card className="border-blue-200 bg-blue-50">
                 <CardContent className="p-4">
-                  <div className="flex items-center space-x-2 mb-2">
+                  <div className="flex items-center mb-2 space-x-2">
                     <Users className="w-5 h-5 text-blue-600" />
                     <div className="text-2xl font-bold text-blue-600">
                       {aiStatus.database_encodings || 0}
@@ -357,7 +357,7 @@ const FaceManagement = () => {
 
               <Card className="border-purple-200 bg-purple-50">
                 <CardContent className="p-4">
-                  <div className="flex items-center space-x-2 mb-2">
+                  <div className="flex items-center mb-2 space-x-2">
                     <Camera className="w-5 h-5 text-purple-600" />
                     <div className="text-2xl font-bold text-purple-600">
                       {aiStatus.accuracy || "N/A"}
@@ -376,16 +376,22 @@ const FaceManagement = () => {
 
               <Card className="border-orange-200 bg-orange-50">
                 <CardContent className="p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                  <div className="flex items-center mb-2 space-x-2">
+                    {aiStatus.sync_status === "synced" ? (
+                      <UserCheck className="w-8 h-8 text-green-600" />
+                    ) : (
+                      <AlertCircle className="w-8 h-8 text-orange-600" />
+                    )}
                     <div className="text-2xl font-bold text-orange-600">
-                      {aiStatus.sync_status === "synced" ? "✅" : "⚠️"}
+                      {aiStatus.sync_status === "synced"
+                        ? "Đồng bộ"
+                        : "Chưa đồng bộ"}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Trạng thái đồng bộ
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground capitalize">
+                  <div className="mt-1 text-xs capitalize text-muted-foreground">
                     {aiStatus.sync_status?.replace("_", " ")}
                   </div>
                 </CardContent>
@@ -397,7 +403,7 @@ const FaceManagement = () => {
             </div>
           )}
 
-          <div className="mt-4 flex space-x-3">
+          <div className="flex mt-4 space-x-3">
             <Button onClick={reloadModels} variant="outline">
               <RefreshCw className="w-4 h-4 mr-2" />
               Reload Models
@@ -427,7 +433,7 @@ const FaceManagement = () => {
               <select
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
-                className="px-3 py-2 w-full rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                className="w-full px-3 py-2 border rounded-md border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
               >
                 {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
                 {isHomeroomTeacher() ? (
@@ -461,7 +467,7 @@ const FaceManagement = () => {
       {/* Students with Face Registration */}
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap gap-3 justify-between items-center">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="flex items-center space-x-2">
                 <Users className="w-5 h-5 text-primary" />
@@ -510,7 +516,7 @@ const FaceManagement = () => {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-center py-8 text-muted-foreground"
+                    className="py-8 text-center text-muted-foreground"
                   >
                     {isHomeroomTeacher() && !selectedClass ? (
                       <div>
@@ -563,7 +569,7 @@ const FaceManagement = () => {
                         {student.insightface_encoding ? (
                           <Badge
                             variant="default"
-                            className="bg-green-100 text-green-800"
+                            className="text-green-800 bg-green-100"
                           >
                             <UserCheck className="w-3 h-3 mr-1" />
                             Đã đăng ký (InsightFace)
@@ -571,14 +577,14 @@ const FaceManagement = () => {
                         ) : (
                           <Badge
                             variant="destructive"
-                            className="bg-red-100 text-red-800"
+                            className="text-red-800 bg-red-100"
                           >
                             <UserX className="w-3 h-3 mr-1" />
                             Chưa đăng ký
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-center text-sm font-medium">
+                      <TableCell className="text-sm font-medium text-center">
                         {student.insightface_encoding ? (
                           <Button
                             onClick={() =>
@@ -593,7 +599,7 @@ const FaceManagement = () => {
                             Xóa
                           </Button>
                         ) : (
-                          <span className="px-3 py-1 text-xs text-muted-foreground bg-muted rounded">
+                          <span className="px-3 py-1 text-xs rounded text-muted-foreground bg-muted">
                             Không có dữ liệu
                           </span>
                         )}
@@ -613,8 +619,8 @@ const FaceManagement = () => {
             if (totalPages <= 1) return null;
 
             return (
-              <div className="px-6 py-4 bg-muted/50 border-t">
-                <div className="flex flex-wrap gap-3 justify-between items-center">
+              <div className="px-6 py-4 border-t bg-muted/50">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm text-muted-foreground">
                     Hiển thị{" "}
                     <span className="font-semibold text-foreground">
