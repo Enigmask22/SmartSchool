@@ -145,13 +145,28 @@ def create_app() -> FastAPI:
     # Startup event
     @app.on_event("startup")
     async def startup_event():
-        """Khởi tạo database và các services"""
-        logger.info("Starting Smart School System API - Modular Edition...")
+        """Khởi tạo khi start server"""
+        logger.info("🚀 Starting Smart School System API - Modular Edition...")
         
         try:
             logger.info("Initializing database...")
             await init_db()
             logger.info("✅ Database initialized successfully")
+            
+            # Cleanup old files on startup
+            from auth.services import OTPService
+            from grades.services import cleanup_old_grade_sheets
+            
+            # Cleanup expired OTPs
+            otp_service = OTPService()
+            otp_deleted = otp_service.cleanup_expired_otps()
+            if otp_deleted > 0:
+                logger.info(f"🧹 Cleaned up {otp_deleted} expired OTPs")
+            
+            # Cleanup old grade sheets (older than 24 hours)
+            sheets_deleted = cleanup_old_grade_sheets(max_age_hours=24)
+            if sheets_deleted > 0:
+                logger.info(f"🧹 Cleaned up {sheets_deleted} old grade sheets")
             
         except Exception as e:
             logger.error(f"❌ Failed to initialize database: {str(e)}")

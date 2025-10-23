@@ -3,6 +3,8 @@ Grades Services
 """
 
 from typing import List, Optional, Dict
+from pathlib import Path
+from datetime import datetime, timedelta
 from core.logger import setup_logger
 
 logger = setup_logger("grades_service")
@@ -174,3 +176,43 @@ def analyze_grade_trend(grade_data: dict, grade_config: Optional[dict] = None) -
         "ordered_points": points,
         "reason": reason
     }
+
+
+def cleanup_old_grade_sheets(max_age_hours: int = 24) -> int:
+    """
+    Dọn dẹp các ảnh grade sheets đã cũ hơn max_age_hours
+    
+    Args:
+        max_age_hours: Số giờ tối đa để giữ file (mặc định: 24 giờ)
+    
+    Returns:
+        Số lượng files đã xóa
+    """
+    deleted_count = 0
+    try:
+        upload_dir = Path("uploads/grade_sheets")
+        if not upload_dir.exists():
+            return 0
+        
+        cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+        
+        for file_path in upload_dir.glob("grade_sheet_*"):
+            try:
+                # Lấy thời gian modified của file
+                file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                
+                if file_mtime < cutoff_time:
+                    file_path.unlink()
+                    deleted_count += 1
+                    logger.debug(f"Đã xóa grade sheet cũ: {file_path.name}")
+                    
+            except Exception as e:
+                logger.error(f"Lỗi xóa file {file_path}: {str(e)}")
+        
+        if deleted_count > 0:
+            logger.info(f"🧹 Đã dọn dẹp {deleted_count} ảnh grade sheets cũ (>{max_age_hours}h)")
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi dọn dẹp grade sheets: {str(e)}")
+    
+    return deleted_count

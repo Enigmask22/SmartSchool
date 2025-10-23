@@ -912,6 +912,13 @@ async def process_ocr_in_background(
         teacher_id: Teacher ID
         db: Database connection
     """
+    # Cleanup old grade sheets before processing (opportunistic cleanup)
+    try:
+        from grades.services import cleanup_old_grade_sheets
+        cleanup_old_grade_sheets(max_age_hours=24)
+    except Exception as e:
+        logger.warning(f"Failed to cleanup old grade sheets: {str(e)}")
+    
     # Wait for semaphore (queue management)
     async with OCR_SEMAPHORE:
         try:
