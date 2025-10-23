@@ -97,7 +97,7 @@ class InsightFaceRecognitionService:
         self._initialize_sync()
     
     def _initialize_sync(self):
-        """Khởi tạo InsightFace model với production deployment support"""
+        """Khởi tạo InsightFace model với GPU acceleration (fallback to CPU nếu cần)"""
         if not INSIGHTFACE_AVAILABLE:
             logger.error("❌ InsightFace not installed. Run: pip install insightface")
             logger.error("   To install: python install_insightface_production.py")
@@ -106,26 +106,59 @@ class InsightFaceRecognitionService:
         try:
             logger.info("🚀 Initializing InsightFace (ArcFace) - State-of-the-Art Face Recognition")
             
-            # Kiểm tra environment để chọn provider phù hợp
-            is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
-            is_render = os.getenv("RENDER", "false").lower() == "true"
+            # Đọc device preference từ environment variable
+            device_preference = os.getenv("INSIGHTFACE_DEVICE", "cuda").lower()
+            # Options: cuda (GPU only), cpu (CPU only), auto (GPU with CPU fallback)
             
-            # Chọn execution provider
-            if is_production or is_render:
+            providers = []
+            use_gpu = False
+            
+            if device_preference == "cpu":
+                # Force CPU only
                 providers = ['CPUExecutionProvider']
-                logger.info("🖥️ Using CPU provider for production deployment")
-            else:
-                # Thử CUDA trước, fallback về CPU nếu không có
+                logger.info("🖥️  Force using CPU provider (from INSIGHTFACE_DEVICE=cpu)")
+                
+            elif device_preference == "cuda":
+                # Try GPU only, fail if not available
                 try:
-                    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-                    logger.info("🚀 Attempting CUDA provider for development")
-                except:
+                    import torch
+                    if torch.cuda.is_available():
+                        providers = ['CUDAExecutionProvider']
+                        use_gpu = True
+                        gpu_name = torch.cuda.get_device_name(0)
+                        vram_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+                        logger.info(f"� Using GPU: {gpu_name}")
+                        logger.info(f"💾 VRAM: {vram_total:.1f} GB")
+                    else:
+                        logger.error("❌ CUDA requested but no GPU available!")
+                        logger.error("   Install CUDA-enabled PyTorch or set INSIGHTFACE_DEVICE=cpu")
+                        return False
+                except ImportError:
+                    logger.error("❌ PyTorch not installed. Cannot check GPU availability.")
+                    logger.error("   Install PyTorch: pip install torch torchvision")
+                    return False
+                    
+            else:  # auto or any other value
+                # Try GPU first, fallback to CPU
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                        use_gpu = True
+                        gpu_name = torch.cuda.get_device_name(0)
+                        vram_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+                        logger.info(f"🚀 Using GPU (with CPU fallback): {gpu_name}")
+                        logger.info(f"💾 VRAM: {vram_total:.1f} GB")
+                    else:
+                        providers = ['CPUExecutionProvider']
+                        logger.warning("⚠️  No GPU detected, using CPU (slower)")
+                except ImportError:
                     providers = ['CPUExecutionProvider']
-                    logger.info("🖥️ Fallback to CPU provider")
+                    logger.warning("⚠️  PyTorch not found, using CPU provider")
             
-            # Cache path đã được set trước khi import InsightFace
-            logger.info(f"📁 Using InsightFace cache path: {self.cache_path}")
-            logger.info(f"🔧 INSIGHTFACE_HOME environment: {os.environ.get('INSIGHTFACE_HOME', 'not set')}")
+            # Cache path info
+            logger.info(f"📁 InsightFace cache path: {self.cache_path}")
+            logger.info(f"🔧 INSIGHTFACE_HOME: {os.environ.get('INSIGHTFACE_HOME', 'not set')}")
             
             # Initialize FaceAnalysis với optimized settings
             self.app = FaceAnalysis(
@@ -134,27 +167,39 @@ class InsightFaceRecognitionService:
             )
             
             # Prepare model với detection size
-            # Giảm detection size cho production để tiết kiệm memory
-            if is_production or is_render:
-                production_det_size = (640, 640)  # Smaller size for production
-                self.det_size = production_det_size
-                logger.info(f"⚡ Using optimized detection size for production: {production_det_size}")
+            # Adjust detection size based on device (GPU can handle larger images)
+            if use_gpu:
+                # GPU: Use high-quality detection size
+                gpu_det_size = (1280, 1280)
+                self.det_size = gpu_det_size
+                logger.info(f"⚡ GPU mode: Using HIGH-QUALITY detection size: {gpu_det_size}")
+            else:
+                # CPU: Use smaller size for better performance
+                cpu_det_size = (640, 640)
+                self.det_size = cpu_det_size
+                logger.info(f"🖥️  CPU mode: Using OPTIMIZED detection size: {cpu_det_size}")
             
             self.app.prepare(ctx_id=0, det_size=self.det_size)
             
             logger.info(f"✅ InsightFace initialized successfully")
             logger.info(f"   Detection size: {self.det_size}")
             logger.info(f"   Providers: {providers}")
-            logger.info(f"   Cache path: {self.cache_path}")
+            logger.info(f"   Device: {'GPU (CUDA)' if use_gpu else 'CPU'}")
             logger.info(f"   Models loaded: {len(self.app.models)} models")
             logger.info(f"   Similarity threshold: {self.similarity_threshold}")
-            logger.info("🎯 Expected accuracy: 95-99% (vs MediaPipe 75-80%)")
+            logger.info(f"🎯 Expected accuracy: 95-99% (vs MediaPipe 75-80%)")
+            
+            if use_gpu:
+                logger.info("⚡ GPU acceleration enabled - Fast inference!")
+            else:
+                logger.info("🐢 CPU mode - Slower inference (consider using GPU)")
             
             return True
             
         except Exception as e:
             logger.error(f"❌ Failed to initialize InsightFace: {str(e)}")
             logger.error("   Make sure InsightFace is installed: pip install insightface")
+            logger.error("   For GPU: Install CUDA-enabled PyTorch")
             return False
 
     async def initialize(self):
