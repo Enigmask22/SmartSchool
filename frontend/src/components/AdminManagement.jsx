@@ -761,6 +761,7 @@ const AdminManagement = () => {
               >
                 <option value="">Chọn vai trò</option>
                 <option value="teacher">Giáo viên</option>
+                <option value="homeroom_teacher">Giáo viên chủ nhiệm</option>
               </select>
             ) : field === "teacher_id" ? (
               <select
@@ -1282,6 +1283,26 @@ const AdminManagement = () => {
                               ) : (
                                 <Badge variant="destructive">Không</Badge>
                               )
+                            ) : field === "role" ? (
+                              // Hiển thị label tiếng Việt cho role
+                              <Badge
+                                variant="outline"
+                                className={
+                                  item[field] === "admin"
+                                    ? "bg-purple-50 text-purple-700 border-purple-200"
+                                    : item[field] === "homeroom_teacher"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-green-50 text-green-700 border-green-200"
+                                }
+                              >
+                                {item[field] === "admin"
+                                  ? "Quản trị viên"
+                                  : item[field] === "homeroom_teacher"
+                                  ? "Giáo viên chủ nhiệm"
+                                  : item[field] === "teacher"
+                                  ? "Giáo viên"
+                                  : item[field]}
+                              </Badge>
                             ) : (
                               item[field] || "-"
                             )}
