@@ -14,6 +14,8 @@ from grades.services import calculate_final_grade
 from core.database import get_db
 from core.logger import setup_logger
 from auth.api import get_current_user
+from grades.ocr_services.qwen_queue_manager import get_queue_manager
+from grades.ocr_services.ocr_factory import OCRFactory
 
 logger = setup_logger("grades_api")
 router = APIRouter()
@@ -886,6 +888,137 @@ async def delete_grade(
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
+# Background task for OCR processing
+async def process_ocr_in_background(
+    request_id: str,
+    image_path: str,
+    teacher_id: int,
+    db
+):
+    """
+    Background task để xử lý OCR request
+    
+    Args:
+        request_id: Unique request ID
+        image_path: Path to uploaded image
+        teacher_id: Teacher ID
+        db: Database connection
+    """
+    try:
+        logger.info(f"🔄 Starting OCR processing for request {request_id}")
+        
+        # Update status: processing
+        ocr_results[request_id] = {
+            'status': 'processing',
+            'message': 'Đang xử lý OCR...',
+            'progress': 0,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Parse ảnh bằng OCR service
+        ocr_service = OCRFactory.get_ocr_service()
+        
+        # Update progress: 10%
+        ocr_results[request_id]['progress'] = 10
+        ocr_results[request_id]['message'] = 'Đang thêm vào hàng chờ...'
+        
+        # Parse grade sheet directly (không dùng queue manager trong background task)
+        ocr_results[request_id]['progress'] = 30
+        ocr_results[request_id]['message'] = 'Đang nhận diện văn bản...'
+        
+        parsed_result = ocr_service.parse_grade_sheet(image_path)
+        
+        # Update progress: 60%
+        ocr_results[request_id]['progress'] = 60
+        ocr_results[request_id]['message'] = 'Đang chuyển đổi dữ liệu...'
+        
+        # Convert to Excel format
+        excel_data = ocr_service.export_to_excel_format(parsed_result)
+        
+        # Update progress: 80%
+        ocr_results[request_id]['progress'] = 80
+        ocr_results[request_id]['message'] = 'Đang xác thực học sinh...'
+        
+        # Validate students exist in database
+        validated_data = []
+        validation_errors = []
+        
+        for idx, row in enumerate(excel_data, start=1):
+            student_id = row.get('student_id')
+            if not student_id:
+                validation_errors.append({
+                    'row': idx,
+                    'error': 'Không tìm thấy ID học sinh',
+                    'data': row
+                })
+                continue
+            
+            # Check if student exists
+            student = db.table("students").select("id, student_id, full_name, class_name").eq("student_id", student_id).execute()
+            
+            if not student.data:
+                validation_errors.append({
+                    'row': idx,
+                    'student_id': student_id,
+                    'error': f'Không tìm thấy học sinh với ID {student_id} trong hệ thống',
+                    'data': row
+                })
+            else:
+                # Add student info to validated data
+                student_info = student.data[0]
+                validated_data.append({
+                    'student_id': student_id,
+                    'student_db_id': student_info['id'],
+                    'full_name': student_info['full_name'],
+                    'class_name': student_info['class_name'],
+                    'ocr_name': row.get('ho_va_ten', ''),
+                    'diem_thuong_xuyen': row.get('diem_thuong_xuyen'),
+                    'diem_thi_giua_ki': row.get('diem_thi_giua_ki'),
+                    'diem_thi_cuoi_ki': row.get('diem_thi_cuoi_ki')
+                })
+        
+        # Cleanup: xóa file tạm sau khi xử lý
+        try:
+            os.remove(image_path)
+            logger.info(f"Removed temporary file {image_path}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temp file: {str(e)}")
+        
+        # Update status: completed
+        ocr_results[request_id] = {
+            'status': 'completed',
+            'message': f'Hoàn thành! Tìm thấy {len(validated_data)} học sinh hợp lệ.',
+            'progress': 100,
+            'timestamp': datetime.now().isoformat(),
+            'result': {
+                'parsed_rows': validated_data,
+                'validation_errors': validation_errors,
+                'total_parsed': len(excel_data),
+                'total_valid': len(validated_data),
+                'total_errors': len(validation_errors)
+            }
+        }
+        
+        logger.info(f"✅ OCR processing completed for request {request_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ ERROR: OCR processing failed for request {request_id}: {str(e)}")
+        
+        # Update status: failed
+        ocr_results[request_id] = {
+            'status': 'failed',
+            'message': f'Lỗi xử lý: {str(e)}',
+            'progress': 0,
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }
+        # Cleanup on error
+        try:
+            os.remove(image_path)
+        except:
+            pass
+
+
 @router.post("/ocr/parse-grade-sheet")
 async def parse_grade_sheet_from_image(
     file: UploadFile = File(...),
@@ -925,11 +1058,8 @@ async def parse_grade_sheet_from_image(
         # Generate unique request ID
         request_id = str(uuid.uuid4())
         
-        # Import OCR services (local)
-        from .ocr_services import QwenQueueManager
-        
-        # Get queue manager (singleton pattern)
-        queue_manager = QwenQueueManager.get_instance(max_concurrent=3, max_queue_size=50)
+        # Get queue manager (singleton pattern using global function)
+        queue_manager = get_queue_manager(max_concurrent=3, max_queue_size=50)
         
         # Get queue stats
         stats = queue_manager.get_stats()
@@ -956,65 +1086,14 @@ async def parse_grade_sheet_from_image(
             'timestamp': datetime.now().isoformat()
         }
         
-        # Start background task
-        async def process_ocr():
-            try:
-                from .ocr_services import OCRFactory
-                
-                ocr_results[request_id]['status'] = 'processing'
-                ocr_results[request_id]['progress'] = 10
-                ocr_results[request_id]['message'] = 'Đang xử lý ảnh...'
-                
-                # Get OCR service
-                ocr_service = OCRFactory.get_ocr_service()
-                
-                # Add to queue and wait
-                result = await queue_manager.add_request(
-                    request_id=request_id,
-                    image_path=str(temp_path),
-                    ocr_service=ocr_service
-                )
-                
-                # Update results
-                if result['success']:
-                    ocr_results[request_id] = {
-                        'status': 'completed',
-                        'progress': 100,
-                        'message': 'Hoàn thành phân tích',
-                        'data': result,
-                        'timestamp': datetime.now().isoformat()
-                    }
-                else:
-                    ocr_results[request_id] = {
-                        'status': 'failed',
-                        'progress': 0,
-                        'message': result.get('error', 'Lỗi không xác định'),
-                        'timestamp': datetime.now().isoformat()
-                    }
-                
-                # Cleanup uploaded file after processing
-                try:
-                    os.remove(temp_path)
-                    logger.info(f"Cleaned up temporary file: {temp_path}")
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup file {temp_path}: {e}")
-                    
-            except Exception as e:
-                logger.error(f"OCR processing error: {str(e)}")
-                ocr_results[request_id] = {
-                    'status': 'failed',
-                    'progress': 0,
-                    'message': f'Lỗi xử lý: {str(e)}',
-                    'timestamp': datetime.now().isoformat()
-                }
-                # Cleanup on error
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
-        
-        # Add to background tasks
-        background_tasks.add_task(process_ocr)
+        # Start background task (sử dụng standalone function)
+        background_tasks.add_task(
+            process_ocr_in_background,
+            request_id,
+            str(temp_path),
+            current_teacher['id'],
+            db
+        )
         
         return {
             "success": True,
@@ -1059,13 +1138,6 @@ async def get_ocr_status(
         result = ocr_results[request_id]
         status_value = result['status']
         
-        # Import OCR services
-        from .ocr_services import QwenQueueManager
-        
-        # Get queue manager for stats
-        queue_manager = QwenQueueManager.get_instance(max_concurrent=3, max_queue_size=50)
-        stats = queue_manager.get_stats()
-        
         if status_value == 'queued':
             return {
                 "success": True,
@@ -1076,10 +1148,6 @@ async def get_ocr_status(
                     'progress': result.get('progress', 0),
                     'message': result.get('message', ''),
                     'position_in_queue': result.get('position_in_queue', 0),
-                    'queue_info': {
-                        'in_queue': stats['in_queue'],
-                        'processing': stats['processing']
-                    },
                     'timestamp': result.get('timestamp')
                 }
             }
@@ -1093,7 +1161,6 @@ async def get_ocr_status(
                     'status': status_value,
                     'progress': result.get('progress', 0),
                     'message': result.get('message', ''),
-                    'queue_info': stats,
                     'timestamp': result.get('timestamp')
                 }
             }
@@ -1106,7 +1173,7 @@ async def get_ocr_status(
                     'request_id': request_id,
                     'status': status_value,
                     'progress': 100,
-                    'result': result.get('data'),
+                    'result': result.get('result'),
                     'timestamp': result.get('timestamp')
                 }
             }
@@ -1662,25 +1729,65 @@ async def bulk_import_grades(
         
         subject_id = class_subject.data[0]["subject_id"]
         
-        # Lấy grade config
-        config = db.table("grade_configs").select("*").eq("subject_id", subject_id).eq("academic_year", import_data.get("academic_year", "2024-2025")).eq("semester", import_data.get("semester", "HK1")).execute()
+        # Lấy grade config với grade_column_config
+        config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", import_data.get("academic_year", "2024-2025")).eq("semester", import_data.get("semester", "HK1")).execute()
         
-        grade_config = config.data[0] if config.data else None
+        if not config.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Chưa có cấu hình cột điểm cho môn này. Vui lòng cấu hình trước khi import."
+            )
+        
+        grade_column_config = config.data[0].get("grade_column_config")
+        
+        if not grade_column_config:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cấu hình cột điểm không hợp lệ"
+            )
         
         imported_count = 0
         errors = []
         
-        for grade_data in grades_data:
+        for grade_record in grades_data:
             try:
-                student_id = grade_data.get("student_id")
+                student_id = grade_record.get("student_id")
                 if not student_id:
                     continue
                 
-                # Tính final grade
-                final_grade = calculate_final_grade(grade_data, grade_config)
+                # Lookup student từ DB để lấy database ID
+                student = db.table("students").select("id, student_id, full_name").eq("student_id", student_id).execute()
                 
-                # Upsert grade
-                existing = db.table("grades").select("id").eq("student_id", student_id).eq("class_subject_id", class_subject_id).execute()
+                if not student.data:
+                    errors.append(f"Không tìm thấy học sinh với ID: {student_id}")
+                    continue
+                
+                student_db_id = student.data[0]['id']
+                
+                # Transform data từ flat structure thành nested structure với He_so
+                grade_data = {}
+                
+                # Map các cột từ import vào grade_column_config
+                column_mapping = {
+                    'diem_thuong_xuyen': 'Diem_thuong_xuyen',
+                    'diem_thi_giua_ki': 'Diem_thi_giua_ki',
+                    'diem_thi_cuoi_ki': 'Diem_thi_cuoi_ki'
+                }
+                
+                for import_col, config_col in column_mapping.items():
+                    if config_col in grade_column_config:
+                        score = grade_record.get(import_col)
+                        if score is not None and score != '':
+                            grade_data[config_col] = {
+                                'He_so': grade_column_config[config_col]['he_so'],
+                                'Diem': float(score)
+                            }
+                
+                # Tính final grade với transformed data
+                final_grade = calculate_final_grade(grade_data, grade_column_config)
+                
+                # Upsert grade (sử dụng student_db_id thay vì student_id string)
+                existing = db.table("grades").select("id").eq("student_id", student_db_id).eq("class_subject_id", class_subject_id).execute()
                 
                 if existing.data:
                     # Update existing
@@ -1690,9 +1797,9 @@ async def bulk_import_grades(
                         "updated_at": datetime.now().isoformat()
                     }).eq("id", existing.data[0]["id"]).execute()
                 else:
-                    # Create new
+                    # Create new (sử dụng student_db_id)
                     db.table("grades").insert({
-                        "student_id": student_id,
+                        "student_id": student_db_id,
                         "class_subject_id": class_subject_id,
                         "academic_year": import_data.get("academic_year", "2024-2025"),
                         "semester": import_data.get("semester", "HK1"),
@@ -1705,13 +1812,15 @@ async def bulk_import_grades(
                 imported_count += 1
                 
             except Exception as e:
-                errors.append(f"Lỗi nhập điểm cho học sinh {grade_data.get('student_id', 'N/A')}: {str(e)}")
+                logger.error(f"Error importing grade for student {grade_record.get('student_id', 'N/A')}: {str(e)}")
+                errors.append(f"Lỗi nhập điểm cho học sinh {grade_record.get('student_id', 'N/A')}: {str(e)}")
         
         return {
             "success": True,
             "message": f"Nhập điểm thành công {imported_count}/{len(grades_data)} học sinh",
             "data": {
-                "imported_count": imported_count,
+                "success_count": imported_count,
+                "error_count": len(errors),
                 "total_count": len(grades_data),
                 "errors": errors
             }

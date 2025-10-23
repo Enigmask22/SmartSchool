@@ -1,9 +1,8 @@
 """
 OCR Services for Grades Module
-"""
 
-from .qwen_ocr_service import QwenOCRService
-from .qwen_queue_manager import QwenQueueManager
-from .ocr_factory import OCRFactory
+Note: Không import trực tiếp ở đây để tránh circular import.
+Sử dụng absolute imports trong các file cần thiết.
+"""
 
 __all__ = ['QwenOCRService', 'QwenQueueManager', 'OCRFactory']

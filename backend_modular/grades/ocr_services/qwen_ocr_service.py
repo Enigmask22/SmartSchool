@@ -12,7 +12,7 @@ import torch
 from transformers import AutoModelForVision2Seq, AutoProcessor
 from qwen_vl_utils import process_vision_info
 
-from ...core.logger import setup_logger
+from core.logger import setup_logger
 
 logger = setup_logger("qwen_ocr")
 
