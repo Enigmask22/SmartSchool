@@ -37,16 +37,21 @@ class QwenOCRService:
         Khởi tạo Qwen2.5-VL-3B OCR Service
         
         Args:
-            model_path: Đường dẫn hoặc tên model (mặc định: "Qwen/Qwen2.5-VL-3B-Instruct")
-            device: Device để chạy model ('cuda', 'cpu', hoặc None để auto-detect)
+            model_path: Đường dẫn hoặc tên model (mặc định: từ env QWEN_MODEL_NAME)
+            device: Device để chạy model (mặc định: từ env QWEN_DEVICE)
         """
-        self.model_path = model_path or "Qwen/Qwen2.5-VL-3B-Instruct"
+        # Đọc từ environment variables
+        self.model_path = model_path or os.getenv('QWEN_MODEL_NAME', 'Qwen/Qwen2.5-VL-3B-Instruct')
         
-        # Auto-detect device
-        if device is None:
+        # Auto-detect device từ env hoặc auto
+        device_env = device or os.getenv('QWEN_DEVICE', 'auto')
+        if device_env == 'auto':
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
-            self.device = device
+            self.device = device_env
+        
+        # Max pixels từ env
+        self.max_pixels = int(os.getenv('QWEN_MAX_PIXELS', '2048'))
         
         self.model = None
         self.processor = None
