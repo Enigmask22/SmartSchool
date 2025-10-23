@@ -33,13 +33,21 @@ class OCRFactory:
     @classmethod
     def _get_default_model(cls) -> OCRModel:
         """
-        Lấy default model từ OCRConfig
+        Lấy default model từ environment variable OCR_MODEL
         
         Returns:
             OCRModel enum
         """
-        # Default to QWEN model (better for Vietnamese)
-        return OCRModel.QWEN
+        # Đọc từ environment variable
+        ocr_model_env = os.getenv('OCR_MODEL', 'qwen').lower()
+        
+        try:
+            model = OCRModel(ocr_model_env)
+            logger.info(f"Using OCR model from environment: {model.value}")
+            return model
+        except ValueError:
+            logger.warning(f"Invalid OCR_MODEL '{ocr_model_env}', defaulting to QWEN")
+            return OCRModel.QWEN
     
     @classmethod
     def get_ocr_service(cls, model: Optional[Union[OCRModel, str]] = None):
@@ -86,8 +94,8 @@ class OCRFactory:
         logger.info(f"Creating new OCR service: {model.value}")
         
         if model == OCRModel.GEMINI:
-            # Note: Gemini service not yet implemented in modular backend
-            raise NotImplementedError("Gemini OCR not available in modular backend. Use QWEN instead.")
+            from .gemini_ocr_service import GeminiOCRService
+            service = GeminiOCRService()
         elif model == OCRModel.QWEN:
             from .qwen_ocr_service import QwenOCRService
             # Auto-detect device (CUDA if available, else CPU)

@@ -141,6 +141,9 @@ const OCRGradeSheet = ({
           setParsedData(result);
           setParsing(false);
           setUploading(false);
+          setOcrStatus(null); // Clear status để ẩn UI loading
+          setProgress(0);
+          setStatusMessage("");
 
           if (result.total_valid === 0) {
             alert(
@@ -165,6 +168,9 @@ const OCRGradeSheet = ({
           // Failed
           setParsing(false);
           setUploading(false);
+          setOcrStatus(null); // Clear status
+          setProgress(0);
+          setStatusMessage("");
           alert(
             "❌ Lỗi khi xử lý ảnh: " + (response.data.error || "Unknown error")
           );
@@ -457,24 +463,18 @@ const OCRGradeSheet = ({
                               </>
                             )}
                           </div>
-                          <span className="text-2xl font-bold text-primary">
-                            {progress}%
-                          </span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {/* Progress Bar */}
-                        <div className="overflow-hidden mb-4 w-full h-3 bg-gray-200 rounded-full">
-                          <div
-                            className="h-3 bg-primary rounded-full transition-all duration-500 ease-out"
-                            style={{ width: `${progress}%` }}
-                          ></div>
-                        </div>
-
                         {/* Status Message */}
-                        <p className="mb-2 text-sm font-medium text-muted-foreground">
-                          {statusMessage}
-                        </p>
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-sm font-medium text-blue-800 flex items-center space-x-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>
+                              Vui lòng đợi 2-3 phút để hệ thống xử lý ảnh...
+                            </span>
+                          </p>
+                        </div>
 
                         {/* Queue Position */}
                         {queuePosition !== null && (

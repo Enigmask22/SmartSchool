@@ -55,10 +55,10 @@ class InsightFaceRecognitionService:
     def __init__(self):
         # Sử dụng cache path đã được setup trước khi import
         self.cache_path = CACHE_PATH
-        self.model_path = os.getenv("INSIGHTFACE_MODEL_PATH", "./ai_models")
+        # self.model_path = os.getenv("INSIGHTFACE_MODEL_PATH", "./ai_models")
         
         # Tạo thư mục model nếu chưa có (cache đã được tạo trong setup function)
-        os.makedirs(self.model_path, exist_ok=True)
+        # os.makedirs(self.model_path, exist_ok=True)
         
         self.app = None
         

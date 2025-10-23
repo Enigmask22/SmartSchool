@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 import uuid
 import os
+import asyncio
 
 from grades.models import GradeCreate, GradeUpdate, ResponseModel
 from grades.services import calculate_final_grade
@@ -22,6 +23,13 @@ router = APIRouter()
 
 # Global dict to store OCR results (in production, use Redis or database)
 ocr_results = {}
+
+# Global semaphore để limit concurrent OCR processing
+# Đọc từ environment variable OCR_MAX_CONCURRENT
+OCR_MAX_CONCURRENT = int(os.getenv('OCR_MAX_CONCURRENT', '2'))
+OCR_SEMAPHORE = asyncio.Semaphore(OCR_MAX_CONCURRENT)
+logger.info(f"OCR Semaphore initialized with max_concurrent={OCR_MAX_CONCURRENT}")
+
 
 
 # Dependency: Get current teacher (supports both admin and teacher)
@@ -896,7 +904,7 @@ async def process_ocr_in_background(
     db
 ):
     """
-    Background task để xử lý OCR request
+    Background task để xử lý OCR request với semaphore để limit concurrency
     
     Args:
         request_id: Unique request ID
@@ -904,91 +912,89 @@ async def process_ocr_in_background(
         teacher_id: Teacher ID
         db: Database connection
     """
-    try:
-        logger.info(f"🔄 Starting OCR processing for request {request_id}")
-        
-        # Update status: processing
-        ocr_results[request_id] = {
-            'status': 'processing',
-            'message': 'Đang xử lý OCR...',
-            'progress': 0,
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # Parse ảnh bằng OCR service
-        ocr_service = OCRFactory.get_ocr_service()
-        
-        # Update progress: 10%
-        ocr_results[request_id]['progress'] = 10
-        ocr_results[request_id]['message'] = 'Đang thêm vào hàng chờ...'
-        
-        # Parse grade sheet directly (không dùng queue manager trong background task)
-        ocr_results[request_id]['progress'] = 30
-        ocr_results[request_id]['message'] = 'Đang nhận diện văn bản...'
-        
-        parsed_result = ocr_service.parse_grade_sheet(image_path)
-        
-        # Update progress: 60%
-        ocr_results[request_id]['progress'] = 60
-        ocr_results[request_id]['message'] = 'Đang chuyển đổi dữ liệu...'
-        
-        # Convert to Excel format
-        excel_data = ocr_service.export_to_excel_format(parsed_result)
-        
-        # Update progress: 80%
-        ocr_results[request_id]['progress'] = 80
-        ocr_results[request_id]['message'] = 'Đang xác thực học sinh...'
-        
-        # Validate students exist in database
-        validated_data = []
-        validation_errors = []
-        
-        for idx, row in enumerate(excel_data, start=1):
-            student_id = row.get('student_id')
-            if not student_id:
-                validation_errors.append({
-                    'row': idx,
-                    'error': 'Không tìm thấy ID học sinh',
-                    'data': row
-                })
-                continue
-            
-            # Check if student exists
-            student = db.table("students").select("id, student_id, full_name, class_name").eq("student_id", student_id).execute()
-            
-            if not student.data:
-                validation_errors.append({
-                    'row': idx,
-                    'student_id': student_id,
-                    'error': f'Không tìm thấy học sinh với ID {student_id} trong hệ thống',
-                    'data': row
-                })
-            else:
-                # Add student info to validated data
-                student_info = student.data[0]
-                validated_data.append({
-                    'student_id': student_id,
-                    'student_db_id': student_info['id'],
-                    'full_name': student_info['full_name'],
-                    'class_name': student_info['class_name'],
-                    'ocr_name': row.get('ho_va_ten', ''),
-                    'diem_thuong_xuyen': row.get('diem_thuong_xuyen'),
-                    'diem_thi_giua_ki': row.get('diem_thi_giua_ki'),
-                    'diem_thi_cuoi_ki': row.get('diem_thi_cuoi_ki')
-                })
-        
-        # Cleanup: xóa file tạm sau khi xử lý
+    # Wait for semaphore (queue management)
+    async with OCR_SEMAPHORE:
         try:
-            os.remove(image_path)
-            logger.info(f"Removed temporary file {image_path}")
-        except Exception as e:
-            logger.warning(f"Failed to remove temp file: {str(e)}")
-        
-        # Update status: completed
-        ocr_results[request_id] = {
-            'status': 'completed',
-            'message': f'Hoàn thành! Tìm thấy {len(validated_data)} học sinh hợp lệ.',
-            'progress': 100,
+            logger.info(f"🔄 Starting OCR processing for request {request_id}")
+            
+            # Update status: processing
+            ocr_results[request_id] = {
+                'status': 'processing',
+                'message': 'Đang xử lý OCR...',
+                'progress': 0,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Parse ảnh bằng OCR service
+            ocr_service = OCRFactory.get_ocr_service()
+            
+            # Update progress: 30%
+            ocr_results[request_id]['progress'] = 30
+            ocr_results[request_id]['message'] = 'Đang nhận diện văn bản...'
+            
+            parsed_result = ocr_service.parse_grade_sheet(image_path)
+            
+            # Update progress: 60%
+            ocr_results[request_id]['progress'] = 60
+            ocr_results[request_id]['message'] = 'Đang chuyển đổi dữ liệu...'
+            
+            # Convert to Excel format
+            excel_data = ocr_service.export_to_excel_format(parsed_result)
+            
+            # Update progress: 80%
+            ocr_results[request_id]['progress'] = 80
+            ocr_results[request_id]['message'] = 'Đang xác thực học sinh...'
+            
+            # Validate students exist in database
+            validated_data = []
+            validation_errors = []
+            
+            for idx, row in enumerate(excel_data, start=1):
+                student_id = row.get('student_id')
+                if not student_id:
+                    validation_errors.append({
+                        'row': idx,
+                        'error': 'Không tìm thấy ID học sinh',
+                        'data': row
+                    })
+                    continue
+                
+                # Check if student exists
+                student = db.table("students").select("id, student_id, full_name, class_name").eq("student_id", student_id).execute()
+                
+                if not student.data:
+                    validation_errors.append({
+                        'row': idx,
+                        'student_id': student_id,
+                        'error': f'Không tìm thấy học sinh với ID {student_id} trong hệ thống',
+                        'data': row
+                    })
+                else:
+                    # Add student info to validated data
+                    student_info = student.data[0]
+                    validated_data.append({
+                        'student_id': student_id,
+                        'student_db_id': student_info['id'],
+                        'full_name': student_info['full_name'],
+                        'class_name': student_info['class_name'],
+                        'ocr_name': row.get('ho_va_ten', ''),
+                        'diem_thuong_xuyen': row.get('diem_thuong_xuyen'),
+                        'diem_thi_giua_ki': row.get('diem_thi_giua_ki'),
+                        'diem_thi_cuoi_ki': row.get('diem_thi_cuoi_ki')
+                    })
+            
+            # Cleanup: xóa file tạm sau khi xử lý
+            try:
+                os.remove(image_path)
+                logger.info(f"Removed temporary file {image_path}")
+            except Exception as e:
+                logger.warning(f"Failed to remove temp file: {str(e)}")
+            
+            # Update status: completed
+            ocr_results[request_id] = {
+                'status': 'completed',
+                'message': f'Hoàn thành! Tìm thấy {len(validated_data)} học sinh hợp lệ.',
+                'progress': 100,
             'timestamp': datetime.now().isoformat(),
             'result': {
                 'parsed_rows': validated_data,
@@ -997,26 +1003,26 @@ async def process_ocr_in_background(
                 'total_valid': len(validated_data),
                 'total_errors': len(validation_errors)
             }
-        }
+            }
+            
+            logger.info(f"✅ OCR processing completed for request {request_id}")
         
-        logger.info(f"✅ OCR processing completed for request {request_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ ERROR: OCR processing failed for request {request_id}: {str(e)}")
-        
-        # Update status: failed
-        ocr_results[request_id] = {
-            'status': 'failed',
-            'message': f'Lỗi xử lý: {str(e)}',
-            'progress': 0,
-            'timestamp': datetime.now().isoformat(),
-            'error': str(e)
-        }
-        # Cleanup on error
-        try:
-            os.remove(image_path)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"❌ ERROR: OCR processing failed for request {request_id}: {str(e)}")
+            
+            # Update status: failed
+            ocr_results[request_id] = {
+                'status': 'failed',
+                'message': f'Lỗi xử lý: {str(e)}',
+                'progress': 0,
+                'timestamp': datetime.now().isoformat(),
+                'error': str(e)
+            }
+            # Cleanup on error
+            try:
+                os.remove(image_path)
+            except:
+                pass
 
 
 @router.post("/ocr/parse-grade-sheet")
