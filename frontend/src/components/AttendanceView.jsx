@@ -451,6 +451,7 @@ const AttendanceView = () => {
   };
 
   const handleEditRecord = (record) => {
+    // Store the entire record including student_id for unique identification
     setEditingRecord(record);
     setEditStatus(record.status);
     setEditNotes(record.notes || "");
@@ -488,31 +489,8 @@ const AttendanceView = () => {
       }
 
       if (response.success) {
-        // Update the record in the local state
-        const updatedRecords = attendanceRecords.map((record) =>
-          record.student_id === editingRecord.student_id
-            ? {
-                ...record,
-                status: editStatus,
-                notes: editNotes,
-                id: response.data?.id || record.id,
-              }
-            : record
-        );
-        setAttendanceRecords(updatedRecords);
-
-        // Update stats if in full list mode
-        if (showFullList) {
-          setStats(calculateStatsFromData(updatedRecords));
-        }
-
-        // Close edit mode
+        // Close edit mode first
         handleCancelEdit();
-
-        // Reload stats for other modes
-        if (!showFullList) {
-          loadStats();
-        }
 
         // Show success message
         setError(null);
@@ -522,6 +500,10 @@ const AttendanceView = () => {
             : "Cập nhật trạng thái điểm danh thành công!"
         );
         setTimeout(() => setSuccessMessage(null), 3000);
+
+        // Reload data from server to ensure consistency
+        await loadAttendanceData();
+        await loadStats();
       } else {
         setError(response.message || "Lỗi cập nhật trạng thái");
       }
@@ -801,7 +783,7 @@ const AttendanceView = () => {
                           {formatTime(record.check_out_time)}
                         </TableCell>
                         <TableCell>
-                          {editingRecord?.id === record.id ? (
+                          {editingRecord?.student_id === record.student_id ? (
                             <select
                               value={editStatus}
                               onChange={(e) => setEditStatus(e.target.value)}
@@ -823,7 +805,7 @@ const AttendanceView = () => {
                             : "-"}
                         </TableCell>
                         <TableCell>
-                          {editingRecord?.id === record.id ? (
+                          {editingRecord?.student_id === record.student_id ? (
                             <Input
                               type="text"
                               value={editNotes}
@@ -841,7 +823,7 @@ const AttendanceView = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-center">
-                          {editingRecord?.id === record.id ? (
+                          {editingRecord?.student_id === record.student_id ? (
                             <div className="flex gap-2 justify-center">
                               <Button
                                 size="sm"
