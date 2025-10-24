@@ -120,6 +120,7 @@ const StudentList = () => {
     score: "",
     score_trend: "",
     attendance_rate: "",
+    subject: "", // Thêm môn học
     notes: "",
   });
   const [generatedFeedback, setGeneratedFeedback] = useState("");
@@ -985,6 +986,7 @@ const StudentList = () => {
       score: "",
       score_trend: "",
       attendance_rate: "",
+      subject: "", // Thêm môn học
       notes: "",
     };
 
@@ -1021,22 +1023,47 @@ const StudentList = () => {
 
             initialForm.score = avgScore;
 
-            // Try to get grade trend for the first subject (if available)
-            const firstGrade = validGrades[0];
-            if (firstGrade && firstGrade.class_subject_id) {
+            // Try to get grade trend for the subject with HIGHEST score
+            // Sắp xếp theo điểm cao nhất và lấy môn đầu tiên
+            const sortedGrades = [...validGrades].sort(
+              (a, b) => (b.final_grade || 0) - (a.final_grade || 0)
+            );
+            const highestGrade = sortedGrades[0];
+
+            console.log("🏆 Highest grade subject:", {
+              subject: highestGrade.subject_name,
+              score: highestGrade.final_grade,
+              all_grades: sortedGrades.map((g) => ({
+                subject: g.subject_name,
+                score: g.final_grade,
+              })),
+            });
+
+            if (highestGrade && highestGrade.class_subject_id) {
+              // Lưu tên môn học có điểm cao nhất vào form
+              if (highestGrade.subject_name) {
+                initialForm.subject = highestGrade.subject_name;
+                console.log(
+                  "📚 Highest score subject added to form:",
+                  highestGrade.subject_name,
+                  "with score:",
+                  highestGrade.final_grade
+                );
+              }
+
               console.log(
-                "🔍 Fetching grade trend for class_subject_id:",
-                firstGrade.class_subject_id
+                "🔍 Fetching grade trend for highest score class_subject_id:",
+                highestGrade.class_subject_id
               );
               console.log("🔍 Student ID:", student.id);
               console.log(
                 "🔍 API URL will be:",
-                `${API_BASE_URL}/grades/grade-trend/${student.id}/${firstGrade.class_subject_id}?academic_year=2024-2025&semester=HK1`
+                `${API_BASE_URL}/grades/grade-trend/${student.id}/${highestGrade.class_subject_id}?academic_year=2024-2025&semester=HK1`
               );
 
               const trendData = await fetchGradeTrend(
                 student.id,
-                firstGrade.class_subject_id
+                highestGrade.class_subject_id
               );
               if (trendData) {
                 console.log("📈 Grade trend data:", trendData);
@@ -1046,8 +1073,8 @@ const StudentList = () => {
               }
             } else {
               console.log(
-                "⚠️ No class_subject_id found in first grade:",
-                firstGrade
+                "⚠️ No class_subject_id found in highest grade:",
+                highestGrade
               );
             }
           } else {
@@ -1079,6 +1106,7 @@ const StudentList = () => {
       score: "",
       score_trend: "",
       attendance_rate: "",
+      subject: "", // Reset môn học
       notes: "",
     });
     setGeneratedFeedback("");
@@ -1145,6 +1173,7 @@ const StudentList = () => {
             score: parseFloat(feedbackForm.score),
             score_trend: feedbackForm.score_trend,
             attendance_rate: parseInt(feedbackForm.attendance_rate),
+            subject: feedbackForm.subject || null, // Thêm môn học
             notes: feedbackForm.notes,
           }),
         }
@@ -1357,14 +1386,14 @@ const StudentList = () => {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="relative">
-          <div className="w-16 h-16 rounded-full border-4 border-blue-200 animate-spin border-t-blue-600"></div>
+          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 min-h-screen bg-gray-50">
+    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
       {/* Header Section */}
       <Card>
         <CardHeader>
@@ -1378,7 +1407,7 @@ const StudentList = () => {
         </CardHeader>
         {error && (
           <CardContent>
-            <div className="flex items-center p-4 space-x-2 rounded-lg border bg-destructive/10 border-destructive/20">
+            <div className="flex items-center p-4 space-x-2 border rounded-lg bg-destructive/10 border-destructive/20">
               <AlertCircle className="w-5 h-5 text-destructive" />
               <p className="text-destructive">{error}</p>
             </div>
@@ -1396,7 +1425,7 @@ const StudentList = () => {
             <div className="space-y-2">
               <Label htmlFor="search">Tìm kiếm</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 w-4 h-4 transform -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
                 <Input
                   id="search"
                   type="text"
@@ -1414,7 +1443,7 @@ const StudentList = () => {
                 id="class-select"
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
-                className="px-3 py-2 w-full rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                className="w-full px-3 py-2 border rounded-md border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
               >
                 {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
                 {isHomeroomTeacher() ? (
@@ -1464,7 +1493,7 @@ const StudentList = () => {
       {totalStudents > 0 && (
         <Card>
           <CardContent className="py-4">
-            <div className="flex flex-wrap gap-3 justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-muted-foreground">
                 Hiển thị <span className="font-semibold">{startIndex + 1}</span>{" "}
                 đến{" "}
@@ -1482,7 +1511,7 @@ const StudentList = () => {
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="py-1 pr-8 pl-3 text-sm rounded-md border bg-background border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="py-1 pl-3 pr-8 text-sm border rounded-md bg-background border-input focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value={6}>6</option>
                   <option value={12}>12</option>
@@ -1500,7 +1529,7 @@ const StudentList = () => {
         {filteredStudents.length === 0 ? (
           <Card className="col-span-full">
             <CardContent className="py-12 text-center">
-              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-muted">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
                 <Users className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="mb-2 text-lg font-medium text-foreground">
@@ -1533,14 +1562,14 @@ const StudentList = () => {
                     : "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground"
                 }`}
               >
-                <div className="flex justify-between items-center">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="relative">
-                      <div className="flex justify-center items-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
+                      <div className="flex items-center justify-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
                         {student.full_name?.charAt(0)?.toUpperCase() || "?"}
                       </div>
                       {student.is_active === false && (
-                        <div className="flex absolute -top-1 -right-1 justify-center items-center w-6 h-6 rounded-full bg-destructive">
+                        <div className="absolute flex items-center justify-center w-6 h-6 rounded-full -top-1 -right-1 bg-destructive">
                           <X className="w-3 h-3 text-destructive-foreground" />
                         </div>
                       )}
@@ -1557,7 +1586,7 @@ const StudentList = () => {
                           variant="secondary"
                           className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
                         >
-                          <GraduationCap className="mr-1 w-3 h-3" />
+                          <GraduationCap className="w-3 h-3 mr-1" />
                           {student.class_name}
                         </Badge>
                         {student.gender && (
@@ -1565,7 +1594,7 @@ const StudentList = () => {
                             variant="secondary"
                             className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
                           >
-                            <Users className="mr-1 w-3 h-3" />
+                            <Users className="w-3 h-3 mr-1" />
                             {student.gender}
                           </Badge>
                         )}
@@ -1592,7 +1621,7 @@ const StudentList = () => {
               <CardContent className="p-4">
                 <div className="space-y-3">
                   <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
                       <Mail className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1604,7 +1633,7 @@ const StudentList = () => {
                   </div>
 
                   <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
                       <Phone className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1618,7 +1647,7 @@ const StudentList = () => {
                   </div>
 
                   <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary/10">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
                       <BookOpen className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1643,12 +1672,12 @@ const StudentList = () => {
                       >
                         {restoreLoading ? (
                           <>
-                            <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             <span>Đang khôi phục...</span>
                           </>
                         ) : (
                           <>
-                            <RefreshCw className="mr-2 w-4 h-4" />
+                            <RefreshCw className="w-4 h-4 mr-2" />
                             <span>Khôi phục học sinh</span>
                           </>
                         )}
@@ -1723,7 +1752,7 @@ const StudentList = () => {
       {totalPages > 1 && (
         <Card>
           <CardContent className="py-4">
-            <div className="flex justify-center items-center space-x-2">
+            <div className="flex items-center justify-center space-x-2">
               <Button
                 onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
@@ -1803,7 +1832,7 @@ const StudentList = () => {
 
           <div className="space-y-4">
             {/* Mode Selection */}
-            <div className="flex gap-2 p-1 bg-muted rounded-lg">
+            <div className="flex gap-2 p-1 rounded-lg bg-muted">
               <Button
                 variant={registrationMode === "camera" ? "default" : "ghost"}
                 onClick={() => setRegistrationMode("camera")}
@@ -1833,7 +1862,7 @@ const StudentList = () => {
                 {!capturedImage ? (
                   <div className="text-center">
                     {cameraError ? (
-                      <div className="p-6 bg-red-50 rounded-lg border border-red-200">
+                      <div className="p-6 border border-red-200 rounded-lg bg-red-50">
                         <div className="mb-2 text-lg text-red-600">❌</div>
                         <p className="font-medium text-red-700">
                           {cameraError}
@@ -1861,12 +1890,12 @@ const StudentList = () => {
                             autoPlay
                             playsInline
                             muted
-                            className="mx-auto w-full max-w-md rounded-lg border"
+                            className="w-full max-w-md mx-auto border rounded-lg"
                           />
                           {!cameraReady && (
-                            <div className="flex absolute inset-0 justify-center items-center bg-gray-200 rounded-lg">
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
                               <div className="text-center">
-                                <div className="mx-auto mb-2 w-8 h-8 rounded-full border-b-2 border-blue-600 animate-spin"></div>
+                                <div className="w-8 h-8 mx-auto mb-2 border-b-2 border-blue-600 rounded-full animate-spin"></div>
                                 <p className="text-gray-600">
                                   Đang khởi động camera...
                                 </p>
@@ -1900,7 +1929,7 @@ const StudentList = () => {
                     <img
                       src={capturedImage}
                       alt="Captured face"
-                      className="mx-auto w-full max-w-md rounded-lg border"
+                      className="w-full max-w-md mx-auto border rounded-lg"
                     />
                     <div className="mt-4 space-x-2">
                       <button
@@ -1929,7 +1958,7 @@ const StudentList = () => {
               <>
                 {!uploadedImage ? (
                   <div className="text-center">
-                    <div className="p-8 rounded-lg border-2 border-gray-300 border-dashed">
+                    <div className="p-8 border-2 border-gray-300 border-dashed rounded-lg">
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -1953,7 +1982,7 @@ const StudentList = () => {
                     <img
                       src={uploadedImage.previewUrl}
                       alt="Uploaded face"
-                      className="mx-auto w-full max-w-md rounded-lg border"
+                      className="w-full max-w-md mx-auto border rounded-lg"
                     />
                     <div className="mt-4 space-x-2">
                       <button
@@ -1986,7 +2015,7 @@ const StudentList = () => {
             {/* Multiple Mode */}
             {registrationMode === "multiple" && (
               <div className="space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
+                <div className="p-4 rounded-lg bg-blue-50">
                   <h4 className="mb-2 font-semibold text-blue-800">
                     📸 Đăng ký nhiều ảnh (Độ chính xác cao)
                   </h4>
@@ -2003,7 +2032,7 @@ const StudentList = () => {
 
                 {multipleFiles.length === 0 ? (
                   <div className="text-center">
-                    <div className="p-8 rounded-lg border-2 border-green-300 border-dashed">
+                    <div className="p-8 border-2 border-green-300 border-dashed rounded-lg">
                       <input
                         ref={multipleFileInputRef}
                         type="file"
@@ -2025,7 +2054,7 @@ const StudentList = () => {
                   </div>
                 ) : (
                   <div>
-                    <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center justify-between mb-3">
                       <h5 className="font-medium">
                         Đã chọn {multipleFiles.length} ảnh:
                       </h5>
@@ -2037,17 +2066,17 @@ const StudentList = () => {
                       </button>
                     </div>
 
-                    <div className="grid overflow-y-auto grid-cols-3 gap-3 max-h-60">
+                    <div className="grid grid-cols-3 gap-3 overflow-y-auto max-h-60">
                       {multipleFiles.map((fileObj) => (
                         <div key={fileObj.id} className="relative">
                           <img
                             src={fileObj.previewUrl}
                             alt={fileObj.name}
-                            className="object-cover w-full h-24 rounded border"
+                            className="object-cover w-full h-24 border rounded"
                           />
                           <button
                             onClick={() => removeMultipleFile(fileObj.id)}
-                            className="absolute -top-2 -right-2 w-6 h-6 text-xs text-white bg-red-500 rounded-full hover:bg-red-600"
+                            className="absolute w-6 h-6 text-xs text-white bg-red-500 rounded-full -top-2 -right-2 hover:bg-red-600"
                           >
                             ×
                           </button>
@@ -2096,7 +2125,7 @@ const StudentList = () => {
                     </div>
 
                     {multipleResults.length > 0 && (
-                      <div className="p-3 mt-4 bg-gray-50 rounded">
+                      <div className="p-3 mt-4 rounded bg-gray-50">
                         <h6 className="mb-2 font-medium">Kết quả:</h6>
                         <div className="space-y-1 text-sm">
                           {multipleResults.map((result, index) => (
@@ -2131,7 +2160,7 @@ const StudentList = () => {
       </Dialog>
 
       {/* Summary */}
-      <div className="p-4 mt-6 bg-gray-50 rounded-lg">
+      <div className="p-4 mt-6 rounded-lg bg-gray-50">
         <p className="text-sm text-gray-600">
           Hiển thị {filteredStudents.length} / {students.length} học sinh
           {selectedClass && ` trong lớp ${selectedClass}`}
@@ -2166,7 +2195,7 @@ const StudentList = () => {
                   <input
                     type="text"
                     value={selectedStudentForEdit.student_id || ""}
-                    className="px-3 py-2 w-full text-gray-500 bg-gray-50 rounded-lg border border-gray-300"
+                    className="w-full px-3 py-2 text-gray-500 border border-gray-300 rounded-lg bg-gray-50"
                     readOnly
                   />
                 </div>
@@ -2181,7 +2210,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("full_name", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Nguyễn Văn An"
                   />
                 </div>
@@ -2196,7 +2225,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("email", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: student@example.com"
                   />
                 </div>
@@ -2211,7 +2240,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("phone", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0123456789"
                   />
                 </div>
@@ -2226,7 +2255,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("class_name", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 10A1"
                   />
                 </div>
@@ -2240,7 +2269,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("grade", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Chọn khối</option>
                     <option value="10">Khối 10</option>
@@ -2258,7 +2287,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("gender", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
@@ -2276,7 +2305,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("date_of_birth", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -2290,7 +2319,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("parent_name", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: Nguyễn Văn Bình"
                   />
                 </div>
@@ -2305,7 +2334,7 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("parent_phone", e.target.value)
                     }
-                    className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 0987654321"
                   />
                 </div>
@@ -2321,7 +2350,7 @@ const StudentList = () => {
                     handleEditFormChange("address", e.target.value)
                   }
                   rows={3}
-                  className="px-3 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
                 />
               </div>
@@ -2369,7 +2398,7 @@ const StudentList = () => {
         >
           <DialogContent className="max-w-6xl">
             <DialogHeader>
-              <DialogTitle className="flex gap-2 items-center">
+              <DialogTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-primary" /> Bảng điểm
               </DialogTitle>
               <DialogDescription>
@@ -2383,8 +2412,8 @@ const StudentList = () => {
             {/* Modal Content */}
             <div className="p-6">
               {gradesLoading ? (
-                <div className="flex justify-center items-center h-64">
-                  <div className="w-16 h-16 rounded-full border-b-2 border-purple-600 animate-spin"></div>
+                <div className="flex items-center justify-center h-64">
+                  <div className="w-16 h-16 border-b-2 border-purple-600 rounded-full animate-spin"></div>
                   <span className="ml-4 text-lg text-gray-600">
                     Đang tải điểm số...
                   </span>
@@ -2402,8 +2431,8 @@ const StudentList = () => {
               ) : (
                 <div className="space-y-6">
                   {/* Academic Year & Semester Filter */}
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-center">
+                  <div className="p-4 rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-medium text-gray-900">
                           Năm học: 2024-2025
@@ -2421,7 +2450,7 @@ const StudentList = () => {
 
                   {/* Grades Table */}
                   <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white rounded-lg border border-gray-200">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-6 py-4 text-sm font-medium tracking-wider text-left text-gray-500 uppercase border-b">
@@ -2443,7 +2472,7 @@ const StudentList = () => {
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="flex items-center">
-                                <div className="flex justify-center items-center w-10 h-10 text-sm font-bold rounded-full text-primary-foreground bg-primary">
+                                <div className="flex items-center justify-center w-10 h-10 text-sm font-bold rounded-full text-primary-foreground bg-primary">
                                   {gradeRecord.subject_name
                                     ?.charAt(0)
                                     ?.toUpperCase() || "?"}
@@ -2471,7 +2500,7 @@ const StudentList = () => {
                             </td>
 
                             <td className="px-6 py-4">
-                              <div className="flex flex-wrap gap-2 justify-center">
+                              <div className="flex flex-wrap justify-center gap-2">
                                 {gradeRecord.grade_data &&
                                   (() => {
                                     // Sắp xếp các cột điểm theo: trọng số tăng dần, rồi theo giai đoạn (thường xuyên -> giữa kì -> cuối kì)
@@ -2530,7 +2559,7 @@ const StudentList = () => {
                                     return keys.map((columnName) => (
                                       <div
                                         key={columnName}
-                                        className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-200"
+                                        className="px-3 py-1 border border-blue-200 rounded-lg bg-blue-50"
                                       >
                                         <div className="text-xs font-medium text-blue-600">
                                           {formatLabel(columnName)}
@@ -2578,7 +2607,7 @@ const StudentList = () => {
 
                   {/* Summary */}
                   <div className="p-6 rounded-lg bg-muted/50">
-                    <h4 className="flex gap-2 items-center mb-3 font-medium text-gray-900">
+                    <h4 className="flex items-center gap-2 mb-3 font-medium text-gray-900">
                       <TrendingUp className="w-5 h-5 text-gray-700" /> Tổng kết
                     </h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -2627,7 +2656,7 @@ const StudentList = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
+            <div className="px-6 py-4 rounded-b-lg bg-gray-50">
               <div className="flex justify-end">
                 <Button variant="secondary" onClick={closeGradesModal}>
                   Đóng
@@ -2646,7 +2675,7 @@ const StudentList = () => {
         >
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex gap-2 items-center">
+              <DialogTitle className="flex items-center gap-2">
                 <MessageCircle className="w-5 h-5 text-primary" /> Tạo nhận xét
                 học sinh
               </DialogTitle>
@@ -2662,7 +2691,7 @@ const StudentList = () => {
             <div className="p-6">
               {/* Error Alert */}
               {feedbackError && (
-                <div className="p-4 mb-4 bg-red-50 rounded-md border border-red-200">
+                <div className="p-4 mb-4 border border-red-200 rounded-md bg-red-50">
                   <div className="flex">
                     <AlertCircle className="w-5 h-5 text-red-500" />
                     <div className="ml-3">
@@ -2674,7 +2703,7 @@ const StudentList = () => {
 
               {/* Success Alert */}
               {feedbackSuccess && (
-                <div className="p-4 mb-4 bg-green-50 rounded-md border border-green-200">
+                <div className="p-4 mb-4 border border-green-200 rounded-md bg-green-50">
                   <div className="flex">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <div className="ml-3">
@@ -2688,7 +2717,7 @@ const StudentList = () => {
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Input Form */}
-                <div className="bg-white rounded-lg border border-gray-200">
+                <div className="bg-white border border-gray-200 rounded-lg">
                   <div className="px-6 py-4 border-b border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900">
                       Thông Tin Học Sinh
@@ -2714,7 +2743,7 @@ const StudentList = () => {
                           )
                         }
                         placeholder="Nhập tên học sinh"
-                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                         readOnly
                       />
                     </div>
@@ -2738,9 +2767,28 @@ const StudentList = () => {
                           handleFeedbackFormChange("score", e.target.value)
                         }
                         placeholder="8.5"
-                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
+
+                    {/* Subject */}
+                    {feedbackForm.subject && (
+                      <div>
+                        <label
+                          htmlFor="subject"
+                          className="block mb-1 text-sm font-medium text-gray-700"
+                        >
+                          Môn Học
+                        </label>
+                        <input
+                          id="subject"
+                          type="text"
+                          value={feedbackForm.subject}
+                          readOnly
+                          className="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-md shadow-sm cursor-not-allowed bg-gray-50"
+                        />
+                      </div>
+                    )}
 
                     {/* Score Trend */}
                     <div>
@@ -2765,7 +2813,7 @@ const StudentList = () => {
                             e.target.value
                           )
                         }
-                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                         disabled={trendLoading}
                       >
                         <option value="">Chọn xu hướng</option>
@@ -2777,13 +2825,13 @@ const StudentList = () => {
                       {/* Grade Trend Analysis Result */}
                       {gradeTrendData && (
                         <div
-                          className="p-3 mt-2 rounded-md border"
+                          className="p-3 mt-2 border rounded-md"
                           style={{
                             backgroundColor: gradeTrendData.color + "10",
                             borderColor: gradeTrendData.color + "40",
                           }}
                         >
-                          <div className="flex justify-between items-center">
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               <span
                                 className="px-2 py-1 text-xs font-medium text-white rounded-full"
@@ -2810,7 +2858,7 @@ const StudentList = () => {
 
                       {/* Trend Error */}
                       {trendError && (
-                        <div className="p-2 mt-2 text-xs text-red-600 bg-red-50 rounded border border-red-200">
+                        <div className="p-2 mt-2 text-xs text-red-600 border border-red-200 rounded bg-red-50">
                           ⚠️ {trendError}
                         </div>
                       )}
@@ -2837,7 +2885,7 @@ const StudentList = () => {
                           )
                         }
                         placeholder="95"
-                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
@@ -2857,7 +2905,7 @@ const StudentList = () => {
                         }
                         placeholder="Ví dụ: Học sinh rất tích cực tham gia hoạt động lớp..."
                         rows={3}
-                        className="px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
@@ -2865,12 +2913,12 @@ const StudentList = () => {
                     <button
                       onClick={generateFeedback}
                       disabled={feedbackLoading}
-                      className="flex justify-center items-center px-4 py-2 w-full font-medium text-white bg-indigo-600 rounded-md transition-colors hover:bg-indigo-700 disabled:bg-gray-400"
+                      className="flex items-center justify-center w-full px-4 py-2 font-medium text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
                     >
                       {feedbackLoading ? (
                         <>
                           <svg
-                            className="mr-2 -ml-1 w-4 h-4 text-white animate-spin"
+                            className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 24 24"
@@ -2893,7 +2941,7 @@ const StudentList = () => {
                         </>
                       ) : (
                         <>
-                          <MessageCircle className="mr-2 w-4 h-4" />
+                          <MessageCircle className="w-4 h-4 mr-2" />
                           <span>Tạo Nhận Xét</span>
                         </>
                       )}
@@ -2902,7 +2950,7 @@ const StudentList = () => {
                 </div>
 
                 {/* Result Display */}
-                <div className="bg-white rounded-lg border border-gray-200">
+                <div className="bg-white border border-gray-200 rounded-lg">
                   <div className="px-6 py-4 border-b border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900">
                       Nhận Xét Được Tạo
@@ -2911,9 +2959,9 @@ const StudentList = () => {
                   <div className="px-6 py-4">
                     {generatedFeedback ? (
                       <div className="space-y-4">
-                        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                          <div className="flex gap-3 items-start">
-                            <MessageCircle className="flex-shrink-0 mt-1 w-5 h-5 text-indigo-600" />
+                        <div className="p-4 border border-indigo-200 rounded-lg bg-indigo-50">
+                          <div className="flex items-start gap-3">
+                            <MessageCircle className="flex-shrink-0 w-5 h-5 mt-1 text-indigo-600" />
                             <div>
                               <h4 className="mb-2 font-medium text-indigo-900">
                                 Nhận xét cho {feedbackForm.student_name}:
@@ -2929,12 +2977,12 @@ const StudentList = () => {
                         <button
                           onClick={sendSMS}
                           disabled={smsLoading}
-                          className="flex justify-center items-center px-4 py-2 w-full font-medium text-white bg-green-600 rounded-md transition-colors hover:bg-green-700 disabled:bg-gray-400"
+                          className="flex items-center justify-center w-full px-4 py-2 font-medium text-white transition-colors bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-400"
                         >
                           {smsLoading ? (
                             <>
                               <svg
-                                className="mr-2 -ml-1 w-4 h-4 text-white animate-spin"
+                                className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
                                 xmlns="http://www.w3.org/2000/svg"
                                 fill="none"
                                 viewBox="0 0 24 24"
@@ -2962,7 +3010,7 @@ const StudentList = () => {
                       </div>
                     ) : (
                       <div className="py-12 text-center text-gray-500">
-                        <MessageCircle className="mx-auto mb-4 w-12 h-12 text-indigo-400" />
+                        <MessageCircle className="w-12 h-12 mx-auto mb-4 text-indigo-400" />
                         <p>
                           Nhấn "Tạo nhận xét" để AI tự động tạo nhận xét cho học
                           sinh
@@ -2975,7 +3023,7 @@ const StudentList = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
+            <div className="px-6 py-4 rounded-b-lg bg-gray-50">
               <div className="flex justify-end">
                 <Button variant="secondary" onClick={closeFeedbackModal}>
                   Đóng
@@ -2994,7 +3042,7 @@ const StudentList = () => {
         >
           <DialogContent className="max-w-4xl">
             <DialogHeader>
-              <DialogTitle className="flex gap-2 items-center">
+              <DialogTitle className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-primary" /> Chọn môn học
               </DialogTitle>
               <DialogDescription>
@@ -3009,9 +3057,9 @@ const StudentList = () => {
             <div className="p-6">
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Core Subjects */}
-                <div className="bg-white rounded-lg border border-gray-200">
+                <div className="bg-white border border-gray-200 rounded-lg">
                   <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="flex gap-2 items-center text-lg font-medium text-gray-900">
+                    <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
                       <BookOpen className="w-5 h-5 text-blue-600" /> Môn học
                       chính (3 môn)
                     </h3>
@@ -3019,7 +3067,7 @@ const StudentList = () => {
                       Bắt buộc: Toán, Văn, Anh
                     </p>
                   </div>
-                  <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
+                  <div className="px-6 py-4 space-y-3 overflow-y-auto max-h-64">
                     {availableSubjects
                       .filter((subject) =>
                         ["TOAN", "VAN", "ANH"].includes(subject.subject_code)
@@ -3040,7 +3088,7 @@ const StudentList = () => {
                                 "core_subjects"
                               )
                             }
-                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                           />
                           <span className="text-sm font-medium text-gray-900">
                             {subject.subject_name} ({subject.subject_code})
@@ -3051,7 +3099,7 @@ const StudentList = () => {
                         </label>
                       ))}
                   </div>
-                  <div className="px-6 py-3 bg-blue-50 border-t border-gray-200">
+                  <div className="px-6 py-3 border-t border-gray-200 bg-blue-50">
                     <p className="text-xs text-blue-700">
                       Đã chọn: {selectedSubjects.core_subjects.length}/3 môn
                       chính
@@ -3060,9 +3108,9 @@ const StudentList = () => {
                 </div>
 
                 {/* Elective Subjects */}
-                <div className="bg-white rounded-lg border border-gray-200">
+                <div className="bg-white border border-gray-200 rounded-lg">
                   <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="flex gap-2 items-center text-lg font-medium text-gray-900">
+                    <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
                       <Target className="w-5 h-5 text-green-600" /> Môn tự chọn
                       (3 môn)
                     </h3>
@@ -3070,7 +3118,7 @@ const StudentList = () => {
                       Chọn 3 môn từ danh sách
                     </p>
                   </div>
-                  <div className="overflow-y-auto px-6 py-4 space-y-3 max-h-64">
+                  <div className="px-6 py-4 space-y-3 overflow-y-auto max-h-64">
                     {availableSubjects
                       .filter(
                         (subject) =>
@@ -3092,7 +3140,7 @@ const StudentList = () => {
                                 "elective_subjects"
                               )
                             }
-                            className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                           />
                           <span className="text-sm font-medium text-gray-900">
                             {subject.subject_name} ({subject.subject_code})
@@ -3103,7 +3151,7 @@ const StudentList = () => {
                         </label>
                       ))}
                   </div>
-                  <div className="px-6 py-3 bg-green-50 border-t border-gray-200">
+                  <div className="px-6 py-3 border-t border-gray-200 bg-green-50">
                     <p className="text-xs text-green-700">
                       Đã chọn: {selectedSubjects.elective_subjects.length}/3 môn
                       tự chọn
@@ -3113,8 +3161,8 @@ const StudentList = () => {
               </div>
 
               {/* Current Selection Summary */}
-              <div className="p-4 mt-6 bg-gray-50 rounded-lg">
-                <h4 className="flex gap-2 items-center mb-3 font-medium text-gray-900">
+              <div className="p-4 mt-6 rounded-lg bg-gray-50">
+                <h4 className="flex items-center gap-2 mb-3 font-medium text-gray-900">
                   <ClipboardList className="w-5 h-5 text-gray-700" /> Tóm tắt
                   lựa chọn:
                 </h4>
@@ -3144,8 +3192,8 @@ const StudentList = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg">
-              <div className="flex gap-2 justify-end">
+            <div className="px-6 py-4 rounded-b-lg bg-gray-50">
+              <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={closeSubjectModal}>
                   Hủy
                 </Button>
