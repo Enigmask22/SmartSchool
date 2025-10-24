@@ -486,3 +486,4 @@ installation.log
 instruction_md/
 llm_gen/
 build_wheel/
+latex/

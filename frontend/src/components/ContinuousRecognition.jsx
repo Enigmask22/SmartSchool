@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Camera,
+  CameraOff,
   Square,
   Play,
   Pause,
@@ -475,12 +476,12 @@ const ContinuousRecognition = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 min-h-screen bg-gray-50">
+    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
       <div className="mx-auto space-y-6 max-w-7xl">
         {/* Header */}
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <Camera className="w-8 h-8 text-primary" />
                 <div>
@@ -538,7 +539,7 @@ const ContinuousRecognition = () => {
 
           {/* Info Banner */}
           <CardContent>
-            <div className="flex items-start p-3 space-x-2 rounded-lg border bg-primary/5 border-primary/20">
+            <div className="flex items-start p-3 space-x-2 border rounded-lg bg-primary/5 border-primary/20">
               <Info className="w-4 h-4 text-primary mt-0.5" />
               <div className="text-sm text-primary">
                 <strong>Về độ tin cậy:</strong> InsightFace AI sử dụng thuật
@@ -598,23 +599,23 @@ const ContinuousRecognition = () => {
             <CardContent>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center">
-                  <div className="mr-2 w-3 h-3 bg-emerald-600 rounded"></div>
+                  <div className="w-3 h-3 mr-2 rounded bg-emerald-600"></div>
                   <span>≥45% (90%+): Xuất sắc</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="mr-2 w-3 h-3 bg-green-600 rounded"></div>
+                  <div className="w-3 h-3 mr-2 bg-green-600 rounded"></div>
                   <span>35-44% (70-88%): Rất cao</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="mr-2 w-3 h-3 bg-blue-600 rounded"></div>
+                  <div className="w-3 h-3 mr-2 bg-blue-600 rounded"></div>
                   <span>25-34% (50-68%): Cao</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="mr-2 w-3 h-3 bg-yellow-600 rounded"></div>
+                  <div className="w-3 h-3 mr-2 bg-yellow-600 rounded"></div>
                   <span>20-24% (40-48%): Tốt</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="mr-2 w-3 h-3 bg-orange-600 rounded"></div>
+                  <div className="w-3 h-3 mr-2 bg-orange-600 rounded"></div>
                   <span>&lt;20% (&lt;40%): Chấp nhận được</span>
                 </div>
               </div>
@@ -684,7 +685,7 @@ const ContinuousRecognition = () => {
 
                   {/* Camera Off Placeholder */}
                   {!isCameraOn && (
-                    <div className="flex justify-center items-center w-full h-96 bg-gray-800 rounded-lg">
+                    <div className="flex items-center justify-center w-full bg-gray-800 rounded-lg h-96">
                       <div className="text-center text-white">
                         <Camera
                           size={64}
@@ -800,7 +801,7 @@ const ContinuousRecognition = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">
                       Tổng điểm danh:
                     </span>
@@ -809,7 +810,7 @@ const ContinuousRecognition = () => {
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">
                       Thời gian chờ:
                     </span>
@@ -818,7 +819,7 @@ const ContinuousRecognition = () => {
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Đang chờ:</span>
                     <span className="font-bold text-orange-600">
                       {Object.keys(activeCooldowns).length}
@@ -837,7 +838,7 @@ const ContinuousRecognition = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-y-auto space-y-3 max-h-96">
+                <div className="space-y-3 overflow-y-auto max-h-96">
                   {recentRecognitions.length === 0 ? (
                     <p className="py-4 text-center text-muted-foreground">
                       Chưa có nhận diện nào
@@ -846,9 +847,9 @@ const ContinuousRecognition = () => {
                     recentRecognitions.map((recognition) => (
                       <div
                         key={recognition.id}
-                        className="p-3 rounded-lg border"
+                        className="p-3 border rounded-lg"
                       >
-                        <div className="flex justify-between items-start">
+                        <div className="flex items-start justify-between">
                           <div>
                             <div className="font-semibold text-foreground">
                               {recognition.student.full_name}

@@ -33,6 +33,7 @@ async def generate_student_feedback(request: StudentFeedbackRequest):
             score=request.score,
             score_trend=request.score_trend,
             attendance_rate=request.attendance_rate,
+            subject=request.subject,
             notes=request.notes
         )
         
@@ -85,6 +86,7 @@ async def generate_batch_feedback(request: BatchFeedbackRequest):
                 "score": student.score,
                 "trend": student.score_trend,
                 "attendance": student.attendance_rate,
+                "subject": student.subject,
                 "notes": student.notes or ""
             })
         
@@ -129,6 +131,7 @@ async def test_feedback_generation():
             score=8.5,
             score_trend="tăng",
             attendance_rate=95,
+            subject="Toán",
             notes="Học sinh rất chăm chỉ và tích cực tham gia hoạt động lớp"
         )
         
