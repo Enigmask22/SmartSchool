@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Camera, 
-  Square, 
-  Play, 
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Camera,
+  Square,
+  Play,
   Pause,
   Settings,
   Users,
@@ -12,23 +12,30 @@ import {
   Wifi,
   WifiOff,
   BarChart3,
-  Info
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
+  Info,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
 
 // API Configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
-const WS_BASE_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/api';
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+const WS_BASE_URL = process.env.REACT_APP_WS_URL || "ws://localhost:8000/api";
 
 const ContinuousRecognition = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
   const intervalRef = useRef(null);
-  
+
   const [isRunning, setIsRunning] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
@@ -37,30 +44,30 @@ const ContinuousRecognition = () => {
   const [cooldownPeriod, setCooldownPeriod] = useState(60);
   const [totalRecognitionsToday, setTotalRecognitionsToday] = useState(0);
   const [activeCooldowns, setActiveCooldowns] = useState({});
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [stats, setStats] = useState({
     totalRecognitions: 0,
     uniqueStudents: new Set(),
-    runningTime: 0
+    runningTime: 0,
   });
   const [settings, setSettings] = useState({
-    cooldownPeriod: 60
+    cooldownPeriod: 60,
   });
   const [startTime, setStartTime] = useState(null);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
 
   // Load current settings from backend
   const loadSettings = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/ai/recognition/status`);
       const result = await response.json();
-      
+
       if (result.success && result.data.cooldown_period) {
         setCooldownPeriod(result.data.cooldown_period);
-        console.log('🔧 Loaded settings:', result.data);
+        console.log("🔧 Loaded settings:", result.data);
       }
     } catch (error) {
-      console.error('❌ Error loading settings:', error);
+      console.error("❌ Error loading settings:", error);
     }
   }, []);
 
@@ -69,23 +76,23 @@ const ContinuousRecognition = () => {
     try {
       // Fix WebSocket URL để match với backend route
       wsRef.current = new WebSocket(`${WS_BASE_URL}/ai/recognition/stream`);
-      
+
       wsRef.current.onopen = () => {
-        console.log('🔗 Connected to recognition stream');
+        console.log("🔗 Connected to recognition stream");
         setIsConnected(true);
-        setConnectionStatus('connected');
+        setConnectionStatus("connected");
       };
-      
+
       wsRef.current.onmessage = (event) => {
         const data = JSON.parse(event.data);
         handleWebSocketMessage(data);
       };
-      
+
       wsRef.current.onclose = () => {
-        console.log('🔌 Disconnected from recognition stream');
+        console.log("🔌 Disconnected from recognition stream");
         setIsConnected(false);
-        setConnectionStatus('disconnected');
-        
+        setConnectionStatus("disconnected");
+
         // Attempt to reconnect after 3 seconds
         setTimeout(() => {
           if (!isConnected) {
@@ -93,68 +100,72 @@ const ContinuousRecognition = () => {
           }
         }, 3000);
       };
-      
+
       wsRef.current.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
-        setConnectionStatus('error');
+        console.error("❌ WebSocket error:", error);
+        setConnectionStatus("error");
       };
-      
     } catch (error) {
-      console.error('❌ Failed to connect WebSocket:', error);
-      setConnectionStatus('error');
+      console.error("❌ Failed to connect WebSocket:", error);
+      setConnectionStatus("error");
     }
   }, [isConnected]);
 
   // Handle WebSocket messages
   const handleWebSocketMessage = (data) => {
     switch (data.type) {
-      case 'recognition_result':
+      case "recognition_result":
         // Log debug info
-        console.log('🔍 Recognition result:', data.data);
-        
-        if (data.data.recognized_students && data.data.recognized_students.length > 0) {
+        console.log("🔍 Recognition result:", data.data);
+
+        if (
+          data.data.recognized_students &&
+          data.data.recognized_students.length > 0
+        ) {
           setRecognizedStudents(data.data.recognized_students);
-          
+
           // Add to recent recognitions
-          data.data.recognized_students.forEach(recognition => {
-            setRecentRecognitions(prev => [
+          data.data.recognized_students.forEach((recognition) => {
+            setRecentRecognitions((prev) => [
               {
                 ...recognition,
-                timestamp: new Date().toLocaleTimeString('vi-VN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  timeZone: 'Asia/Ho_Chi_Minh'
+                timestamp: new Date().toLocaleTimeString("vi-VN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  timeZone: "Asia/Ho_Chi_Minh",
                 }),
-                id: Date.now() + Math.random()
+                id: Date.now() + Math.random(),
               },
-              ...prev.slice(0, 9) // Keep only last 10
+              ...prev.slice(0, 9), // Keep only last 10
             ]);
           });
-          
-          setTotalRecognitionsToday(prev => prev + data.data.recognized_students.length);
+
+          setTotalRecognitionsToday(
+            (prev) => prev + data.data.recognized_students.length
+          );
         } else {
           // Clear recognized students if no valid recognition
           setRecognizedStudents([]);
-          
+
           // Log debug message if available
           if (data.data.message) {
             console.log(`⚠️ Recognition message: ${data.data.message}`);
           }
         }
         break;
-        
-      case 'status':
-        console.log('📢 Status update:', data.message);
+
+      case "status":
+        console.log("📢 Status update:", data.message);
         setIsRunning(data.is_running);
         break;
-        
-      case 'control_update':
+
+      case "control_update":
         setIsRunning(data.is_running);
         break;
-        
+
       default:
-        console.log('📨 Unknown message type:', data.type);
+        console.log("📨 Unknown message type:", data.type);
     }
   };
 
@@ -163,53 +174,55 @@ const ContinuousRecognition = () => {
     try {
       // Stop existing stream first
       stopCamera();
-      
-      console.log('🎥 Starting camera...');
+
+      console.log("🎥 Starting camera...");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
-          facingMode: 'user',
-          frameRate: { ideal: 15, max: 60 }
+          facingMode: "user",
+          frameRate: { ideal: 15, max: 60 },
         },
-        audio: false
+        audio: false,
       });
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsCameraOn(true);
-        
+
         // Add event listeners
         videoRef.current.onloadedmetadata = () => {
-          console.log('✅ Camera metadata loaded');
-          videoRef.current.play().catch(e => {
-            console.error('❌ Video play error:', e);
+          console.log("✅ Camera metadata loaded");
+          videoRef.current.play().catch((e) => {
+            console.error("❌ Video play error:", e);
           });
         };
-        
+
         videoRef.current.onplay = () => {
-          console.log('▶️ Camera started playing');
+          console.log("▶️ Camera started playing");
         };
-        
+
         videoRef.current.onerror = (e) => {
-          console.error('❌ Video element error:', e);
+          console.error("❌ Video element error:", e);
         };
       }
     } catch (error) {
-      console.error('❌ Error accessing camera:', error);
-      
-      let errorMessage = 'Không thể truy cập camera.';
-      
-      if (error.name === 'NotAllowedError') {
-        errorMessage = 'Quyền truy cập camera bị từ chối. Vui lòng cho phép camera trong trình duyệt.';
-      } else if (error.name === 'NotFoundError') {
-        errorMessage = 'Không tìm thấy camera. Vui lòng kiểm tra thiết bị camera.';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = 'Camera đang được sử dụng bởi ứng dụng khác.';
+      console.error("❌ Error accessing camera:", error);
+
+      let errorMessage = "Không thể truy cập camera.";
+
+      if (error.name === "NotAllowedError") {
+        errorMessage =
+          "Quyền truy cập camera bị từ chối. Vui lòng cho phép camera trong trình duyệt.";
+      } else if (error.name === "NotFoundError") {
+        errorMessage =
+          "Không tìm thấy camera. Vui lòng kiểm tra thiết bị camera.";
+      } else if (error.name === "NotReadableError") {
+        errorMessage = "Camera đang được sử dụng bởi ứng dụng khác.";
       }
-      
+
       alert(errorMessage);
-      setConnectionStatus('camera_error');
+      setConnectionStatus("camera_error");
       setIsCameraOn(false);
     }
   };
@@ -218,9 +231,9 @@ const ContinuousRecognition = () => {
   const stopCamera = () => {
     try {
       if (videoRef.current && videoRef.current.srcObject) {
-        console.log('🛑 Stopping camera...');
+        console.log("🛑 Stopping camera...");
         const tracks = videoRef.current.srcObject.getTracks();
-        tracks.forEach(track => {
+        tracks.forEach((track) => {
           track.stop();
           console.log(`🔇 Stopped track: ${track.kind}`);
         });
@@ -229,54 +242,61 @@ const ContinuousRecognition = () => {
         setIsCameraOn(false);
       }
     } catch (error) {
-      console.error('❌ Error stopping camera:', error);
+      console.error("❌ Error stopping camera:", error);
     }
   };
 
   // Capture and send frame
   const captureAndSendFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current || !wsRef.current || !isRunning || !isCameraOn) {
+    if (
+      !videoRef.current ||
+      !canvasRef.current ||
+      !wsRef.current ||
+      !isRunning ||
+      !isCameraOn
+    ) {
       return;
     }
 
     try {
       const canvas = canvasRef.current;
       const video = videoRef.current;
-      
+
       // Check if video is ready
       if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-        console.log('⏳ Video not ready for capture');
+        console.log("⏳ Video not ready for capture");
         return;
       }
-      
-      const ctx = canvas.getContext('2d');
-      
+
+      const ctx = canvas.getContext("2d");
+
       canvas.width = video.videoWidth || 640;
       canvas.height = video.videoHeight || 480;
-      
+
       // Clear canvas first
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       // Draw video frame
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
+
       // Convert to base64 with error handling
       try {
-        const imageData = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-        
+        const imageData = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
+
         // Send frame via WebSocket
         if (wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            type: 'frame',
-            image: imageData
-          }));
+          wsRef.current.send(
+            JSON.stringify({
+              type: "frame",
+              image: imageData,
+            })
+          );
         }
       } catch (canvasError) {
-        console.error('❌ Canvas capture error:', canvasError);
+        console.error("❌ Canvas capture error:", canvasError);
       }
-      
     } catch (error) {
-      console.error('❌ Frame capture error:', error);
+      console.error("❌ Frame capture error:", error);
     }
   }, [isRunning, isCameraOn]);
 
@@ -285,11 +305,17 @@ const ContinuousRecognition = () => {
     if (isCameraOn) {
       // Tắt camera và dừng nhận diện
       stopCamera();
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && isRunning) {
-        wsRef.current.send(JSON.stringify({
-          type: 'control',
-          command: 'stop'
-        }));
+      if (
+        wsRef.current &&
+        wsRef.current.readyState === WebSocket.OPEN &&
+        isRunning
+      ) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "control",
+            command: "stop",
+          })
+        );
       }
     } else {
       // Bật camera
@@ -300,23 +326,25 @@ const ContinuousRecognition = () => {
   // Control recognition (chỉ khi camera đang bật)
   const toggleRecognition = () => {
     if (!isCameraOn) {
-      alert('Vui lòng bật camera trước khi bắt đầu nhận diện!');
+      alert("Vui lòng bật camera trước khi bắt đầu nhận diện!");
       return;
     }
-    
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const command = isRunning ? 'stop' : 'start';
-      wsRef.current.send(JSON.stringify({
-        type: 'control',
-        command: command
-      }));
+      const command = isRunning ? "stop" : "start";
+      wsRef.current.send(
+        JSON.stringify({
+          type: "control",
+          command: command,
+        })
+      );
     }
   };
 
   // Initialize on component mount
   useEffect(() => {
     let mounted = true;
-    
+
     const initializeComponent = async () => {
       if (mounted) {
         await loadSettings(); // Load settings trước
@@ -324,20 +352,20 @@ const ContinuousRecognition = () => {
         // Không tự động bật camera, để người dùng tự bật
       }
     };
-    
+
     initializeComponent();
-    
+
     return () => {
       mounted = false;
-      
+
       // Cleanup WebSocket
       if (wsRef.current) {
         wsRef.current.close();
       }
-      
+
       // Cleanup camera
       stopCamera();
-      
+
       // Cleanup interval
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -356,7 +384,7 @@ const ContinuousRecognition = () => {
         intervalRef.current = null;
       }
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -375,14 +403,14 @@ const ContinuousRecognition = () => {
   // Update stats when recognition happens
   useEffect(() => {
     if (recognizedStudents.length > 0) {
-      setStats(prev => {
+      setStats((prev) => {
         const newUniqueStudents = new Set(prev.uniqueStudents);
-        recognizedStudents.forEach(r => newUniqueStudents.add(r.student.id));
-        
+        recognizedStudents.forEach((r) => newUniqueStudents.add(r.student.id));
+
         return {
           ...prev,
           totalRecognitions: prev.totalRecognitions + recognizedStudents.length,
-          uniqueStudents: newUniqueStudents
+          uniqueStudents: newUniqueStudents,
         };
       });
     }
@@ -393,9 +421,9 @@ const ContinuousRecognition = () => {
     let interval;
     if (isRunning && startTime) {
       interval = setInterval(() => {
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
-          runningTime: Math.floor((Date.now() - startTime) / 1000)
+          runningTime: Math.floor((Date.now() - startTime) / 1000),
         }));
       }, 1000);
     }
@@ -405,39 +433,44 @@ const ContinuousRecognition = () => {
   const handleStart = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/ai/recognition/control`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" }),
       });
-      
+
       if (response.ok) {
         setIsRunning(true);
         setStartTime(Date.now());
-        setStats(prev => ({ ...prev, totalRecognitions: 0, uniqueStudents: new Set(), runningTime: 0 }));
-        setMessage('🎥 Đã bắt đầu nhận diện tự động');
+        setStats((prev) => ({
+          ...prev,
+          totalRecognitions: 0,
+          uniqueStudents: new Set(),
+          runningTime: 0,
+        }));
+        setMessage("Đã bắt đầu nhận diện tự động");
       }
     } catch (error) {
-      console.error('Error starting recognition:', error);
-      setMessage('❌ Lỗi khi bắt đầu nhận diện');
+      console.error("Error starting recognition:", error);
+      setMessage("Lỗi khi bắt đầu nhận diện");
     }
   };
 
   const handleStop = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/ai/recognition/control`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop' })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop" }),
       });
-      
+
       if (response.ok) {
         setIsRunning(false);
         setStartTime(null);
-        setMessage('⏹️ Đã dừng nhận diện tự động');
+        setMessage("Đã dừng nhận diện tự động");
       }
     } catch (error) {
-      console.error('Error stopping recognition:', error);
-      setMessage('❌ Lỗi khi dừng nhận diện');
+      console.error("Error stopping recognition:", error);
+      setMessage("Lỗi khi dừng nhận diện");
     }
   };
 
@@ -451,20 +484,30 @@ const ContinuousRecognition = () => {
               <div className="flex items-center space-x-3">
                 <Camera className="w-8 h-8 text-primary" />
                 <div>
-                  <CardTitle className="text-3xl font-bold">Điểm Danh Tự Động Liên Tục</CardTitle>
-                  <CardDescription>Hệ thống nhận diện khuôn mặt tự động liên tục</CardDescription>
+                  <CardTitle className="text-3xl font-bold">
+                    Điểm Danh Tự Động Liên Tục
+                  </CardTitle>
+                  <CardDescription>
+                    Hệ thống nhận diện khuôn mặt tự động liên tục
+                  </CardDescription>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4">
                 {/* Status Indicators */}
-                <Badge variant={isConnected ? "default" : "destructive"} className="flex items-center space-x-1">
+                <Badge
+                  variant={isConnected ? "default" : "destructive"}
+                  className="flex items-center space-x-1"
+                >
                   {isConnected ? <Wifi size={16} /> : <WifiOff size={16} />}
-                  <span>{isConnected ? 'Đã kết nối' : 'Mất kết nối'}</span>
+                  <span>{isConnected ? "Đã kết nối" : "Mất kết nối"}</span>
                 </Badge>
-                
-                <Badge variant={isRunning ? "default" : "secondary"} className="flex items-center space-x-1">
-                  <span>{isRunning ? 'Đang chạy' : 'Đã dừng'}</span>
+
+                <Badge
+                  variant={isRunning ? "default" : "secondary"}
+                  className="flex items-center space-x-1"
+                >
+                  <span>{isRunning ? "Đang chạy" : "Đã dừng"}</span>
                 </Badge>
 
                 {/* Camera Toggle Button */}
@@ -474,9 +517,9 @@ const ContinuousRecognition = () => {
                   className="flex items-center space-x-2"
                 >
                   {isCameraOn ? <Square size={18} /> : <Camera size={18} />}
-                  <span>{isCameraOn ? 'Tắt Camera' : 'Bật Camera'}</span>
+                  <span>{isCameraOn ? "Tắt Camera" : "Bật Camera"}</span>
                 </Button>
-                
+
                 {/* Recognition Control Button */}
                 <Button
                   onClick={isRunning ? handleStop : handleStart}
@@ -485,19 +528,24 @@ const ContinuousRecognition = () => {
                   className="flex items-center space-x-2"
                 >
                   {isRunning ? <Pause size={18} /> : <Play size={18} />}
-                  <span>{isRunning ? 'Dừng Nhận Diện' : 'Bắt Đầu Nhận Diện'}</span>
+                  <span>
+                    {isRunning ? "Dừng Nhận Diện" : "Bắt Đầu Nhận Diện"}
+                  </span>
                 </Button>
               </div>
             </div>
           </CardHeader>
-          
+
           {/* Info Banner */}
           <CardContent>
             <div className="flex items-start p-3 space-x-2 rounded-lg border bg-primary/5 border-primary/20">
               <Info className="w-4 h-4 text-primary mt-0.5" />
               <div className="text-sm text-primary">
-                <strong>Về độ tin cậy:</strong> InsightFace AI sử dụng thuật toán ArcFace với độ tin cậy 20-50% là bình thường và rất chính xác. 
-                Hệ thống hiển thị cả <strong>độ tin cậy gốc</strong> (20-50%) và <strong>độ chính xác quy đổi</strong> (40-100%) để dễ hiểu hơn.
+                <strong>Về độ tin cậy:</strong> InsightFace AI sử dụng thuật
+                toán ArcFace với độ tin cậy 20-50% là bình thường và rất chính
+                xác. Hệ thống hiển thị cả <strong>độ tin cậy gốc</strong>{" "}
+                (20-50%) và <strong>độ chính xác quy đổi</strong> (40-100%) để
+                dễ hiểu hơn.
               </div>
             </div>
           </CardContent>
@@ -517,15 +565,23 @@ const ContinuousRecognition = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tổng nhận diện:</span>
-                  <span className="font-semibold text-primary">{stats.totalRecognitions}</span>
+                  <span className="font-semibold text-primary">
+                    {stats.totalRecognitions}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Học sinh unique:</span>
-                  <span className="font-semibold text-green-600">{stats.uniqueStudents.size}</span>
+                  <span className="text-muted-foreground">
+                    Học sinh unique:
+                  </span>
+                  <span className="font-semibold text-green-600">
+                    {stats.uniqueStudents.size}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Thời gian chạy:</span>
-                  <span className="font-semibold text-purple-600">{formatDuration(stats.runningTime)}</span>
+                  <span className="font-semibold text-purple-600">
+                    {formatDuration(stats.runningTime)}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -577,23 +633,27 @@ const ContinuousRecognition = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">AI Engine:</span>
-                  <span className="font-semibold text-primary">InsightFace</span>
+                  <span className="font-semibold text-primary">
+                    InsightFace
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Kết nối:</span>
                   <Badge variant={isConnected ? "default" : "destructive"}>
-                    {isConnected ? 'Đã kết nối' : 'Mất kết nối'}
+                    {isConnected ? "Đã kết nối" : "Mất kết nối"}
                   </Badge>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Camera:</span>
                   <Badge variant={isCameraOn ? "default" : "destructive"}>
-                    {isCameraOn ? 'Hoạt động' : 'Tắt'}
+                    {isCameraOn ? "Hoạt động" : "Tắt"}
                   </Badge>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cooldown:</span>
-                  <span className="font-semibold text-primary">{cooldownPeriod}s</span>
+                  <span className="font-semibold text-primary">
+                    {cooldownPeriod}s
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -611,90 +671,119 @@ const ContinuousRecognition = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-              
-              <div className="relative">
-                <video
-                  ref={videoRef}
-                  className={`w-full h-auto bg-black rounded-lg ${!isCameraOn ? 'hidden' : ''}`}
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                
-                {/* Camera Off Placeholder */}
-                {!isCameraOn && (
-                  <div className="flex justify-center items-center w-full h-96 bg-gray-800 rounded-lg">
-                    <div className="text-center text-white">
-                      <Camera size={64} className="mx-auto mb-4 text-gray-400" />
-                      <h3 className="mb-2 text-xl font-semibold">Camera đã tắt</h3>
-                      <p className="text-gray-300">Nhấn nút "Bật Camera" để bắt đầu</p>
+                <div className="relative">
+                  <video
+                    ref={videoRef}
+                    className={`w-full h-auto bg-black rounded-lg ${
+                      !isCameraOn ? "hidden" : ""
+                    }`}
+                    autoPlay
+                    muted
+                    playsInline
+                  />
+
+                  {/* Camera Off Placeholder */}
+                  {!isCameraOn && (
+                    <div className="flex justify-center items-center w-full h-96 bg-gray-800 rounded-lg">
+                      <div className="text-center text-white">
+                        <Camera
+                          size={64}
+                          className="mx-auto mb-4 text-gray-400"
+                        />
+                        <h3 className="mb-2 text-xl font-semibold">
+                          Camera đã tắt
+                        </h3>
+                        <p className="text-gray-300">
+                          Nhấn nút "Bật Camera" để bắt đầu
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <canvas ref={canvasRef} className="hidden" />
+
+                  {/* Status Overlay */}
+                  <div className="absolute top-4 left-4">
+                    <div
+                      className={`px-3 py-2 rounded-lg text-white font-medium flex items-center space-x-2 ${
+                        !isCameraOn
+                          ? "bg-gray-600"
+                          : isRunning
+                          ? "bg-green-600"
+                          : "bg-red-600"
+                      }`}
+                    >
+                      {!isCameraOn ? (
+                        <>
+                          <CameraOff size={18} />
+                          <span>CAMERA TẮT</span>
+                        </>
+                      ) : isRunning ? (
+                        <>
+                          <AlertCircle size={18} className="animate-pulse" />
+                          <span>ĐANG NHẬN DIỆN</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pause size={18} />
+                          <span>TẠM DỪNG</span>
+                        </>
+                      )}
                     </div>
                   </div>
-                )}
-                
-                <canvas
-                  ref={canvasRef}
-                  className="hidden"
-                />
-                
-                {/* Status Overlay */}
-                <div className="absolute top-4 left-4">
-                  <div className={`px-3 py-2 rounded-lg text-white font-medium ${
-                    !isCameraOn ? 'bg-gray-600' :
-                    isRunning ? 'bg-green-600' : 'bg-red-600'
-                  }`}>
-                    {!isCameraOn ? '📷 CAMERA TẮT' :
-                     isRunning ? '🔴 ĐANG NHẬN DIỆN' : '⏸️ TẠM DỪNG'}
-                  </div>
-                </div>
-                
-                {/* Recognition Results Overlay */}
-                {recognizedStudents.length > 0 && (
-                  <div className="absolute right-4 bottom-4 left-4">
-                    {recognizedStudents.map((recognition, index) => {
-                      // Color coding based on confidence level
-                      const confidence = recognition.confidence;
-                      let bgColor = 'bg-green-600';
-                      let confidenceLabel = 'Tốt';
-                      
-                      if (confidence >= 45) {
-                        bgColor = 'bg-emerald-600';
-                        confidenceLabel = 'Xuất sắc';
-                      } else if (confidence >= 35) {
-                        bgColor = 'bg-green-600';
-                        confidenceLabel = 'Rất cao';
-                      } else if (confidence >= 25) {
-                        bgColor = 'bg-blue-600';
-                        confidenceLabel = 'Cao';
-                      } else if (confidence >= 20) {
-                        bgColor = 'bg-yellow-600';
-                        confidenceLabel = 'Tốt';
-                      } else {
-                        bgColor = 'bg-orange-600';
-                        confidenceLabel = 'Chấp nhận được';
-                      }
-                      
-                      return (
-                        <div
-                          key={index}
-                          className={`flex justify-between items-center p-3 mb-2 text-white rounded-lg ${bgColor}`}
-                        >
-                          <div>
-                            <div className="font-semibold">{recognition.student.full_name}</div>
-                            <div className="text-sm opacity-90">
-                              Độ tin cậy: {(recognition.confidence/100).toFixed(3)} | Độ chính xác: {Math.round(recognition.confidence * 2)}%
+
+                  {/* Recognition Results Overlay */}
+                  {recognizedStudents.length > 0 && (
+                    <div className="absolute right-4 bottom-4 left-4">
+                      {recognizedStudents.map((recognition, index) => {
+                        // Color coding based on confidence level
+                        const confidence = recognition.confidence;
+                        let bgColor = "bg-green-600";
+                        let confidenceLabel = "Tốt";
+
+                        if (confidence >= 45) {
+                          bgColor = "bg-emerald-600";
+                          confidenceLabel = "Xuất sắc";
+                        } else if (confidence >= 35) {
+                          bgColor = "bg-green-600";
+                          confidenceLabel = "Rất cao";
+                        } else if (confidence >= 25) {
+                          bgColor = "bg-blue-600";
+                          confidenceLabel = "Cao";
+                        } else if (confidence >= 20) {
+                          bgColor = "bg-yellow-600";
+                          confidenceLabel = "Tốt";
+                        } else {
+                          bgColor = "bg-orange-600";
+                          confidenceLabel = "Chấp nhận được";
+                        }
+
+                        return (
+                          <div
+                            key={index}
+                            className={`flex justify-between items-center p-3 mb-2 text-white rounded-lg ${bgColor}`}
+                          >
+                            <div>
+                              <div className="font-semibold">
+                                {recognition.student.full_name}
+                              </div>
+                              <div className="text-sm opacity-90">
+                                Độ tin cậy:{" "}
+                                {(recognition.confidence / 100).toFixed(3)} | Độ
+                                chính xác:{" "}
+                                {Math.round(recognition.confidence * 2)}%
+                              </div>
+                              <div className="text-xs opacity-75">
+                                {confidenceLabel} - InsightFace AI
+                              </div>
                             </div>
-                            <div className="text-xs opacity-75">
-                              {confidenceLabel} - InsightFace AI
-                            </div>
+                            <CheckCircle size={24} />
                           </div>
-                          <CheckCircle size={24} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -712,18 +801,28 @@ const ContinuousRecognition = () => {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Tổng điểm danh:</span>
-                    <span className="text-xl font-bold text-green-600">{totalRecognitionsToday}</span>
+                    <span className="text-muted-foreground">
+                      Tổng điểm danh:
+                    </span>
+                    <span className="text-xl font-bold text-green-600">
+                      {totalRecognitionsToday}
+                    </span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Thời gian chờ:</span>
-                    <span className="font-bold text-primary">{cooldownPeriod}s</span>
+                    <span className="text-muted-foreground">
+                      Thời gian chờ:
+                    </span>
+                    <span className="font-bold text-primary">
+                      {cooldownPeriod}s
+                    </span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Đang chờ:</span>
-                    <span className="font-bold text-orange-600">{Object.keys(activeCooldowns).length}</span>
+                    <span className="font-bold text-orange-600">
+                      {Object.keys(activeCooldowns).length}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -758,15 +857,23 @@ const ContinuousRecognition = () => {
                               {recognition.student.student_code}
                             </div>
                             <div className="text-sm text-green-600">
-                              {(recognition.confidence/100).toFixed(3)} ({Math.round(recognition.confidence * 2)}%) - {recognition.timestamp}
+                              {(recognition.confidence / 100).toFixed(3)} (
+                              {Math.round(recognition.confidence * 2)}%) -{" "}
+                              {recognition.timestamp}
                             </div>
                           </div>
-                          
-                          <Badge 
-                            variant={recognition.attendance.type === 'created' ? "success" : "default"}
+
+                          <Badge
+                            variant={
+                              recognition.attendance.type === "created"
+                                ? "success"
+                                : "default"
+                            }
                             className="text-xs"
                           >
-                            {recognition.attendance.type === 'created' ? 'Mới' : 'Cập nhật'}
+                            {recognition.attendance.type === "created"
+                              ? "Mới"
+                              : "Cập nhật"}
                           </Badge>
                         </div>
                       </div>
@@ -795,38 +902,50 @@ const ContinuousRecognition = () => {
                       min="5"
                       max="300"
                       value={cooldownPeriod}
-                      onChange={(e) => setCooldownPeriod(parseInt(e.target.value))}
+                      onChange={(e) =>
+                        setCooldownPeriod(parseInt(e.target.value))
+                      }
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
                       Thời gian chờ giữa các lần nhận diện cho cùng 1 học sinh
                     </p>
                   </div>
-                  
+
                   <Button
                     onClick={async () => {
                       try {
                         // Call API to update settings
-                        const response = await fetch(`${API_BASE_URL}/ai/recognition/settings`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ cooldown_period: cooldownPeriod })
-                        });
-                        
+                        const response = await fetch(
+                          `${API_BASE_URL}/ai/recognition/settings`,
+                          {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              cooldown_period: cooldownPeriod,
+                            }),
+                          }
+                        );
+
                         const result = await response.json();
-                        
+
                         if (result.success) {
-                          alert(`✅ ${result.message}`);
-                          console.log('🔧 Settings updated:', result.data);
+                          alert(`${result.message}`);
+                          console.log("Settings updated:", result.data);
                         } else {
-                          alert(`❌ Lỗi: ${result.message || 'Không thể cập nhật cài đặt'}`);
+                          alert(
+                            `Lỗi: ${
+                              result.message || "Không thể cập nhật cài đặt"
+                            }`
+                          );
                         }
                       } catch (error) {
-                        console.error('❌ Error updating settings:', error);
-                        alert('❌ Lỗi kết nối khi cập nhật cài đặt');
+                        console.error("Error updating settings:", error);
+                        alert("Lỗi kết nối khi cập nhật cài đặt");
                       }
                     }}
                     className="w-full"
                   >
+                    <Settings className="w-4 h-4 mr-2" />
                     Lưu Cài Đặt
                   </Button>
                 </div>
@@ -839,4 +958,4 @@ const ContinuousRecognition = () => {
   );
 };
 
-export default ContinuousRecognition; 
+export default ContinuousRecognition;
