@@ -14,6 +14,7 @@ from grades.models import GradeCreate, GradeUpdate, ResponseModel
 from grades.services import calculate_final_grade
 from core.database import get_db
 from core.logger import setup_logger
+from core.system_settings import get_current_academic_year, get_current_semester
 from auth.api import get_current_user
 from grades.ocr_services.qwen_queue_manager import get_queue_manager
 from grades.ocr_services.ocr_factory import OCRFactory
@@ -95,12 +96,18 @@ async def get_student_grades(
 @router.get("/student/{student_id}")
 async def get_student_all_grades(
     student_id: int,
-    academic_year: str = "2024-2025",
-    semester: str = "HK1",
+    academic_year: str = None,
+    semester: str = None,
     db=Depends(get_db)
 ):
     """Lấy tất cả điểm của một học sinh (admin có thể xem)"""
     try:
+        # Lấy giá trị mặc định từ system settings nếu không được cung cấp
+        if academic_year is None:
+            academic_year = get_current_academic_year()
+        if semester is None:
+            semester = get_current_semester()
+        
         # Lấy thông tin học sinh
         student = db.table("students").select("*").eq("id", student_id).execute()
         
@@ -1294,8 +1301,8 @@ async def get_student_grade_trend(
 
 @router.get("/teacher/classes")
 async def get_teacher_classes(
-    academic_year: str = "2024-2025",
-    semester: str = "HK1",
+    academic_year: str = None,
+    semester: str = None,
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
@@ -1304,6 +1311,12 @@ async def get_teacher_classes(
     Dùng để tạo dropdown filter cho dashboard
     """
     try:
+        # Lấy giá trị mặc định từ system settings nếu không được cung cấp
+        if academic_year is None:
+            academic_year = get_current_academic_year()
+        if semester is None:
+            semester = get_current_semester()
+        
         class_subjects = db.table("class_subjects").select("""
             *,
             classes:class_id(id, class_name, grade),
@@ -1358,8 +1371,8 @@ async def get_teacher_classes(
 
 @router.get("/teacher/dashboard/analytics")
 async def get_teacher_dashboard_analytics(
-    academic_year: str = "2024-2025",
-    semester: str = "HK1",
+    academic_year: str = None,
+    semester: str = None,
     class_id: Optional[int] = None,  # Thêm tham số filter theo lớp
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
@@ -1372,6 +1385,12 @@ async def get_teacher_dashboard_analytics(
     - class_id (optional): Filter theo lớp cụ thể. Nếu không truyền, hiển thị tất cả các lớp
     """
     try:
+        # Lấy giá trị mặc định từ system settings nếu không được cung cấp
+        if academic_year is None:
+            academic_year = get_current_academic_year()
+        if semester is None:
+            semester = get_current_semester()
+        
         # Lấy các lớp-môn mà giáo viên dạy
         query = db.table("class_subjects").select("""
             *,
@@ -1742,8 +1761,12 @@ async def bulk_import_grades(
         
         subject_id = class_subject.data[0]["subject_id"]
         
+        # Lấy giá trị mặc định từ system settings
+        academic_year = import_data.get("academic_year") or get_current_academic_year()
+        semester = import_data.get("semester") or get_current_semester()
+        
         # Lấy grade config với grade_column_config
-        config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", import_data.get("academic_year", "2024-2025")).eq("semester", import_data.get("semester", "HK1")).execute()
+        config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
         
         if not config.data:
             raise HTTPException(
@@ -1814,8 +1837,8 @@ async def bulk_import_grades(
                     db.table("grades").insert({
                         "student_id": student_db_id,
                         "class_subject_id": class_subject_id,
-                        "academic_year": import_data.get("academic_year", "2024-2025"),
-                        "semester": import_data.get("semester", "HK1"),
+                        "academic_year": academic_year,
+                        "semester": semester,
                         "grade_data": grade_data,
                         "final_grade": final_grade,
                         "created_at": datetime.now().isoformat(),

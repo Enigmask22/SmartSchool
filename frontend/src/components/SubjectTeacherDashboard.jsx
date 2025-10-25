@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
+import { useSystemSettings } from "../contexts/SystemSettingsContext";
 import api from "../services/api";
 import {
   BarChart,
@@ -33,10 +34,9 @@ import {
 
 const SubjectTeacherDashboard = () => {
   const { user } = useContext(AuthContext);
+  const { academicYear, semester } = useSystemSettings();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState(null);
-  const [academicYear] = useState("2024-2025");
-  const [semester] = useState("HK1");
   const [selectedTab, setSelectedTab] = useState("overview"); // overview, attention, top, comparison
   const [classList, setClassList] = useState([]); // Danh sách lớp
   const [selectedClass, setSelectedClass] = useState(null); // Lớp được chọn (null = tất cả)
