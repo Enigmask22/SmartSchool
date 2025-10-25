@@ -54,6 +54,7 @@ import { AuthContext } from "../contexts/AuthContext";
 import { useSystemSettings } from "../contexts/SystemSettingsContext";
 import api from "../services/api";
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import OCRGradeSheet from "./OCRGradeSheet";
 
 const GradeManagement = () => {
@@ -218,17 +219,17 @@ const GradeManagement = () => {
 
     const columnNames = Object.keys(gradeColumnConfig);
 
-    // Define desired order: Điểm thường xuyên -> Điểm giữa kì -> Điểm cuối kì -> Others
+    // Define desired order: Điểm cuối kì -> Điểm giữa kì -> Điểm thường xuyên -> Others
     const orderPriority = {
-      diem_thuong_xuyen: 1,
-      Diem_thuong_xuyen: 1,
-      diem_tx: 1,
+      diem_thi_cuoi_ki: 1,
+      Diem_thi_cuoi_ki: 1,
+      diem_ck: 1,
       diem_thi_giua_ki: 2,
       Diem_thi_giua_ki: 2,
       diem_gk: 2,
-      diem_thi_cuoi_ki: 3,
-      Diem_thi_cuoi_ki: 3,
-      diem_ck: 3,
+      diem_thuong_xuyen: 3,
+      Diem_thuong_xuyen: 3,
+      diem_tx: 3,
     };
 
     return columnNames.sort((a, b) => {
@@ -272,9 +273,9 @@ const GradeManagement = () => {
     } else {
       // Default config
       setConfigForm({
-        Diem_thuong_xuyen: { he_so: 1, label: "Điểm thường xuyên" },
-        Diem_thi_giua_ki: { he_so: 2, label: "Điểm thi giữa kì" },
-        Diem_thi_cuoi_ki: { he_so: 3, label: "Điểm thi cuối kì" },
+        Diem_thuong_xuyen: { he_so: 1, label: "Điểm TX" },
+        Diem_thi_giua_ki: { he_so: 2, label: "Điểm GK" },
+        Diem_thi_cuoi_ki: { he_so: 3, label: "Điểm CK" },
       });
     }
     setShowConfigEditor(true);
@@ -582,6 +583,249 @@ const GradeManagement = () => {
     }
   };
 
+  // Function to export grades to Excel using ExcelJS
+  const handleExportToExcel = async () => {
+    if (!selectedClassSubject || !gradeConfig) {
+      alert("Vui lòng chọn lớp và có cấu hình điểm!");
+      return;
+    }
+
+    try {
+      // Create workbook and worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Bảng điểm");
+
+      // Prepare grade columns
+      const gradeColumns = Object.keys(gradeConfig.grade_column_config).sort();
+
+      // Calculate total columns: STT + Mã HS + Họ tên + grade columns + Điểm TB
+      const totalColumns = 3 + gradeColumns.length + 1;
+
+      // Set column widths - thu nhỏ các cột điểm và mã HS
+      worksheet.columns = [
+        { width: 6 }, // STT
+        { width: 10 }, // Mã HS - thu nhỏ từ 12 -> 10
+        { width: 25 }, // Họ tên
+        ...gradeColumns.map(() => ({ width: 12 })), // Grade columns - thu nhỏ từ 15 -> 12
+        { width: 10 }, // Điểm TB - thu nhỏ từ 12 -> 10
+      ];
+
+      let currentRow = 1;
+
+      // Title
+      worksheet.mergeCells(currentRow, 1, currentRow, totalColumns);
+      const titleCell = worksheet.getCell(currentRow, 1);
+      titleCell.value = "BẢNG ĐIỂM HỌC SINH";
+      titleCell.font = { bold: true, size: 16 };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      titleCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
+      };
+      titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+      worksheet.getRow(currentRow).height = 30;
+      currentRow += 2;
+
+      // Header information
+      const headerInfo = [
+        [`Giáo viên: ${teacherInfo.teacher.full_name}`],
+        [
+          `Lớp: ${selectedClassSubject.classes.class_name} (Khối ${selectedClassSubject.classes.grade})`,
+        ],
+        [`Môn học: ${selectedClassSubject.subjects.subject_name}`],
+        [`Năm học: ${academicYear}     Học kỳ: ${semester}`],
+      ];
+
+      headerInfo.forEach((info) => {
+        worksheet.mergeCells(currentRow, 1, currentRow, totalColumns);
+        const cell = worksheet.getCell(currentRow, 1);
+        cell.value = info[0];
+        cell.font = { size: 11 };
+        cell.alignment = { horizontal: "left", vertical: "middle" };
+        worksheet.getRow(currentRow).height = 18;
+        currentRow++;
+      });
+
+      currentRow++; // Skip a row
+
+      // Table headers
+      const headerRow = worksheet.getRow(currentRow);
+      const headers = [
+        "STT",
+        "Mã HS",
+        "Họ và tên",
+        ...gradeColumns.map(
+          (col) => `${gradeConfig.grade_column_config[col].label}`
+        ),
+        "Điểm TB",
+      ];
+
+      headerRow.values = headers;
+      headerRow.height = 35;
+      headerRow.font = { bold: true, size: 11 };
+      headerRow.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+      headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFD9E1F2" },
+      };
+
+      // Apply borders to header
+      for (let col = 1; col <= totalColumns; col++) {
+        const cell = worksheet.getCell(currentRow, col);
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      }
+      currentRow++;
+
+      // Data rows
+      students.forEach((studentData, index) => {
+        const student = studentData.student;
+        const grade = studentData.grade;
+
+        const dataRow = worksheet.getRow(currentRow);
+        const rowValues = [
+          index + 1,
+          student?.student_id || "",
+          student?.full_name || "",
+        ];
+
+        // Add grade columns
+        gradeColumns.forEach((col) => {
+          const gradeValue = grade?.grade_data?.[col]?.Diem;
+          rowValues.push(
+            gradeValue !== undefined && gradeValue !== null ? gradeValue : ""
+          );
+        });
+
+        // Add final grade
+        rowValues.push(
+          grade?.final_grade !== undefined && grade?.final_grade !== null
+            ? grade.final_grade
+            : ""
+        );
+
+        dataRow.values = rowValues;
+        dataRow.height = 20;
+
+        // Apply styling and borders to all cells
+        for (let col = 1; col <= totalColumns; col++) {
+          const cell = worksheet.getCell(currentRow, col);
+
+          // Alignment
+          if (col === 1) {
+            // STT - center
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (col === 2) {
+            // Mã HS - center
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (col === 3) {
+            // Họ tên - left
+            cell.alignment = { horizontal: "left", vertical: "middle" };
+          } else {
+            // Điểm - center
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+          }
+
+          // Borders
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+
+          // Highlight final grade column
+          if (col === totalColumns && cell.value) {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FFFCE4D6" },
+            };
+            cell.font = { bold: true };
+          }
+
+          // Highlight grade cells with values
+          if (col > 3 && col < totalColumns && cell.value !== "") {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FFE2EFDA" },
+            };
+          }
+        }
+
+        // Alternating row colors for better readability
+        if (index % 2 === 0) {
+          for (let col = 1; col <= 3; col++) {
+            const cell = worksheet.getCell(currentRow, col);
+            if (!cell.fill || !cell.fill.fgColor) {
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFF2F2F2" },
+              };
+            }
+          }
+        }
+
+        currentRow++;
+      });
+
+      // Summary row
+      currentRow++; // Skip a row
+      worksheet.mergeCells(currentRow, 1, currentRow, 3);
+      const summaryCell = worksheet.getCell(currentRow, 1);
+      summaryCell.value = `Tổng số học sinh: ${students.length}`;
+      summaryCell.font = { bold: true, size: 11 };
+      summaryCell.alignment = { horizontal: "left", vertical: "middle" };
+
+      // Calculate students with grades
+      const studentsWithGrades = students.filter(
+        (s) =>
+          s.grade?.final_grade !== undefined && s.grade?.final_grade !== null
+      ).length;
+      worksheet.mergeCells(currentRow, 4, currentRow, totalColumns);
+      const gradesSummaryCell = worksheet.getCell(currentRow, 4);
+      gradesSummaryCell.value = `Đã có điểm: ${studentsWithGrades}/${students.length}`;
+      gradesSummaryCell.font = {
+        bold: true,
+        size: 11,
+        color: {
+          argb:
+            studentsWithGrades === students.length ? "FF008000" : "FFFF0000",
+        },
+      };
+      gradesSummaryCell.alignment = { horizontal: "right", vertical: "middle" };
+
+      // Generate buffer and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `BangDiem_${selectedClassSubject.classes.class_name}_${selectedClassSubject.subjects.subject_name}_${academicYear}_${semester}.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      alert("✅ Xuất file Excel thành công!");
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      alert("❌ Lỗi khi xuất file Excel!");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -753,6 +997,15 @@ const GradeManagement = () => {
                             className="hidden"
                           />
                         </label>
+                      </Button>
+
+                      <Button
+                        onClick={handleExportToExcel}
+                        variant="outline"
+                        className="flex items-center space-x-2 text-green-600 border-green-200 hover:bg-green-50"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Xuất Excel</span>
                       </Button>
 
                       <OCRGradeSheet
