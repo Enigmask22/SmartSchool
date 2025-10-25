@@ -57,6 +57,8 @@ import ApiService from "../services/api";
 import MultipleFaceRegistration from "./MultipleFaceRegistration";
 import { AuthContext } from "../contexts/AuthContext";
 import { useSystemSettings } from "../contexts/SystemSettingsContext";
+import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 // API Configuration
 const API_BASE_URL =
@@ -1225,6 +1227,245 @@ const StudentList = () => {
       setFeedbackError("Lỗi kết nối server khi gửi SMS");
     } finally {
       setSmsLoading(false);
+    }
+  };
+
+  // Function to export student report card to Excel using ExcelJS
+  const exportStudentReportCard = async () => {
+    if (!selectedStudentForFeedback) {
+      alert("Không có thông tin học sinh!");
+      return;
+    }
+
+    try {
+      const student = selectedStudentForFeedback;
+
+      // Fetch grades if not already loaded
+      let grades = studentGrades;
+      if (!grades || grades.length === 0) {
+        const response = await ApiService.getStudentGrades(student.id);
+        if (response.success && response.data?.grades) {
+          grades = response.data.grades;
+        } else {
+          alert(
+            "⚠️ Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét."
+          );
+          grades = [];
+        }
+      }
+
+      // Create workbook and worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Phiếu điểm");
+
+      // Set column widths
+      worksheet.columns = [
+        { width: 18 }, // Column A
+        { width: 40 }, // Column B
+        { width: 24 }, // Column C
+      ];
+
+      let currentRow = 1;
+
+      // Title
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      const titleCell = worksheet.getCell(`A${currentRow}`);
+      titleCell.value = "PHIẾU ĐIỂM HỌC SINH";
+      titleCell.font = { bold: true, size: 14 };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      currentRow += 2; // Skip a row
+
+      // Teacher name
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      worksheet.getCell(`A${currentRow}`).value = `Giáo viên chủ nhiệm: ${
+        user?.full_name || ""
+      }`;
+      currentRow++;
+
+      // Class
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      worksheet.getCell(`A${currentRow}`).value = `Lớp: ${
+        student.class_name || ""
+      }`;
+      currentRow++;
+
+      // Academic year and semester
+      worksheet.getCell(`A${currentRow}`).value = `Năm học: ${academicYear}`;
+      worksheet.getCell(`C${currentRow}`).value = `Học kỳ: ${semester}`;
+      currentRow += 2; // Skip a row
+
+      // Student info
+      worksheet.getCell(
+        `A${currentRow}`
+      ).value = `Học sinh: ${student.full_name}`;
+      worksheet.getCell(
+        `C${currentRow}`
+      ).value = `Mã số: ${student.student_id}`;
+      currentRow += 2; // Skip a row
+
+      // Grades section
+      if (grades.length > 0) {
+        // Section title
+        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        const gradeTitleCell = worksheet.getCell(`A${currentRow}`);
+        gradeTitleCell.value = "BẢNG ĐIỂM TỔNG KẾT";
+        gradeTitleCell.font = { bold: true, size: 11 };
+        gradeTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+        currentRow += 2; // Skip a row
+
+        // Calculate overall average
+        const validGrades = grades.filter(
+          (g) => g.final_grade !== null && g.final_grade !== undefined
+        );
+        const overallAverage =
+          validGrades.length > 0
+            ? (
+                validGrades.reduce((sum, g) => sum + g.final_grade, 0) /
+                validGrades.length
+              ).toFixed(2)
+            : "N/A";
+
+        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        worksheet.getCell(
+          `A${currentRow}`
+        ).value = `Điểm trung bình học kỳ: ${overallAverage}`;
+        currentRow += 2; // Skip a row
+
+        // Table headers
+        const headerRow = worksheet.getRow(currentRow);
+        headerRow.values = ["STT", "Môn học", "Điểm trung bình"];
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFE8E8E8" },
+        };
+
+        // Apply borders and alignment to header
+        ["A", "B", "C"].forEach((col) => {
+          const cell = worksheet.getCell(`${col}${currentRow}`);
+          cell.alignment = { horizontal: "left", vertical: "middle" };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+        currentRow++;
+
+        // Grade data rows
+        grades.forEach((grade, index) => {
+          const dataRow = worksheet.getRow(currentRow);
+          dataRow.values = [
+            index + 1,
+            grade.subject_name || "N/A",
+            grade.final_grade !== null && grade.final_grade !== undefined
+              ? grade.final_grade
+              : "",
+          ];
+
+          // Apply borders and LEFT alignment to all cells
+          ["A", "B", "C"].forEach((col) => {
+            const cell = worksheet.getCell(`${col}${currentRow}`);
+            cell.alignment = { horizontal: "left", vertical: "middle" }; // ALL LEFT
+            cell.border = {
+              top: { style: "thin" },
+              left: { style: "thin" },
+              bottom: { style: "thin" },
+              right: { style: "thin" },
+            };
+          });
+
+          currentRow++;
+        });
+
+        currentRow++; // Skip a row after table
+      }
+
+      // Comments section
+      currentRow += 2; // Extra space
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      const commentTitleCell = worksheet.getCell(`A${currentRow}`);
+      commentTitleCell.value = "NHẬN XÉT CỦA GIÁO VIÊN";
+      commentTitleCell.font = { bold: true, size: 11 };
+      commentTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+      currentRow += 2; // Skip a row
+
+      // Feedback text with wrapping
+      const feedbackText = generatedFeedback || "Chưa có nhận xét";
+      const wrapText = (text, maxLength = 70) => {
+        const words = text.split(" ");
+        const lines = [];
+        let currentLine = "";
+
+        words.forEach((word) => {
+          if ((currentLine + word).length <= maxLength) {
+            currentLine += (currentLine ? " " : "") + word;
+          } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+          }
+        });
+        if (currentLine) lines.push(currentLine);
+
+        return lines;
+      };
+
+      const feedbackLines = wrapText(feedbackText);
+      feedbackLines.forEach((line) => {
+        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        const feedbackCell = worksheet.getCell(`A${currentRow}`);
+        feedbackCell.value = line;
+        feedbackCell.alignment = {
+          horizontal: "left",
+          vertical: "top",
+          wrapText: true,
+        };
+        worksheet.getRow(currentRow).height = 18;
+        currentRow++;
+      });
+
+      // Signature section
+      currentRow += 3; // Extra space
+      const signatureRow = worksheet.getRow(currentRow);
+      signatureRow.values = ["Giáo viên chủ nhiệm", "", "Phụ huynh"];
+      ["A", "C"].forEach((col) => {
+        const cell = worksheet.getCell(`${col}${currentRow}`);
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+      currentRow++;
+
+      const signatureSubRow = worksheet.getRow(currentRow);
+      signatureSubRow.values = [
+        "(Ký và ghi rõ họ tên)",
+        "",
+        "(Ký và ghi rõ họ tên)",
+      ];
+      ["A", "C"].forEach((col) => {
+        const cell = worksheet.getCell(`${col}${currentRow}`);
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+
+      // Generate buffer and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `PhieuDiem_${student.student_id}_${student.full_name}_${academicYear}_${semester}.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      alert("✅ Xuất phiếu điểm thành công!");
+    } catch (error) {
+      console.error("Error exporting report card:", error);
+      alert(
+        "❌ Lỗi khi xuất phiếu điểm: " + (error.message || "Unknown error")
+      );
     }
   };
 
@@ -3008,7 +3249,7 @@ const StudentList = () => {
                               Đang gửi...
                             </>
                           ) : (
-                            <>📱 Gửi SMS cho phụ huynh</>
+                            <>Gửi SMS cho phụ huynh</>
                           )}
                         </button>
                       </div>
@@ -3028,10 +3269,21 @@ const StudentList = () => {
 
             {/* Modal Footer */}
             <div className="px-6 py-4 rounded-b-lg bg-gray-50">
-              <div className="flex justify-end">
-                <Button variant="secondary" onClick={closeFeedbackModal}>
-                  Đóng
-                </Button>
+              <div className="flex items-center justify-between">
+                {generatedFeedback && (
+                  <Button
+                    onClick={exportStudentReportCard}
+                    className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700"
+                  >
+                    <Download className="w-4 h-4" />
+                    Xuất phiếu điểm
+                  </Button>
+                )}
+                <div className="ml-auto">
+                  <Button variant="secondary" onClick={closeFeedbackModal}>
+                    Đóng
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogContent>
