@@ -1977,3 +1977,81 @@ async def get_teacher_performance(
     except Exception as e:
         logger.error(f"Error getting teacher performance: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy hiệu suất giáo viên: {str(e)}")
+
+
+# ===============================================
+# SYSTEM SETTINGS ENDPOINTS
+# ===============================================
+
+@router.get("/system-settings")
+async def get_system_settings(
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Lấy danh sách tất cả cấu hình hệ thống"""
+    try:
+        response = db.table("system_settings").select("*").order("setting_key").execute()
+        
+        return {"success": True, "data": response.data}
+    except Exception as e:
+        logger.error(f"Error getting system settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy cấu hình hệ thống: {str(e)}")
+
+
+@router.get("/system-settings/{setting_key}")
+async def get_system_setting(
+    setting_key: str,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Lấy một cấu hình hệ thống cụ thể"""
+    try:
+        response = db.table("system_settings").select("*").eq("setting_key", setting_key).execute()
+        
+        if response.data and len(response.data) > 0:
+            return {"success": True, "data": response.data[0]}
+        else:
+            raise HTTPException(status_code=404, detail="Không tìm thấy cấu hình")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting system setting: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy cấu hình: {str(e)}")
+
+
+@router.put("/system-settings/{setting_key}")
+async def update_system_setting(
+    setting_key: str,
+    setting_data: dict,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Cập nhật cấu hình hệ thống"""
+    try:
+        # Kiểm tra xem setting có tồn tại không
+        check_response = db.table("system_settings").select("*").eq("setting_key", setting_key).execute()
+        
+        if not check_response.data or len(check_response.data) == 0:
+            raise HTTPException(status_code=404, detail="Không tìm thấy cấu hình")
+        
+        # Cập nhật
+        update_data = {
+            "setting_value": setting_data.get('setting_value'),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        if 'description' in setting_data:
+            update_data['description'] = setting_data['description']
+        
+        response = db.table("system_settings").update(update_data).eq("setting_key", setting_key).execute()
+        
+        if response.data:
+            return {"success": True, "data": response.data[0], "message": "Cập nhật cấu hình thành công"}
+        else:
+            raise HTTPException(status_code=500, detail="Không thể cập nhật cấu hình")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating system setting: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật cấu hình: {str(e)}")

@@ -56,6 +56,7 @@ import { Label } from "./ui/label";
 import ApiService from "../services/api";
 import MultipleFaceRegistration from "./MultipleFaceRegistration";
 import { AuthContext } from "../contexts/AuthContext";
+import { useSystemSettings } from "../contexts/SystemSettingsContext";
 
 // API Configuration
 const API_BASE_URL =
@@ -63,6 +64,7 @@ const API_BASE_URL =
 
 const StudentList = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
+  const { academicYear, semester } = useSystemSettings();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -888,8 +890,8 @@ const StudentList = () => {
         {
           subject_name: "Toán",
           class_name: student.class_name,
-          academic_year: "2024-2025",
-          semester: "HK1",
+          academic_year: academicYear,
+          semester: semester,
           grade_data: {
             Diem_thuong_xuyen: { Diem: 8.5, He_so: 1 },
             Diem_thi_giua_ki: { Diem: 9.0, He_so: 2 },
@@ -901,8 +903,8 @@ const StudentList = () => {
         {
           subject_name: "Ngữ Văn",
           class_name: student.class_name,
-          academic_year: "2024-2025",
-          semester: "HK1",
+          academic_year: academicYear,
+          semester: semester,
           grade_data: {
             Diem_mieng: { Diem: 7.5, He_so: 1 },
             Diem_15_phut: { Diem: 8.0, He_so: 1 },
@@ -935,7 +937,7 @@ const StudentList = () => {
       console.log("🔑 Token from localStorage:", token ? "Present" : "Missing");
       console.log("🔑 Token length:", token ? token.length : 0);
 
-      const url = `${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=2024-2025&semester=HK1`;
+      const url = `${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`;
       console.log("🌐 Making request to:", url);
 
       const response = await fetch(url, {
@@ -1058,7 +1060,7 @@ const StudentList = () => {
               console.log("🔍 Student ID:", student.id);
               console.log(
                 "🔍 API URL will be:",
-                `${API_BASE_URL}/grades/grade-trend/${student.id}/${highestGrade.class_subject_id}?academic_year=2024-2025&semester=HK1`
+                `${API_BASE_URL}/grades/grade-trend/${student.id}/${highestGrade.class_subject_id}?academic_year=${academicYear}&semester=${semester}`
               );
 
               const trendData = await fetchGradeTrend(
@@ -2435,9 +2437,11 @@ const StudentList = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-medium text-gray-900">
-                          Năm học: 2024-2025
+                          Năm học: {academicYear}
                         </h4>
-                        <p className="text-sm text-gray-600">Học kỳ: HK1</p>
+                        <p className="text-sm text-gray-600">
+                          Học kỳ: {semester}
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-600">Tổng số môn học</p>

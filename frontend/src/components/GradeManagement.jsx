@@ -51,19 +51,19 @@ import {
 } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { AuthContext } from "../contexts/AuthContext";
+import { useSystemSettings } from "../contexts/SystemSettingsContext";
 import api from "../services/api";
 import * as XLSX from "xlsx";
 import OCRGradeSheet from "./OCRGradeSheet";
 
 const GradeManagement = () => {
   const { user } = useContext(AuthContext);
+  const { academicYear, semester } = useSystemSettings();
   const [loading, setLoading] = useState(true);
   const [teacherInfo, setTeacherInfo] = useState(null);
   const [selectedClassSubject, setSelectedClassSubject] = useState(null);
   const [students, setStudents] = useState([]);
   const [gradeConfig, setGradeConfig] = useState(null);
-  const [academicYear] = useState("2024-2025");
-  const [semester] = useState("HK1");
   const [editingStudent, setEditingStudent] = useState(null);
   const [gradeForm, setGradeForm] = useState({});
   const [showConfigEditor, setShowConfigEditor] = useState(false);

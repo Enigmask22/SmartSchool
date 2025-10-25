@@ -18,6 +18,7 @@ import {
   UserCheck,
   Building,
   FileX,
+  Settings,
 } from "lucide-react";
 import api from "../services/api";
 import {
@@ -46,6 +47,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import SystemSettings from "./SystemSettings";
 
 const AdminManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
@@ -184,6 +186,7 @@ const AdminManagement = () => {
     { id: "classes", label: "Lớp học", icon: School },
     // { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck }, // Đã tích hợp vào tab Giáo viên
     { id: "class_subjects", label: "GV-Lớp học", icon: Building },
+    { id: "system_settings", label: "Học kỳ - Năm học", icon: Settings },
   ];
 
   const currentConfig = tabConfig[activeTab];
@@ -1080,479 +1083,492 @@ const AdminManagement = () => {
         </Card>
       </div>
 
-      {/* Enhanced Content */}
-      <Card>
-        {/* Enhanced Header */}
-        <CardHeader className="bg-muted/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-2xl font-bold">
-                {currentConfig?.title || "Quản lý"}
-              </CardTitle>
-              <CardDescription>
-                Quản lý và cấu hình dữ liệu hệ thống
-              </CardDescription>
-            </div>
-            <div className="flex space-x-3">
-              {activeTab === "teachers" && (
-                <Button
-                  onClick={() => {
-                    setShowImportModal(true);
-                    loadAvailableUsers();
-                  }}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Download className="w-5 h-5 mr-2" />
-                  Import từ Users
-                </Button>
-              )}
-              <Button onClick={() => setShowAddForm(true)}>
-                <Plus className="w-5 h-5 mr-2" />
-                Thêm mới
-              </Button>
-            </div>
-          </div>
-
-          {/* Enhanced Search */}
-          <div className="flex items-center justify-between gap-4 mt-6">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute w-5 h-5 transform -translate-y-1/2 left-4 top-1/2 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Tìm kiếm..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12"
-              />
-            </div>
-
-            {/* Checkbox hiển thị đã xóa - chỉ hiện cho Users, Teachers và Subjects */}
-            {(activeTab === "users" ||
-              activeTab === "teachers" ||
-              activeTab === "subjects" ||
-              activeTab === "subject_teachers" ||
-              activeTab === "class_subjects") && (
-              <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
-                <input
-                  type="checkbox"
-                  id="showDeleted"
-                  checked={showDeleted}
-                  onChange={(e) => setShowDeleted(e.target.checked)}
-                  className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary"
-                />
-                <label
-                  htmlFor="showDeleted"
-                  className="text-sm font-medium cursor-pointer"
-                >
-                  Hiển thị đã xóa tạm thời
-                </label>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-
-        {/* Enhanced Add Form */}
-        {showAddForm && (
-          <CardContent className="border-b bg-muted/30">
-            <div className="mb-4">
-              <h3 className="mb-2 text-lg font-semibold">Thông tin mới</h3>
-              <p className="text-sm text-muted-foreground">
-                Nhập thông tin để tạo bản ghi mới
-              </p>
-            </div>
-            {renderForm()}
-          </CardContent>
-        )}
-
-        {/* Enhanced Table */}
-        <CardContent>
-          {loading ? (
-            <div className="py-16 text-center">
-              <div className="w-12 h-12 mx-auto border-4 rounded-full animate-spin border-primary/20 border-t-primary"></div>
-              <p className="mt-4 font-medium text-muted-foreground">
-                Đang tải dữ liệu...
-              </p>
-            </div>
-          ) : error ? (
-            <div className="py-16 text-center">
-              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10">
-                <span className="text-2xl text-destructive">⚠️</span>
-              </div>
-              <p className="mb-4 font-medium text-destructive">{error}</p>
-              <Button onClick={loadData}>Thử lại</Button>
-            </div>
-          ) : filteredData.length === 0 ? (
-            <div className="py-16 text-center">
-              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
-                <FileX className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <p className="font-medium text-muted-foreground">
-                Không có dữ liệu
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {currentConfig?.displayFields?.map((field) => (
-                      <TableHead key={field}>
-                        {field === "username"
-                          ? "USERNAME"
-                          : field === "full_name"
-                          ? "HỌ TÊN"
-                          : field === "is_active"
-                          ? "TRẠNG THÁI"
-                          : field === "subjects"
-                          ? "MÔN HỌC PHỤ TRÁCH"
-                          : field === "subject_code"
-                          ? "MÃ MÔN HỌC"
-                          : field === "subject_name"
-                          ? "TÊN MÔN HỌC"
-                          : field === "description"
-                          ? "MÔ TẢ"
-                          : field === "class_name"
-                          ? "TÊN LỚP"
-                          : field === "grade"
-                          ? "KHỐI"
-                          : field === "homeroom_teacher"
-                          ? "GIÁO VIÊN CHỦ NHIỆM"
-                          : field === "room_number"
-                          ? "SỐ PHÒNG"
-                          : field === "academic_year"
-                          ? "NĂM HỌC"
-                          : field === "total_students"
-                          ? "TỔNG SỐ HỌC SINH"
-                          : field === "teacher_name"
-                          ? "TÊN GIÁO VIÊN"
-                          : field === "semester"
-                          ? "HỌC KỲ"
-                          : field.replace(/_/g, " ").toUpperCase()}
-                      </TableHead>
-                    ))}
-                    <TableHead>THAO TÁC</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData.map((item, index) => (
-                    <React.Fragment key={item.id}>
-                      <TableRow
-                        className={
-                          index % 2 === 0 ? "bg-background" : "bg-muted/50"
-                        }
-                      >
-                        {currentConfig?.displayFields?.map((field) => (
-                          <TableCell key={field}>
-                            {field === "subjects" ? (
-                              // Hiển thị môn học của giáo viên
-                              <div className="flex flex-wrap gap-1">
-                                {(() => {
-                                  const teacherSubjectIds =
-                                    teacherSubjects[item.id] || [];
-                                  if (teacherSubjectIds.length === 0) {
-                                    return (
-                                      <span className="text-xs italic text-gray-400">
-                                        Chưa phân công
-                                      </span>
-                                    );
-                                  }
-                                  return teacherSubjectIds.map((subjectId) => {
-                                    const subject = subjects.find(
-                                      (s) => s.id === subjectId
-                                    );
-                                    return subject ? (
-                                      <Badge
-                                        key={subjectId}
-                                        variant="outline"
-                                        className="text-xs text-blue-700 border-blue-200 bg-blue-50"
-                                      >
-                                        {subject.subject_code}
-                                      </Badge>
-                                    ) : null;
-                                  });
-                                })()}
-                              </div>
-                            ) : typeof item[field] === "boolean" ? (
-                              item[field] ? (
-                                <Badge
-                                  variant="default"
-                                  className="text-green-800 bg-green-100"
-                                >
-                                  Có
-                                </Badge>
-                              ) : (
-                                <Badge variant="destructive">Không</Badge>
-                              )
-                            ) : field === "role" ? (
-                              // Hiển thị label tiếng Việt cho role
-                              <Badge
-                                variant="outline"
-                                className={
-                                  item[field] === "admin"
-                                    ? "bg-purple-50 text-purple-700 border-purple-200"
-                                    : item[field] === "homeroom_teacher"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                                    : "bg-green-50 text-green-700 border-green-200"
-                                }
-                              >
-                                {item[field] === "admin"
-                                  ? "Quản trị viên"
-                                  : item[field] === "homeroom_teacher"
-                                  ? "Giáo viên chủ nhiệm"
-                                  : item[field] === "teacher"
-                                  ? "Giáo viên"
-                                  : item[field]}
-                              </Badge>
-                            ) : (
-                              item[field] || "-"
-                            )}
-                          </TableCell>
-                        ))}
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            {showDeleted ? (
-                              // Buttons cho items đã xóa
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleRestore(item.id)}
-                                  className="text-green-600 border-green-200 hover:bg-green-50"
-                                  title="Khôi phục"
-                                >
-                                  <Save className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handlePermanentDelete(item.id)}
-                                  className="text-red-600 border-red-200 hover:bg-red-50"
-                                  title="Xóa vĩnh viễn"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </>
-                            ) : (
-                              // Buttons bình thường
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingItem(item.id);
-                                    setFormData(item);
-
-                                    // Auto-filter teachers for class_subjects when editing
-                                    if (
-                                      activeTab === "class_subjects" &&
-                                      item.subject_id
-                                    ) {
-                                      const teachersForSubject =
-                                        subjectTeachersData
-                                          .filter(
-                                            (st) =>
-                                              st.subject_id ===
-                                                item.subject_id &&
-                                              st.is_active !== false
-                                          )
-                                          .map((st) => st.teacher_id);
-                                      const filtered = teachers.filter((t) =>
-                                        teachersForSubject.includes(t.id)
-                                      );
-                                      setFilteredTeachers(filtered);
-                                    }
-                                  }}
-                                  className="text-primary hover:bg-primary/10"
-                                  title="Chỉnh sửa"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDelete(item.id)}
-                                  className="text-destructive hover:bg-destructive/10"
-                                  title="Xóa tạm thời"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {editingItem === item.id && (
-                        <TableRow>
-                          <TableCell
-                            colSpan={
-                              (currentConfig?.displayFields?.length || 0) + 1
-                            }
-                            className="bg-muted/30"
-                          >
-                            <div className="mb-4">
-                              <h3 className="mb-2 text-lg font-semibold">
-                                Chỉnh sửa thông tin
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                Cập nhật thông tin cho bản ghi này
-                              </p>
-                            </div>
-                            {renderForm(true, item)}
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Import từ Users Modal */}
-      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Import giáo viên từ Users</DialogTitle>
-            <DialogDescription>
-              Chọn những user có role teacher hoặc homeroom_teacher để tạo thành
-              giáo viên
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="max-h-[60vh] overflow-y-auto">
-            {availableUsers.length === 0 ? (
-              <div className="py-12 text-center">
-                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
-                  <Users className="w-8 h-8 text-gray-400" />
+      {/* Conditional Content - System Settings hoặc Table-based Content */}
+      {activeTab === "system_settings" ? (
+        <SystemSettings />
+      ) : (
+        <>
+          {/* Enhanced Content */}
+          <Card>
+            {/* Enhanced Header */}
+            <CardHeader className="bg-muted/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl font-bold">
+                    {currentConfig?.title || "Quản lý"}
+                  </CardTitle>
+                  <CardDescription>
+                    Quản lý và cấu hình dữ liệu hệ thống
+                  </CardDescription>
                 </div>
-                <p className="font-medium text-gray-500">
-                  Không có user nào có thể import
-                </p>
-                <p className="mt-2 text-sm text-gray-400">
-                  Tất cả users có role teacher/homeroom_teacher đã được tạo
-                  thành giáo viên
-                </p>
+                <div className="flex space-x-3">
+                  {activeTab === "teachers" && (
+                    <Button
+                      onClick={() => {
+                        setShowImportModal(true);
+                        loadAvailableUsers();
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Download className="w-5 h-5 mr-2" />
+                      Import từ Users
+                    </Button>
+                  )}
+                  <Button onClick={() => setShowAddForm(true)}>
+                    <Plus className="w-5 h-5 mr-2" />
+                    Thêm mới
+                  </Button>
+                </div>
               </div>
-            ) : (
-              <>
-                {/* Select All */}
-                <div className="p-3 mb-4 border border-blue-200 rounded-lg bg-blue-50">
-                  <label className="flex items-center cursor-pointer">
+
+              {/* Enhanced Search */}
+              <div className="flex items-center justify-between gap-4 mt-6">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute w-5 h-5 transform -translate-y-1/2 left-4 top-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Tìm kiếm..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-12"
+                  />
+                </div>
+
+                {/* Checkbox hiển thị đã xóa - chỉ hiện cho Users, Teachers và Subjects */}
+                {(activeTab === "users" ||
+                  activeTab === "teachers" ||
+                  activeTab === "subjects" ||
+                  activeTab === "subject_teachers" ||
+                  activeTab === "class_subjects") && (
+                  <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
                     <input
                       type="checkbox"
-                      checked={
-                        selectedUserIds.length === availableUsers.length &&
-                        availableUsers.length > 0
-                      }
-                      onChange={handleSelectAllUsers}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                      id="showDeleted"
+                      checked={showDeleted}
+                      onChange={(e) => setShowDeleted(e.target.checked)}
+                      className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary"
                     />
-                    <span className="ml-3 font-medium text-blue-800">
-                      Chọn tất cả ({availableUsers.length} users)
-                    </span>
-                  </label>
-                </div>
-
-                {/* Users List */}
-                <div className="space-y-2">
-                  {availableUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                        selectedUserIds.includes(user.id)
-                          ? "border-green-500 bg-green-50"
-                          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
-                      onClick={() => handleUserSelect(user.id)}
+                    <label
+                      htmlFor="showDeleted"
+                      className="text-sm font-medium cursor-pointer"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedUserIds.includes(user.id)}
-                            onChange={() => handleUserSelect(user.id)}
-                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                          />
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <h4 className="font-medium text-gray-900">
-                                {user.full_name}
-                              </h4>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                  user.role === "teacher"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-purple-100 text-purple-800"
-                                }`}
-                              >
-                                {user.role === "teacher"
-                                  ? "Teacher"
-                                  : "Homeroom Teacher"}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              {user.email}
-                            </p>
-                            {user.username && (
-                              <p className="text-xs text-gray-500">
-                                @{user.username}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">
-                            ID: {user.id}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+                      Hiển thị đã xóa tạm thời
+                    </label>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
 
-          <DialogFooter className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Đã chọn:{" "}
-              <span className="font-semibold text-green-600">
-                {selectedUserIds.length}
-              </span>{" "}
-              users
-            </div>
-            <div className="flex space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowImportModal(false);
-                  setSelectedUserIds([]);
-                }}
-              >
-                Hủy
-              </Button>
-              <Button
-                onClick={handleImportTeachers}
-                disabled={selectedUserIds.length === 0 || importLoading}
-              >
-                {importLoading ? (
-                  <>
-                    <div className="w-4 h-4 mr-2 border-2 border-white rounded-full animate-spin border-t-transparent"></div>
-                    Đang tạo...
-                  </>
+            {/* Enhanced Add Form */}
+            {showAddForm && (
+              <CardContent className="border-b bg-muted/30">
+                <div className="mb-4">
+                  <h3 className="mb-2 text-lg font-semibold">Thông tin mới</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Nhập thông tin để tạo bản ghi mới
+                  </p>
+                </div>
+                {renderForm()}
+              </CardContent>
+            )}
+
+            {/* Enhanced Table */}
+            <CardContent>
+              {loading ? (
+                <div className="py-16 text-center">
+                  <div className="w-12 h-12 mx-auto border-4 rounded-full animate-spin border-primary/20 border-t-primary"></div>
+                  <p className="mt-4 font-medium text-muted-foreground">
+                    Đang tải dữ liệu...
+                  </p>
+                </div>
+              ) : error ? (
+                <div className="py-16 text-center">
+                  <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10">
+                    <span className="text-2xl text-destructive">⚠️</span>
+                  </div>
+                  <p className="mb-4 font-medium text-destructive">{error}</p>
+                  <Button onClick={loadData}>Thử lại</Button>
+                </div>
+              ) : filteredData.length === 0 ? (
+                <div className="py-16 text-center">
+                  <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
+                    <FileX className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="font-medium text-muted-foreground">
+                    Không có dữ liệu
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {currentConfig?.displayFields?.map((field) => (
+                          <TableHead key={field}>
+                            {field === "username"
+                              ? "USERNAME"
+                              : field === "full_name"
+                              ? "HỌ TÊN"
+                              : field === "is_active"
+                              ? "TRẠNG THÁI"
+                              : field === "subjects"
+                              ? "MÔN HỌC PHỤ TRÁCH"
+                              : field === "subject_code"
+                              ? "MÃ MÔN HỌC"
+                              : field === "subject_name"
+                              ? "TÊN MÔN HỌC"
+                              : field === "description"
+                              ? "MÔ TẢ"
+                              : field === "class_name"
+                              ? "TÊN LỚP"
+                              : field === "grade"
+                              ? "KHỐI"
+                              : field === "homeroom_teacher"
+                              ? "GIÁO VIÊN CHỦ NHIỆM"
+                              : field === "room_number"
+                              ? "SỐ PHÒNG"
+                              : field === "academic_year"
+                              ? "NĂM HỌC"
+                              : field === "total_students"
+                              ? "TỔNG SỐ HỌC SINH"
+                              : field === "teacher_name"
+                              ? "TÊN GIÁO VIÊN"
+                              : field === "semester"
+                              ? "HỌC KỲ"
+                              : field.replace(/_/g, " ").toUpperCase()}
+                          </TableHead>
+                        ))}
+                        <TableHead>THAO TÁC</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredData.map((item, index) => (
+                        <React.Fragment key={item.id}>
+                          <TableRow
+                            className={
+                              index % 2 === 0 ? "bg-background" : "bg-muted/50"
+                            }
+                          >
+                            {currentConfig?.displayFields?.map((field) => (
+                              <TableCell key={field}>
+                                {field === "subjects" ? (
+                                  // Hiển thị môn học của giáo viên
+                                  <div className="flex flex-wrap gap-1">
+                                    {(() => {
+                                      const teacherSubjectIds =
+                                        teacherSubjects[item.id] || [];
+                                      if (teacherSubjectIds.length === 0) {
+                                        return (
+                                          <span className="text-xs italic text-gray-400">
+                                            Chưa phân công
+                                          </span>
+                                        );
+                                      }
+                                      return teacherSubjectIds.map(
+                                        (subjectId) => {
+                                          const subject = subjects.find(
+                                            (s) => s.id === subjectId
+                                          );
+                                          return subject ? (
+                                            <Badge
+                                              key={subjectId}
+                                              variant="outline"
+                                              className="text-xs text-blue-700 border-blue-200 bg-blue-50"
+                                            >
+                                              {subject.subject_code}
+                                            </Badge>
+                                          ) : null;
+                                        }
+                                      );
+                                    })()}
+                                  </div>
+                                ) : typeof item[field] === "boolean" ? (
+                                  item[field] ? (
+                                    <Badge
+                                      variant="default"
+                                      className="text-green-800 bg-green-100"
+                                    >
+                                      Có
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="destructive">Không</Badge>
+                                  )
+                                ) : field === "role" ? (
+                                  // Hiển thị label tiếng Việt cho role
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      item[field] === "admin"
+                                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                                        : item[field] === "homeroom_teacher"
+                                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                                        : "bg-green-50 text-green-700 border-green-200"
+                                    }
+                                  >
+                                    {item[field] === "admin"
+                                      ? "Quản trị viên"
+                                      : item[field] === "homeroom_teacher"
+                                      ? "Giáo viên chủ nhiệm"
+                                      : item[field] === "teacher"
+                                      ? "Giáo viên"
+                                      : item[field]}
+                                  </Badge>
+                                ) : (
+                                  item[field] || "-"
+                                )}
+                              </TableCell>
+                            ))}
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                {showDeleted ? (
+                                  // Buttons cho items đã xóa
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleRestore(item.id)}
+                                      className="text-green-600 border-green-200 hover:bg-green-50"
+                                      title="Khôi phục"
+                                    >
+                                      <Save className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        handlePermanentDelete(item.id)
+                                      }
+                                      className="text-red-600 border-red-200 hover:bg-red-50"
+                                      title="Xóa vĩnh viễn"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  // Buttons bình thường
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingItem(item.id);
+                                        setFormData(item);
+
+                                        // Auto-filter teachers for class_subjects when editing
+                                        if (
+                                          activeTab === "class_subjects" &&
+                                          item.subject_id
+                                        ) {
+                                          const teachersForSubject =
+                                            subjectTeachersData
+                                              .filter(
+                                                (st) =>
+                                                  st.subject_id ===
+                                                    item.subject_id &&
+                                                  st.is_active !== false
+                                              )
+                                              .map((st) => st.teacher_id);
+                                          const filtered = teachers.filter(
+                                            (t) =>
+                                              teachersForSubject.includes(t.id)
+                                          );
+                                          setFilteredTeachers(filtered);
+                                        }
+                                      }}
+                                      className="text-primary hover:bg-primary/10"
+                                      title="Chỉnh sửa"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDelete(item.id)}
+                                      className="text-destructive hover:bg-destructive/10"
+                                      title="Xóa tạm thời"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {editingItem === item.id && (
+                            <TableRow>
+                              <TableCell
+                                colSpan={
+                                  (currentConfig?.displayFields?.length || 0) +
+                                  1
+                                }
+                                className="bg-muted/30"
+                              >
+                                <div className="mb-4">
+                                  <h3 className="mb-2 text-lg font-semibold">
+                                    Chỉnh sửa thông tin
+                                  </h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    Cập nhật thông tin cho bản ghi này
+                                  </p>
+                                </div>
+                                {renderForm(true, item)}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Import từ Users Modal */}
+          <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+            <DialogContent className="max-w-4xl max-h-[90vh]">
+              <DialogHeader>
+                <DialogTitle>Import giáo viên từ Users</DialogTitle>
+                <DialogDescription>
+                  Chọn những user có role teacher hoặc homeroom_teacher để tạo
+                  thành giáo viên
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="max-h-[60vh] overflow-y-auto">
+                {availableUsers.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+                      <Users className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="font-medium text-gray-500">
+                      Không có user nào có thể import
+                    </p>
+                    <p className="mt-2 text-sm text-gray-400">
+                      Tất cả users có role teacher/homeroom_teacher đã được tạo
+                      thành giáo viên
+                    </p>
+                  </div>
                 ) : (
                   <>
-                    <Download className="w-4 h-4 mr-2" />
-                    Tạo {selectedUserIds.length} giáo viên
+                    {/* Select All */}
+                    <div className="p-3 mb-4 border border-blue-200 rounded-lg bg-blue-50">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedUserIds.length === availableUsers.length &&
+                            availableUsers.length > 0
+                          }
+                          onChange={handleSelectAllUsers}
+                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                        />
+                        <span className="ml-3 font-medium text-blue-800">
+                          Chọn tất cả ({availableUsers.length} users)
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Users List */}
+                    <div className="space-y-2">
+                      {availableUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                            selectedUserIds.includes(user.id)
+                              ? "border-green-500 bg-green-50"
+                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                          }`}
+                          onClick={() => handleUserSelect(user.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedUserIds.includes(user.id)}
+                                onChange={() => handleUserSelect(user.id)}
+                                className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                              />
+                              <div>
+                                <div className="flex items-center space-x-2">
+                                  <h4 className="font-medium text-gray-900">
+                                    {user.full_name}
+                                  </h4>
+                                  <span
+                                    className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                      user.role === "teacher"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-purple-100 text-purple-800"
+                                    }`}
+                                  >
+                                    {user.role === "teacher"
+                                      ? "Teacher"
+                                      : "Homeroom Teacher"}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-600">
+                                  {user.email}
+                                </p>
+                                {user.username && (
+                                  <p className="text-xs text-gray-500">
+                                    @{user.username}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-gray-900">
+                                ID: {user.id}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </>
                 )}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </div>
+
+              <DialogFooter className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Đã chọn:{" "}
+                  <span className="font-semibold text-green-600">
+                    {selectedUserIds.length}
+                  </span>{" "}
+                  users
+                </div>
+                <div className="flex space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setSelectedUserIds([]);
+                    }}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    onClick={handleImportTeachers}
+                    disabled={selectedUserIds.length === 0 || importLoading}
+                  >
+                    {importLoading ? (
+                      <>
+                        <div className="w-4 h-4 mr-2 border-2 border-white rounded-full animate-spin border-t-transparent"></div>
+                        Đang tạo...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-2" />
+                        Tạo {selectedUserIds.length} giáo viên
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </div>
   );
 };
