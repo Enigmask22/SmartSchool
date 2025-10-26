@@ -19,6 +19,13 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
   BarChart3,
   TrendingUp,
   AlertTriangle,
@@ -32,9 +39,26 @@ import {
   Award,
 } from "lucide-react";
 
+// Tạo danh sách năm học từ 2024-2025 đến 2035-2036
+const generateAcademicYears = () => {
+  const years = [];
+  for (let year = 2024; year <= 2035; year++) {
+    years.push(`${year}-${year + 1}`);
+  }
+  return years;
+};
+
+// Danh sách học kỳ cố định
+const SEMESTERS = ["HK1", "HK2", "HK3"];
+const ACADEMIC_YEARS = generateAcademicYears();
+
 const SubjectTeacherDashboard = () => {
   const { user } = useContext(AuthContext);
-  const { academicYear, semester } = useSystemSettings();
+  const {
+    academicYear: defaultAcademicYear,
+    semester: defaultSemester,
+    loading: settingsLoading,
+  } = useSystemSettings();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState(null);
   const [selectedTab, setSelectedTab] = useState("overview"); // overview, attention, top, comparison
@@ -42,12 +66,35 @@ const SubjectTeacherDashboard = () => {
   const [selectedClass, setSelectedClass] = useState(null); // Lớp được chọn (null = tất cả)
   const [loadingClasses, setLoadingClasses] = useState(false);
 
+  // Filter states - sử dụng trực tiếp giá trị từ system settings với fallback
+  const [academicYear, setAcademicYear] = useState(
+    defaultAcademicYear || "2024-2025"
+  );
+  const [semester, setSemester] = useState(defaultSemester || "HK1");
+
+  // Sync với system settings khi có thay đổi
   useEffect(() => {
-    fetchClassList();
+    if (defaultAcademicYear) {
+      setAcademicYear(defaultAcademicYear);
+    }
+  }, [defaultAcademicYear]);
+
+  useEffect(() => {
+    if (defaultSemester) {
+      setSemester(defaultSemester);
+    }
+  }, [defaultSemester]);
+
+  useEffect(() => {
+    if (academicYear && semester) {
+      fetchClassList();
+    }
   }, [academicYear, semester]);
 
   useEffect(() => {
-    fetchAnalytics();
+    if (academicYear && semester) {
+      fetchAnalytics();
+    }
   }, [academicYear, semester, selectedClass]);
 
   const fetchClassList = async () => {
@@ -121,7 +168,7 @@ const SubjectTeacherDashboard = () => {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="relative">
-          <div className="w-16 h-16 rounded-full border-4 border-blue-200 animate-spin border-t-blue-600"></div>
+          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
         </div>
       </div>
     );
@@ -130,8 +177,8 @@ const SubjectTeacherDashboard = () => {
   if (!analytics) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="p-8 text-center bg-white rounded-2xl border-2 border-red-200 shadow-lg">
-          <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-red-50 rounded-full">
+        <div className="p-8 text-center bg-white border-2 border-red-200 shadow-lg rounded-2xl">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-red-50">
             <AlertTriangle className="w-8 h-8 text-red-500" />
           </div>
           <p className="font-medium text-red-600">
@@ -162,13 +209,13 @@ const SubjectTeacherDashboard = () => {
   const COLORS = ["#059669", "#2563EB", "#D97706", "#EA580C", "#DC2626"];
 
   return (
-    <div className="p-6 min-h-screen bg-background">
+    <div className="min-h-screen p-6 bg-background">
       <div className="mx-auto space-y-6 max-w-7xl">
         {/* Header Card */}
-        <div className="p-6 bg-white rounded-2xl border-l-4 border-blue-600 shadow-lg">
-          <div className="flex justify-between items-center">
+        <div className="p-6 bg-white border-l-4 border-blue-600 shadow-lg rounded-2xl">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="flex justify-center items-center w-16 h-16 rounded-xl shadow-lg bg-primary">
+              <div className="flex items-center justify-center w-16 h-16 shadow-lg rounded-xl bg-primary">
                 <BarChart3 className="w-8 h-8 text-white" />
               </div>
               <div>
@@ -186,14 +233,14 @@ const SubjectTeacherDashboard = () => {
                     variant="secondary"
                     className="text-blue-700 bg-blue-100"
                   >
-                    <Calendar className="mr-1 w-3 h-3" />
+                    <Calendar className="w-3 h-3 mr-1" />
                     {academicYear}
                   </Badge>
                   <Badge
                     variant="secondary"
                     className="bg-slate-100 text-slate-700"
                   >
-                    <BookOpen className="mr-1 w-3 h-3" />
+                    <BookOpen className="w-3 h-3 mr-1" />
                     {semester}
                   </Badge>
                   {analytics.subjects && analytics.subjects.length > 0 && (
@@ -201,38 +248,77 @@ const SubjectTeacherDashboard = () => {
                       variant="secondary"
                       className="text-blue-700 bg-blue-100"
                     >
-                      <BookOpen className="mr-1 w-3 h-3" />
+                      <BookOpen className="w-3 h-3 mr-1" />
                       {analytics.subjects.join(", ")}
                     </Badge>
                   )}
                 </div>
               </div>
             </div>
+
+            {/* Period Filters */}
+            <div className="flex gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500">
+                  Năm học
+                </label>
+                <Select value={academicYear} onValueChange={setAcademicYear}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Chọn năm học" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACADEMIC_YEARS.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500">
+                  Học kỳ
+                </label>
+                <Select value={semester} onValueChange={setSemester}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue placeholder="Chọn HK" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SEMESTERS.map((sem) => (
+                      <SelectItem key={sem} value={sem}>
+                        {sem}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Class Filter Dropdown */}
-        <div className="p-4 bg-white rounded-xl border shadow-md">
-          <div className="flex flex-wrap gap-4 items-center">
+        <div className="p-4 bg-white border shadow-md rounded-xl">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center space-x-2">
               <Users className="w-5 h-5 text-gray-600" />
               <label className="text-sm font-medium text-gray-700">
                 Lọc theo lớp:
               </label>
             </div>
-            <div className="flex flex-wrap gap-2 flex-1">
+            <div className="flex flex-wrap flex-1 gap-2">
               <Button
                 variant={selectedClass === null ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedClass(null)}
                 className="transition-all"
               >
-                <GraduationCap className="mr-1 w-4 h-4" />
+                <GraduationCap className="w-4 h-4 mr-1" />
                 Tất cả lớp ({analytics?.total_classes || 0})
               </Button>
               {loadingClasses ? (
                 <div className="flex items-center px-4 py-2 text-sm text-gray-500">
-                  <div className="mr-2 w-4 h-4 rounded-full border-2 border-blue-200 animate-spin border-t-blue-600"></div>
+                  <div className="w-4 h-4 mr-2 border-2 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
                   Đang tải danh sách lớp...
                 </div>
               ) : classList && classList.length > 0 ? (
@@ -289,8 +375,8 @@ const SubjectTeacherDashboard = () => {
 
         {/* Overview Stats Cards */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <div className="p-6 bg-white rounded-2xl border-l-4 border-blue-500 shadow-lg transition-shadow duration-200 hover:shadow-xl">
-            <div className="flex justify-between items-center">
+          <div className="p-6 transition-shadow duration-200 bg-white border-l-4 border-blue-500 shadow-lg rounded-2xl hover:shadow-xl">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
                   Tổng số lớp dạy
@@ -300,14 +386,14 @@ const SubjectTeacherDashboard = () => {
                 </h3>
                 <p className="mt-1 text-xs text-gray-500 opacity-0">_</p>
               </div>
-              <div className="flex justify-center items-center w-14 h-14 bg-blue-100 rounded-xl">
-                <GraduationCap className="w-7 h-7 text-blue-600" />
+              <div className="flex items-center justify-center bg-blue-100 w-14 h-14 rounded-xl">
+                <GraduationCap className="text-blue-600 w-7 h-7" />
               </div>
             </div>
           </div>
 
-          <div className="p-6 bg-white rounded-2xl border-l-4 shadow-lg transition-shadow duration-200 border-slate-500 hover:shadow-xl">
-            <div className="flex justify-between items-center">
+          <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-lg rounded-2xl border-slate-500 hover:shadow-xl">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
                   Tổng số học sinh
@@ -319,14 +405,14 @@ const SubjectTeacherDashboard = () => {
                   {analytics.students_with_grades} đã có điểm
                 </p>
               </div>
-              <div className="flex justify-center items-center w-14 h-14 rounded-xl bg-slate-100">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-slate-100">
                 <Users className="w-7 h-7 text-slate-600" />
               </div>
             </div>
           </div>
 
-          <div className="p-6 bg-white rounded-2xl border-l-4 border-emerald-500 shadow-lg transition-shadow duration-200 hover:shadow-xl">
-            <div className="flex justify-between items-center">
+          <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-lg rounded-2xl border-emerald-500 hover:shadow-xl">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
                   Điểm trung bình
@@ -338,14 +424,14 @@ const SubjectTeacherDashboard = () => {
                   Cao nhất: {analytics.overview?.highest_score || 0}
                 </p>
               </div>
-              <div className="flex justify-center items-center w-14 h-14 bg-emerald-100 rounded-xl">
+              <div className="flex items-center justify-center w-14 h-14 bg-emerald-100 rounded-xl">
                 <TrendingUp className="w-7 h-7 text-emerald-600" />
               </div>
             </div>
           </div>
 
-          <div className="p-6 bg-white rounded-2xl border-l-4 border-amber-500 shadow-lg transition-shadow duration-200 hover:shadow-xl">
-            <div className="flex justify-between items-center">
+          <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-lg rounded-2xl border-amber-500 hover:shadow-xl">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Tỷ lệ đạt</p>
                 <h3 className="mt-2 text-4xl font-bold text-amber-600">
@@ -356,7 +442,7 @@ const SubjectTeacherDashboard = () => {
                   {analytics.students_with_grades} học sinh
                 </p>
               </div>
-              <div className="flex justify-center items-center w-14 h-14 bg-amber-100 rounded-xl">
+              <div className="flex items-center justify-center w-14 h-14 bg-amber-100 rounded-xl">
                 <Award className="w-7 h-7 text-amber-600" />
               </div>
             </div>
@@ -372,7 +458,7 @@ const SubjectTeacherDashboard = () => {
                 variant={selectedTab === "overview" ? "default" : "outline"}
                 className="flex-1 min-w-fit"
               >
-                <BarChart3 className="mr-2 w-4 h-4" />
+                <BarChart3 className="w-4 h-4 mr-2" />
                 Tổng quan
               </Button>
               <Button
@@ -380,7 +466,7 @@ const SubjectTeacherDashboard = () => {
                 variant={selectedTab === "attention" ? "default" : "outline"}
                 className="flex-1 min-w-fit"
               >
-                <AlertTriangle className="mr-2 w-4 h-4" />
+                <AlertTriangle className="w-4 h-4 mr-2" />
                 Học sinh cần quan tâm
               </Button>
               <Button
@@ -388,7 +474,7 @@ const SubjectTeacherDashboard = () => {
                 variant={selectedTab === "top" ? "default" : "outline"}
                 className="flex-1 min-w-fit"
               >
-                <Trophy className="mr-2 w-4 h-4" />
+                <Trophy className="w-4 h-4 mr-2" />
                 Học sinh xuất sắc
               </Button>
               <Button
@@ -396,7 +482,7 @@ const SubjectTeacherDashboard = () => {
                 variant={selectedTab === "comparison" ? "default" : "outline"}
                 className="flex-1 min-w-fit"
               >
-                <TrendingDown className="mr-2 w-4 h-4" />
+                <TrendingDown className="w-4 h-4 mr-2" />
                 So sánh lớp
               </Button>
             </div>
@@ -407,9 +493,9 @@ const SubjectTeacherDashboard = () => {
         {selectedTab === "overview" && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Performance Groups - Pie Chart */}
-            <div className="p-6 bg-white rounded-2xl shadow-lg">
+            <div className="p-6 bg-white shadow-lg rounded-2xl">
               <h3 className="flex items-center mb-4 text-xl font-bold text-gray-800">
-                <Target className="mr-2 w-5 h-5" />
+                <Target className="w-5 h-5 mr-2" />
                 Phân nhóm học lực
               </h3>
               <ResponsiveContainer width="100%" height={300}>
@@ -448,7 +534,7 @@ const SubjectTeacherDashboard = () => {
                 {performanceData.map((group, index) => (
                   <div
                     key={index}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
                   >
                     <div className="flex items-center space-x-3">
                       <div
@@ -471,9 +557,9 @@ const SubjectTeacherDashboard = () => {
             </div>
 
             {/* Score Distribution - Bar Chart */}
-            <div className="p-6 bg-white rounded-2xl shadow-lg">
+            <div className="p-6 bg-white shadow-lg rounded-2xl">
               <h3 className="flex items-center mb-4 text-xl font-bold text-gray-800">
-                <BarChart3 className="mr-2 w-5 h-5" />
+                <BarChart3 className="w-5 h-5 mr-2" />
                 Phân bố điểm số
               </h3>
               <ResponsiveContainer width="100%" height={300}>
@@ -505,7 +591,7 @@ const SubjectTeacherDashboard = () => {
                 </BarChart>
               </ResponsiveContainer>
 
-              <div className="p-4 mt-4 rounded-lg border bg-muted/50">
+              <div className="p-4 mt-4 border rounded-lg bg-muted/50">
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="mb-1 text-xs text-gray-600">Điểm cao nhất</p>
@@ -534,10 +620,10 @@ const SubjectTeacherDashboard = () => {
         )}
 
         {selectedTab === "attention" && (
-          <div className="overflow-hidden bg-white rounded-2xl shadow-lg">
+          <div className="overflow-hidden bg-white shadow-lg rounded-2xl">
             <div className="px-6 py-4 bg-destructive">
               <h3 className="flex items-center text-xl font-bold text-white">
-                <AlertTriangle className="mr-2 w-5 h-5" />
+                <AlertTriangle className="w-5 h-5 mr-2" />
                 Học sinh cần quan tâm (
                 {analytics.students_need_attention?.length || 0} học sinh)
               </h3>
@@ -623,8 +709,8 @@ const SubjectTeacherDashboard = () => {
                   ) : (
                     <tr>
                       <td colSpan="6" className="px-6 py-12 text-center">
-                        <div className="flex flex-col justify-center items-center">
-                          <div className="flex justify-center items-center mb-4 w-16 h-16 bg-green-100 rounded-full">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="flex items-center justify-center w-16 h-16 mb-4 bg-green-100 rounded-full">
                             <span className="text-3xl">🎉</span>
                           </div>
                           <p className="font-medium text-gray-600">
@@ -642,10 +728,10 @@ const SubjectTeacherDashboard = () => {
         )}
 
         {selectedTab === "top" && (
-          <div className="overflow-hidden bg-white rounded-2xl shadow-lg">
+          <div className="overflow-hidden bg-white shadow-lg rounded-2xl">
             <div className="px-6 py-4 bg-primary">
               <h3 className="flex items-center text-xl font-bold text-white">
-                <Trophy className="mr-2 w-5 h-5" />
+                <Trophy className="w-5 h-5 mr-2" />
                 Top học sinh xuất sắc ({analytics.top_students?.length || 0} học
                 sinh)
               </h3>
@@ -724,8 +810,8 @@ const SubjectTeacherDashboard = () => {
                   ) : (
                     <tr>
                       <td colSpan="5" className="px-6 py-12 text-center">
-                        <div className="flex flex-col justify-center items-center">
-                          <div className="flex justify-center items-center mb-4 w-16 h-16 bg-gray-100 rounded-full">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
                             <span className="text-3xl">📚</span>
                           </div>
                           <p className="font-medium text-gray-600">
@@ -742,10 +828,10 @@ const SubjectTeacherDashboard = () => {
         )}
 
         {selectedTab === "comparison" && (
-          <div className="overflow-hidden bg-white rounded-2xl shadow-lg">
+          <div className="overflow-hidden bg-white shadow-lg rounded-2xl">
             <div className="px-6 py-4 bg-primary">
               <h3 className="flex items-center text-xl font-bold text-white">
-                <TrendingDown className="mr-2 w-5 h-5" />
+                <TrendingDown className="w-5 h-5 mr-2" />
                 So sánh kết quả giữa các lớp
               </h3>
               <p className="mt-1 text-sm text-blue-100">
@@ -819,7 +905,7 @@ const SubjectTeacherDashboard = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center whitespace-nowrap">
-                          <div className="flex justify-center items-center space-x-2">
+                          <div className="flex items-center justify-center space-x-2">
                             <div className="w-20 h-2 bg-gray-200 rounded-full">
                               <div
                                 className="h-2 rounded-full bg-primary"
@@ -836,8 +922,8 @@ const SubjectTeacherDashboard = () => {
                   ) : (
                     <tr>
                       <td colSpan="7" className="px-6 py-12 text-center">
-                        <div className="flex flex-col justify-center items-center">
-                          <div className="flex justify-center items-center mb-4 w-16 h-16 bg-gray-100 rounded-full">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
                             <BarChart3 className="w-8 h-8 text-gray-400" />
                           </div>
                           <p className="font-medium text-gray-600">

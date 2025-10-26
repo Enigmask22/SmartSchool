@@ -1985,10 +1985,10 @@ async def get_teacher_performance(
 
 @router.get("/system-settings")
 async def get_system_settings(
-    admin_user=Depends(get_admin_user),
+    current_user=Depends(get_current_user),  # Cho phép tất cả user đã login
     db=Depends(get_db)
 ):
-    """Lấy danh sách tất cả cấu hình hệ thống"""
+    """Lấy danh sách tất cả cấu hình hệ thống (public cho mọi user)"""
     try:
         response = db.table("system_settings").select("*").order("setting_key").execute()
         

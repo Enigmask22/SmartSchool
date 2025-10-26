@@ -11,6 +11,14 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { SimpleDatePicker } from "./ui/simple-date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import {
   Table,
   TableBody,
@@ -32,8 +40,8 @@ const AttendanceView = () => {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
   const [classes, setClasses] = useState([]);
 
   // Pagination
@@ -65,17 +73,6 @@ const AttendanceView = () => {
   useEffect(() => {
     loadClasses();
   }, []);
-
-  // Auto-select first class for homeroom teachers
-  useEffect(() => {
-    if (isHomeroomTeacher() && classes.length > 0 && !selectedClass) {
-      console.log(
-        "🎯 Auto-selecting first homeroom class for attendance:",
-        classes[0]
-      );
-      setSelectedClass(classes[0]);
-    }
-  }, [classes, isHomeroomTeacher, selectedClass]);
 
   const loadClasses = async () => {
     try {
@@ -160,7 +157,7 @@ const AttendanceView = () => {
     });
     try {
       // If homeroom teacher but no class selected, don't fetch
-      if (isHomeroomTeacher() && !selectedClass) {
+      if (isHomeroomTeacher() && (!selectedClass || selectedClass === "all")) {
         console.log(
           "🚫 No class selected for homeroom teacher, skipping attendance fetch"
         );
@@ -179,13 +176,13 @@ const AttendanceView = () => {
         // Use full list API - shows all students with their attendance status
         const response = await ApiService.getFullAttendanceList(
           selectedDate,
-          selectedClass
+          selectedClass === "all" ? "" : selectedClass
         );
         if (response.success) {
           let filteredData = response.data || [];
 
           // Apply status filter if specified
-          if (selectedStatus) {
+          if (selectedStatus && selectedStatus !== "all") {
             filteredData = filteredData.filter(
               (record) => record.status === selectedStatus
             );
@@ -210,7 +207,7 @@ const AttendanceView = () => {
           date_to: selectedDate,
         };
 
-        if (selectedClass) {
+        if (selectedClass && selectedClass !== "all") {
           // For class filter, we need to use today's attendance endpoint
           // because the main endpoint doesn't have direct class filtering
           if (selectedDate === new Date().toISOString().split("T")[0]) {
@@ -218,7 +215,7 @@ const AttendanceView = () => {
             if (response.success) {
               let filteredData = response.data || [];
 
-              if (selectedStatus) {
+              if (selectedStatus && selectedStatus !== "all") {
                 filteredData = filteredData.filter(
                   (record) => record.status === selectedStatus
                 );
@@ -233,7 +230,7 @@ const AttendanceView = () => {
             if (response.success) {
               let filteredData = response.data || [];
 
-              if (selectedClass) {
+              if (selectedClass && selectedClass !== "all") {
                 filteredData = filteredData.filter(
                   (record) =>
                     record.students &&
@@ -241,7 +238,7 @@ const AttendanceView = () => {
                 );
               }
 
-              if (selectedStatus) {
+              if (selectedStatus && selectedStatus !== "all") {
                 filteredData = filteredData.filter(
                   (record) => record.status === selectedStatus
                 );
@@ -252,7 +249,7 @@ const AttendanceView = () => {
             }
           }
         } else {
-          if (selectedStatus) {
+          if (selectedStatus && selectedStatus !== "all") {
             params.status = selectedStatus;
           }
 
@@ -343,8 +340,8 @@ const AttendanceView = () => {
   const resetFilters = () => {
     // Clear tất cả filters và data để tránh duplicate
     setSelectedDate(new Date().toISOString().split("T")[0]);
-    setSelectedClass("");
-    setSelectedStatus("");
+    setSelectedClass("all");
+    setSelectedStatus("all");
     setPage(1);
 
     // Clear data states
@@ -519,7 +516,7 @@ const AttendanceView = () => {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="relative">
-          <div className="w-16 h-16 rounded-full border-4 border-blue-200 animate-spin border-t-blue-600"></div>
+          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
         </div>
       </div>
     );
@@ -533,12 +530,12 @@ const AttendanceView = () => {
             <CardTitle className="text-3xl font-bold">Điểm danh</CardTitle>
             <CardDescription>Quản lý điểm danh học sinh</CardDescription>
             {error && (
-              <div className="p-3 mt-2 rounded border text-destructive bg-destructive/10 border-destructive/20">
+              <div className="p-3 mt-2 border rounded text-destructive bg-destructive/10 border-destructive/20">
                 {error}
               </div>
             )}
             {successMessage && (
-              <div className="p-3 mt-2 text-green-700 bg-green-100 rounded border border-green-400">
+              <div className="p-3 mt-2 text-green-700 bg-green-100 border border-green-400 rounded">
                 {successMessage}
               </div>
             )}
@@ -624,11 +621,11 @@ const AttendanceView = () => {
       {/* Filters */}
       <Card className="mb-6">
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <CardTitle>Bộ lọc</CardTitle>
-            <div className="flex gap-3 items-center">
+            <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">Chế độ xem:</span>
-              <label className="flex gap-2 items-center cursor-pointer">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={showFullList}
@@ -646,49 +643,58 @@ const AttendanceView = () => {
           <div className="flex flex-col gap-4 md:flex-row md:items-end">
             <div className="flex-1 max-w-[160px]">
               <label className="block mb-2 text-sm font-medium">Ngày</label>
-              <Input
-                type="date"
+              <SimpleDatePicker
                 value={selectedDate}
-                onChange={(e) => handleDateChange(e.target.value)}
+                onChange={(value) => handleDateChange(value)}
+                placeholder="Chọn ngày"
                 className="w-full"
               />
             </div>
 
             <div className="flex-1 max-w-[200px]">
               <label className="block mb-2 text-sm font-medium">Lớp</label>
-              <select
+              <Select
                 value={selectedClass}
-                onChange={(e) => handleClassChange(e.target.value)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onValueChange={(value) => handleClassChange(value)}
               >
-                {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
-                {isHomeroomTeacher() ? (
-                  <option value="">Chọn lớp chủ nhiệm</option>
-                ) : (
-                  <option value="">Tất cả lớp</option>
-                )}
-                {classes.map((className) => (
-                  <option key={className} value={className}>
-                    {className}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"}
+                  </SelectItem>
+                  {classes.map((className) => (
+                    <SelectItem key={className} value={className}>
+                      {className}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex-1 max-w-[200px]">
               <label className="block mb-2 text-sm font-medium">
                 Trạng thái
               </label>
-              <select
+              <Select
                 value={selectedStatus}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className="flex px-3 py-2 w-full h-10 text-sm rounded-md border border-input bg-background ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onValueChange={(value) => handleStatusChange(value)}
               >
-                <option value="">Tất cả trạng thái</option>
-                <option value="present">Có mặt</option>
-                <option value="absent">Vắng mặt</option>
-                <option value="late">Muộn</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Tất cả trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="present">Có mặt</SelectItem>
+                  <SelectItem value="absent">Vắng mặt</SelectItem>
+                  <SelectItem value="late">Muộn</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex gap-2">
@@ -741,7 +747,7 @@ const AttendanceView = () => {
                     <TableCell colSpan={9} className="py-8 text-center">
                       {loading ? (
                         <div className="flex justify-center">
-                          <div className="w-8 h-8 rounded-full border-b-2 animate-spin border-primary"></div>
+                          <div className="w-8 h-8 border-b-2 rounded-full animate-spin border-primary"></div>
                         </div>
                       ) : (
                         "Không có dữ liệu điểm danh"
@@ -784,15 +790,19 @@ const AttendanceView = () => {
                         </TableCell>
                         <TableCell>
                           {editingRecord?.student_id === record.student_id ? (
-                            <select
+                            <Select
                               value={editStatus}
-                              onChange={(e) => setEditStatus(e.target.value)}
-                              className="flex px-2 py-1 w-full h-8 text-xs rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              onValueChange={(value) => setEditStatus(value)}
                             >
-                              <option value="present">Có mặt</option>
-                              <option value="absent">Vắng</option>
-                              <option value="late">Muộn</option>
-                            </select>
+                              <SelectTrigger className="w-full h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="present">Có mặt</SelectItem>
+                                <SelectItem value="absent">Vắng</SelectItem>
+                                <SelectItem value="late">Muộn</SelectItem>
+                              </SelectContent>
+                            </Select>
                           ) : (
                             getStatusBadge(record.status)
                           )}
@@ -824,7 +834,7 @@ const AttendanceView = () => {
                         </TableCell>
                         <TableCell className="text-center">
                           {editingRecord?.student_id === record.student_id ? (
-                            <div className="flex gap-2 justify-center">
+                            <div className="flex justify-center gap-2">
                               <Button
                                 size="sm"
                                 onClick={handleSaveEdit}
@@ -872,7 +882,7 @@ const AttendanceView = () => {
 
           return (
             <div className="px-6 py-4 border-t bg-muted/50">
-              <div className="flex flex-wrap gap-3 justify-between items-center">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center space-x-4">
                   <div className="text-sm text-muted-foreground">
                     Hiển thị{" "}
@@ -891,19 +901,23 @@ const AttendanceView = () => {
                     <label className="text-sm text-muted-foreground">
                       Số lượng/trang:
                     </label>
-                    <select
-                      value={pageSize}
-                      onChange={(e) => {
-                        setPageSize(Number(e.target.value));
+                    <Select
+                      value={pageSize.toString()}
+                      onValueChange={(value) => {
+                        setPageSize(Number(value));
                         setPage(1);
                       }}
-                      className="flex px-2 py-1 w-16 h-8 text-sm rounded-md border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={30}>30</option>
-                      <option value={50}>50</option>
-                    </select>
+                      <SelectTrigger className="w-16 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="30">30</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

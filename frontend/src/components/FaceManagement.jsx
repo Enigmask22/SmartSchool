@@ -24,6 +24,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -46,7 +53,7 @@ const FaceManagement = () => {
   const [error, setError] = useState(null);
 
   // Filter states
-  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedClass, setSelectedClass] = useState("all");
   const [availableClasses, setAvailableClasses] = useState([]);
 
   // Pagination states
@@ -65,17 +72,6 @@ const FaceManagement = () => {
   useEffect(() => {
     fetchAvailableClasses();
   }, [user]);
-
-  // Auto-select first class for homeroom teachers
-  useEffect(() => {
-    if (isHomeroomTeacher() && availableClasses.length > 0 && !selectedClass) {
-      console.log(
-        "🎯 Auto-selecting first homeroom class for face management:",
-        availableClasses[0]
-      );
-      setSelectedClass(availableClasses[0]);
-    }
-  }, [availableClasses, isHomeroomTeacher, selectedClass]);
 
   // Fetch available classes based on user role
   const fetchAvailableClasses = async () => {
@@ -151,7 +147,7 @@ const FaceManagement = () => {
       setError(null);
 
       // If homeroom teacher but no class selected, don't fetch
-      if (isHomeroomTeacher() && !selectedClass) {
+      if (isHomeroomTeacher() && (!selectedClass || selectedClass === "all")) {
         console.log(
           "🚫 No class selected for homeroom teacher, skipping face management students fetch"
         );
@@ -177,7 +173,7 @@ const FaceManagement = () => {
           : [];
 
         // Apply class filter for non-homeroom users
-        if (!isHomeroomTeacher() && selectedClass) {
+        if (!isHomeroomTeacher() && selectedClass && selectedClass !== "all") {
           studentsData = studentsData.filter(
             (student) => student.class_name === selectedClass
           );
@@ -430,23 +426,28 @@ const FaceManagement = () => {
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Lớp
               </label>
-              <select
+              <Select
                 value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                onValueChange={(value) => setSelectedClass(value)}
               >
-                {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
-                {isHomeroomTeacher() ? (
-                  <option value="">Chọn lớp chủ nhiệm</option>
-                ) : (
-                  <option value="">Tất cả lớp</option>
-                )}
-                {availableClasses.map((className) => (
-                  <option key={className} value={className}>
-                    {className}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"}
+                  </SelectItem>
+                  {availableClasses.map((className) => (
+                    <SelectItem key={className} value={className}>
+                      {className}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex items-end">
@@ -475,7 +476,9 @@ const FaceManagement = () => {
               </CardTitle>
               <CardDescription>
                 Danh sách học sinh có thể được nhận diện bằng AI
-                {selectedClass && ` - Lớp ${selectedClass}`}
+                {selectedClass &&
+                  selectedClass !== "all" &&
+                  ` - Lớp ${selectedClass}`}
               </CardDescription>
             </div>
             {students.length > pageSize && (
@@ -483,19 +486,23 @@ const FaceManagement = () => {
                 <label className="text-sm text-muted-foreground">
                   Số lượng/trang:
                 </label>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(value) => {
+                    setPageSize(Number(value));
                     setCurrentPage(1);
                   }}
-                  className="pl-3 pr-8 py-1.5 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                 >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={30}>30</option>
-                  <option value={50}>50</option>
-                </select>
+                  <SelectTrigger className="w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="30">30</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </div>
@@ -520,7 +527,7 @@ const FaceManagement = () => {
                   >
                     {isHomeroomTeacher() && !selectedClass ? (
                       <div>
-                        <div className="mb-4 text-6xl text-gray-400">🎯</div>
+                        <Search className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                         <h3 className="mb-2 text-lg font-medium text-gray-900">
                           Chọn lớp chủ nhiệm để xem dữ liệu
                         </h3>
@@ -530,7 +537,7 @@ const FaceManagement = () => {
                       </div>
                     ) : (
                       <div>
-                        <div className="mb-4 text-6xl text-gray-400">👤</div>
+                        <UserX className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                         <h3 className="mb-2 text-lg font-medium text-gray-900">
                           Chưa có học sinh nào đăng ký khuôn mặt
                         </h3>

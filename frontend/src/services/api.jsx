@@ -643,8 +643,13 @@ class ApiService {
   }
 
   // Teacher-specific Grades Management API
-  async getTeacherInfo() {
-    return this.request("/grades/teacher/info");
+  async getTeacherInfo(academicYear = null, semester = null) {
+    let url = "/grades/teacher/info";
+    const params = new URLSearchParams();
+    if (academicYear) params.append("academic_year", academicYear);
+    if (semester) params.append("semester", semester);
+    if (params.toString()) url += `?${params.toString()}`;
+    return this.request(url);
   }
 
   async createGradeConfig(config) {
@@ -775,6 +780,16 @@ class ApiService {
       url += `&class_id=${classId}`;
     }
     return this.request(url);
+  }
+
+  // Get available academic years and semesters for teacher (from class_subjects)
+  async getTeacherAvailablePeriods() {
+    return this.request("/grades/teacher/available-periods");
+  }
+
+  // Get available academic years and semesters for teacher (from grades)
+  async getTeacherAvailablePeriodsGrades() {
+    return this.request("/grades/teacher/available-periods-grades");
   }
 
   // ===============================================

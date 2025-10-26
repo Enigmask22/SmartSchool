@@ -222,11 +222,19 @@ async def update_grade(
 
 @router.get("/teacher/info")
 async def get_teacher_info(
+    academic_year: Optional[str] = None,
+    semester: Optional[str] = None,
     current_user=Depends(get_current_user),
     db=Depends(get_db)
 ):
     """Lấy thông tin giáo viên và các lớp/môn được phân công"""
     try:
+        # Lấy giá trị mặc định từ system settings nếu không được cung cấp
+        if academic_year is None:
+            academic_year = get_current_academic_year()
+        if semester is None:
+            semester = get_current_semester()
+        
         teacher_response = db.table("teachers").select("*").eq("user_id", current_user["id"]).execute()
         
         if not teacher_response.data:
@@ -238,12 +246,17 @@ async def get_teacher_info(
         
         current_teacher = teacher_response.data[0]
         
-        # Lấy các lớp-môn mà giáo viên được phân công
-        class_subjects = db.table("class_subjects").select("""
+        # Lấy các lớp-môn mà giáo viên được phân công, filter theo academic_year và semester
+        query = db.table("class_subjects").select("""
             *,
             classes:class_id(id, class_name, grade),
             subjects:subject_id(id, subject_code, subject_name)
-        """).eq("teacher_id", current_teacher["id"]).eq("is_active", True).execute()
+        """).eq("teacher_id", current_teacher["id"]).eq("is_active", True)
+        
+        # Add filters
+        query = query.eq("academic_year", academic_year).eq("semester", semester)
+        
+        class_subjects = query.execute()
         
         teacher_info = {
             "teacher": current_teacher,
@@ -2008,3 +2021,95 @@ async def export_parsed_ocr_to_excel(
             status_code=500,
             detail=f"Lỗi export file: {str(e)}"
         )
+
+
+@router.get("/teacher/available-periods")
+async def get_teacher_available_periods(
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Lấy danh sách năm học và học kỳ có dữ liệu cho giáo viên"""
+    try:
+        # Nếu là admin, lấy tất cả periods từ class_subjects
+        if current_teacher.get("is_admin"):
+            response = db.table("class_subjects").select("academic_year, semester").execute()
+        else:
+            # Nếu là teacher, chỉ lấy periods của giáo viên đó
+            response = db.table("class_subjects").select("academic_year, semester").eq("teacher_id", current_teacher["id"]).execute()
+        
+        if not response.data:
+            return {
+                "success": True,
+                "data": {
+                    "academic_years": [],
+                    "semesters": []
+                }
+            }
+        
+        # Extract unique academic years and semesters
+        academic_years = sorted(list(set([item["academic_year"] for item in response.data if item.get("academic_year")])), reverse=True)
+        semesters = sorted(list(set([item["semester"] for item in response.data if item.get("semester")])))
+        
+        return {
+            "success": True,
+            "data": {
+                "academic_years": academic_years,
+                "semesters": semesters
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting available periods: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+
+
+@router.get("/teacher/available-periods-grades")
+async def get_teacher_available_periods_grades(
+    current_teacher=Depends(get_current_teacher),
+    db=Depends(get_db)
+):
+    """Lấy danh sách năm học và học kỳ có dữ liệu điểm cho giáo viên"""
+    try:
+        # Lấy class_subject_ids của giáo viên
+        if current_teacher.get("is_admin"):
+            # Admin có thể xem tất cả
+            cs_response = db.table("class_subjects").select("id").execute()
+        else:
+            cs_response = db.table("class_subjects").select("id").eq("teacher_id", current_teacher["id"]).execute()
+        
+        if not cs_response.data:
+            return {
+                "success": True,
+                "data": {
+                    "academic_years": [],
+                    "semesters": []
+                }
+            }
+        
+        class_subject_ids = [cs["id"] for cs in cs_response.data]
+        
+        # Lấy grades theo class_subject_ids
+        grades_response = db.table("grades").select("academic_year, semester").in_("class_subject_id", class_subject_ids).execute()
+        
+        if not grades_response.data:
+            return {
+                "success": True,
+                "data": {
+                    "academic_years": [],
+                    "semesters": []
+                }
+            }
+        
+        # Extract unique academic years and semesters
+        academic_years = sorted(list(set([item["academic_year"] for item in grades_response.data if item.get("academic_year")])), reverse=True)
+        semesters = sorted(list(set([item["semester"] for item in grades_response.data if item.get("semester")])))
+        
+        return {
+            "success": True,
+            "data": {
+                "academic_years": academic_years,
+                "semesters": semesters
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting available periods for grades: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")

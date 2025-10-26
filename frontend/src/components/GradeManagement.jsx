@@ -34,6 +34,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -57,9 +64,26 @@ import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import OCRGradeSheet from "./OCRGradeSheet";
 
+// Tạo danh sách năm học từ 2024-2025 đến 2035-2036
+const generateAcademicYears = () => {
+  const years = [];
+  for (let year = 2024; year <= 2035; year++) {
+    years.push(`${year}-${year + 1}`);
+  }
+  return years;
+};
+
+// Danh sách học kỳ cố định
+const SEMESTERS = ["HK1", "HK2", "HK3"];
+const ACADEMIC_YEARS = generateAcademicYears();
+
 const GradeManagement = () => {
   const { user } = useContext(AuthContext);
-  const { academicYear, semester } = useSystemSettings();
+  const {
+    academicYear: defaultAcademicYear,
+    semester: defaultSemester,
+    loading: settingsLoading,
+  } = useSystemSettings();
   const [loading, setLoading] = useState(true);
   const [teacherInfo, setTeacherInfo] = useState(null);
   const [selectedClassSubject, setSelectedClassSubject] = useState(null);
@@ -83,9 +107,30 @@ const GradeManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20); // 20 students per page
 
+  // Filter states - sử dụng trực tiếp giá trị từ system settings với fallback
+  const [academicYear, setAcademicYear] = useState(
+    defaultAcademicYear || "2024-2025"
+  );
+  const [semester, setSemester] = useState(defaultSemester || "HK1");
+
+  // Sync với system settings khi có thay đổi
   useEffect(() => {
-    fetchTeacherInfo();
-  }, [user]);
+    if (defaultAcademicYear) {
+      setAcademicYear(defaultAcademicYear);
+    }
+  }, [defaultAcademicYear]);
+
+  useEffect(() => {
+    if (defaultSemester) {
+      setSemester(defaultSemester);
+    }
+  }, [defaultSemester]);
+
+  useEffect(() => {
+    if (academicYear && semester) {
+      fetchTeacherInfo();
+    }
+  }, [user, academicYear, semester]);
 
   // Reset page when selectedClassSubject changes
   useEffect(() => {
@@ -95,9 +140,11 @@ const GradeManagement = () => {
   const fetchTeacherInfo = async () => {
     try {
       setLoading(true);
-      const response = await api.getTeacherInfo();
+      const response = await api.getTeacherInfo(academicYear, semester);
       if (response.success) {
         setTeacherInfo(response.data);
+        // Reset selected class subject when changing period
+        setSelectedClassSubject(null);
       } else {
         console.error("Failed to fetch teacher info:", response.message);
       }
@@ -877,6 +924,45 @@ const GradeManagement = () => {
                     <BookOpen className="w-3 h-3 mr-1" />
                     {semester}
                   </Badge>
+                </div>
+              </div>
+
+              {/* Period Filters */}
+              <div className="flex gap-3 ml-auto">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    Năm học
+                  </label>
+                  <Select value={academicYear} onValueChange={setAcademicYear}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Chọn năm học" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACADEMIC_YEARS.map((year) => (
+                        <SelectItem key={year} value={year}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    Học kỳ
+                  </label>
+                  <Select value={semester} onValueChange={setSemester}>
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue placeholder="Chọn HK" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SEMESTERS.map((sem) => (
+                        <SelectItem key={sem} value={sem}>
+                          {sem}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

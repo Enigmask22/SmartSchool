@@ -60,18 +60,18 @@ export const SystemSettingsProvider = ({ children }) => {
     fetchSettings();
   };
 
+  const contextValue = {
+    settings,
+    loading,
+    error,
+    refreshSettings,
+    academicYear: settings.academic_year || "2024-2025",
+    semester: settings.semester || "HK1",
+    attendanceCutoffTime: settings.attendance_cutoff_time || "07:15:00",
+  };
+
   return (
-    <SystemSettingsContext.Provider
-      value={{
-        settings,
-        loading,
-        error,
-        refreshSettings,
-        academicYear: settings.academic_year || "2024-2025",
-        semester: settings.semester || "HK1",
-        attendanceCutoffTime: settings.attendance_cutoff_time || "07:15:00",
-      }}
-    >
+    <SystemSettingsContext.Provider value={contextValue}>
       {children}
     </SystemSettingsContext.Provider>
   );
