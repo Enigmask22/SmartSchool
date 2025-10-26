@@ -37,6 +37,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -71,7 +78,7 @@ const StudentList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedClass, setSelectedClass] = useState("all");
   const [availableClasses, setAvailableClasses] = useState([]);
 
   // Face registration states
@@ -200,17 +207,6 @@ const StudentList = () => {
     fetchAvailableClasses();
   }, [user]);
 
-  // Auto-select first class for homeroom teachers
-  useEffect(() => {
-    if (isHomeroomTeacher() && availableClasses.length > 0 && !selectedClass) {
-      console.log(
-        "🎯 Auto-selecting first homeroom class:",
-        availableClasses[0]
-      );
-      setSelectedClass(availableClasses[0]);
-    }
-  }, [availableClasses, isHomeroomTeacher, selectedClass]);
-
   const fetchStudents = async () => {
     try {
       setLoading(true);
@@ -300,7 +296,9 @@ const StudentList = () => {
               ?.toLowerCase()
               .includes(searchTerm.toLowerCase());
           const matchesClass =
-            selectedClass === "" || student.class_name === selectedClass;
+            selectedClass === "all" ||
+            selectedClass === "" ||
+            student.class_name === selectedClass;
 
           // Filter theo trạng thái is_active
           let matchesActiveStatus = true;
@@ -1682,24 +1680,28 @@ const StudentList = () => {
 
             <div className="space-y-2">
               <Label htmlFor="class-select">Lớp</Label>
-              <select
-                id="class-select"
+              <Select
                 value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                onValueChange={(value) => setSelectedClass(value)}
               >
-                {/* Show placeholder for homeroom teachers, "Tất cả lớp" for others */}
-                {isHomeroomTeacher() ? (
-                  <option value="">Chọn lớp chủ nhiệm</option>
-                ) : (
-                  <option value="">Tất cả lớp</option>
-                )}
-                {availableClasses.map((className) => (
-                  <option key={className} value={className}>
-                    {className}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"}
+                  </SelectItem>
+                  {availableClasses.map((className) => (
+                    <SelectItem key={className} value={className}>
+                      {className}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -1748,19 +1750,23 @@ const StudentList = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <Label className="text-sm">Số lượng/trang:</Label>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => {
+                    setPageSize(Number(value));
                     setCurrentPage(1);
                   }}
-                  className="py-1 pl-3 pr-8 text-sm border rounded-md bg-background border-input focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value={6}>6</option>
-                  <option value={12}>12</option>
-                  <option value={24}>24</option>
-                  <option value={48}>48</option>
-                </select>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">6</SelectItem>
+                    <SelectItem value="12">12</SelectItem>
+                    <SelectItem value="24">24</SelectItem>
+                    <SelectItem value="48">48</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
@@ -2406,7 +2412,9 @@ const StudentList = () => {
       <div className="p-4 mt-6 rounded-lg bg-gray-50">
         <p className="text-sm text-gray-600">
           Hiển thị {filteredStudents.length} / {students.length} học sinh
-          {selectedClass && ` trong lớp ${selectedClass}`}
+          {selectedClass &&
+            selectedClass !== "all" &&
+            ` trong lớp ${selectedClass}`}
           {searchTerm && ` với từ khóa "${searchTerm}"`}
           {showInactive && ` (chỉ hiển thị học sinh đã xóa)`}
         </p>
@@ -2507,35 +2515,46 @@ const StudentList = () => {
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Khối
                   </label>
-                  <select
-                    value={editForm.grade || ""}
-                    onChange={(e) =>
-                      handleEditFormChange("grade", e.target.value)
+                  <Select
+                    value={editForm.grade || "none"}
+                    onValueChange={(value) =>
+                      handleEditFormChange(
+                        "grade",
+                        value === "none" ? "" : value
+                      )
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Chọn khối</option>
-                    <option value="10">Khối 10</option>
-                    <option value="11">Khối 11</option>
-                    <option value="12">Khối 12</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Chọn khối" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Chọn khối</SelectItem>
+                      <SelectItem value="10">Khối 10</SelectItem>
+                      <SelectItem value="11">Khối 11</SelectItem>
+                      <SelectItem value="12">Khối 12</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Giới tính
                   </label>
-                  <select
+                  <Select
                     value={editForm.gender || "Nam"}
-                    onChange={(e) =>
-                      handleEditFormChange("gender", e.target.value)
+                    onValueChange={(value) =>
+                      handleEditFormChange("gender", value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="Nam">Nam</option>
-                    <option value="Nữ">Nữ</option>
-                    <option value="Khác">Khác</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Nam">Nam</SelectItem>
+                      <SelectItem value="Nữ">Nữ</SelectItem>
+                      <SelectItem value="Khác">Khác</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -3049,23 +3068,26 @@ const StudentList = () => {
                           </span>
                         )}
                       </label>
-                      <select
-                        id="score_trend"
-                        value={feedbackForm.score_trend}
-                        onChange={(e) =>
+                      <Select
+                        value={feedbackForm.score_trend || "none"}
+                        onValueChange={(value) =>
                           handleFeedbackFormChange(
                             "score_trend",
-                            e.target.value
+                            value === "none" ? "" : value
                           )
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                         disabled={trendLoading}
                       >
-                        <option value="">Chọn xu hướng</option>
-                        <option value="tăng">Tăng</option>
-                        <option value="giảm">Giảm</option>
-                        <option value="ổn định">Ổn định</option>
-                      </select>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Chọn xu hướng" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Chọn xu hướng</SelectItem>
+                          <SelectItem value="tăng">Tăng</SelectItem>
+                          <SelectItem value="giảm">Giảm</SelectItem>
+                          <SelectItem value="ổn định">Ổn định</SelectItem>
+                        </SelectContent>
+                      </Select>
 
                       {/* Grade Trend Analysis Result */}
                       {gradeTrendData && (

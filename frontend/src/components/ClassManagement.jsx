@@ -24,6 +24,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -40,6 +47,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Label } from "./ui/label";
+import { SimpleDatePicker } from "./ui/simple-date-picker";
 import api from "../services/api";
 import * as XLSX from "xlsx";
 
@@ -727,7 +735,7 @@ const ClassManagement = () => {
   const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
 
   return (
-    <div className="p-6 space-y-6 min-h-screen bg-gray-50">
+    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
       {/* Header Section */}
       <Card>
         <CardHeader>
@@ -747,25 +755,30 @@ const ClassManagement = () => {
           <CardTitle>Bộ lọc lớp học</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-6 items-start sm:flex-row sm:items-end">
+          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-end">
             {/* Class Selection */}
             <div className="flex-1 space-y-2">
               <Label htmlFor="class-select" className="text-sm font-medium">
                 Chọn lớp học
               </Label>
-              <select
-                id="class-select"
-                value={selectedClassForManagement}
-                onChange={(e) => setSelectedClassForManagement(e.target.value)}
-                className="px-4 py-3 w-full rounded-lg border sm:w-64 border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+              <Select
+                value={selectedClassForManagement || "none"}
+                onValueChange={(value) =>
+                  setSelectedClassForManagement(value === "none" ? "" : value)
+                }
               >
-                <option value="">Chọn lớp học</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.class_name} - Khối {cls.grade}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder="Chọn lớp học" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Chọn lớp học</SelectItem>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.class_name} - Khối {cls.grade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Show Inactive Students */}
@@ -799,7 +812,7 @@ const ClassManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-4">
-              <div className="flex justify-center items-center w-12 h-12 rounded-full bg-primary">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary">
                 <span className="text-lg font-bold text-primary-foreground">
                   {homeroomTeacher.full_name?.charAt(0) || "?"}
                 </span>
@@ -823,7 +836,7 @@ const ClassManagement = () => {
       {selectedClassForManagement && (
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <div className="flex-1">
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="w-5 h-5" />
@@ -835,15 +848,15 @@ const ClassManagement = () => {
                 </CardDescription>
 
                 {/* Search Bar */}
-                <div className="mt-4 max-w-md">
+                <div className="max-w-md mt-4">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 w-4 h-4 transform -translate-y-1/2 text-muted-foreground" />
+                    <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
                     <Input
                       type="text"
                       placeholder="Tìm kiếm theo tên, mã học sinh hoặc lớp..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="py-2 pr-4 pl-10"
+                      className="py-2 pl-10 pr-4"
                     />
                   </div>
                 </div>
@@ -889,14 +902,14 @@ const ClassManagement = () => {
           <CardContent>
             {loadingClassData ? (
               <div className="py-12 text-center">
-                <Loader2 className="mx-auto w-8 h-8 animate-spin text-primary" />
+                <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
                 <p className="mt-4 font-medium text-muted-foreground">
                   Đang tải dữ liệu...
                 </p>
               </div>
             ) : error ? (
               <div className="py-12 text-center">
-                <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10">
                   <AlertCircle className="w-8 h-8 text-destructive" />
                 </div>
                 <p className="mb-4 font-medium text-destructive">{error}</p>
@@ -904,7 +917,7 @@ const ClassManagement = () => {
               </div>
             ) : paginatedStudents.length === 0 ? (
               <div className="py-12 text-center">
-                <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 rounded-full bg-muted">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
                   <Users className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <p className="font-medium text-muted-foreground">
@@ -931,7 +944,7 @@ const ClassManagement = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-3">
-                            <div className="flex justify-center items-center w-8 h-8 rounded-full bg-primary">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary">
                               <span className="text-sm font-bold text-primary-foreground">
                                 {student.full_name?.charAt(0) || "?"}
                               </span>
@@ -944,7 +957,7 @@ const ClassManagement = () => {
                           {student.insightface_encoding ? (
                             <Badge
                               variant="default"
-                              className="bg-green-100 text-green-800"
+                              className="text-green-800 bg-green-100"
                             >
                               ✓ Đã đăng ký
                             </Badge>
@@ -1030,7 +1043,7 @@ const ClassManagement = () => {
                 {/* Pagination for Class Management */}
                 {totalPages > 1 && (
                   <div className="px-6 py-4 border-t bg-muted/50">
-                    <div className="flex flex-wrap gap-3 justify-between items-center">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center space-x-4">
                         <div className="text-sm text-muted-foreground">
                           Hiển thị{" "}
@@ -1050,21 +1063,23 @@ const ClassManagement = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Label className="text-sm">Số lượng/trang:</Label>
-                          <select
-                            value={classManagementPageSize}
-                            onChange={(e) => {
-                              setClassManagementPageSize(
-                                Number(e.target.value)
-                              );
+                          <Select
+                            value={String(classManagementPageSize)}
+                            onValueChange={(value) => {
+                              setClassManagementPageSize(Number(value));
                               setCurrentPage(1);
                             }}
-                            className="pl-3 pr-8 py-1.5 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                           >
-                            <option value={10}>10</option>
-                            <option value={20}>20</option>
-                            <option value={30}>30</option>
-                            <option value={50}>50</option>
-                          </select>
+                            <SelectTrigger className="w-[70px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="20">20</SelectItem>
+                              <SelectItem value="30">30</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 
@@ -1242,23 +1257,29 @@ const ClassManagement = () => {
               {/* Khối */}
               <div className="space-y-2">
                 <Label htmlFor="grade">Khối *</Label>
-                <select
-                  id="grade"
-                  value={studentFormData.grade}
-                  onChange={(e) =>
-                    handleStudentFormChange("grade", e.target.value)
+                <Select
+                  value={studentFormData.grade || "none"}
+                  onValueChange={(value) =>
+                    handleStudentFormChange(
+                      "grade",
+                      value === "none" ? "" : value
+                    )
                   }
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring ${
-                    studentFormErrors.grade
-                      ? "border-destructive"
-                      : "border-input"
-                  }`}
                 >
-                  <option value="">Chọn khối</option>
-                  <option value="10">Khối 10</option>
-                  <option value="11">Khối 11</option>
-                  <option value="12">Khối 12</option>
-                </select>
+                  <SelectTrigger
+                    className={
+                      studentFormErrors.grade ? "border-destructive" : ""
+                    }
+                  >
+                    <SelectValue placeholder="Chọn khối" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Chọn khối</SelectItem>
+                    <SelectItem value="10">Khối 10</SelectItem>
+                    <SelectItem value="11">Khối 11</SelectItem>
+                    <SelectItem value="12">Khối 12</SelectItem>
+                  </SelectContent>
+                </Select>
                 {studentFormErrors.grade && (
                   <p className="text-sm text-destructive">
                     {studentFormErrors.grade}
@@ -1269,30 +1290,33 @@ const ClassManagement = () => {
               {/* Giới tính */}
               <div className="space-y-2">
                 <Label htmlFor="gender">Giới tính</Label>
-                <select
-                  id="gender"
+                <Select
                   value={studentFormData.gender}
-                  onChange={(e) =>
-                    handleStudentFormChange("gender", e.target.value)
+                  onValueChange={(value) =>
+                    handleStudentFormChange("gender", value)
                   }
-                  className="px-4 py-3 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="Nam">Nam</option>
-                  <option value="Nữ">Nữ</option>
-                  <option value="Khác">Khác</option>
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Ngày sinh */}
               <div className="space-y-2">
                 <Label htmlFor="date_of_birth">Ngày sinh</Label>
-                <Input
-                  id="date_of_birth"
-                  type="date"
+                <SimpleDatePicker
                   value={studentFormData.date_of_birth}
-                  onChange={(e) =>
-                    handleStudentFormChange("date_of_birth", e.target.value)
+                  onChange={(value) =>
+                    handleStudentFormChange("date_of_birth", value)
                   }
+                  placeholder="Chọn ngày sinh"
+                  className="w-full"
                 />
               </div>
 
@@ -1335,13 +1359,13 @@ const ClassManagement = () => {
                   handleStudentFormChange("address", e.target.value)
                 }
                 rows={3}
-                className="px-4 py-3 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full px-4 py-3 border rounded-lg border-input focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
               />
             </div>
 
             {/* Thông báo mã học sinh sẽ được tạo tự động */}
-            <div className="p-4 rounded-lg border bg-primary/5 border-primary/20">
+            <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <AlertCircle className="w-5 h-5 text-primary" />
@@ -1367,12 +1391,12 @@ const ClassManagement = () => {
               <Button type="submit" disabled={studentFormLoading}>
                 {studentFormLoading ? (
                   <>
-                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     <span>Đang thêm...</span>
                   </>
                 ) : (
                   <>
-                    <Plus className="mr-2 w-4 h-4" />
+                    <Plus className="w-4 h-4 mr-2" />
                     <span>Thêm học sinh</span>
                   </>
                 )}
@@ -1395,15 +1419,15 @@ const ClassManagement = () => {
 
           {/* Import Errors */}
           {importErrors.length > 0 && (
-            <div className="p-4 mb-6 rounded-lg border bg-destructive/10 border-destructive/20">
+            <div className="p-4 mb-6 border rounded-lg bg-destructive/10 border-destructive/20">
               <h3 className="mb-3 text-lg font-semibold text-destructive">
                 Các lỗi cần sửa:
               </h3>
-              <div className="overflow-y-auto space-y-2 max-h-40">
+              <div className="space-y-2 overflow-y-auto max-h-40">
                 {importErrors.map((error, index) => (
                   <div
                     key={index}
-                    className="p-2 rounded border bg-destructive/5 border-destructive/20"
+                    className="p-2 border rounded bg-destructive/5 border-destructive/20"
                   >
                     <p className="font-medium text-destructive">
                       Dòng {error.row}: {error.student_name}
@@ -1420,7 +1444,7 @@ const ClassManagement = () => {
           )}
 
           {/* Preview Table */}
-          <div className="overflow-x-auto mb-6">
+          <div className="mb-6 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1469,7 +1493,7 @@ const ClassManagement = () => {
           </div>
 
           {/* Thông báo về mã học sinh */}
-          <div className="p-4 mb-6 rounded-lg border bg-primary/5 border-primary/20">
+          <div className="p-4 mb-6 border rounded-lg bg-primary/5 border-primary/20">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <AlertCircle className="w-5 h-5 text-primary" />
@@ -1499,12 +1523,12 @@ const ClassManagement = () => {
             >
               {importLoading ? (
                 <>
-                  <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   <span>Đang nhập...</span>
                 </>
               ) : (
                 <>
-                  <Upload className="mr-2 w-4 h-4" />
+                  <Upload className="w-4 h-4 mr-2" />
                   <span>Xác nhận nhập ({importedData.length} học sinh)</span>
                 </>
               )}
@@ -1592,46 +1616,52 @@ const ClassManagement = () => {
 
               <div>
                 <Label htmlFor="edit-grade">Khối</Label>
-                <select
-                  id="edit-grade"
-                  value={editForm.grade || ""}
-                  onChange={(e) =>
-                    handleEditFormChange("grade", e.target.value)
+                <Select
+                  value={editForm.grade || "none"}
+                  onValueChange={(value) =>
+                    handleEditFormChange("grade", value === "none" ? "" : value)
                   }
-                  className="px-3 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                 >
-                  <option value="">Chọn khối</option>
-                  <option value="10">Khối 10</option>
-                  <option value="11">Khối 11</option>
-                  <option value="12">Khối 12</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn khối" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Chọn khối</SelectItem>
+                    <SelectItem value="10">Khối 10</SelectItem>
+                    <SelectItem value="11">Khối 11</SelectItem>
+                    <SelectItem value="12">Khối 12</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <Label htmlFor="edit-gender">Giới tính</Label>
-                <select
-                  id="edit-gender"
+                <Select
                   value={editForm.gender || "Nam"}
-                  onChange={(e) =>
-                    handleEditFormChange("gender", e.target.value)
+                  onValueChange={(value) =>
+                    handleEditFormChange("gender", value)
                   }
-                  className="px-3 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                 >
-                  <option value="Nam">Nam</option>
-                  <option value="Nữ">Nữ</option>
-                  <option value="Khác">Khác</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <Label htmlFor="edit-date-of-birth">Ngày sinh</Label>
-                <Input
-                  id="edit-date-of-birth"
-                  type="date"
+                <SimpleDatePicker
                   value={editForm.date_of_birth || ""}
-                  onChange={(e) =>
-                    handleEditFormChange("date_of_birth", e.target.value)
+                  onChange={(value) =>
+                    handleEditFormChange("date_of_birth", value)
                   }
+                  placeholder="Chọn ngày sinh"
+                  className="w-full"
                 />
               </div>
 
@@ -1673,7 +1703,7 @@ const ClassManagement = () => {
                   handleEditFormChange("address", e.target.value)
                 }
                 rows={3}
-                className="px-3 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                className="w-full px-3 py-2 border rounded-lg border-input focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                 placeholder="VD: 123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
               />
             </div>
@@ -1689,7 +1719,7 @@ const ClassManagement = () => {
               >
                 {editLoading ? (
                   <>
-                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Đang cập nhật...
                   </>
                 ) : (

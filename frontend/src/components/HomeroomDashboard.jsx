@@ -10,6 +10,14 @@ import {
 } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { SimpleDatePicker } from "./ui/simple-date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import {
   Dialog,
   DialogContent,
@@ -220,7 +228,7 @@ const HomeroomDashboard = () => {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="relative">
-          <div className="w-16 h-16 rounded-full border-4 border-blue-200 animate-spin border-t-blue-600"></div>
+          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
         </div>
       </div>
     );
@@ -235,7 +243,7 @@ const HomeroomDashboard = () => {
             <h1 className="text-3xl font-bold text-gray-900">
               Dashboard Chủ Nhiệm
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="mt-1 text-gray-600">
               {selectedClass
                 ? `Lớp ${selectedClass}`
                 : "Đang tải thông tin lớp..."}
@@ -245,21 +253,25 @@ const HomeroomDashboard = () => {
           {/* Dropdown chọn lớp (chỉ hiển thị nếu giáo viên chủ nhiệm > 1 lớp) */}
           {teacherClasses.length > 1 && (
             <div className="flex items-center gap-3">
-              <GraduationCap className="w-5 h-5 text-gray-500 flex-shrink-0" />
-              <select
+              <GraduationCap className="flex-shrink-0 w-5 h-5 text-gray-500" />
+              <Select
                 value={selectedClass || ""}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="px-4 py-2 min-w-[200px] border border-gray-300 rounded-lg bg-white text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                onValueChange={(value) => setSelectedClass(value)}
               >
-                {teacherClasses.map((classInfo) => (
-                  <option
-                    key={classInfo.class_name}
-                    value={classInfo.class_name}
-                  >
-                    Lớp {classInfo.class_name} - {classInfo.grade}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="min-w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {teacherClasses.map((classInfo) => (
+                    <SelectItem
+                      key={classInfo.class_name}
+                      value={classInfo.class_name}
+                    >
+                      Lớp {classInfo.class_name} - {classInfo.grade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>
@@ -349,11 +361,11 @@ const HomeroomDashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <input
-            type="date"
+          <SimpleDatePicker
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            onChange={setSelectedDate}
+            placeholder="Chọn ngày điểm danh"
+            className="w-[160px]"
           />
         </CardContent>
       </Card>
@@ -361,7 +373,7 @@ const HomeroomDashboard = () => {
       {/* Students Grid */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <div>
               <CardTitle>Học sinh lớp {homeroomInfo?.class_name}</CardTitle>
               <CardDescription>
@@ -388,9 +400,9 @@ const HomeroomDashboard = () => {
                   className="transition-shadow hover:shadow-md"
                 >
                   <CardContent className="p-4">
-                    <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-3">
-                        <div className="flex justify-center items-center w-10 h-10 bg-blue-100 rounded-full">
+                        <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
                           <span className="text-sm font-medium text-blue-600">
                             {student.full_name.charAt(0).toUpperCase()}
                           </span>
@@ -406,7 +418,7 @@ const HomeroomDashboard = () => {
                       </div>
                       {getStatusIcon(status)}
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex items-center justify-between">
                       {getStatusBadge(status)}
                     </div>
                   </CardContent>
@@ -417,7 +429,7 @@ const HomeroomDashboard = () => {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center mt-6 space-x-2">
+            <div className="flex items-center justify-center mt-6 space-x-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -467,9 +479,9 @@ const HomeroomDashboard = () => {
                     className="transition-shadow hover:shadow-md"
                   >
                     <CardContent className="p-4">
-                      <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">
-                          <div className="flex justify-center items-center w-10 h-10 bg-blue-100 rounded-full">
+                          <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
                             <span className="text-sm font-medium text-blue-600">
                               {student.full_name.charAt(0).toUpperCase()}
                             </span>
@@ -485,7 +497,7 @@ const HomeroomDashboard = () => {
                         </div>
                         {getStatusIcon(status)}
                       </div>
-                      <div className="flex justify-between items-center">
+                      <div className="flex items-center justify-between">
                         {getStatusBadge(status)}
                       </div>
                     </CardContent>

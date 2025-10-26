@@ -165,7 +165,7 @@ const SystemSettings = () => {
             <div>
               <CardTitle className="flex items-center text-3xl font-bold text-primary">
                 <Settings className="w-8 h-8 mr-3" />
-                Cấu hình Học kỳ - Năm học
+                Cấu hình Học kỳ - Năm học - Thời gian điểm danh
               </CardTitle>
               <CardDescription className="mt-2 text-lg">
                 Quản lý năm học, học kỳ và thời gian điểm danh

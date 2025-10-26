@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import SystemSettings from "./SystemSettings";
+import SchoolDaysConfig from "./SchoolDaysConfig";
 
 const AdminManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
@@ -186,7 +187,8 @@ const AdminManagement = () => {
     { id: "classes", label: "Lớp học", icon: School },
     // { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck }, // Đã tích hợp vào tab Giáo viên
     { id: "class_subjects", label: "GV-Lớp học", icon: Building },
-    { id: "system_settings", label: "Học kỳ - Năm học", icon: Settings },
+    { id: "system_settings", label: "Cấu hình thời gian", icon: Settings },
+    { id: "school_config", label: "Cấu hình học tập", icon: School },
   ];
 
   const currentConfig = tabConfig[activeTab];
@@ -1083,9 +1085,11 @@ const AdminManagement = () => {
         </Card>
       </div>
 
-      {/* Conditional Content - System Settings hoặc Table-based Content */}
+      {/* Conditional Content - System Settings, School Config hoặc Table-based Content */}
       {activeTab === "system_settings" ? (
         <SystemSettings />
+      ) : activeTab === "school_config" ? (
+        <SchoolDaysConfig />
       ) : (
         <>
           {/* Enhanced Content */}
