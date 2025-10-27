@@ -38,6 +38,7 @@ import {
   Loader2,
 } from "lucide-react";
 import api from "../services/api";
+import logger from "../utils/logger";
 
 const PersonalInfo = () => {
   const { user } = useContext(AuthContext);
@@ -113,7 +114,7 @@ const PersonalInfo = () => {
         setSubjectClasses(data.subject_classes || []);
       }
     } catch (error) {
-      console.error("Error loading personal data:", error);
+      logger.error("Error loading personal data:", error);
       setError("Không thể tải thông tin cá nhân");
     } finally {
       setLoading(false);
@@ -168,7 +169,7 @@ const PersonalInfo = () => {
         setError(response.message || "Cập nhật thông tin thất bại");
       }
     } catch (error) {
-      console.error("Error updating personal data:", error);
+      logger.error("Error updating personal data:", error);
       setError("Có lỗi xảy ra khi cập nhật thông tin");
     } finally {
       setLoading(false);
@@ -210,7 +211,7 @@ const PersonalInfo = () => {
         setError(response.message || "Đổi mật khẩu thất bại");
       }
     } catch (error) {
-      console.error("Error changing password:", error);
+      logger.error("Error changing password:", error);
       setError("Có lỗi xảy ra khi đổi mật khẩu");
     } finally {
       setPasswordLoading(false);

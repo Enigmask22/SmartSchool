@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "./ui/table";
 import api from "../services/api";
+import logger from "../utils/logger";
 
 const OCRGradeSheet = ({
   selectedClassSubject,
@@ -179,7 +180,7 @@ const OCRGradeSheet = ({
         throw new Error(response.message || "Failed to get status");
       }
     } catch (error) {
-      console.error("Error polling OCR status:", error);
+      logger.error("Error polling OCR status:", error);
       setParsing(false);
       setUploading(false);
       alert("❌ Lỗi khi kiểm tra trạng thái OCR!");
@@ -220,7 +221,7 @@ const OCRGradeSheet = ({
         setParsing(false);
       }
     } catch (error) {
-      console.error("Error uploading OCR:", error);
+      logger.error("Error uploading OCR:", error);
 
       // Check if queue is full (HTTP 503)
       if (error.response && error.response.status === 503) {
@@ -286,7 +287,7 @@ const OCRGradeSheet = ({
         alert("❌ Lỗi khi import điểm: " + response.message);
       }
     } catch (error) {
-      console.error("Error importing grades from OCR:", error);
+      logger.error("Error importing grades from OCR:", error);
       alert("❌ Lỗi khi import điểm!");
     } finally {
       setUploading(false);
@@ -307,7 +308,7 @@ const OCRGradeSheet = ({
       await api.exportParsedOCRToExcel({ parsed_rows: parsedData.parsed_rows });
       alert("✅ Tải file Excel thành công!");
     } catch (error) {
-      console.error("Error exporting OCR data:", error);
+      logger.error("Error exporting OCR data:", error);
       alert("❌ Lỗi khi export file!");
     }
   };

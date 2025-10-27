@@ -40,6 +40,7 @@ import {
 } from "./ui/table";
 import ApiService from "../services/api";
 import { AuthContext } from "../contexts/AuthContext";
+import logger from "../utils/logger";
 
 // API Configuration
 const API_BASE_URL =
@@ -76,7 +77,7 @@ const FaceManagement = () => {
   // Fetch available classes based on user role
   const fetchAvailableClasses = async () => {
     try {
-      console.log("👤 Face Management - User role check:", {
+      logger.debug("👤 Face Management - User role check:", {
         user,
         isHomeroomTeacher: isHomeroomTeacher(),
         userRole: user?.role,
@@ -85,7 +86,7 @@ const FaceManagement = () => {
       let classesResponse;
 
       if (isHomeroomTeacher()) {
-        console.log("📚 Fetching homeroom classes for face management...");
+        logger.debug("📚 Fetching homeroom classes for face management...");
         // If homeroom teacher, only get their homeroom classes
         classesResponse = await ApiService.getHomeroomClasses();
 
@@ -98,17 +99,17 @@ const FaceManagement = () => {
                 .filter((name) => name) // Remove null/undefined
             ),
           ].sort();
-          console.log("📚 Setting homeroom classes:", classNames);
+          logger.debug("📚 Setting homeroom classes:", classNames);
           setAvailableClasses(classNames);
         } else {
-          console.warn(
+          logger.warn(
             "📚 Invalid homeroom classes response:",
             classesResponse
           );
           setAvailableClasses([]);
         }
       } else {
-        console.log("📚 Fetching all students to extract classes for admin...");
+        logger.debug("📚 Fetching all students to extract classes for admin...");
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
 
@@ -122,13 +123,13 @@ const FaceManagement = () => {
             ),
           ].sort();
 
-          console.log(
+          logger.debug(
             "📚 Extracted unique classes from students:",
             uniqueClasses
           );
           setAvailableClasses(uniqueClasses);
         } else {
-          console.warn(
+          logger.warn(
             "📚 Invalid students response for classes:",
             studentsResponse
           );
@@ -136,7 +137,7 @@ const FaceManagement = () => {
         }
       }
     } catch (error) {
-      console.error("Error fetching available classes:", error);
+      logger.error("Error fetching available classes:", error);
       setAvailableClasses([]);
     }
   };
@@ -148,7 +149,7 @@ const FaceManagement = () => {
 
       // If homeroom teacher but no class selected, don't fetch
       if (isHomeroomTeacher() && (!selectedClass || selectedClass === "all")) {
-        console.log(
+        logger.debug(
           "🚫 No class selected for homeroom teacher, skipping face management students fetch"
         );
         setStudents([]);
@@ -197,9 +198,9 @@ const FaceManagement = () => {
       }
 
       // Log để debug
-      console.log("Face Management Students data:", studentsResponse);
+      logger.debug("Face Management Students data:", studentsResponse);
     } catch (error) {
-      console.error("Error fetching students data:", error);
+      logger.error("Error fetching students data:", error);
       setError("Không thể tải thông tin học sinh");
       setStudents([]);
     } finally {
@@ -216,7 +217,7 @@ const FaceManagement = () => {
         setAiStatus(statusData.data);
       }
     } catch (error) {
-      console.error("Error fetching AI status:", error);
+      logger.error("Error fetching AI status:", error);
     }
   };
 
@@ -250,7 +251,7 @@ const FaceManagement = () => {
         alert(`Lỗi: ${result.message}`);
       }
     } catch (error) {
-      console.error("Error deleting face encoding:", error);
+      logger.error("Error deleting face encoding:", error);
       alert("Có lỗi xảy ra khi xóa khuôn mặt");
     }
   };
@@ -270,7 +271,7 @@ const FaceManagement = () => {
         alert(`Lỗi: ${result.message}`);
       }
     } catch (error) {
-      console.error("Error reloading models:", error);
+      logger.error("Error reloading models:", error);
       alert("Có lỗi xảy ra khi reload models");
     }
   };

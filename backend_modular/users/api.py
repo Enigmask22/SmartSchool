@@ -143,8 +143,6 @@ async def get_all_teachers(db=Depends(get_db)):
 async def create_teacher(teacher_data: dict, db=Depends(get_db)):
     """Tạo giáo viên mới"""
     try:
-        logger.info(f"Creating teacher with data: {teacher_data}")
-        
         data = {
             "teacher_code": teacher_data['teacher_code'],
             "full_name": teacher_data['full_name'],
@@ -157,8 +155,6 @@ async def create_teacher(teacher_data: dict, db=Depends(get_db)):
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
-        
-        logger.info(f"Prepared data for insert: {data}")
         
         response = db.table("teachers").insert(data).execute()
         

@@ -307,9 +307,12 @@ async def get_all_teachers(
     """Lấy danh sách tất cả giáo viên"""
     try:
         response = db.table("teachers").select(
-            "*, users:user_id(id, email, username, full_name, role)"
+            "id, teacher_code, full_name, email, phone, date_of_birth, gender, "
+            "is_active, created_at, updated_at, user_id, "
+            "users:user_id(id, email, username, full_name, role)"
         ).order("created_at", desc=True).execute()
         
+        # Return raw data - let frontend handle display formatting
         return {"success": True, "data": response.data}
     except Exception as e:
         logger.error(f"Error getting teachers: {str(e)}")
@@ -343,8 +346,6 @@ async def create_teacher(
             data["date_of_birth"] = str(teacher_data.date_of_birth)
         if teacher_data.gender:
             data["gender"] = teacher_data.gender
-        if teacher_data.subject_specialization:
-            data["subject_specialization"] = teacher_data.subject_specialization
         
         response = db.table("teachers").insert(data).execute()
         
@@ -381,8 +382,6 @@ async def update_teacher(
             update_data["date_of_birth"] = str(teacher_data.date_of_birth)
         if teacher_data.gender:
             update_data["gender"] = teacher_data.gender
-        if teacher_data.subject_specialization:
-            update_data["subject_specialization"] = teacher_data.subject_specialization
         
         response = db.table("teachers").update(update_data).eq("id", teacher_id).execute()
         

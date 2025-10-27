@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../services/api";
+import logger from "../utils/logger";
 
 const SystemSettingsContext = createContext();
 
@@ -39,7 +40,7 @@ export const SystemSettingsProvider = ({ children }) => {
         setError(null);
       }
     } catch (err) {
-      console.error("Error fetching system settings:", err);
+      logger.error("Error fetching system settings:", err);
       setError(err.message);
       // Giữ nguyên giá trị mặc định nếu có lỗi
     } finally {

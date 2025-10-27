@@ -50,6 +50,7 @@ import { Label } from "./ui/label";
 import { SimpleDatePicker } from "./ui/simple-date-picker";
 import api from "../services/api";
 import * as XLSX from "xlsx";
+import logger from "../utils/logger";
 
 const ClassManagement = () => {
   // States cho Class Management
@@ -107,7 +108,7 @@ const ClassManagement = () => {
         setClasses(response.data || []);
       }
     } catch (err) {
-      console.error("Error loading classes:", err);
+      logger.error("Error loading classes:", err);
     }
   }, []);
 
@@ -154,7 +155,7 @@ const ClassManagement = () => {
         }
       }
     } catch (err) {
-      console.error("Error loading class students:", err);
+      logger.error("Error loading class students:", err);
       setError("Không thể tải danh sách học sinh");
     } finally {
       setLoadingClassData(false);
@@ -205,7 +206,7 @@ const ClassManagement = () => {
         return nextId.toString();
       }
     } catch (error) {
-      console.error("Error generating student ID:", error);
+      logger.error("Error generating student ID:", error);
       // Fallback: tạo mã dựa trên thời gian hiện tại
       const currentYear = new Date().getFullYear();
       let yearPrefix;
@@ -318,7 +319,7 @@ const ClassManagement = () => {
         setError(response.message || "Không thể thêm học sinh");
       }
     } catch (error) {
-      console.error("Error creating student:", error);
+      logger.error("Error creating student:", error);
       setError("Có lỗi xảy ra khi thêm học sinh: " + error.message);
     } finally {
       setStudentFormLoading(false);
@@ -487,7 +488,7 @@ const ClassManagement = () => {
         setImportErrors([]);
         setShowImportModal(true);
       } catch (error) {
-        console.error("Error parsing file:", error);
+        logger.error("Error parsing file:", error);
         alert("❌ Lỗi khi đọc file! Vui lòng kiểm tra định dạng file.");
       }
     };
@@ -525,7 +526,7 @@ const ClassManagement = () => {
         );
 
         if (response.data.errors && response.data.errors.length > 0) {
-          console.log("Import errors:", response.data.errors);
+          logger.debug("Import errors:", response.data.errors);
         }
 
         // Refresh data
@@ -539,7 +540,7 @@ const ClassManagement = () => {
         alert("❌ Lỗi khi import học sinh: " + response.message);
       }
     } catch (error) {
-      console.error("Error importing students:", error);
+      logger.error("Error importing students:", error);
       alert("❌ Lỗi khi import học sinh!");
     } finally {
       setImportLoading(false);
@@ -585,7 +586,7 @@ const ClassManagement = () => {
           alert(`Lỗi: ${response.message || "Không thể xóa học sinh"}`);
         }
       } catch (error) {
-        console.error("Error deleting student:", error);
+        logger.error("Error deleting student:", error);
         alert("Có lỗi xảy ra khi xóa học sinh: " + error.message);
       }
     }
@@ -609,7 +610,7 @@ const ClassManagement = () => {
           );
         }
       } catch (error) {
-        console.error("Error permanently deleting student:", error);
+        logger.error("Error permanently deleting student:", error);
         alert("Có lỗi xảy ra khi xóa vĩnh viễn học sinh: " + error.message);
       }
     }
@@ -635,7 +636,7 @@ const ClassManagement = () => {
 
   // Hàm xử lý khôi phục học sinh
   const handleRestore = async (student) => {
-    console.log("Restore button clicked for student:", student);
+    logger.debug("Restore button clicked for student:", student);
 
     if (
       window.confirm(
@@ -644,9 +645,9 @@ const ClassManagement = () => {
     ) {
       setRestoreLoading(true);
       try {
-        console.log("Sending restore request for student ID:", student.id);
+        logger.debug("Sending restore request for student ID:", student.id);
         const response = await api.restoreStudent(student.id);
-        console.log("Restore response:", response);
+        logger.debug("Restore response:", response);
 
         if (response.success) {
           alert("Khôi phục học sinh thành công!");
@@ -655,7 +656,7 @@ const ClassManagement = () => {
           alert(`Lỗi: ${response.message || "Không thể khôi phục học sinh"}`);
         }
       } catch (error) {
-        console.error("Error restoring student:", error);
+        logger.error("Error restoring student:", error);
         alert("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
       } finally {
         setRestoreLoading(false);
@@ -680,12 +681,12 @@ const ClassManagement = () => {
 
     setEditLoading(true);
     try {
-      console.log("Updating student:", selectedStudentForEdit.id, editForm);
+      logger.debug("Updating student:", selectedStudentForEdit.id, editForm);
       const response = await api.updateStudent(
         selectedStudentForEdit.id,
         editForm
       );
-      console.log("Update response:", response);
+      logger.debug("Update response:", response);
 
       if (response.success) {
         alert("Cập nhật thông tin học sinh thành công!");
@@ -703,7 +704,7 @@ const ClassManagement = () => {
         );
       }
     } catch (error) {
-      console.error("Error updating student:", error);
+      logger.error("Error updating student:", error);
       alert("Có lỗi xảy ra khi cập nhật thông tin học sinh");
     } finally {
       setEditLoading(false);

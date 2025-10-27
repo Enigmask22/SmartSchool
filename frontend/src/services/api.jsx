@@ -1,5 +1,7 @@
 // API Service để giao tiếp với backend
 // Sử dụng environment variable hoặc fallback về localhost
+import logger from "../utils/logger";
+
 const API_BASE_URL =
   process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
@@ -186,7 +188,7 @@ class ApiService {
       // Trả về toàn bộ result để component có thể xử lý success/error
       return result;
     } catch (error) {
-      console.error("API request failed:", error);
+      logger.error("API request failed:", error);
       throw error;
     }
   }
@@ -214,7 +216,7 @@ class ApiService {
         method: "POST",
       });
     } catch (error) {
-      console.error("Backend logout failed:", error);
+      logger.error("Backend logout failed:", error);
     } finally {
       // Luôn xóa tokens local dù backend logout có thành công hay không
       this.clearTokens();
@@ -467,7 +469,7 @@ class ApiService {
         attendanceRate: stats.attendance_rate || 0,
       };
     } catch (error) {
-      console.error("Failed to fetch dashboard stats:", error);
+      logger.error("Failed to fetch dashboard stats:", error);
       // Return mock data as fallback
       return {
         totalStudents: 150,
@@ -749,7 +751,7 @@ class ApiService {
         message: "Tải template thành công",
       };
     } catch (error) {
-      console.error("Error downloading template:", error);
+      logger.error("Error downloading template:", error);
       throw error;
     }
   }
@@ -1039,7 +1041,7 @@ class ApiService {
         campaignid: "school_feedback", // Tên chiến dịch
       };
 
-      console.log("🚀 Gửi SMS qua eSMS.vn với dữ liệu:", {
+      logger.debug("🚀 Gửi SMS qua eSMS.vn với dữ liệu:", {
         phone: parent_phone,
         content: smsContent.substring(0, 50) + "...",
         requestId: esmsData.RequestId,
@@ -1059,7 +1061,7 @@ class ApiService {
       }
 
       const result = await response.json();
-      console.log("📱 Kết quả từ eSMS.vn:", result);
+      logger.debug("📱 Kết quả từ eSMS.vn:", result);
 
       // Xử lý kết quả từ eSMS
       if (result.CodeResult === "100") {
@@ -1094,7 +1096,7 @@ class ApiService {
         };
       }
     } catch (error) {
-      console.error("❌ Lỗi khi gửi SMS qua eSMS.vn:", error);
+      logger.error("❌ Lỗi khi gửi SMS qua eSMS.vn:", error);
       return {
         success: false,
         error: `Lỗi kết nối eSMS.vn: ${error.message}`,
@@ -1155,7 +1157,7 @@ class ApiService {
 
       return await response.json();
     } catch (error) {
-      console.error("Error parsing OCR grade sheet:", error);
+      logger.error("Error parsing OCR grade sheet:", error);
       throw error;
     }
   }
@@ -1223,7 +1225,7 @@ class ApiService {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error("Error exporting OCR data to Excel:", error);
+      logger.error("Error exporting OCR data to Excel:", error);
       throw error;
     }
   }

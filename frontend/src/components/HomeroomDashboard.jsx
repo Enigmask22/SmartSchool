@@ -11,6 +11,7 @@ import {
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { SimpleDatePicker } from "./ui/simple-date-picker";
+import logger from "../utils/logger";
 import {
   Select,
   SelectContent,
@@ -69,7 +70,7 @@ const HomeroomDashboard = () => {
         setAttendanceStats(response.data.stats);
       }
     } catch (error) {
-      console.error("Error fetching attendance stats:", error);
+      logger.error("Error fetching attendance stats:", error);
     }
   }, [selectedDate, selectedClass]);
 
@@ -86,7 +87,7 @@ const HomeroomDashboard = () => {
         setAttendanceRecords(response.data || []);
       }
     } catch (error) {
-      console.error("Error fetching attendance records:", error);
+      logger.error("Error fetching attendance records:", error);
     }
   }, [selectedDate, selectedClass]);
 
@@ -123,9 +124,9 @@ const HomeroomDashboard = () => {
         const studentsResponse = await api.request(
           `/homeroom/students?class_name=${selectedClass}`
         );
-        console.log("👥 Students response:", studentsResponse);
+        logger.debug("👥 Students response:", studentsResponse);
         if (studentsResponse.success) {
-          console.log("👥 Students data:", studentsResponse.data);
+          logger.debug("👥 Students data:", studentsResponse.data);
           // Filter chỉ hiển thị học sinh đang hoạt động (is_active !== false)
           const activeStudents = (studentsResponse.data || []).filter(
             (student) => student.is_active !== false
@@ -139,14 +140,14 @@ const HomeroomDashboard = () => {
           });
 
           setStudents(sortedStudents);
-          console.log("👥 Sorted students:", sortedStudents);
+          logger.debug("👥 Sorted students:", sortedStudents);
         }
       }
 
       // Fetch attendance stats and records
       await Promise.all([fetchAttendanceStats(), fetchAttendanceRecords()]);
     } catch (error) {
-      console.error("Error fetching homeroom data:", error);
+      logger.error("Error fetching homeroom data:", error);
     } finally {
       setLoading(false);
     }

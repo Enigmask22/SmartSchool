@@ -126,9 +126,7 @@ class InsightFaceRecognitionService:
                         providers = ['CUDAExecutionProvider']
                         use_gpu = True
                         gpu_name = torch.cuda.get_device_name(0)
-                        vram_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
-                        logger.info(f"� Using GPU: {gpu_name}")
-                        logger.info(f"💾 VRAM: {vram_total:.1f} GB")
+                        logger.info(f"Using GPU: {gpu_name}")
                     else:
                         logger.error("❌ CUDA requested but no GPU available!")
                         logger.error("   Install CUDA-enabled PyTorch or set INSIGHTFACE_DEVICE=cpu")
@@ -145,10 +143,7 @@ class InsightFaceRecognitionService:
                     if torch.cuda.is_available():
                         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
                         use_gpu = True
-                        gpu_name = torch.cuda.get_device_name(0)
-                        vram_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
-                        logger.info(f"🚀 Using GPU (with CPU fallback): {gpu_name}")
-                        logger.info(f"💾 VRAM: {vram_total:.1f} GB")
+                        logger.info("Using GPU with CPU fallback")
                     else:
                         providers = ['CPUExecutionProvider']
                         logger.warning("⚠️  No GPU detected, using CPU (slower)")
@@ -156,9 +151,6 @@ class InsightFaceRecognitionService:
                     providers = ['CPUExecutionProvider']
                     logger.warning("⚠️  PyTorch not found, using CPU provider")
             
-            # Cache path info
-            logger.info(f"📁 InsightFace cache path: {self.cache_path}")
-            logger.info(f"🔧 INSIGHTFACE_HOME: {os.environ.get('INSIGHTFACE_HOME', 'not set')}")
             
             # Initialize FaceAnalysis với optimized settings
             self.app = FaceAnalysis(
@@ -170,29 +162,18 @@ class InsightFaceRecognitionService:
             # Adjust detection size based on device (GPU can handle larger images)
             if use_gpu:
                 # GPU: Use high-quality detection size
-                gpu_det_size = (1280, 1280)
-                self.det_size = gpu_det_size
-                logger.info(f"⚡ GPU mode: Using HIGH-QUALITY detection size: {gpu_det_size}")
+                self.det_size = (1280, 1280)
             else:
                 # CPU: Use smaller size for better performance
-                cpu_det_size = (640, 640)
-                self.det_size = cpu_det_size
-                logger.info(f"🖥️  CPU mode: Using OPTIMIZED detection size: {cpu_det_size}")
+                self.det_size = (640, 640)
             
             self.app.prepare(ctx_id=0, det_size=self.det_size)
             
-            logger.info(f"✅ InsightFace initialized successfully")
-            logger.info(f"   Detection size: {self.det_size}")
-            logger.info(f"   Providers: {providers}")
-            logger.info(f"   Device: {'GPU (CUDA)' if use_gpu else 'CPU'}")
-            logger.info(f"   Models loaded: {len(self.app.models)} models")
-            logger.info(f"   Similarity threshold: {self.similarity_threshold}")
-            logger.info(f"🎯 Expected accuracy: 95-99% (vs MediaPipe 75-80%)")
-            
-            if use_gpu:
-                logger.info("⚡ GPU acceleration enabled - Fast inference!")
-            else:
-                logger.info("🐢 CPU mode - Slower inference (consider using GPU)")
+            # Summary log
+            logger.info(f"✅ InsightFace initialized: {self.det_size} detection, "
+                       f"{'GPU' if use_gpu else 'CPU'} mode, "
+                       f"{len(self.app.models)} models, "
+                       f"threshold={self.similarity_threshold}")
             
             return True
             
@@ -277,7 +258,7 @@ class InsightFaceRecognitionService:
                     "landmark": face.landmark if hasattr(face, 'landmark') else None
                 })
             
-            logger.info(f"🔍 InsightFace detected {len(results)} faces with embeddings")
+            logger.debug(f"Detected {len(results)} faces with embeddings")
             return results
             
         except Exception as e:

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ApiService from '../services/api';
+import logger from "../utils/logger";
 
 const ReportView = ({ isOpen, onClose }) => {
   const [stats, setStats] = useState({
@@ -33,15 +34,15 @@ const ReportView = ({ isOpen, onClose }) => {
         ApiService.getAttendance()
       ]);
       
-      console.log('Debug - Stats response:', statsResponse);
-      console.log('Debug - Attendance response:', attendanceResponse);
+      logger.debug('Debug - Stats response:', statsResponse);
+      logger.debug('Debug - Attendance response:', attendanceResponse);
       
       // Extract data from API responses
       const statsData = statsResponse.success ? statsResponse.data : null;
       const attendanceData = attendanceResponse.success ? attendanceResponse.data : [];
       
-      console.log('Debug - Extracted stats:', statsData);
-      console.log('Debug - Extracted attendance:', attendanceData);
+      logger.debug('Debug - Extracted stats:', statsData);
+      logger.debug('Debug - Extracted attendance:', attendanceData);
       
       if (statsData) {
         setStats({
@@ -63,7 +64,7 @@ const ReportView = ({ isOpen, onClose }) => {
       
       setAttendanceData(Array.isArray(attendanceData) ? attendanceData : []);
     } catch (error) {
-      console.error('Error loading report data:', error);
+      logger.error('Error loading report data:', error);
       // Set mock data on error
       setStats({
         totalStudents: 150,
@@ -87,15 +88,15 @@ const ReportView = ({ isOpen, onClose }) => {
       )];
       setClasses(uniqueClasses);
     } catch (error) {
-      console.error('Error loading classes:', error);
+      logger.error('Error loading classes:', error);
     }
   };
 
   const getFilteredAttendance = () => {
     let filtered = attendanceData;
-    console.log('Debug - Raw attendance data:', attendanceData);
-    console.log('Debug - Time range:', timeRange);
-    console.log('Debug - Class filter:', classFilter);
+    logger.debug('Debug - Raw attendance data:', attendanceData);
+    logger.debug('Debug - Time range:', timeRange);
+    logger.debug('Debug - Class filter:', classFilter);
     
     if (classFilter) {
       filtered = filtered.filter(record => 
@@ -104,12 +105,12 @@ const ReportView = ({ isOpen, onClose }) => {
     }
     
     const today = new Date().toISOString().split('T')[0];
-    console.log('Debug - Today date:', today);
+    logger.debug('Debug - Today date:', today);
     
     switch (timeRange) {
       case 'today':
         filtered = filtered.filter(record => {
-          console.log('Debug - Record date:', record.date, 'vs Today:', today);
+          logger.debug('Debug - Record date:', record.date, 'vs Today:', today);
           return record.date === today;
         });
         break;
@@ -129,7 +130,7 @@ const ReportView = ({ isOpen, onClose }) => {
         break;
     }
     
-    console.log('Debug - Filtered attendance:', filtered);
+    logger.debug('Debug - Filtered attendance:', filtered);
     return filtered;
   };
 

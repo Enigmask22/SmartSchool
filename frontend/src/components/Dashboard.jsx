@@ -5,6 +5,7 @@ import ReportView from './ReportView';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import logger from "../utils/logger";
 import { 
   Users, 
   CheckCircle, 
@@ -44,7 +45,7 @@ const Dashboard = ({ setCurrentView }) => {
       const statsData = await ApiService.getDashboardStats();
       setStats(statsData);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      logger.error('Error fetching stats:', error);
       setError('Không thể tải dữ liệu từ server. Đang hiển thị dữ liệu mẫu.');
       
       // Fallback to mock data

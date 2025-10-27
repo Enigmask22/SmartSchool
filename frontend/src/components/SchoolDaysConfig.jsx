@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import ApiService from '../services/api';
+import logger from "../utils/logger";
 
 const SchoolDaysConfig = () => {
   const [configs, setConfigs] = useState([]);
@@ -35,7 +36,7 @@ const SchoolDaysConfig = () => {
       
       // Nếu không có config, thử initialize
       if (response.success && (!response.data || response.data.length === 0)) {
-        console.log('No configs found, initializing...');
+        logger.debug('No configs found, initializing...');
         const initResponse = await ApiService.initializeSchoolDaysConfigs();
         
         if (initResponse.success) {
@@ -75,7 +76,7 @@ const SchoolDaysConfig = () => {
         setError('Không thể tải cấu hình: ' + (response.message || 'Lỗi không xác định'));
       }
     } catch (error) {
-      console.error('Error loading configs:', error);
+      logger.error('Error loading configs:', error);
       setError('Lỗi khi tải cấu hình: ' + error.message);
     } finally {
       setLoading(false);
@@ -89,7 +90,7 @@ const SchoolDaysConfig = () => {
         setNextReset(response.data);
       }
     } catch (error) {
-      console.error('Error loading next reset time:', error);
+      logger.error('Error loading next reset time:', error);
     }
   };
 
@@ -141,7 +142,7 @@ const SchoolDaysConfig = () => {
         setError(response.message || 'Lỗi khi lưu cấu hình');
       }
     } catch (error) {
-      console.error('Error saving configs:', error);
+      logger.error('Error saving configs:', error);
       setError('Lỗi khi lưu cấu hình: ' + error.message);
     } finally {
       setSaving(false);
@@ -174,7 +175,7 @@ const SchoolDaysConfig = () => {
         setError(response.message || 'Lỗi khi áp dụng cấu hình tạm thời');
       }
     } catch (error) {
-      console.error('Error applying temporary config:', error);
+      logger.error('Error applying temporary config:', error);
       setError('Lỗi khi áp dụng cấu hình tạm thời: ' + error.message);
     }
   };
@@ -196,7 +197,7 @@ const SchoolDaysConfig = () => {
         setError(response.message || 'Lỗi khi reset cấu hình');
       }
     } catch (error) {
-      console.error('Error resetting configs:', error);
+      logger.error('Error resetting configs:', error);
       setError('Lỗi khi reset cấu hình: ' + error.message);
     }
   };

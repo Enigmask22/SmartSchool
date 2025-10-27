@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { X, Loader2, UserPlus } from 'lucide-react';
+import logger from "../utils/logger";
 
 const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -109,7 +110,7 @@ const AddStudentModal = ({ isOpen, onClose, onSuccess }) => {
       alert('Thêm học sinh thành công!');
       
     } catch (error) {
-      console.error('Error creating student:', error);
+      logger.error('Error creating student:', error);
       alert('Có lỗi xảy ra khi thêm học sinh: ' + error.message);
     } finally {
       setLoading(false);

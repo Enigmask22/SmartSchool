@@ -21,6 +21,7 @@ import {
   Settings,
 } from "lucide-react";
 import api from "../services/api";
+import logger from "../utils/logger";
 import { SimpleDatePicker } from "./ui/simple-date-picker";
 import {
   Card,
@@ -249,6 +250,9 @@ const AdminManagement = () => {
       if (response.success) {
         let items = response.data || [];
 
+        // No data normalization - keep raw data for form editing
+        // Display formatting will be handled in render
+
         // Filter theo trạng thái active/inactive
         if (tabsWithServerFiltering.includes(activeTab)) {
           // Các tabs có server-side filtering
@@ -318,14 +322,26 @@ const AdminManagement = () => {
         setTeacherSubjects(teacherSubjectsMap);
       }
     } catch (err) {
-      console.error("Error loading reference data:", err);
+      logger.error("Error loading reference data:", err);
     }
   }, []);
 
   // Load dữ liệu khi đổi tab
   useEffect(() => {
-    loadData();
-    loadReferenceData();
+    // Load data trước, sau đó mới load reference data để tránh race condition
+    const loadAllData = async () => {
+      await loadData();
+      // Chỉ load reference data cho các tabs cần dropdown/mapping
+      if (
+        activeTab === "teachers" ||
+        activeTab === "class_subjects" ||
+        activeTab === "subject_teachers"
+      ) {
+        await loadReferenceData();
+      }
+    };
+
+    loadAllData();
   }, [activeTab, loadData, loadReferenceData]);
 
   // Auto-filter teachers when editing class_subjects with existing subject_id
@@ -392,7 +408,7 @@ const AdminManagement = () => {
           }
         });
 
-        console.log("Clean data to send:", cleanData);
+        logger.debug("Clean data to send:", cleanData);
 
         // Validate required fields
         if (!cleanData.full_name) {
@@ -471,7 +487,7 @@ const AdminManagement = () => {
     if (!currentConfig?.endpoint) return;
 
     try {
-      console.log("Updating with id:", id, "data:", data); // DEBUG LOG
+      logger.debug("Updating with id:", id, "data:", data);
 
       // Xử lý đặc biệt cho teachers: update teacher + subject_teachers
       if (activeTab === "teachers") {
@@ -674,9 +690,9 @@ const AdminManagement = () => {
 
       if (value) {
         // Lọc giáo viên đã được phân công dạy môn này (từ subject_teachers)
-        console.log("=== DEBUG: Filter Teachers for Subject ===");
-        console.log("Selected subject_id:", value);
-        console.log("subjectTeachersData:", subjectTeachersData);
+        logger.debug("=== DEBUG: Filter Teachers for Subject ===");
+        logger.debug("Selected subject_id:", value);
+        logger.debug("subjectTeachersData:", subjectTeachersData);
 
         const teachersForSubject = subjectTeachersData
           .filter(
@@ -684,14 +700,14 @@ const AdminManagement = () => {
           )
           .map((st) => st.teacher_id);
 
-        console.log("teachersForSubject (IDs):", teachersForSubject);
-        console.log("All teachers:", teachers);
+        logger.debug("teachersForSubject (IDs):", teachersForSubject);
+        logger.debug("All teachers:", teachers);
 
         const filtered = teachers.filter((t) =>
           teachersForSubject.includes(t.id)
         );
 
-        console.log("Filtered teachers:", filtered);
+        logger.debug("Filtered teachers:", filtered);
         setFilteredTeachers(filtered);
       } else {
         setFilteredTeachers([]);
@@ -985,7 +1001,10 @@ const AdminManagement = () => {
               </select>
             ) : field === "gender" ? (
               <Select
-                value={formData[field] || item?.[field] || "Nam"}
+                value={
+                  formData[field] ||
+                  (item?.[field] && item[field] !== "-" ? item[field] : "Nam")
+                }
                 onValueChange={(value) => handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
@@ -1000,7 +1019,10 @@ const AdminManagement = () => {
             ) : field === "date_of_birth" ? (
               <div className="w-full">
                 <SimpleDatePicker
-                  value={formData[field] || item?.[field] || ""}
+                  value={
+                    formData[field] ||
+                    (item?.[field] && item[field] !== "-" ? item[field] : "")
+                  }
                   onChange={(date) => handleChange(field, date)}
                   placeholder="Chọn ngày sinh"
                 />
@@ -1074,10 +1096,19 @@ const AdminManagement = () => {
                         : "password"
                       : "text"
                   }
-                  value={formData[field] || item?.[field] || ""}
+                  value={
+                    formData[field] ||
+                    (item?.[field] && item[field] !== "-" ? item[field] : "")
+                  }
                   onChange={(e) => handleChange(field, e.target.value)}
                   placeholder={
-                    field === "username" ? "ho_va_ten.ten_truong.ten_tinh" : ""
+                    field === "username"
+                      ? "ho_va_ten.ten_truong.ten_tinh"
+                      : field === "phone"
+                      ? "Nhập số điện thoại"
+                      : field === "teacher_code"
+                      ? "Nhập mã giáo viên"
+                      : ""
                   }
                   required={
                     field !== "description" &&
@@ -1346,11 +1377,38 @@ const AdminManagement = () => {
             {/* Enhanced Table */}
             <CardContent>
               {loading ? (
-                <div className="py-16 text-center">
-                  <div className="w-12 h-12 mx-auto border-4 rounded-full animate-spin border-primary/20 border-t-primary"></div>
-                  <p className="mt-4 font-medium text-muted-foreground">
-                    Đang tải dữ liệu...
-                  </p>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {currentConfig?.displayFields?.map((field) => (
+                          <TableHead key={field}>
+                            <div className="h-4 rounded animate-pulse bg-muted"></div>
+                          </TableHead>
+                        ))}
+                        <TableHead>
+                          <div className="h-4 rounded animate-pulse bg-muted"></div>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...Array(5)].map((_, index) => (
+                        <TableRow key={index}>
+                          {currentConfig?.displayFields?.map((field) => (
+                            <TableCell key={field}>
+                              <div className="h-4 rounded animate-pulse bg-muted"></div>
+                            </TableCell>
+                          ))}
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <div className="w-8 h-8 rounded animate-pulse bg-muted"></div>
+                              <div className="w-8 h-8 rounded animate-pulse bg-muted"></div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : error ? (
                 <div className="py-16 text-center">
@@ -1410,6 +1468,8 @@ const AdminManagement = () => {
                               ? "NGÀY SINH"
                               : field === "gender"
                               ? "GIỚI TÍNH"
+                              : field === "phone"
+                              ? "SDT"
                               : field.replace(/_/g, " ").toUpperCase()}
                           </TableHead>
                         ))}
@@ -1459,16 +1519,16 @@ const AdminManagement = () => {
                                   </div>
                                 ) : field === "date_of_birth" ? (
                                   // Hiển thị ngày sinh với format đẹp
-                                  item[field] ? (
+                                  item[field] && item[field] !== "-" ? (
                                     new Date(item[field]).toLocaleDateString(
                                       "vi-VN"
                                     )
                                   ) : (
-                                    "-"
+                                    <span className="text-gray-400">-</span>
                                   )
                                 ) : field === "gender" ? (
                                   // Hiển thị giới tính với màu
-                                  item[field] ? (
+                                  item[field] && item[field] !== "-" ? (
                                     <Badge
                                       variant="outline"
                                       className={
@@ -1482,7 +1542,7 @@ const AdminManagement = () => {
                                       {item[field]}
                                     </Badge>
                                   ) : (
-                                    "-"
+                                    <span className="text-gray-400">-</span>
                                   )
                                 ) : typeof item[field] === "boolean" ? (
                                   item[field] ? (
@@ -1515,8 +1575,21 @@ const AdminManagement = () => {
                                       ? "Giáo viên"
                                       : item[field]}
                                   </Badge>
+                                ) : field === "teacher_code" ||
+                                  field === "phone" ||
+                                  field === "email" ? (
+                                  // Các trường text đặc biệt - hiển thị với màu xám nếu là "-"
+                                  <span
+                                    className={
+                                      item[field] === "-"
+                                        ? "text-gray-400 italic"
+                                        : ""
+                                    }
+                                  >
+                                    {item[field] ?? "-"}
+                                  </span>
                                 ) : (
-                                  item[field] || "-"
+                                  item[field] ?? "-"
                                 )}
                               </TableCell>
                             ))}
@@ -1557,18 +1630,18 @@ const AdminManagement = () => {
 
                                         // Khởi tạo formData với giá trị mặc định cho teachers
                                         if (activeTab === "teachers") {
-                                          console.log(
+                                          logger.debug(
                                             ">>> EDIT TEACHER CLICKED"
                                           );
-                                          console.log(
+                                          logger.debug(
                                             ">>> Original item:",
                                             item
                                           );
-                                          console.log(
+                                          logger.debug(
                                             ">>> item.gender:",
                                             item.gender
                                           );
-                                          console.log(
+                                          logger.debug(
                                             ">>> item.date_of_birth:",
                                             item.date_of_birth
                                           );
@@ -1580,7 +1653,7 @@ const AdminManagement = () => {
                                               item.date_of_birth || "",
                                           };
 
-                                          console.log(
+                                          logger.debug(
                                             ">>> Initialized formData:",
                                             initData
                                           );

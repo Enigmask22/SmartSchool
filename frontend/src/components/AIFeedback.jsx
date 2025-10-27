@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
+import logger from "../utils/logger";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
@@ -62,7 +63,7 @@ const AIFeedback = () => {
         return null;
       }
     } catch (error) {
-      console.error('Error fetching grade trend:', error);
+      logger.error('Error fetching grade trend:', error);
       setTrendError('Lỗi kết nối server khi phân tích xu hướng');
       return null;
     } finally {
@@ -157,7 +158,7 @@ const AIFeedback = () => {
         setError(result.error || 'Không thể tạo nhận xét');
       }
     } catch (err) {
-      console.error('Error generating feedback:', err);
+      logger.error('Error generating feedback:', err);
       setError('Lỗi kết nối server. Vui lòng thử lại.');
     } finally {
       setLoading(false);
@@ -219,7 +220,7 @@ const AIFeedback = () => {
         setError('Không thể tạo nhận xét hàng loạt');
       }
     } catch (err) {
-      console.error('Error generating batch feedback:', err);
+      logger.error('Error generating batch feedback:', err);
       setError('Lỗi kết nối server. Vui lòng thử lại.');
     } finally {
       setLoading(false);

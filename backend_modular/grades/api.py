@@ -518,8 +518,6 @@ async def get_students_by_class_subject(
         filtered_students = []
         if students.data and subject_info:
             subject_code = subject_info.get("subject_code")
-            logger.info(f"Filtering students for subject: {subject_code}")
-            logger.info(f"Total students in class: {len(students.data)}")
             
             for student in students.data:
                 subject_selected = student.get("subject_selected")
@@ -530,16 +528,10 @@ async def get_students_by_class_subject(
                     # Kiểm tra xem học sinh có học môn này không
                     if subject_code in core_subjects or subject_code in elective_subjects:
                         filtered_students.append(student)
-                        logger.info(f"Student {student.get('full_name')} ({student.get('student_id')}) studies {subject_code}")
-                else:
-                    # Nếu không có subject_selected, KHÔNG bao gồm học sinh
-                    # Chỉ bao gồm học sinh có dữ liệu subject_selected rõ ràng
-                    logger.info(f"Student {student.get('full_name')} ({student.get('student_id')}) has no subject_selected data - EXCLUDED")
+                # Nếu không có subject_selected, KHÔNG bao gồm học sinh
         else:
             # Nếu không có dữ liệu, giữ nguyên danh sách
             filtered_students = students.data or []
-        
-        logger.info(f"Filtered students count: {len(filtered_students)}")
         
         # Lấy điểm của các học sinh cho môn này
         student_ids = [s["id"] for s in filtered_students]
@@ -1336,8 +1328,6 @@ async def get_teacher_classes(
             subjects:subject_id(id, subject_code, subject_name)
         """).eq("teacher_id", current_teacher["id"]).eq("is_active", True).eq("academic_year", academic_year).eq("semester", semester).execute()
         
-        logger.info(f"Class subjects raw data: {class_subjects.data}")
-        
         if not class_subjects.data:
             return {
                 "success": True,
@@ -1348,7 +1338,6 @@ async def get_teacher_classes(
         # Tạo danh sách unique classes
         classes_dict = {}
         for cs in class_subjects.data:
-            logger.info(f"Processing class_subject: {cs}")
             if cs.get("classes"):
                 class_id = cs["classes"]["id"]
                 if class_id not in classes_dict:
@@ -1368,8 +1357,6 @@ async def get_teacher_classes(
                     })
         
         classes_list = sorted(list(classes_dict.values()), key=lambda x: (x["grade"], x["class_name"]))
-        
-        logger.info(f"Final classes list: {classes_list}")
         
         return {
             "success": True,
@@ -1666,8 +1653,6 @@ async def download_grade_template(
         filtered_students = []
         if students.data and subject_info:
             subject_code = subject_info.get("subject_code")
-            logger.info(f"Template filtering students for subject: {subject_code}")
-            logger.info(f"Total students in class: {len(students.data)}")
             
             for student in students.data:
                 subject_selected = student.get("subject_selected")
@@ -1678,15 +1663,9 @@ async def download_grade_template(
                     # Kiểm tra xem học sinh có học môn này không
                     if subject_code in core_subjects or subject_code in elective_subjects:
                         filtered_students.append(student)
-                        logger.info(f"Template: Student {student.get('full_name')} ({student.get('student_id')}) studies {subject_code}")
-                else:
-                    # Nếu không có subject_selected, KHÔNG bao gồm học sinh
-                    logger.info(f"Template: Student {student.get('full_name')} ({student.get('student_id')}) has no subject_selected data - EXCLUDED")
         else:
             # Nếu không có dữ liệu, giữ nguyên danh sách
             filtered_students = students.data or []
-        
-        logger.info(f"Template filtered students count: {len(filtered_students)}")
         
         # Tạo file Excel
         output = io.BytesIO()

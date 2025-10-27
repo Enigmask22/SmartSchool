@@ -25,6 +25,7 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import logger from "../utils/logger";
 
 // API Configuration
 const API_BASE_URL =
@@ -65,10 +66,10 @@ const ContinuousRecognition = () => {
 
       if (result.success && result.data.cooldown_period) {
         setCooldownPeriod(result.data.cooldown_period);
-        console.log("🔧 Loaded settings:", result.data);
+        logger.debug("🔧 Loaded settings:", result.data);
       }
     } catch (error) {
-      console.error("❌ Error loading settings:", error);
+      logger.error("❌ Error loading settings:", error);
     }
   }, []);
 
@@ -79,7 +80,7 @@ const ContinuousRecognition = () => {
       wsRef.current = new WebSocket(`${WS_BASE_URL}/ai/recognition/stream`);
 
       wsRef.current.onopen = () => {
-        console.log("🔗 Connected to recognition stream");
+        logger.debug("🔗 Connected to recognition stream");
         setIsConnected(true);
         setConnectionStatus("connected");
       };
@@ -90,7 +91,7 @@ const ContinuousRecognition = () => {
       };
 
       wsRef.current.onclose = () => {
-        console.log("🔌 Disconnected from recognition stream");
+        logger.debug("🔌 Disconnected from recognition stream");
         setIsConnected(false);
         setConnectionStatus("disconnected");
 
@@ -103,11 +104,11 @@ const ContinuousRecognition = () => {
       };
 
       wsRef.current.onerror = (error) => {
-        console.error("❌ WebSocket error:", error);
+        logger.error("❌ WebSocket error:", error);
         setConnectionStatus("error");
       };
     } catch (error) {
-      console.error("❌ Failed to connect WebSocket:", error);
+      logger.error("❌ Failed to connect WebSocket:", error);
       setConnectionStatus("error");
     }
   }, [isConnected]);
@@ -117,7 +118,7 @@ const ContinuousRecognition = () => {
     switch (data.type) {
       case "recognition_result":
         // Log debug info
-        console.log("🔍 Recognition result:", data.data);
+        logger.debug("🔍 Recognition result:", data.data);
 
         if (
           data.data.recognized_students &&
@@ -151,13 +152,13 @@ const ContinuousRecognition = () => {
 
           // Log debug message if available
           if (data.data.message) {
-            console.log(`⚠️ Recognition message: ${data.data.message}`);
+            logger.debug(`⚠️ Recognition message: ${data.data.message}`);
           }
         }
         break;
 
       case "status":
-        console.log("📢 Status update:", data.message);
+        logger.debug("📢 Status update:", data.message);
         setIsRunning(data.is_running);
         break;
 
@@ -166,7 +167,7 @@ const ContinuousRecognition = () => {
         break;
 
       default:
-        console.log("📨 Unknown message type:", data.type);
+        logger.debug("📨 Unknown message type:", data.type);
     }
   };
 
@@ -176,7 +177,7 @@ const ContinuousRecognition = () => {
       // Stop existing stream first
       stopCamera();
 
-      console.log("🎥 Starting camera...");
+      logger.debug("🎥 Starting camera...");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
@@ -193,22 +194,22 @@ const ContinuousRecognition = () => {
 
         // Add event listeners
         videoRef.current.onloadedmetadata = () => {
-          console.log("✅ Camera metadata loaded");
+          logger.debug("✅ Camera metadata loaded");
           videoRef.current.play().catch((e) => {
-            console.error("❌ Video play error:", e);
+            logger.error("❌ Video play error:", e);
           });
         };
 
         videoRef.current.onplay = () => {
-          console.log("▶️ Camera started playing");
+          logger.debug("▶️ Camera started playing");
         };
 
         videoRef.current.onerror = (e) => {
-          console.error("❌ Video element error:", e);
+          logger.error("❌ Video element error:", e);
         };
       }
     } catch (error) {
-      console.error("❌ Error accessing camera:", error);
+      logger.error("❌ Error accessing camera:", error);
 
       let errorMessage = "Không thể truy cập camera.";
 
@@ -232,18 +233,18 @@ const ContinuousRecognition = () => {
   const stopCamera = () => {
     try {
       if (videoRef.current && videoRef.current.srcObject) {
-        console.log("🛑 Stopping camera...");
+        logger.debug("🛑 Stopping camera...");
         const tracks = videoRef.current.srcObject.getTracks();
         tracks.forEach((track) => {
           track.stop();
-          console.log(`🔇 Stopped track: ${track.kind}`);
+          logger.debug(`🔇 Stopped track: ${track.kind}`);
         });
         videoRef.current.srcObject = null;
         videoRef.current.load(); // Reset video element
         setIsCameraOn(false);
       }
     } catch (error) {
-      console.error("❌ Error stopping camera:", error);
+      logger.error("❌ Error stopping camera:", error);
     }
   };
 
@@ -265,7 +266,7 @@ const ContinuousRecognition = () => {
 
       // Check if video is ready
       if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-        console.log("⏳ Video not ready for capture");
+        logger.debug("⏳ Video not ready for capture");
         return;
       }
 
@@ -294,10 +295,10 @@ const ContinuousRecognition = () => {
           );
         }
       } catch (canvasError) {
-        console.error("❌ Canvas capture error:", canvasError);
+        logger.error("❌ Canvas capture error:", canvasError);
       }
     } catch (error) {
-      console.error("❌ Frame capture error:", error);
+      logger.error("❌ Frame capture error:", error);
     }
   }, [isRunning, isCameraOn]);
 
@@ -451,7 +452,7 @@ const ContinuousRecognition = () => {
         setMessage("Đã bắt đầu nhận diện tự động");
       }
     } catch (error) {
-      console.error("Error starting recognition:", error);
+      logger.error("Error starting recognition:", error);
       setMessage("Lỗi khi bắt đầu nhận diện");
     }
   };
@@ -470,7 +471,7 @@ const ContinuousRecognition = () => {
         setMessage("Đã dừng nhận diện tự động");
       }
     } catch (error) {
-      console.error("Error stopping recognition:", error);
+      logger.error("Error stopping recognition:", error);
       setMessage("Lỗi khi dừng nhận diện");
     }
   };
@@ -931,7 +932,7 @@ const ContinuousRecognition = () => {
 
                         if (result.success) {
                           alert(`${result.message}`);
-                          console.log("Settings updated:", result.data);
+                          logger.debug("Settings updated:", result.data);
                         } else {
                           alert(
                             `Lỗi: ${
@@ -940,7 +941,7 @@ const ContinuousRecognition = () => {
                           );
                         }
                       } catch (error) {
-                        console.error("Error updating settings:", error);
+                        logger.error("Error updating settings:", error);
                         alert("Lỗi kết nối khi cập nhật cài đặt");
                       }
                     }}
