@@ -200,14 +200,98 @@ const GradeManagement = () => {
     }
   };
 
+  // Helper: Get columns with hierarchy for display (parent + children structure)
+  const getDisplayColumns = (gradeColumnConfig) => {
+    const columns = [];
+    if (!gradeColumnConfig) return columns;
+
+    // Sort keys: Thường xuyên -> Giữa kì -> Cuối kì
+    const priorityOrder = {
+      Diem_thuong_xuyen: 1,
+      diem_thuong_xuyen: 1,
+      Diem_thi_giua_ki: 2,
+      diem_thi_giua_ki: 2,
+      Diem_thi_cuoi_ki: 3,
+      diem_thi_cuoi_ki: 3,
+    };
+
+    const sortedKeys = Object.keys(gradeColumnConfig).sort((a, b) => {
+      return (priorityOrder[a] || 999) - (priorityOrder[b] || 999);
+    });
+
+    sortedKeys.forEach((columnName) => {
+      const columnConfig = gradeColumnConfig[columnName];
+
+      if (columnConfig.data && typeof columnConfig.data === "object") {
+        // Parent column with children
+        const children = Object.keys(columnConfig.data).map((childName) => ({
+          key: childName,
+          label: columnConfig.data[childName].label || childName,
+          he_so: columnConfig.data[childName].he_so,
+        }));
+
+        columns.push({
+          key: columnName,
+          label: columnConfig.label || columnName,
+          hasChildren: true,
+          children: children,
+        });
+      } else {
+        // Regular column
+        columns.push({
+          key: columnName,
+          label: columnConfig.label || columnName,
+          he_so: columnConfig.he_so,
+          hasChildren: false,
+        });
+      }
+    });
+
+    return columns;
+  };
+
+  // Helper: Flatten nested columns to get all input fields (child columns)
+  const flattenGradeColumns = (gradeColumnConfig) => {
+    const flatColumns = [];
+    if (!gradeColumnConfig) return flatColumns;
+
+    Object.keys(gradeColumnConfig).forEach((columnName) => {
+      const columnConfig = gradeColumnConfig[columnName];
+
+      // Check if column has nested data (children)
+      if (columnConfig.data && typeof columnConfig.data === "object") {
+        // Add all child columns
+        Object.keys(columnConfig.data).forEach((childName) => {
+          flatColumns.push({
+            key: childName,
+            he_so: columnConfig.data[childName].he_so,
+            label: columnConfig.data[childName].label || childName,
+          });
+        });
+      } else {
+        // Regular column without children
+        flatColumns.push({
+          key: columnName,
+          he_so: columnConfig.he_so,
+          label: columnConfig.label || columnName,
+        });
+      }
+    });
+
+    return flatColumns;
+  };
+
   const initializeGradeForm = (student, existingGrade = null) => {
     const form = {};
 
     if (gradeConfig && gradeConfig.grade_column_config) {
-      Object.keys(gradeConfig.grade_column_config).forEach((columnName) => {
-        form[columnName] = {
-          He_so: gradeConfig.grade_column_config[columnName].he_so,
-          Diem: existingGrade?.grade_data?.[columnName]?.Diem || "",
+      // Use flattened columns (all child columns, not parent)
+      const flatColumns = flattenGradeColumns(gradeConfig.grade_column_config);
+
+      flatColumns.forEach((column) => {
+        form[column.key] = {
+          He_so: column.he_so,
+          Diem: existingGrade?.grade_data?.[column.key]?.Diem || "",
         };
       });
     }
@@ -222,17 +306,83 @@ const GradeManagement = () => {
   };
 
   const handleGradeInputChange = (columnName, value) => {
+    // Normalize letter grades
+    let normalizedValue = value.trim();
+
+    if (normalizedValue !== "") {
+      const upperValue = normalizedValue.toUpperCase();
+
+      // Accept various formats for Đ (Pass)
+      if (
+        upperValue === "Đ" ||
+        upperValue === "D" ||
+        upperValue === "DAT" ||
+        upperValue === "ĐẠT"
+      ) {
+        normalizedValue = "Đ";
+      }
+      // Accept various formats for KĐ (Not Pass)
+      else if (
+        upperValue === "KĐ" ||
+        upperValue === "KD" ||
+        upperValue === "KHONG_DAT" ||
+        upperValue === "KHONGDAT" ||
+        upperValue === "KHÔNG_ĐẠT" ||
+        upperValue === "KHÔNG ĐẠT"
+      ) {
+        normalizedValue = "KĐ";
+      }
+      // For numeric values, keep as is (will be parsed as float later)
+    }
+
     setGradeForm((prev) => ({
       ...prev,
       [columnName]: {
         ...prev[columnName],
-        Diem: value,
+        Diem: normalizedValue,
       },
     }));
   };
 
   const handleSaveGrade = async () => {
     try {
+      // Validate grade values before saving
+      for (const [columnName, columnData] of Object.entries(gradeForm)) {
+        const gradeValue = columnData?.Diem;
+
+        if (
+          gradeValue !== "" &&
+          gradeValue !== null &&
+          gradeValue !== undefined
+        ) {
+          const valueStr = String(gradeValue).trim().toUpperCase();
+
+          // Check if it's a letter grade
+          const isLetterGrade =
+            valueStr === "Đ" ||
+            valueStr === "D" ||
+            valueStr === "KĐ" ||
+            valueStr === "KD" ||
+            valueStr === "DAT" ||
+            valueStr === "ĐẠT" ||
+            valueStr === "KHONG_DAT" ||
+            valueStr === "KHONGDAT" ||
+            valueStr === "KHÔNG_ĐẠT" ||
+            valueStr === "KHÔNG ĐẠT";
+
+          // If not a letter grade, validate as number
+          if (!isLetterGrade) {
+            const numValue = parseFloat(gradeValue);
+            if (isNaN(numValue) || numValue < 0 || numValue > 10) {
+              alert(
+                `Điểm ${columnName} không hợp lệ! Phải là số (0-10) hoặc Đ/KĐ`
+              );
+              return;
+            }
+          }
+        }
+      }
+
       const gradeData = {
         student_id: editingStudent.student.id,
         class_subject_id: selectedClassSubject.id,
@@ -299,12 +449,13 @@ const GradeManagement = () => {
     let totalScore = 0;
     let totalWeight = 0;
 
-    Object.keys(gradeConfig.grade_column_config).forEach((columnName) => {
-      if (gradeData[columnName]?.Diem) {
-        const score = parseFloat(gradeData[columnName].Diem);
-        const weight = parseFloat(
-          gradeConfig.grade_column_config[columnName].he_so
-        );
+    // Use flattened columns to calculate (includes all child columns)
+    const flatColumns = flattenGradeColumns(gradeConfig.grade_column_config);
+
+    flatColumns.forEach((column) => {
+      if (gradeData[column.key]?.Diem) {
+        const score = parseFloat(gradeData[column.key].Diem);
+        const weight = parseFloat(column.he_so);
 
         totalScore += score * weight;
         totalWeight += weight;
@@ -482,14 +633,14 @@ const GradeManagement = () => {
           return;
         }
 
-        // Kiểm tra cột bắt buộc
-        const requiredColumns = [
-          "id",
-          "ho_va_ten",
-          "diem_thuong_xuyen",
-          "diem_thi_giua_ki",
-          "diem_thi_cuoi_ki",
-        ];
+        // Get all expected columns from gradeConfig (flattened)
+        const flatColumns = flattenGradeColumns(
+          gradeConfig?.grade_column_config || {}
+        );
+        const expectedColumnKeys = flatColumns.map((col) => col.key);
+
+        // Required columns
+        const requiredColumns = ["id", "ho_va_ten", ...expectedColumnKeys];
         const firstRow = jsonData[0];
         const missingColumns = requiredColumns.filter(
           (col) => !(col in firstRow)
@@ -514,51 +665,84 @@ const GradeManagement = () => {
             return;
           }
 
-          // Validate điểm số
-          const scores = {
-            diem_thuong_xuyen: row.diem_thuong_xuyen,
-            diem_thi_giua_ki: row.diem_thi_giua_ki,
-            diem_thi_cuoi_ki: row.diem_thi_cuoi_ki,
-          };
+          // Validate điểm số for all columns
+          const scores = {};
+          expectedColumnKeys.forEach((key) => {
+            scores[key] = row[key];
+          });
 
           let hasInvalidScore = false;
           Object.entries(scores).forEach(([key, value]) => {
             if (value !== "" && value !== null && value !== undefined) {
-              const score = parseFloat(value);
-              if (isNaN(score) || score < 0 || score > 10) {
-                errors.push(
-                  `Dòng ${rowNum} - ${
-                    row.ho_va_ten || row.id
-                  }: Điểm ${key} không hợp lệ (${value}). Điểm phải từ 0-10.`
-                );
-                hasInvalidScore = true;
+              const valueStr = String(value).trim().toUpperCase();
+
+              // Check if it's a letter grade (Đ or KĐ)
+              const isLetterGrade =
+                valueStr === "Đ" ||
+                valueStr === "D" ||
+                valueStr === "KĐ" ||
+                valueStr === "KD" ||
+                valueStr === "DAT" ||
+                valueStr === "ĐẠT" ||
+                valueStr === "KHONG_DAT" ||
+                valueStr === "KHÔNG_ĐẠT" ||
+                valueStr === "KHONGDAT" ||
+                valueStr === "KHÔNG ĐẠT";
+
+              // If it's not a letter grade, validate as number
+              if (!isLetterGrade) {
+                const score = parseFloat(value);
+                if (isNaN(score) || score < 0 || score > 10) {
+                  errors.push(
+                    `Dòng ${rowNum} - ${
+                      row.ho_va_ten || row.id
+                    }: Điểm ${key} không hợp lệ (${value}). Điểm phải từ 0-10 hoặc Đ/KĐ.`
+                  );
+                  hasInvalidScore = true;
+                }
               }
             }
           });
 
           if (!hasInvalidScore) {
-            validData.push({
+            const gradeData = {
               student_id: row.id,
               ho_va_ten: row.ho_va_ten,
-              diem_thuong_xuyen:
-                scores.diem_thuong_xuyen === "" ||
-                scores.diem_thuong_xuyen === null ||
-                scores.diem_thuong_xuyen === undefined
-                  ? null
-                  : parseFloat(scores.diem_thuong_xuyen),
-              diem_thi_giua_ki:
-                scores.diem_thi_giua_ki === "" ||
-                scores.diem_thi_giua_ki === null ||
-                scores.diem_thi_giua_ki === undefined
-                  ? null
-                  : parseFloat(scores.diem_thi_giua_ki),
-              diem_thi_cuoi_ki:
-                scores.diem_thi_cuoi_ki === "" ||
-                scores.diem_thi_cuoi_ki === null ||
-                scores.diem_thi_cuoi_ki === undefined
-                  ? null
-                  : parseFloat(scores.diem_thi_cuoi_ki),
+            };
+
+            // Add all grade columns (support both numbers and letter grades)
+            expectedColumnKeys.forEach((key) => {
+              const value = scores[key];
+              if (value === "" || value === null || value === undefined) {
+                gradeData[key] = null;
+              } else {
+                const valueStr = String(value).trim().toUpperCase();
+
+                // Normalize letter grades
+                if (
+                  valueStr === "Đ" ||
+                  valueStr === "D" ||
+                  valueStr === "DAT" ||
+                  valueStr === "ĐẠT"
+                ) {
+                  gradeData[key] = "Đ";
+                } else if (
+                  valueStr === "KĐ" ||
+                  valueStr === "KD" ||
+                  valueStr === "KHONG_DAT" ||
+                  valueStr === "KHÔNG_ĐẠT" ||
+                  valueStr === "KHONGDAT" ||
+                  valueStr === "KHÔNG ĐẠT"
+                ) {
+                  gradeData[key] = "KĐ";
+                } else {
+                  // Parse as number
+                  gradeData[key] = parseFloat(value);
+                }
+              }
             });
+
+            validData.push(gradeData);
           }
         });
 
@@ -643,20 +827,42 @@ const GradeManagement = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Bảng điểm");
 
-      // Prepare grade columns
-      const gradeColumns = Object.keys(gradeConfig.grade_column_config).sort();
+      // Get display columns (with hierarchy)
+      const displayColumns = getDisplayColumns(
+        gradeConfig?.grade_column_config || {}
+      );
+
+      // Calculate total grade columns (flatten nested)
+      let totalGradeColumns = 0;
+      displayColumns.forEach((col) => {
+        if (col.hasChildren) {
+          totalGradeColumns += col.children.length;
+        } else {
+          totalGradeColumns += 1;
+        }
+      });
 
       // Calculate total columns: STT + Mã HS + Họ tên + grade columns + Điểm TB
-      const totalColumns = 3 + gradeColumns.length + 1;
+      const totalColumns = 3 + totalGradeColumns + 1;
 
-      // Set column widths - thu nhỏ các cột điểm và mã HS
-      worksheet.columns = [
+      // Set column widths
+      const columnWidths = [
         { width: 6 }, // STT
-        { width: 10 }, // Mã HS - thu nhỏ từ 12 -> 10
+        { width: 10 }, // Mã HS
         { width: 25 }, // Họ tên
-        ...gradeColumns.map(() => ({ width: 12 })), // Grade columns - thu nhỏ từ 15 -> 12
-        { width: 10 }, // Điểm TB - thu nhỏ từ 12 -> 10
       ];
+
+      // Add widths for grade columns
+      displayColumns.forEach((col) => {
+        if (col.hasChildren) {
+          col.children.forEach(() => columnWidths.push({ width: 10 }));
+        } else {
+          columnWidths.push({ width: 12 });
+        }
+      });
+
+      columnWidths.push({ width: 10 }); // Điểm TB
+      worksheet.columns = columnWidths;
 
       let currentRow = 1;
 
@@ -697,35 +903,110 @@ const GradeManagement = () => {
 
       currentRow++; // Skip a row
 
-      // Table headers
-      const headerRow = worksheet.getRow(currentRow);
-      const headers = [
-        "STT",
-        "Mã HS",
-        "Họ và tên",
-        ...gradeColumns.map(
-          (col) => `${gradeConfig.grade_column_config[col].label}`
-        ),
-        "Điểm TB",
-      ];
+      // Table headers - Row 1 (Parent columns)
+      const headerRow1 = worksheet.getRow(currentRow);
+      let colIndex = 1;
 
-      headerRow.values = headers;
-      headerRow.height = 35;
-      headerRow.font = { bold: true, size: 11 };
-      headerRow.alignment = {
+      // STT, Mã HS, Họ tên - rowspan 2
+      const fixedHeaders = ["STT", "Mã HS", "Họ và tên"];
+      fixedHeaders.forEach((header) => {
+        const cell = worksheet.getCell(currentRow, colIndex);
+        cell.value = header;
+        worksheet.mergeCells(currentRow, colIndex, currentRow + 1, colIndex);
+        colIndex++;
+      });
+
+      // Grade columns
+      displayColumns.forEach((col) => {
+        if (col.hasChildren) {
+          // Parent column - merge across children
+          const startCol = colIndex;
+          const endCol = colIndex + col.children.length - 1;
+          worksheet.mergeCells(currentRow, startCol, currentRow, endCol);
+          const cell = worksheet.getCell(currentRow, startCol);
+          cell.value = col.label;
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFDAE3F3" }, // Light blue for parent
+          };
+          colIndex += col.children.length;
+        } else {
+          // Regular column - rowspan 2
+          const cell = worksheet.getCell(currentRow, colIndex);
+          cell.value = col.label;
+          worksheet.mergeCells(currentRow, colIndex, currentRow + 1, colIndex);
+          colIndex++;
+        }
+      });
+
+      // Điểm TB - rowspan 2
+      const tbCell = worksheet.getCell(currentRow, colIndex);
+      tbCell.value = "Điểm TB";
+      worksheet.mergeCells(currentRow, colIndex, currentRow + 1, colIndex);
+
+      // Style header row 1
+      headerRow1.height = 25;
+      headerRow1.font = { bold: true, size: 11 };
+      headerRow1.alignment = {
         horizontal: "center",
         vertical: "middle",
         wrapText: true,
       };
-      headerRow.fill = {
+      headerRow1.fill = {
         type: "pattern",
         pattern: "solid",
         fgColor: { argb: "FFD9E1F2" },
       };
 
-      // Apply borders to header
+      // Apply borders to header row 1
       for (let col = 1; col <= totalColumns; col++) {
         const cell = worksheet.getCell(currentRow, col);
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      }
+      currentRow++;
+
+      // Table headers - Row 2 (Child columns)
+      const headerRow2 = worksheet.getRow(currentRow);
+      colIndex = 4; // Start after STT, Mã HS, Họ tên
+
+      displayColumns.forEach((col) => {
+        if (col.hasChildren) {
+          // Render child column headers
+          col.children.forEach((child) => {
+            const cell = worksheet.getCell(currentRow, colIndex);
+            cell.value = child.label;
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FFDAE3F3" },
+            };
+            colIndex++;
+          });
+        } else {
+          // Regular columns already merged, skip
+          colIndex++;
+        }
+      });
+
+      // Style header row 2
+      headerRow2.height = 25;
+      headerRow2.font = { bold: true, size: 10 };
+      headerRow2.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+
+      // Apply borders to header row 2
+      for (let col = 1; col <= totalColumns; col++) {
+        const cell = worksheet.getCell(currentRow, col);
+        if (!cell.value) continue; // Skip merged cells
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -747,19 +1028,28 @@ const GradeManagement = () => {
           student?.full_name || "",
         ];
 
-        // Add grade columns
-        gradeColumns.forEach((col) => {
-          const gradeValue = grade?.grade_data?.[col]?.Diem;
-          rowValues.push(
-            gradeValue !== undefined && gradeValue !== null ? gradeValue : ""
-          );
+        // Add grade columns (flattened)
+        displayColumns.forEach((col) => {
+          if (col.hasChildren) {
+            col.children.forEach((child) => {
+              const gradeValue = grade?.grade_data?.[child.key]?.Diem;
+              rowValues.push(
+                gradeValue !== undefined && gradeValue !== null
+                  ? gradeValue
+                  : ""
+              );
+            });
+          } else {
+            const gradeValue = grade?.grade_data?.[col.key]?.Diem;
+            rowValues.push(
+              gradeValue !== undefined && gradeValue !== null ? gradeValue : ""
+            );
+          }
         });
 
         // Add final grade
         rowValues.push(
-          grade?.final_grade !== undefined && grade?.final_grade !== null
-            ? grade.final_grade
-            : ""
+          grade?.grade_data ? calculateFinalGrade(grade.grade_data) : ""
         );
 
         dataRow.values = rowValues;
@@ -1049,13 +1339,16 @@ const GradeManagement = () => {
                       </div>
                     </div>
 
-                    <Button
-                      onClick={handleShowConfigEditor}
-                      className="flex items-center space-x-2"
-                    >
-                      <Settings className="w-4 h-4" />
-                      <span>Cấu hình cột điểm</span>
-                    </Button>
+                    {/* Hidden: Cấu hình cột điểm - now managed in Admin panel */}
+                    {false && (
+                      <Button
+                        onClick={handleShowConfigEditor}
+                        className="flex items-center space-x-2"
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>Cấu hình cột điểm</span>
+                      </Button>
+                    )}
                   </div>
 
                   {/* Import/Export Buttons */}
@@ -1386,46 +1679,97 @@ const GradeManagement = () => {
                 <div className="overflow-x-auto">
                   <table className="min-w-full">
                     <thead>
+                      {/* First header row: Parent columns */}
                       <tr className="bg-gray-50">
-                        <th className="px-5 py-3 text-left">
+                        <th
+                          className="px-5 py-3 text-left border-b-2 border-gray-300"
+                          rowSpan="2"
+                        >
                           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
                             <User className="w-4 h-4" />
                             <span>Học sinh</span>
                           </span>
                         </th>
-                        {getSortedColumnNames(
-                          gradeConfig.grade_column_config
-                        ).map((columnName) => (
-                          <th key={columnName} className="px-5 py-3 text-left">
-                            <div className="text-xs font-semibold tracking-wider text-gray-600 uppercase">
-                              <div>
-                                {
-                                  gradeConfig.grade_column_config[columnName]
-                                    .label
-                                }
-                              </div>
-                              <div className="text-xs text-blue-600 normal-case font-normal mt-0.5">
-                                Hệ số:{" "}
-                                {
-                                  gradeConfig.grade_column_config[columnName]
-                                    .he_so
-                                }
-                              </div>
-                            </div>
-                          </th>
-                        ))}
-                        <th className="px-5 py-3 text-left">
+                        {getDisplayColumns(
+                          gradeConfig?.grade_column_config || {}
+                        ).map((column) => {
+                          if (column.hasChildren) {
+                            // Parent column with children - use colspan
+                            return (
+                              <th
+                                key={column.key}
+                                colSpan={column.children.length}
+                                className="px-3 py-3 text-center border-b-2 border-gray-300 border-x bg-blue-50"
+                              >
+                                <div className="text-xs font-semibold tracking-wider text-blue-700 uppercase">
+                                  {column.label}
+                                </div>
+                                <div className="text-xs text-blue-600 normal-case font-normal mt-0.5">
+                                  {column.children.length} điểm
+                                </div>
+                              </th>
+                            );
+                          } else {
+                            // Regular column without children - use rowspan
+                            return (
+                              <th
+                                key={column.key}
+                                rowSpan="2"
+                                className="px-5 py-3 text-center border-b-2 border-gray-300"
+                              >
+                                <div className="text-xs font-semibold tracking-wider text-gray-600 uppercase">
+                                  {column.label}
+                                </div>
+                                <div className="text-xs text-blue-600 normal-case font-normal mt-0.5">
+                                  Hệ số: {column.he_so}
+                                </div>
+                              </th>
+                            );
+                          }
+                        })}
+                        <th
+                          className="px-5 py-3 text-left border-b-2 border-gray-300"
+                          rowSpan="2"
+                        >
                           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
                             <Star className="w-4 h-4" />
                             <span>Điểm TB</span>
                           </span>
                         </th>
-                        <th className="px-5 py-3 text-left">
+                        <th
+                          className="px-5 py-3 text-left border-b-2 border-gray-300"
+                          rowSpan="2"
+                        >
                           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
                             <Zap className="w-4 h-4" />
                             <span>Thao tác</span>
                           </span>
                         </th>
+                      </tr>
+                      {/* Second header row: Child columns */}
+                      <tr className="bg-gray-50">
+                        {getDisplayColumns(
+                          gradeConfig?.grade_column_config || {}
+                        ).map((column) => {
+                          if (column.hasChildren) {
+                            // Render child column headers
+                            return column.children.map((child) => (
+                              <th
+                                key={child.key}
+                                className="px-3 py-2 text-center border-gray-200 border-x bg-blue-50"
+                              >
+                                <div className="text-xs font-medium text-gray-700">
+                                  {child.label}
+                                </div>
+                                <div className="text-xs text-blue-500 normal-case font-normal mt-0.5">
+                                  Hệ số: {child.he_so}
+                                </div>
+                              </th>
+                            ));
+                          }
+                          // Regular columns already span 2 rows, no header needed here
+                          return null;
+                        })}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1459,27 +1803,57 @@ const GradeManagement = () => {
                                 </div>
                               </div>
                             </td>
-                            {getSortedColumnNames(
-                              gradeConfig.grade_column_config
-                            ).map((columnName) => (
-                              <td key={columnName} className="px-5 py-3">
-                                <span className="text-sm font-medium text-gray-900">
-                                  {studentData.grade?.grade_data?.[columnName]
-                                    ?.Diem ? (
-                                    <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
-                                      {
-                                        studentData.grade.grade_data[columnName]
-                                          .Diem
-                                      }
-                                    </span>
-                                  ) : (
-                                    <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm">
-                                      -
-                                    </span>
-                                  )}
-                                </span>
-                              </td>
-                            ))}
+                            {getDisplayColumns(
+                              gradeConfig?.grade_column_config || {}
+                            ).map((column) => {
+                              if (column.hasChildren) {
+                                // Render cells for all child columns
+                                return column.children.map((child) => (
+                                  <td
+                                    key={child.key}
+                                    className="px-3 py-3 text-center"
+                                  >
+                                    {studentData.grade?.grade_data?.[child.key]
+                                      ?.Diem ? (
+                                      <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
+                                        {
+                                          studentData.grade.grade_data[
+                                            child.key
+                                          ].Diem
+                                        }
+                                      </span>
+                                    ) : (
+                                      <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm">
+                                        -
+                                      </span>
+                                    )}
+                                  </td>
+                                ));
+                              } else {
+                                // Regular column cell
+                                return (
+                                  <td
+                                    key={column.key}
+                                    className="px-5 py-3 text-center"
+                                  >
+                                    {studentData.grade?.grade_data?.[column.key]
+                                      ?.Diem ? (
+                                      <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
+                                        {
+                                          studentData.grade.grade_data[
+                                            column.key
+                                          ].Diem
+                                        }
+                                      </span>
+                                    ) : (
+                                      <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm">
+                                        -
+                                      </span>
+                                    )}
+                                  </td>
+                                );
+                              }
+                            })}
                             <td className="px-5 py-3">
                               {studentData.grade?.grade_data ? (
                                 <span className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-bold">
@@ -1654,37 +2028,96 @@ const GradeManagement = () => {
             </DialogHeader>
 
             <div className="space-y-4">
-              {editingStudent &&
-                gradeConfig &&
-                getSortedColumnNames(gradeConfig.grade_column_config).map(
-                  (columnName) => (
-                    <div key={columnName} className="p-4 rounded-lg bg-muted">
-                      <Label className="block mb-2 text-sm font-medium">
-                        <span className="flex items-center justify-between">
-                          <span>
-                            {gradeConfig.grade_column_config[columnName].label}
-                          </span>
-                          <Badge variant="secondary" className="text-xs">
-                            Hệ số:{" "}
-                            {gradeConfig.grade_column_config[columnName].he_so}
-                          </Badge>
-                        </span>
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.1"
-                        value={gradeForm[columnName]?.Diem || ""}
-                        onChange={(e) =>
-                          handleGradeInputChange(columnName, e.target.value)
-                        }
-                        className="text-lg font-semibold text-center"
-                        placeholder="0.0"
-                      />
-                    </div>
-                  )
-                )}
+              {editingStudent && gradeConfig && (
+                <>
+                  {getDisplayColumns(gradeConfig.grade_column_config).map(
+                    (column) => {
+                      if (column.hasChildren) {
+                        // Parent column with children - show grouped inputs
+                        return (
+                          <div
+                            key={column.key}
+                            className="p-4 border rounded-lg bg-blue-50"
+                          >
+                            <div className="mb-3 text-sm font-semibold text-blue-900">
+                              {column.label}
+                            </div>
+                            <div className="space-y-3">
+                              {column.children.map((child) => (
+                                <div
+                                  key={child.key}
+                                  className="flex items-center space-x-3"
+                                >
+                                  <Label className="w-32 text-sm font-medium text-gray-700">
+                                    {child.label}
+                                  </Label>
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    Hệ số: {child.he_so}
+                                  </Badge>
+                                  <Input
+                                    type="text"
+                                    placeholder="-"
+                                    value={gradeForm[child.key]?.Diem || ""}
+                                    onChange={(e) =>
+                                      handleGradeInputChange(
+                                        child.key,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="flex-1 text-lg font-semibold text-center"
+                                  />
+                                  <div className="text-xs text-gray-500 min-w-16">
+                                    <div>Số: 0-10</div>
+                                    <div>Chữ: Đ/KĐ</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        // Regular column without children
+                        return (
+                          <div
+                            key={column.key}
+                            className="p-4 rounded-lg bg-muted"
+                          >
+                            <Label className="block mb-2 text-sm font-medium">
+                              <span className="flex items-center justify-between">
+                                <span>{column.label}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  Hệ số: {column.he_so}
+                                </Badge>
+                              </span>
+                            </Label>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                type="text"
+                                placeholder="0.0, Đ, hoặc KĐ"
+                                value={gradeForm[column.key]?.Diem || ""}
+                                onChange={(e) =>
+                                  handleGradeInputChange(
+                                    column.key,
+                                    e.target.value
+                                  )
+                                }
+                                className="flex-1 text-lg font-semibold text-center"
+                              />
+                              <div className="text-xs text-gray-500 min-w-16">
+                                <div>Số: 0-10</div>
+                                <div>Chữ: Đ/KĐ</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                    }
+                  )}
+                </>
+              )}
             </div>
 
             <DialogFooter>
@@ -1737,9 +2170,14 @@ const GradeManagement = () => {
                       <TableHead>STT</TableHead>
                       <TableHead>Mã HS</TableHead>
                       <TableHead>Họ và tên</TableHead>
-                      <TableHead className="text-center">Điểm TX</TableHead>
-                      <TableHead className="text-center">Điểm GK</TableHead>
-                      <TableHead className="text-center">Điểm CK</TableHead>
+                      {gradeConfig &&
+                        flattenGradeColumns(
+                          gradeConfig.grade_column_config
+                        ).map((column) => (
+                          <TableHead key={column.key} className="text-center">
+                            {column.label}
+                          </TableHead>
+                        ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1750,45 +2188,24 @@ const GradeManagement = () => {
                           {row.student_id}
                         </TableCell>
                         <TableCell>{row.ho_va_ten}</TableCell>
-                        <TableCell className="text-center">
-                          {row.diem_thuong_xuyen !== null &&
-                          row.diem_thuong_xuyen !== undefined ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-green-700 bg-green-100"
-                            >
-                              {row.diem_thuong_xuyen}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {row.diem_thi_giua_ki !== null &&
-                          row.diem_thi_giua_ki !== undefined ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-blue-700 bg-blue-100"
-                            >
-                              {row.diem_thi_giua_ki}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {row.diem_thi_cuoi_ki !== null &&
-                          row.diem_thi_cuoi_ki !== undefined ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-purple-700 bg-purple-100"
-                            >
-                              {row.diem_thi_cuoi_ki}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
+                        {gradeConfig &&
+                          flattenGradeColumns(
+                            gradeConfig.grade_column_config
+                          ).map((column) => (
+                            <TableCell key={column.key} className="text-center">
+                              {row[column.key] !== null &&
+                              row[column.key] !== undefined ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-green-700 bg-green-100"
+                                >
+                                  {row[column.key]}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                          ))}
                       </TableRow>
                     ))}
                   </TableBody>

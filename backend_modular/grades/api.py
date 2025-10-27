@@ -1623,7 +1623,7 @@ async def download_grade_template(
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
-    """Download template Excel để nhập điểm hàng loạt"""
+    """Download template Excel để nhập điểm hàng loạt - supports nested columns"""
     try:
         import xlsxwriter
         import io
@@ -1644,12 +1644,67 @@ async def download_grade_template(
         
         class_subject_info = class_subject.data[0]
         class_info = class_subject_info["classes"]
+        subject_info = class_subject_info["subjects"]
+        
+        # Get grade_settings for this subject
+        grade_settings_response = db.table("grade_settings").select("*").eq(
+            "subject_id", subject_info["id"]
+        ).eq("is_active", True).execute()
+        
+        # Helper function to flatten nested columns with proper ordering
+        def flatten_grade_columns(grade_column_config):
+            """Extract all column keys (child columns from nested structure) in correct order"""
+            if not grade_column_config:
+                return []
+            
+            # Define priority order for sorting
+            priority_order = {
+                'Diem_thuong_xuyen': 1,
+                'diem_thuong_xuyen': 1,
+                'diem_tx': 1,
+                'Diem_thi_giua_ki': 2,
+                'diem_thi_giua_ki': 2,
+                'diem_gk': 2,
+                'Diem_thi_cuoi_ki': 3,
+                'diem_thi_cuoi_ki': 3,
+                'diem_ck': 3,
+            }
+            
+            # Sort parent columns first
+            sorted_columns = sorted(
+                grade_column_config.items(),
+                key=lambda x: priority_order.get(x[0], 999)
+            )
+            
+            # Flatten while maintaining order
+            flat_columns = []
+            for column_name, column_config in sorted_columns:
+                # Check if column has nested data (children)
+                if isinstance(column_config, dict) and 'data' in column_config:
+                    # Add all child column keys in order
+                    child_items = list(column_config['data'].items())
+                    # Sort children if they have numeric suffixes (tx1, tx2, tx3, tx4)
+                    child_items.sort(key=lambda x: x[0])
+                    for child_key, _ in child_items:
+                        flat_columns.append(child_key)
+                else:
+                    # Regular column without children
+                    flat_columns.append(column_name)
+            
+            return flat_columns
+        
+        # Determine column headers
+        if grade_settings_response.data:
+            grade_config = grade_settings_response.data[0].get("grade_column_config", {})
+            grade_columns = flatten_grade_columns(grade_config)
+        else:
+            # Fallback to default columns if no grade_settings
+            grade_columns = ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
         
         # Lấy danh sách học sinh (bao gồm subject_selected)
         students = db.table("students").select("*").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).order("student_id").execute()
         
-        # Filter học sinh theo subject_selected (giống như endpoint get_students_by_class_subject)
-        subject_info = class_subject_info["subjects"]
+        # Filter học sinh theo subject_selected
         filtered_students = []
         if students.data and subject_info:
             subject_code = subject_info.get("subject_code")
@@ -1689,8 +1744,8 @@ async def download_grade_template(
             'bg_color': 'white'
         })
         
-        # Header
-        headers = ['id', 'ho_va_ten', 'diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
+        # Header - Dynamic based on grade_settings
+        headers = ['id', 'ho_va_ten'] + grade_columns
         for col, header in enumerate(headers):
             worksheet.write(0, col, header, header_format)
         
@@ -1698,20 +1753,23 @@ async def download_grade_template(
         for row, student in enumerate(filtered_students, start=1):
             worksheet.write(row, 0, student['student_id'], cell_format)
             worksheet.write(row, 1, student['full_name'], cell_format)
-            worksheet.write(row, 2, '', cell_format)  # Điểm thường xuyên
-            worksheet.write(row, 3, '', cell_format)  # Điểm giữa kỳ
-            worksheet.write(row, 4, '', cell_format)  # Điểm cuối kỳ
+            # Empty cells for all grade columns
+            for col_idx in range(len(grade_columns)):
+                worksheet.write(row, col_idx + 2, '', cell_format)
         
         # Điều chỉnh độ rộng cột
         worksheet.set_column('A:A', 12)  # id
         worksheet.set_column('B:B', 25)  # họ và tên
-        worksheet.set_column('C:E', 20)  # các cột điểm
+        # Set width for all grade columns dynamically
+        if grade_columns:
+            last_col_letter = chr(ord('C') + len(grade_columns) - 1)
+            worksheet.set_column(f'C:{last_col_letter}', 15)
         
         workbook.close()
         output.seek(0)
         
         # Tên file
-        filename = f"Template_Diem_{class_info['class_name']}_{class_subject_info['subjects']['subject_name']}_{len(filtered_students)}HS.xlsx"
+        filename = f"Template_Diem_{class_info['class_name']}_{subject_info['subject_name']}_{len(filtered_students)}HS.xlsx"
         
         return StreamingResponse(
             output,
@@ -1777,6 +1835,55 @@ async def bulk_import_grades(
         imported_count = 0
         errors = []
         
+        # Helper function to normalize grade values (support both numbers and letter grades)
+        def normalize_grade_value(value):
+            """
+            Convert raw value to either float (numeric grade) or string (letter grade: Đ/KĐ)
+            Returns: (normalized_value, is_valid)
+            """
+            if value is None or value == '':
+                return None, True
+            
+            # Convert to string and normalize
+            value_str = str(value).strip().upper()
+            
+            # Check for letter grades (Đ - Pass)
+            if value_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
+                return 'Đ', True
+            
+            # Check for letter grades (KĐ - Not Pass)
+            if value_str in ['KĐ', 'KD', 'KHONG_DAT', 'KHÔNG_ĐẠT', 'KHONGDAT', 'KHÔNG ĐẠT']:
+                return 'KĐ', True
+            
+            # Try to parse as number
+            try:
+                numeric_value = float(value)
+                if 0 <= numeric_value <= 10:
+                    return numeric_value, True
+                else:
+                    return None, False
+            except (ValueError, TypeError):
+                return None, False
+        
+        # Build column mapping from grade_column_config (dynamic)
+        def get_column_mapping(grade_column_config):
+            """Generate mapping from import column names to grade_column_config structure"""
+            mapping = {}
+            
+            # Flatten the grade_column_config to get all column names
+            for column_name, column_config in grade_column_config.items():
+                if isinstance(column_config, dict) and 'data' in column_config:
+                    # Parent column with children
+                    for child_key in column_config['data'].keys():
+                        mapping[child_key] = (column_name, child_key)
+                else:
+                    # Regular column
+                    mapping[column_name] = (None, column_name)
+            
+            return mapping
+        
+        column_mapping = get_column_mapping(grade_column_config)
+        
         for grade_record in grades_data:
             try:
                 student_id = grade_record.get("student_id")
@@ -1795,20 +1902,42 @@ async def bulk_import_grades(
                 # Transform data từ flat structure thành nested structure với He_so
                 grade_data = {}
                 
-                # Map các cột từ import vào grade_column_config
-                column_mapping = {
-                    'diem_thuong_xuyen': 'Diem_thuong_xuyen',
-                    'diem_thi_giua_ki': 'Diem_thi_giua_ki',
-                    'diem_thi_cuoi_ki': 'Diem_thi_cuoi_ki'
-                }
-                
-                for import_col, config_col in column_mapping.items():
-                    if config_col in grade_column_config:
-                        score = grade_record.get(import_col)
-                        if score is not None and score != '':
-                            grade_data[config_col] = {
-                                'He_so': grade_column_config[config_col]['he_so'],
-                                'Diem': float(score)
+                # Process all columns from the import data
+                for import_col_name, import_value in grade_record.items():
+                    if import_col_name in ['student_id', 'ho_va_ten']:
+                        continue  # Skip student info columns
+                    
+                    # Normalize the grade value
+                    normalized_value, is_valid = normalize_grade_value(import_value)
+                    
+                    if not is_valid:
+                        errors.append(
+                            f"Học sinh {student_id}: Điểm {import_col_name} không hợp lệ ({import_value}). "
+                            f"Phải là số (0-10) hoặc Đ/KĐ."
+                        )
+                        continue
+                    
+                    if normalized_value is None:
+                        continue  # Skip empty values
+                    
+                    # Find the config for this column
+                    if import_col_name in column_mapping:
+                        parent_col, child_col = column_mapping[import_col_name]
+                        
+                        if parent_col:
+                            # This is a child column (nested)
+                            if parent_col not in grade_data:
+                                grade_data[parent_col] = {}
+                            
+                            grade_data[parent_col][child_col] = {
+                                'He_so': grade_column_config[parent_col]['data'][child_col].get('he_so', 1),
+                                'Diem': normalized_value
+                            }
+                        else:
+                            # This is a regular column
+                            grade_data[import_col_name] = {
+                                'He_so': grade_column_config[import_col_name].get('he_so', 1),
+                                'Diem': normalized_value
                             }
                 
                 # Tính final grade với transformed data
