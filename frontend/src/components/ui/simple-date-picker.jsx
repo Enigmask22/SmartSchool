@@ -40,6 +40,13 @@ export function SimpleDatePicker({
     return selectedDate || new Date();
   });
 
+  // Generate year range (from 1950 to current year + 10)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from(
+    { length: currentYear - 1950 + 11 },
+    (_, i) => 1950 + i
+  );
+
   const formatDate = (date) => {
     if (!date) return "";
     const day = String(date.getDate()).padStart(2, "0");
@@ -75,6 +82,16 @@ export function SimpleDatePicker({
 
   const handleNextMonth = () => {
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+  };
+
+  const handleMonthChange = (e) => {
+    const newMonth = parseInt(e.target.value);
+    setViewDate(new Date(viewDate.getFullYear(), newMonth, 1));
+  };
+
+  const handleYearChange = (e) => {
+    const newYear = parseInt(e.target.value);
+    setViewDate(new Date(newYear, viewDate.getMonth(), 1));
   };
 
   const handleToday = () => {
@@ -161,25 +178,49 @@ export function SimpleDatePicker({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <div className="p-3 space-y-3">
-          {/* Header with month/year and navigation */}
-          <div className="flex items-center justify-between">
+          {/* Header with month/year selectors and navigation */}
+          <div className="flex items-center justify-between gap-2">
             <Button
               variant="outline"
               size="icon"
-              className="h-7 w-7"
+              className="flex-shrink-0 h-9 w-9"
               onClick={handlePrevMonth}
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
 
-            <div className="text-sm font-medium">
-              {MONTHS[viewDate.getMonth()]} {viewDate.getFullYear()}
+            <div className="flex gap-2 flex-1 min-w-[240px]">
+              {/* Month selector */}
+              <select
+                value={viewDate.getMonth()}
+                onChange={handleMonthChange}
+                className="flex-1 min-w-[140px] h-9 py-1 px-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {MONTHS.map((month, index) => (
+                  <option key={index} value={index}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+
+              {/* Year selector */}
+              <select
+                value={viewDate.getFullYear()}
+                onChange={handleYearChange}
+                className="w-[80px] h-9 py-1 px-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <Button
               variant="outline"
               size="icon"
-              className="h-7 w-7"
+              className="flex-shrink-0 h-9 w-9"
               onClick={handleNextMonth}
             >
               <ChevronRight className="w-4 h-4" />

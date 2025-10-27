@@ -350,7 +350,7 @@ async def update_teacher_profile(
     """Cập nhật thông tin cá nhân của giáo viên (hỗ trợ cả admin)"""
     try:
         # Validate input data
-        allowed_fields = ['full_name', 'email', 'phone']
+        allowed_fields = ['full_name', 'email', 'phone', 'date_of_birth', 'gender']
         update_data = {}
         
         for field in allowed_fields:
@@ -371,7 +371,7 @@ async def update_teacher_profile(
             # Admin: cập nhật trong bảng users (chỉ các cột có tồn tại)
             user_update_data = {}
             for field in allowed_fields:
-                if field in profile_data and field != "phone":  # Bỏ phone vì không có trong users table
+                if field in profile_data and field not in ["phone", "date_of_birth", "gender"]:  # Bỏ các field không có trong users table
                     user_update_data[field] = profile_data[field]
             
             if user_update_data:

@@ -21,6 +21,7 @@ import {
   Settings,
 } from "lucide-react";
 import api from "../services/api";
+import { SimpleDatePicker } from "./ui/simple-date-picker";
 import {
   Card,
   CardContent,
@@ -31,6 +32,13 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import {
   Table,
   TableBody,
@@ -83,6 +91,7 @@ const AdminManagement = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [userSubjects, setUserSubjects] = useState({}); // Map user_id -> [subject_ids] cho import
   const [importLoading, setImportLoading] = useState(false);
 
   // Configuration cho từng tab
@@ -102,13 +111,22 @@ const AdminManagement = () => {
     },
     teachers: {
       title: "Quản lý giáo viên",
-      fields: ["teacher_code", "full_name", "email", "phone"],
+      fields: [
+        "teacher_code",
+        "full_name",
+        "email",
+        "phone",
+        "date_of_birth",
+        "gender",
+      ],
       displayFields: [
         "id",
         "teacher_code",
         "full_name",
         "email",
         "phone",
+        "date_of_birth",
+        "gender",
         "subjects", // Thêm cột môn học
         "is_active",
       ],
@@ -350,10 +368,42 @@ const AdminManagement = () => {
     try {
       // Xử lý đặc biệt cho teachers: tạo teacher + subject_teachers
       if (activeTab === "teachers") {
+        // Lọc chỉ các field được phép create
+        const allowedFields = [
+          "teacher_code",
+          "full_name",
+          "email",
+          "phone",
+          "date_of_birth",
+          "gender",
+          "user_id",
+          "subject_specialization",
+        ];
+        const cleanData = {};
+
+        allowedFields.forEach((field) => {
+          if (
+            field in data &&
+            data[field] !== undefined &&
+            data[field] !== null &&
+            data[field] !== ""
+          ) {
+            cleanData[field] = data[field];
+          }
+        });
+
+        console.log("Clean data to send:", cleanData);
+
+        // Validate required fields
+        if (!cleanData.full_name) {
+          setError("Vui lòng nhập họ tên giáo viên");
+          return;
+        }
+
         // 1. Tạo teacher trước
         const teacherResponse = await api.request(currentConfig.endpoint, {
           method: "POST",
-          body: JSON.stringify(data),
+          body: JSON.stringify(cleanData),
         });
 
         if (!teacherResponse.success) {
@@ -421,14 +471,35 @@ const AdminManagement = () => {
     if (!currentConfig?.endpoint) return;
 
     try {
+      console.log("Updating with id:", id, "data:", data); // DEBUG LOG
+
       // Xử lý đặc biệt cho teachers: update teacher + subject_teachers
       if (activeTab === "teachers") {
+        // Lọc chỉ các field được phép update, loại bỏ các field hệ thống
+        const allowedFields = [
+          "teacher_code",
+          "full_name",
+          "email",
+          "phone",
+          "date_of_birth",
+          "gender",
+          "user_id",
+          "is_active",
+        ];
+        const cleanData = {};
+
+        allowedFields.forEach((field) => {
+          if (field in data) {
+            cleanData[field] = data[field];
+          }
+        });
+
         // 1. Update teacher trước
         const teacherResponse = await api.request(
           `${currentConfig.endpoint}/${id}`,
           {
             method: "PUT",
-            body: JSON.stringify(data),
+            body: JSON.stringify(cleanData),
           }
         );
 
@@ -590,7 +661,10 @@ const AdminManagement = () => {
   };
 
   const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value };
+      return updated;
+    });
 
     // Khi chọn môn học ở tab class_subjects, filter danh sách giáo viên
     // Chỉ hiển thị giáo viên đã được phân công dạy môn học đó
@@ -648,16 +722,58 @@ const AdminManagement = () => {
 
     setImportLoading(true);
     try {
+      // 1. Tạo giáo viên từ users
       const response = await api.request("/admin/teachers/import-from-users", {
         method: "POST",
         body: JSON.stringify(selectedUserIds),
       });
 
       if (response.success) {
+        const createdTeachers = response.data;
+
+        // 2. Tạo subject_teachers cho những giáo viên có môn học được chọn
+        const currentYear = new Date().getFullYear();
+        const academicYear = `${currentYear}-${currentYear + 1}`;
+
+        const subjectTeacherPromises = [];
+
+        createdTeachers.forEach((teacher) => {
+          const subjectIds = userSubjects[teacher.user_id] || [];
+
+          subjectIds.forEach((subjectId) => {
+            subjectTeacherPromises.push(
+              api.request("/admin/subject-teachers", {
+                method: "POST",
+                body: JSON.stringify({
+                  teacher_id: teacher.id,
+                  subject_id: subjectId,
+                  academic_year: academicYear,
+                  is_active: true,
+                }),
+              })
+            );
+          });
+        });
+
+        if (subjectTeacherPromises.length > 0) {
+          await Promise.all(subjectTeacherPromises);
+        }
+
         setShowImportModal(false);
         setSelectedUserIds([]);
+        setUserSubjects({}); // Reset subject selections
         loadData(); // Reload teachers list
-        alert(`Tạo thành công ${response.data.length} giáo viên!`);
+        loadReferenceData(); // Reload để cập nhật teacherSubjects map
+
+        const totalSubjects = Object.values(userSubjects).reduce(
+          (sum, subjects) => sum + subjects.length,
+          0
+        );
+        alert(
+          `Tạo thành công ${createdTeachers.length} giáo viên${
+            totalSubjects > 0 ? ` và phân công ${totalSubjects} môn học!` : "!"
+          }`
+        );
       } else {
         setError(response.message || "Không thể tạo giáo viên");
       }
@@ -684,6 +800,21 @@ const AdminManagement = () => {
     } else {
       setSelectedUserIds(availableUsers.map((user) => user.id));
     }
+  };
+
+  // Handle toggle subject for a user in import modal
+  const handleUserSubjectToggle = (userId, subjectId) => {
+    setUserSubjects((prev) => {
+      const currentSubjects = prev[userId] || [];
+      const newSubjects = currentSubjects.includes(subjectId)
+        ? currentSubjects.filter((id) => id !== subjectId)
+        : [...currentSubjects, subjectId];
+
+      return {
+        ...prev,
+        [userId]: newSubjects,
+      };
+    });
   };
 
   const filteredData = data.filter((item) => {
@@ -741,6 +872,10 @@ const AdminManagement = () => {
                 ? "Giáo viên chủ nhiệm"
                 : field === "phone"
                 ? "Số điện thoại"
+                : field === "date_of_birth"
+                ? "Ngày sinh"
+                : field === "gender"
+                ? "Giới tính"
                 : field === "description"
                 ? "Mô tả"
                 : field === "grade"
@@ -848,6 +983,28 @@ const AdminManagement = () => {
                   </option>
                 ))}
               </select>
+            ) : field === "gender" ? (
+              <Select
+                value={formData[field] || item?.[field] || "Nam"}
+                onValueChange={(value) => handleChange(field, value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Chọn giới tính" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Nam">Nam</SelectItem>
+                  <SelectItem value="Nữ">Nữ</SelectItem>
+                  <SelectItem value="Khác">Khác</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : field === "date_of_birth" ? (
+              <div className="w-full">
+                <SimpleDatePicker
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(date) => handleChange(field, date)}
+                  placeholder="Chọn ngày sinh"
+                />
+              </div>
             ) : field === "user_id" ? (
               <select
                 value={formData[field] || item?.[field] || ""}
@@ -1118,7 +1275,17 @@ const AdminManagement = () => {
                       Import từ Users
                     </Button>
                   )}
-                  <Button onClick={() => setShowAddForm(true)}>
+                  <Button
+                    onClick={() => {
+                      setShowAddForm(true);
+                      // Khởi tạo formData với giá trị mặc định cho teachers
+                      if (activeTab === "teachers") {
+                        setFormData({ gender: "Nam" });
+                      } else {
+                        setFormData({});
+                      }
+                    }}
+                  >
                     <Plus className="w-5 h-5 mr-2" />
                     Thêm mới
                   </Button>
@@ -1239,6 +1406,10 @@ const AdminManagement = () => {
                               ? "TÊN GIÁO VIÊN"
                               : field === "semester"
                               ? "HỌC KỲ"
+                              : field === "date_of_birth"
+                              ? "NGÀY SINH"
+                              : field === "gender"
+                              ? "GIỚI TÍNH"
                               : field.replace(/_/g, " ").toUpperCase()}
                           </TableHead>
                         ))}
@@ -1286,6 +1457,33 @@ const AdminManagement = () => {
                                       );
                                     })()}
                                   </div>
+                                ) : field === "date_of_birth" ? (
+                                  // Hiển thị ngày sinh với format đẹp
+                                  item[field] ? (
+                                    new Date(item[field]).toLocaleDateString(
+                                      "vi-VN"
+                                    )
+                                  ) : (
+                                    "-"
+                                  )
+                                ) : field === "gender" ? (
+                                  // Hiển thị giới tính với màu
+                                  item[field] ? (
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        item[field] === "Nam"
+                                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                                          : item[field] === "Nữ"
+                                          ? "bg-pink-50 text-pink-700 border-pink-200"
+                                          : "bg-gray-50 text-gray-700 border-gray-200"
+                                      }
+                                    >
+                                      {item[field]}
+                                    </Badge>
+                                  ) : (
+                                    "-"
+                                  )
                                 ) : typeof item[field] === "boolean" ? (
                                   item[field] ? (
                                     <Badge
@@ -1356,7 +1554,40 @@ const AdminManagement = () => {
                                       size="sm"
                                       onClick={() => {
                                         setEditingItem(item.id);
-                                        setFormData(item);
+
+                                        // Khởi tạo formData với giá trị mặc định cho teachers
+                                        if (activeTab === "teachers") {
+                                          console.log(
+                                            ">>> EDIT TEACHER CLICKED"
+                                          );
+                                          console.log(
+                                            ">>> Original item:",
+                                            item
+                                          );
+                                          console.log(
+                                            ">>> item.gender:",
+                                            item.gender
+                                          );
+                                          console.log(
+                                            ">>> item.date_of_birth:",
+                                            item.date_of_birth
+                                          );
+
+                                          const initData = {
+                                            ...item,
+                                            gender: item.gender || "Nam",
+                                            date_of_birth:
+                                              item.date_of_birth || "",
+                                          };
+
+                                          console.log(
+                                            ">>> Initialized formData:",
+                                            initData
+                                          );
+                                          setFormData(initData);
+                                        } else {
+                                          setFormData(item);
+                                        }
 
                                         // Auto-filter teachers for class_subjects when editing
                                         if (
@@ -1475,59 +1706,101 @@ const AdminManagement = () => {
 
                     {/* Users List */}
                     <div className="space-y-2">
-                      {availableUsers.map((user) => (
-                        <div
-                          key={user.id}
-                          className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                            selectedUserIds.includes(user.id)
-                              ? "border-green-500 bg-green-50"
-                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                          }`}
-                          onClick={() => handleUserSelect(user.id)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedUserIds.includes(user.id)}
-                                onChange={() => handleUserSelect(user.id)}
-                                className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                              />
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  <h4 className="font-medium text-gray-900">
-                                    {user.full_name}
-                                  </h4>
-                                  <span
-                                    className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                      user.role === "teacher"
-                                        ? "bg-blue-100 text-blue-800"
-                                        : "bg-purple-100 text-purple-800"
-                                    }`}
-                                  >
-                                    {user.role === "teacher"
-                                      ? "Teacher"
-                                      : "Homeroom Teacher"}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-600">
-                                  {user.email}
-                                </p>
-                                {user.username && (
-                                  <p className="text-xs text-gray-500">
-                                    @{user.username}
+                      {availableUsers.map((user) => {
+                        const selectedSubjects = userSubjects[user.id] || [];
+
+                        return (
+                          <div
+                            key={user.id}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                              selectedUserIds.includes(user.id)
+                                ? "border-green-500 bg-green-50"
+                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedUserIds.includes(user.id)}
+                                  onChange={() => handleUserSelect(user.id)}
+                                  className="mt-1 w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                                />
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2">
+                                    <h4 className="font-medium text-gray-900">
+                                      {user.full_name}
+                                    </h4>
+                                    <span
+                                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                        user.role === "teacher"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : "bg-purple-100 text-purple-800"
+                                      }`}
+                                    >
+                                      {user.role === "teacher"
+                                        ? "Teacher"
+                                        : "Homeroom Teacher"}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-600">
+                                    {user.email}
                                   </p>
-                                )}
+                                  {user.username && (
+                                    <p className="text-xs text-gray-500">
+                                      @{user.username}
+                                    </p>
+                                  )}
+
+                                  {/* Subject selection */}
+                                  <div className="mt-3">
+                                    <label className="block mb-2 text-xs font-semibold text-gray-700">
+                                      Chọn môn học (tùy chọn):
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                      {subjects.map((subject) => {
+                                        const isSelected =
+                                          selectedSubjects.includes(subject.id);
+                                        return (
+                                          <button
+                                            key={subject.id}
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleUserSubjectToggle(
+                                                user.id,
+                                                subject.id
+                                              );
+                                            }}
+                                            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                                              isSelected
+                                                ? "bg-blue-600 text-white hover:bg-blue-700"
+                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                            }`}
+                                          >
+                                            {subject.subject_code}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    {selectedSubjects.length > 0 && (
+                                      <p className="mt-2 text-xs text-green-600">
+                                        ✓ Đã chọn {selectedSubjects.length} môn
+                                        học
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right ml-4">
+                                <p className="text-sm font-medium text-gray-900">
+                                  ID: {user.id}
+                                </p>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-gray-900">
-                                ID: {user.id}
-                              </p>
-                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -1535,11 +1808,23 @@ const AdminManagement = () => {
 
               <DialogFooter className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  Đã chọn:{" "}
-                  <span className="font-semibold text-green-600">
-                    {selectedUserIds.length}
-                  </span>{" "}
-                  users
+                  <div>
+                    Đã chọn:{" "}
+                    <span className="font-semibold text-green-600">
+                      {selectedUserIds.length}
+                    </span>{" "}
+                    users
+                  </div>
+                  {Object.keys(userSubjects).length > 0 && (
+                    <div className="mt-1 text-xs text-blue-600">
+                      📚{" "}
+                      {Object.values(userSubjects).reduce(
+                        (sum, subjects) => sum + subjects.length,
+                        0
+                      )}{" "}
+                      môn học được chọn
+                    </div>
+                  )}
                 </div>
                 <div className="flex space-x-3">
                   <Button
@@ -1547,6 +1832,7 @@ const AdminManagement = () => {
                     onClick={() => {
                       setShowImportModal(false);
                       setSelectedUserIds([]);
+                      setUserSubjects({}); // Reset subject selections
                     }}
                   >
                     Hủy

@@ -2,7 +2,7 @@
 Pydantic models cho Admin module
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 
@@ -23,11 +23,13 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 class TeacherCreate(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None
     teacher_code: Optional[str] = None
     full_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
     subject_specialization: Optional[str] = None
 
 class TeacherUpdate(BaseModel):
@@ -35,6 +37,8 @@ class TeacherUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
     subject_specialization: Optional[str] = None
 
 class SubjectCreate(BaseModel):
