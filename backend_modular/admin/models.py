@@ -30,7 +30,6 @@ class TeacherCreate(BaseModel):
     phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     gender: Optional[str] = None
-    subject_specialization: Optional[str] = None
 
 class TeacherUpdate(BaseModel):
     teacher_code: Optional[str] = None
@@ -39,7 +38,6 @@ class TeacherUpdate(BaseModel):
     phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     gender: Optional[str] = None
-    subject_specialization: Optional[str] = None
 
 class SubjectCreate(BaseModel):
     subject_code: str

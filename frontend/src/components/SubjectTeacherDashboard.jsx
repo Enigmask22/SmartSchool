@@ -18,6 +18,7 @@ import {
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import logger from "../utils/logger";
 import {
   Select,
   SelectContent,
@@ -101,7 +102,7 @@ const SubjectTeacherDashboard = () => {
     try {
       setLoadingClasses(true);
       const response = await api.getTeacherClasses(academicYear, semester);
-      console.log("Class list response:", response); // Debug log
+      logger.debug("Class list response:", response); // Debug log
       if (response.success && response.data) {
         // Extract unique classes from class_subjects data
         const classesMap = {};
@@ -133,10 +134,10 @@ const SubjectTeacherDashboard = () => {
         });
 
         setClassList(classList);
-        console.log("Class list set to:", classList); // Debug log
+        logger.debug("Class list set to:", classList); // Debug log
       }
     } catch (error) {
-      console.error("Error fetching class list:", error);
+      logger.error("Error fetching class list:", error);
       setClassList([]); // Set to empty array on error
     } finally {
       setLoadingClasses(false);
@@ -151,14 +152,14 @@ const SubjectTeacherDashboard = () => {
         semester,
         selectedClass
       );
-      console.log("Analytics response:", response); // Debug log
+      logger.debug("Analytics response:", response); // Debug log
       if (response.success) {
         setAnalytics(response.data);
       } else {
-        console.error("Failed to fetch analytics:", response.message);
+        logger.error("Failed to fetch analytics:", response.message);
       }
     } catch (error) {
-      console.error("Error fetching analytics:", error);
+      logger.error("Error fetching analytics:", error);
     } finally {
       setLoading(false);
     }
@@ -323,15 +324,15 @@ const SubjectTeacherDashboard = () => {
                 </div>
               ) : classList && classList.length > 0 ? (
                 <>
-                  {console.log("Rendering classList:", classList)}
+                  {logger.debug("Rendering classList:", classList)}
                   {classList.map((classItem, index) => {
-                    console.log(`ClassItem ${index}:`, classItem);
+                    logger.debug(`ClassItem ${index}:`, classItem);
                     if (
                       !classItem ||
                       !classItem.class_id ||
                       !classItem.class_name
                     ) {
-                      console.warn(`Invalid classItem at ${index}:`, classItem);
+                      logger.warn(`Invalid classItem at ${index}:`, classItem);
                       return null;
                     }
                     return (

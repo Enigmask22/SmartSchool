@@ -145,23 +145,17 @@ class SchoolDatabaseManager:
         try:
             parts = username.split('.')
             
-            logger.debug(f"Parsing username: {username}")
-            logger.debug(f"Parts: {parts}")
-            
             if len(parts) < 3:
-                logger.warning(f"⚠️ Username format không đúng (cần 3 phần): {username}")
-                logger.warning(f"Sử dụng default school: {self._default_school}")
+                logger.warning(f"Username format không đúng (cần 3 phần): {username}, using default: {self._default_school}")
                 return self._default_school
             
             # School key = school_name.province (bỏ phần user_name đầu tiên)
             school_key = '.'.join(parts[1:])
             
-            logger.debug(f"Extracted school_key: {school_key}")
-            
             return school_key
             
         except Exception as e:
-            logger.error(f"❌ Lỗi khi parse username: {str(e)}")
+            logger.error(f"Lỗi khi parse username: {str(e)}")
             return self._default_school
     
     def get_client(self, username: str) -> Client:
@@ -179,15 +173,13 @@ class SchoolDatabaseManager:
         
         # Kiểm tra cache
         if school_key in self._clients:
-            logger.debug(f"Using cached client for: {school_key}")
             return self._clients[school_key]
         
         # Lấy config cho school
         school_config = self._school_configs.get(school_key)
         
         if not school_config:
-            logger.warning(f"⚠️ Không tìm thấy config cho school: {school_key}")
-            logger.warning(f"Available schools: {list(self._school_configs.keys())}")
+            logger.warning(f"Config not found for school: {school_key}, using default: {self._default_school}")
             
             # Fallback to default school
             school_key = self._default_school

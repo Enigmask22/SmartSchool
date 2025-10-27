@@ -67,6 +67,7 @@ import { AuthContext } from "../contexts/AuthContext";
 import { useSystemSettings } from "../contexts/SystemSettingsContext";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
+import logger from "../utils/logger";
 
 // API Configuration
 const API_BASE_URL =
@@ -218,7 +219,7 @@ const StudentList = () => {
       if (isHomeroomTeacher()) {
         // If homeroom teacher but no class selected, don't fetch
         if (!selectedClass) {
-          console.log(
+          logger.debug(
             "🚫 No class selected for homeroom teacher, skipping fetch"
           );
           setStudents([]);
@@ -233,16 +234,16 @@ const StudentList = () => {
         response = await ApiService.getStudents({});
       }
 
-      console.log("Students API response:", response);
+      logger.debug("Students API response:", response);
 
       if (response.success && response.data) {
         setStudents(Array.isArray(response.data) ? response.data : []);
       } else {
-        console.warn("Invalid response structure:", response);
+        logger.warn("Invalid response structure:", response);
         setStudents([]);
       }
     } catch (error) {
-      console.error("Error fetching students:", error);
+      logger.error("Error fetching students:", error);
       setError(
         "Không thể tải danh sách học sinh từ server. Hiển thị dữ liệu mẫu."
       );
@@ -336,7 +337,7 @@ const StudentList = () => {
   // Fetch available classes based on user role
   const fetchAvailableClasses = async () => {
     try {
-      console.log("👤 User role check:", {
+      logger.debug("👤 User role check:", {
         user,
         isHomeroomTeacher: isHomeroomTeacher(),
         userRole: user?.role,
@@ -345,7 +346,7 @@ const StudentList = () => {
       let classesResponse;
 
       if (isHomeroomTeacher()) {
-        console.log("📚 Fetching homeroom classes...");
+        logger.debug("📚 Fetching homeroom classes...");
         // If homeroom teacher, only get their homeroom classes
         classesResponse = await ApiService.getHomeroomClasses();
 
@@ -358,17 +359,17 @@ const StudentList = () => {
                 .filter((name) => name) // Remove null/undefined
             ),
           ].sort();
-          console.log("📚 Setting homeroom classes:", classNames);
+          logger.debug("📚 Setting homeroom classes:", classNames);
           setAvailableClasses(classNames);
         } else {
-          console.warn(
+          logger.warn(
             "📚 Invalid homeroom classes response:",
             classesResponse
           );
           setAvailableClasses([]);
         }
       } else {
-        console.log("📚 Fetching all students to extract classes for admin...");
+        logger.debug("📚 Fetching all students to extract classes for admin...");
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
 
@@ -382,13 +383,13 @@ const StudentList = () => {
             ),
           ].sort();
 
-          console.log(
+          logger.debug(
             "📚 Extracted unique classes from students:",
             uniqueClasses
           );
           setAvailableClasses(uniqueClasses);
         } else {
-          console.warn(
+          logger.warn(
             "📚 Invalid students response for classes:",
             studentsResponse
           );
@@ -396,7 +397,7 @@ const StudentList = () => {
         }
       }
     } catch (error) {
-      console.error("Error fetching available classes:", error);
+      logger.error("Error fetching available classes:", error);
       // Fallback: get unique classes from students data
       const fallbackClasses = Array.isArray(students)
         ? [
@@ -405,7 +406,7 @@ const StudentList = () => {
             ),
           ].sort()
         : [];
-      console.log("📚 Using fallback classes:", fallbackClasses);
+      logger.debug("📚 Using fallback classes:", fallbackClasses);
       setAvailableClasses(fallbackClasses);
     }
   };
@@ -447,7 +448,7 @@ const StudentList = () => {
         }
       }, 100);
     } catch (error) {
-      console.error("Error accessing camera:", error);
+      logger.error("Error accessing camera:", error);
       setCameraError(
         "Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập."
       );
@@ -491,7 +492,7 @@ const StudentList = () => {
       const imageDataUrl = canvas.toDataURL("image/jpeg", 0.8);
       setCapturedImage(imageDataUrl);
     } catch (error) {
-      console.error("Error capturing photo:", error);
+      logger.error("Error capturing photo:", error);
       alert("Có lỗi khi chụp ảnh. Vui lòng thử lại.");
     }
   };
@@ -532,7 +533,7 @@ const StudentList = () => {
         }
       }, 100);
     } catch (error) {
-      console.error("Error restarting camera:", error);
+      logger.error("Error restarting camera:", error);
       setCameraError(
         "Không thể khởi động lại camera. Vui lòng kiểm tra quyền truy cập."
       );
@@ -606,7 +607,7 @@ const StudentList = () => {
         alert(`Lỗi: ${result.message}`);
       }
     } catch (error) {
-      console.error("Error registering face:", error);
+      logger.error("Error registering face:", error);
       alert("Có lỗi xảy ra khi đăng ký khuôn mặt");
     } finally {
       setFaceRegistrationLoading(false);
@@ -734,7 +735,7 @@ const StudentList = () => {
         alert(`Lỗi: ${result.message}`);
       }
     } catch (error) {
-      console.error("Error registering multiple faces:", error);
+      logger.error("Error registering multiple faces:", error);
       alert("Có lỗi xảy ra khi đăng ký nhiều khuôn mặt");
     } finally {
       setFaceRegistrationLoading(false);
@@ -805,7 +806,7 @@ const StudentList = () => {
         setEditForm({});
       } else {
         const errorData = await response.json();
-        console.error("API Error Response:", errorData);
+        logger.error("API Error Response:", errorData);
         throw new Error(
           `Failed to update student: ${response.status} - ${JSON.stringify(
             errorData
@@ -813,7 +814,7 @@ const StudentList = () => {
         );
       }
     } catch (error) {
-      console.error("Error updating student:", error);
+      logger.error("Error updating student:", error);
       alert("Có lỗi xảy ra khi cập nhật thông tin học sinh");
     } finally {
       setEditLoading(false);
@@ -827,7 +828,7 @@ const StudentList = () => {
   };
 
   const handleRestore = async (student) => {
-    console.log("Restore button clicked for student:", student);
+    logger.debug("Restore button clicked for student:", student);
 
     if (
       window.confirm(
@@ -836,7 +837,7 @@ const StudentList = () => {
     ) {
       setRestoreLoading(true);
       try {
-        console.log("Sending restore request for student ID:", student.id);
+        logger.debug("Sending restore request for student ID:", student.id);
         const response = await fetch(`${API_BASE_URL}/students/${student.id}`, {
           method: "PUT",
           headers: {
@@ -847,20 +848,20 @@ const StudentList = () => {
           }),
         });
 
-        console.log("Restore response status:", response.status);
+        logger.debug("Restore response status:", response.status);
 
         if (response.ok) {
           const result = await response.json();
-          console.log("Restore successful:", result);
+          logger.debug("Restore successful:", result);
           alert("Khôi phục học sinh thành công!");
           fetchStudents(); // Refresh danh sách
         } else {
           const errorData = await response.json();
-          console.error("API Error Response:", errorData);
+          logger.error("API Error Response:", errorData);
           alert(`Lỗi khi khôi phục: ${errorData.detail || "Unknown error"}`);
         }
       } catch (error) {
-        console.error("Error restoring student:", error);
+        logger.error("Error restoring student:", error);
         alert("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
       } finally {
         setRestoreLoading(false);
@@ -881,11 +882,11 @@ const StudentList = () => {
       if (response.success) {
         setStudentGrades(response.data?.grades || []);
       } else {
-        console.error("Failed to fetch grades:", response.message);
+        logger.error("Failed to fetch grades:", response.message);
         setStudentGrades([]);
       }
     } catch (error) {
-      console.error("Error fetching student grades:", error);
+      logger.error("Error fetching student grades:", error);
       // Mock data for demonstration
       setStudentGrades([
         {
@@ -935,11 +936,11 @@ const StudentList = () => {
 
     try {
       const token = localStorage.getItem("access_token");
-      console.log("🔑 Token from localStorage:", token ? "Present" : "Missing");
-      console.log("🔑 Token length:", token ? token.length : 0);
+      logger.debug("🔑 Token from localStorage:", token ? "Present" : "Missing");
+      logger.debug("🔑 Token length:", token ? token.length : 0);
 
       const url = `${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`;
-      console.log("🌐 Making request to:", url);
+      logger.debug("🌐 Making request to:", url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -949,14 +950,14 @@ const StudentList = () => {
         },
       });
 
-      console.log("📡 Response status:", response.status);
-      console.log(
+      logger.debug("📡 Response status:", response.status);
+      logger.debug(
         "📡 Response headers:",
         Object.fromEntries(response.headers.entries())
       );
 
       const result = await response.json();
-      console.log("📊 Response data:", result);
+      logger.debug("📊 Response data:", result);
 
       if (result.success && result.data) {
         setGradeTrendData(result.data);
@@ -966,7 +967,7 @@ const StudentList = () => {
         return null;
       }
     } catch (error) {
-      console.error("❌ Error fetching grade trend:", error);
+      logger.error("❌ Error fetching grade trend:", error);
       setTrendError("Lỗi kết nối server khi phân tích xu hướng");
       return null;
     } finally {
@@ -995,17 +996,17 @@ const StudentList = () => {
 
     // Fetch student's average grade and grade trend analysis
     try {
-      console.log("🎯 Fetching grades for feedback form for student:", student);
+      logger.debug("🎯 Fetching grades for feedback form for student:", student);
       const gradesResponse = await ApiService.getStudentGrades(student.id);
-      console.log("📊 Grades response for feedback:", gradesResponse);
+      logger.debug("📊 Grades response for feedback:", gradesResponse);
 
       if (gradesResponse.success && gradesResponse.data) {
         const responseData = gradesResponse.data;
         const grades = responseData.grades; // Access the grades array from the response object
-        console.log("📋 Full response data:", responseData);
-        console.log("📋 Grades array:", grades);
-        console.log("📏 Grades array length:", grades?.length);
-        console.log("🔍 First grade object:", grades?.[0]);
+        logger.debug("📋 Full response data:", responseData);
+        logger.debug("📋 Grades array:", grades);
+        logger.debug("📏 Grades array length:", grades?.length);
+        logger.debug("🔍 First grade object:", grades?.[0]);
 
         if (Array.isArray(grades) && grades.length > 0) {
           // Use final_grade (điểm trung bình môn) instead of individual scores
@@ -1013,7 +1014,7 @@ const StudentList = () => {
             (grade) =>
               grade.final_grade !== null && grade.final_grade !== undefined
           );
-          console.log("✅ Valid grades with final_grade:", validGrades);
+          logger.debug("✅ Valid grades with final_grade:", validGrades);
 
           if (validGrades.length > 0) {
             const avgScore = (
@@ -1022,7 +1023,7 @@ const StudentList = () => {
                 0
               ) / validGrades.length
             ).toFixed(1);
-            console.log("📊 Calculated average score for feedback:", avgScore);
+            logger.debug("📊 Calculated average score for feedback:", avgScore);
 
             initialForm.score = avgScore;
 
@@ -1033,7 +1034,7 @@ const StudentList = () => {
             );
             const highestGrade = sortedGrades[0];
 
-            console.log("🏆 Highest grade subject:", {
+            logger.debug("🏆 Highest grade subject:", {
               subject: highestGrade.subject_name,
               score: highestGrade.final_grade,
               all_grades: sortedGrades.map((g) => ({
@@ -1046,7 +1047,7 @@ const StudentList = () => {
               // Lưu tên môn học có điểm cao nhất vào form
               if (highestGrade.subject_name) {
                 initialForm.subject = highestGrade.subject_name;
-                console.log(
+                logger.debug(
                   "📚 Highest score subject added to form:",
                   highestGrade.subject_name,
                   "with score:",
@@ -1054,12 +1055,12 @@ const StudentList = () => {
                 );
               }
 
-              console.log(
+              logger.debug(
                 "🔍 Fetching grade trend for highest score class_subject_id:",
                 highestGrade.class_subject_id
               );
-              console.log("🔍 Student ID:", student.id);
-              console.log(
+              logger.debug("🔍 Student ID:", student.id);
+              logger.debug(
                 "🔍 API URL will be:",
                 `${API_BASE_URL}/grades/grade-trend/${student.id}/${highestGrade.class_subject_id}?academic_year=${academicYear}&semester=${semester}`
               );
@@ -1069,34 +1070,34 @@ const StudentList = () => {
                 highestGrade.class_subject_id
               );
               if (trendData) {
-                console.log("📈 Grade trend data:", trendData);
+                logger.debug("📈 Grade trend data:", trendData);
                 initialForm.score_trend = trendData.label.toLowerCase(); // "tăng", "giảm", "ổn định"
               } else {
-                console.log("❌ No trend data returned");
+                logger.debug("❌ No trend data returned");
               }
             } else {
-              console.log(
+              logger.debug(
                 "⚠️ No class_subject_id found in highest grade:",
                 highestGrade
               );
             }
           } else {
-            console.log("⚠️ No valid final_grade found in grades");
+            logger.debug("⚠️ No valid final_grade found in grades");
           }
         } else {
-          console.log("⚠️ No grades found for student - not an array or empty");
-          console.log("📋 Grades type:", typeof grades);
-          console.log("📋 Is array:", Array.isArray(grades));
+          logger.debug("⚠️ No grades found for student - not an array or empty");
+          logger.debug("📋 Grades type:", typeof grades);
+          logger.debug("📋 Is array:", Array.isArray(grades));
         }
       } else {
-        console.log("❌ Failed to fetch grades:", gradesResponse);
+        logger.debug("❌ Failed to fetch grades:", gradesResponse);
       }
     } catch (error) {
-      console.error("Error fetching student grades:", error);
+      logger.error("Error fetching student grades:", error);
     }
 
     // Set form with calculated score and trend
-    console.log("📝 Setting feedback form:", initialForm);
+    logger.debug("📝 Setting feedback form:", initialForm);
     setFeedbackForm(initialForm);
     setShowFeedbackModal(true);
   };
@@ -1191,7 +1192,7 @@ const StudentList = () => {
         setFeedbackError(result.error || "Không thể tạo nhận xét");
       }
     } catch (err) {
-      console.error("Error generating feedback:", err);
+      logger.error("Error generating feedback:", err);
       setFeedbackError("Lỗi kết nối server. Vui lòng thử lại.");
     } finally {
       setFeedbackLoading(false);
@@ -1222,7 +1223,7 @@ const StudentList = () => {
         setFeedbackError(response.error || "Không thể gửi SMS");
       }
     } catch (error) {
-      console.error("Error sending SMS:", error);
+      logger.error("Error sending SMS:", error);
       setFeedbackError("Lỗi kết nối server khi gửi SMS");
     } finally {
       setSmsLoading(false);
@@ -1461,7 +1462,7 @@ const StudentList = () => {
 
       alert("✅ Xuất phiếu điểm thành công!");
     } catch (error) {
-      console.error("Error exporting report card:", error);
+      logger.error("Error exporting report card:", error);
       alert(
         "❌ Lỗi khi xuất phiếu điểm: " + (error.message || "Unknown error")
       );
@@ -1471,20 +1472,20 @@ const StudentList = () => {
   // Subject selection functions
   const fetchAvailableSubjects = async () => {
     try {
-      console.log("🔍 Fetching subjects from API...");
+      logger.debug("🔍 Fetching subjects from API...");
       const response = await ApiService.getSubjectsForSelection();
-      console.log("📦 API Response:", response);
+      logger.debug("📦 API Response:", response);
 
       if (response.success && response.data) {
-        console.log("✅ Setting subjects from API:", response.data);
+        logger.debug("✅ Setting subjects from API:", response.data);
         setAvailableSubjects(response.data);
       } else {
-        console.warn("⚠️ API response invalid, using fallback");
+        logger.warn("⚠️ API response invalid, using fallback");
         throw new Error("Invalid API response");
       }
     } catch (error) {
-      console.error("❌ Error fetching subjects:", error);
-      console.log("📋 Using fallback subject data");
+      logger.error("❌ Error fetching subjects:", error);
+      logger.debug("📋 Using fallback subject data");
       // Fallback data nếu API không hoạt động
       setAvailableSubjects([
         { subject_code: "TOAN", subject_name: "Toán" },
@@ -1506,10 +1507,10 @@ const StudentList = () => {
     setSelectedStudentForSubject(student);
 
     // Debug log để kiểm tra dữ liệu
-    console.log("=== DEBUG SUBJECT SELECTION ===");
-    console.log("Student data:", student);
-    console.log("Subject selected:", student.subject_selected);
-    console.log("Subject selected type:", typeof student.subject_selected);
+    logger.debug("=== DEBUG SUBJECT SELECTION ===");
+    logger.debug("Student data:", student);
+    logger.debug("Subject selected:", student.subject_selected);
+    logger.debug("Subject selected type:", typeof student.subject_selected);
 
     // Load existing subject selection nếu có
     if (student.subject_selected) {
@@ -1519,13 +1520,13 @@ const StudentList = () => {
         try {
           subjectData = JSON.parse(subjectData);
         } catch (e) {
-          console.error("Error parsing subject_selected:", e);
+          logger.error("Error parsing subject_selected:", e);
           subjectData = null;
         }
       }
 
       if (subjectData && typeof subjectData === "object") {
-        console.log("Setting selected subjects:", subjectData);
+        logger.debug("Setting selected subjects:", subjectData);
         setSelectedSubjects(subjectData);
       } else {
         // Reset về mặc định nếu data không hợp lệ
@@ -1608,7 +1609,7 @@ const StudentList = () => {
         alert(`Lỗi khi lưu môn học: ${errorData.detail || "Unknown error"}`);
       }
     } catch (error) {
-      console.error("Error saving subject selection:", error);
+      logger.error("Error saving subject selection:", error);
       alert("Có lỗi xảy ra khi lưu môn học");
     } finally {
       setSubjectLoading(false);

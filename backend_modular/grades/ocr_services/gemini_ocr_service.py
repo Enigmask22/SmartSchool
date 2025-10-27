@@ -166,7 +166,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         }
         """
         try:
-            logger.info(f"📸 Processing grade sheet with Gemini Vision API: {image_path}")
+            logger.debug(f"Processing grade sheet: {image_path}")
             
             # Bước 1: Mở và validate ảnh
             if not os.path.exists(image_path):
@@ -181,7 +181,6 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
             # Bước 2: Đọc ảnh
             try:
                 image = Image.open(image_path)
-                logger.info(f"📐 Loaded image: {image.size}, mode: {image.mode}")
             except Exception as e:
                 return {
                     'success': False,
@@ -195,7 +194,6 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
             prompt = self._create_ocr_prompt()
             
             # Bước 4: Gửi request đến Gemini
-            logger.info("🔄 Sending image to Gemini Vision API...")
             response = self.model.generate_content(
                 [prompt, image],
                 generation_config=self.generation_config
@@ -211,13 +209,12 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                 }
             
             # Bước 5: Parse JSON response
-            logger.info("📝 Received response from Gemini, parsing...")
             parsed_data = self._parse_gemini_response(response.text)
             
             # Bước 6: Validate và chuẩn hóa dữ liệu
             validated_data = self._validate_and_normalize(parsed_data)
             
-            logger.info(f"✅ Successfully parsed {validated_data.get('total_rows', 0)} rows")
+            logger.debug(f"Parsed {validated_data.get('total_rows', 0)} rows")
             return validated_data
             
         except Exception as e:
@@ -258,12 +255,12 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
             # Parse JSON
             data = json.loads(response_text)
             
-            logger.info(f"✅ Successfully parsed Gemini response: {data.get('total_rows', 0)} rows detected")
+            logger.debug(f"Parsed Gemini response: {data.get('total_rows', 0)} rows")
             return data
             
         except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON decode error: {e}")
-            logger.error(f"Response text: {response_text[:500]}...")  # Log first 500 chars
+            logger.error(f"JSON decode error: {e}")
+            logger.debug(f"Response text: {response_text[:500]}...")  # Log first 500 chars
             return {
                 'success': False,
                 'headers': [],
@@ -322,7 +319,6 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                 # Phải có ít nhất student_id
                 if validated_row.get('student_id'):
                     validated_rows.append(validated_row)
-                    logger.info(f"✅ Validated row {idx}: {validated_row}")
                 
             except Exception as e:
                 errors.append(f"Row {idx}: Lỗi validate - {str(e)}")

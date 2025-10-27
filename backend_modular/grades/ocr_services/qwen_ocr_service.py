@@ -191,7 +191,7 @@ class QwenOCRService:
         }
         """
         try:
-            logger.info(f"📸 Processing grade sheet with Qwen2.5-VL-3B: {image_path}")
+            logger.debug(f"Processing grade sheet: {image_path}")
             
             # Bước 1: Validate file
             if not os.path.exists(image_path):
@@ -214,9 +214,7 @@ class QwenOCRService:
                     ratio = max_width / image.width
                     new_size = (max_width, int(image.height * ratio))
                     image = image.resize(new_size, Image.Resampling.LANCZOS)
-                    logger.info(f"📐 Resized image: {original_size} → {image.size}")
-                else:
-                    logger.info(f"✅ Loaded image: {image.size}, mode: {image.mode}")
+                    logger.debug(f"Resized image: {original_size} → {image.size}")
             except Exception as e:
                 return {
                     'success': False,
@@ -230,7 +228,6 @@ class QwenOCRService:
             prompt = self._create_ocr_prompt()
             
             # Bước 4: Gửi request đến Qwen2.5-VL
-            logger.info("🔄 Processing image with Qwen2.5-VL-3B model...")
             response_text = self._generate_response(prompt, image_path)
             
             if not response_text:
@@ -243,13 +240,12 @@ class QwenOCRService:
                 }
             
             # Bước 5: Parse JSON response
-            logger.info("📝 Received response from Qwen2.5-VL, parsing...")
             parsed_data = self._parse_model_response(response_text)
             
             # Bước 6: Validate và chuẩn hóa dữ liệu
             validated_data = self._validate_and_normalize(parsed_data)
             
-            logger.info(f"✅ Successfully parsed {validated_data.get('total_rows', 0)} rows")
+            logger.debug(f"Parsed {validated_data.get('total_rows', 0)} rows")
             return validated_data
             
         except Exception as e:
@@ -310,7 +306,6 @@ class QwenOCRService:
             # 50 dòng ~ 6000-8000 tokens (với JSON format đầy đủ)
             # 100 dòng ~ 12000-15000 tokens
             # Model hỗ trợ 32K context length → dư sức xử lý
-            logger.info("🚀 Generating response...")
             with torch.no_grad():
                 generated_ids = self.model.generate(
                     **inputs,
@@ -335,8 +330,7 @@ class QwenOCRService:
                 clean_up_tokenization_spaces=False
             )[0]
             
-            logger.info(f"✅ Generated response length: {len(response)} chars")
-            logger.info(f"📊 Generated tokens: {len(generated_ids_trimmed[0])}")
+            logger.debug(f"Generated {len(generated_ids_trimmed[0])} tokens, {len(response)} chars")
             
             return response
             
@@ -372,22 +366,18 @@ class QwenOCRService:
             # Parse JSON
             data = json.loads(response_text)
             
-            logger.info(f"✅ Successfully parsed Qwen2.5-VL response: {data.get('total_rows', 0)} rows detected")
+            logger.debug(f"Parsed response: {data.get('total_rows', 0)} rows")
             return data
             
         except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON decode error: {e}")
-            logger.error(f"Response length: {len(response_text)} chars")
-            logger.error(f"Error position: line {e.lineno}, column {e.colno}, char {e.pos}")
-            logger.error(f"Response text (first 1000 chars):\n{response_text[:1000]}")
-            logger.error(f"Response text (last 500 chars):\n{response_text[-500:]}")
+            logger.error(f"JSON decode error at line {e.lineno}, col {e.colno}")
+            logger.debug(f"Response (first 1000): {response_text[:1000]}")
             
             # Thử phục hồi JSON bị truncate
-            logger.warning("⚠️ Attempting to recover truncated JSON...")
             recovered_data = self._recover_truncated_json(response_text)
             
             if recovered_data and recovered_data.get('rows'):
-                logger.info(f"✅ Recovered {len(recovered_data['rows'])} rows from truncated JSON")
+                logger.info(f"Recovered {len(recovered_data['rows'])} rows from truncated JSON")
                 return recovered_data
             
             return {
@@ -441,7 +431,7 @@ class QwenOCRService:
             # Thêm ] sau (đóng array)
             fixed_text += ']' * missing_close_brackets
             
-            logger.info(f"🔧 Recovery: added {missing_close_braces} '}}' and {missing_close_brackets} ']'")
+            logger.debug(f"Recovery: added {missing_close_braces} '}}' and {missing_close_brackets} ']'")
             
             # Thử parse lại
             data = json.loads(fixed_text)
@@ -512,7 +502,6 @@ class QwenOCRService:
                 # Phải có ít nhất student_id
                 if validated_row.get('student_id'):
                     validated_rows.append(validated_row)
-                    logger.info(f"✅ Validated row {idx}: {validated_row}")
                 
             except Exception as e:
                 errors.append(f"Row {idx}: Lỗi validate - {str(e)}")

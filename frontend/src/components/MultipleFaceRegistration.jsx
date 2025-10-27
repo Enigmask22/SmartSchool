@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import logger from "../utils/logger";
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
@@ -82,7 +83,7 @@ const MultipleFaceRegistration = ({ student, onClose, onSuccess }) => {
         alert(`Lỗi: ${result.message}`);
       }
     } catch (error) {
-      console.error('Error registering multiple faces:', error);
+      logger.error('Error registering multiple faces:', error);
       alert('Có lỗi xảy ra khi đăng ký nhiều khuôn mặt');
     } finally {
       setLoading(false);

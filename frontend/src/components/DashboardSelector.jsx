@@ -3,6 +3,7 @@ import { GraduationCap, Users, Loader2, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import api from '../services/api';
+import logger from "../utils/logger";
 
 const DashboardSelector = ({ onSelectDashboard }) => {
   const [hasHomeroomRole, setHasHomeroomRole] = useState(false);
@@ -24,7 +25,7 @@ const DashboardSelector = ({ onSelectDashboard }) => {
           setHasHomeroomRole(true);
         }
       } catch (error) {
-        console.log('Không phải giáo viên chủ nhiệm');
+        logger.debug('Không phải giáo viên chủ nhiệm');
       }
 
       // Kiểm tra xem có phải giáo viên bộ môn không
@@ -34,11 +35,11 @@ const DashboardSelector = ({ onSelectDashboard }) => {
           setHasSubjectRole(true);
         }
       } catch (error) {
-        console.log('Không phải giáo viên bộ môn');
+        logger.debug('Không phải giáo viên bộ môn');
       }
       
     } catch (error) {
-      console.error('Error checking user roles:', error);
+      logger.error('Error checking user roles:', error);
     } finally {
       setLoading(false);
     }

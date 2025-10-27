@@ -194,18 +194,7 @@ async def register(user: UserCreate):
 async def login(user_credentials: UserLogin):
     """Đăng nhập user"""
     try:
-        logger.info(f"=== LOGIN ATTEMPT ===")
-        logger.info(f"Username: {user_credentials.username}")
-        
         db = get_school_db(user_credentials.username)
-        
-        # Debug: Log thông tin database đang sử dụng
-        try:
-            from core.database import get_school_info
-            school_info = get_school_info(user_credentials.username)
-            logger.info(f"School info: {school_info}")
-        except Exception as e:
-            logger.warning(f"Không lấy được school info: {str(e)}")
         
         user_response = db.table("users").select("*").or_(
             f"username.eq.{user_credentials.username},email.eq.{user_credentials.username}"

@@ -1,5 +1,6 @@
 import React, { useState, useContext } from "react";
 import "./App.css";
+import logger from "./utils/logger";
 
 // Context
 import { AuthProvider, AuthContext } from "./contexts/AuthContext";
@@ -52,7 +53,7 @@ function AppContent() {
 
       // Admin không cần chọn dashboard - bypass trực tiếp
       if (isAdmin()) {
-        console.log("👑 Admin logged in - bypassing dashboard selector");
+        logger.debug("Admin logged in - bypassing dashboard selector");
         setShowDashboardSelector(false);
         setSelectedDashboardType("admin"); // Set special type for admin
         setCurrentView("dashboard");
@@ -62,7 +63,7 @@ function AppContent() {
 
       // Nếu chưa chọn dashboard type, hiển thị selector cho giáo viên
       if (!selectedDashboardType) {
-        console.log("🎯 Showing dashboard selector");
+        logger.debug("Showing dashboard selector");
         setShowDashboardSelector(true);
       }
       setHasRedirected(true);
@@ -71,7 +72,7 @@ function AppContent() {
 
   // Handle dashboard selection
   const handleDashboardSelect = (type) => {
-    console.log(`📊 Dashboard type selected: ${type}`);
+    logger.debug(`Dashboard type selected: ${type}`);
     setSelectedDashboardType(type);
     setShowDashboardSelector(false);
     setCurrentView("dashboard");
@@ -217,14 +218,13 @@ function AppContent() {
   const handleDashboardSwitch = () => {
     // Admin không có dashboard switch
     if (isAdmin()) {
-      console.log("⚠️ Admin không thể switch dashboard");
       return;
     }
 
     const newType =
       selectedDashboardType === "homeroom" ? "subject" : "homeroom";
-    console.log(
-      `🔄 Switching dashboard from ${selectedDashboardType} to ${newType}`
+    logger.debug(
+      `Switching dashboard from ${selectedDashboardType} to ${newType}`
     );
     setSelectedDashboardType(newType);
     setCurrentView("dashboard"); // Reset to dashboard view

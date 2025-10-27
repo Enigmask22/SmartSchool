@@ -103,11 +103,9 @@ def get_db(request: Request = None) -> Client:
     nên tất cả endpoints chỉ cần dùng Depends(get_db) như bình thường!
     """
     if request and hasattr(request.state, 'db') and request.state.db:
-        logger.debug(f"✅ Using school database from request.state")
         return request.state.db
     
     # Fallback to legacy database
-    logger.debug("⚠️ Using legacy database (no request.state.db)")
     return db.client
 
 # ===== MULTI-SCHOOL SUPPORT FUNCTIONS =====
@@ -120,7 +118,6 @@ def get_school_db(username: str) -> Client:
     Note: Function này được gọi 1 lần mỗi request từ middleware.
     SchoolDatabaseManager tự động cache client nên không có overhead.
     """
-    logger.debug(f"get_school_db called for: {username}")
     
     if school_db_manager is None:
         logger.warning("school_db_manager not available, using default client")
@@ -128,7 +125,6 @@ def get_school_db(username: str) -> Client:
         
     try:
         client = school_db_manager.get_client(username)
-        logger.debug(f"Got cached client for: {username}")
         return client
     except Exception as e:
         logger.error(f"Lỗi khi lấy school database cho {username}: {str(e)}")

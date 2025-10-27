@@ -21,6 +21,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import api from "../services/api";
+import logger from "../utils/logger";
 
 const Sidebar = ({
   currentView,
@@ -68,7 +69,7 @@ const Sidebar = ({
 
       setHasBothRoles(hasHomeroom && hasSubject);
     } catch (error) {
-      console.error("Error checking roles:", error);
+      logger.error("Error checking roles:", error);
     }
   }, [user]);
 

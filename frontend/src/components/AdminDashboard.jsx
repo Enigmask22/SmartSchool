@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Progress } from './ui/progress';
 import ApiService from '../services/api';
+import logger from "../utils/logger";
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,7 @@ const AdminDashboard = () => {
       if (teacherRes.success) setTeacherPerformance(teacherRes.data);
       if (healthRes.success) setSystemHealth(healthRes.data);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      logger.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }

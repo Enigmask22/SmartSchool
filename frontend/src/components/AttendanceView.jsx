@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { Users, CheckCircle, XCircle, Clock } from "lucide-react";
+import logger from "../utils/logger";
 
 const AttendanceView = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
@@ -76,7 +77,7 @@ const AttendanceView = () => {
 
   const loadClasses = async () => {
     try {
-      console.log("📚 Loading classes for attendance filter...", {
+      logger.debug("📚 Loading classes for attendance filter...", {
         user,
         isHomeroomTeacher: isHomeroomTeacher(),
         userRole: user?.role,
@@ -85,7 +86,7 @@ const AttendanceView = () => {
       let classesResponse;
 
       if (isHomeroomTeacher()) {
-        console.log("📚 Fetching homeroom classes for attendance...");
+        logger.debug("📚 Fetching homeroom classes for attendance...");
         // If homeroom teacher, only get their homeroom classes
         classesResponse = await ApiService.getHomeroomClasses();
 
@@ -98,17 +99,17 @@ const AttendanceView = () => {
                 .filter((name) => name) // Remove null/undefined
             ),
           ].sort();
-          console.log("📚 Setting homeroom classes:", classNames);
+          logger.debug("📚 Setting homeroom classes:", classNames);
           setClasses(classNames);
         } else {
-          console.warn(
+          logger.warn(
             "📚 Invalid homeroom classes response:",
             classesResponse
           );
           setClasses([]);
         }
       } else {
-        console.log("📚 Fetching all students to extract classes for admin...");
+        logger.debug("📚 Fetching all students to extract classes for admin...");
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
 
@@ -122,13 +123,13 @@ const AttendanceView = () => {
             ),
           ].sort();
 
-          console.log(
+          logger.debug(
             "📚 Extracted unique classes from students:",
             uniqueClasses
           );
           setClasses(uniqueClasses);
         } else {
-          console.warn(
+          logger.warn(
             "📚 Invalid students response for classes:",
             studentsResponse
           );
@@ -136,7 +137,7 @@ const AttendanceView = () => {
         }
       }
     } catch (error) {
-      console.error("Error loading classes:", error);
+      logger.error("Error loading classes:", error);
       setClasses([]);
     }
   };
@@ -148,7 +149,7 @@ const AttendanceView = () => {
     setError(null);
     setSuccessMessage(null);
 
-    console.log("🔍 Loading attendance data...", {
+    logger.debug("🔍 Loading attendance data...", {
       selectedDate,
       selectedClass,
       selectedStatus,
@@ -158,7 +159,7 @@ const AttendanceView = () => {
     try {
       // If homeroom teacher but no class selected, don't fetch
       if (isHomeroomTeacher() && (!selectedClass || selectedClass === "all")) {
-        console.log(
+        logger.debug(
           "🚫 No class selected for homeroom teacher, skipping attendance fetch"
         );
         setAttendanceRecords([]);
@@ -193,9 +194,9 @@ const AttendanceView = () => {
 
           // Calculate stats from full list data - but use full data not filtered data
           const fullData = response.data || [];
-          console.log("📊 Calculating stats from full data:", fullData);
+          logger.debug("📊 Calculating stats from full data:", fullData);
           const calculatedStats = calculateStatsFromData(fullData);
-          console.log("📊 Calculated stats:", calculatedStats);
+          logger.debug("📊 Calculated stats:", calculatedStats);
           setStats(calculatedStats);
         }
       } else {
@@ -254,7 +255,7 @@ const AttendanceView = () => {
           }
 
           const response = await ApiService.getAttendanceRecords(params);
-          console.log("📡 API Response:", response);
+          logger.debug("📡 API Response:", response);
           if (response.success) {
             setAttendanceRecords(response.data || []);
             setTotal(response.total || 0);
@@ -262,7 +263,7 @@ const AttendanceView = () => {
         }
       }
     } catch (error) {
-      console.error("Error loading attendance:", error);
+      logger.error("Error loading attendance:", error);
       setError("Không thể tải dữ liệu điểm danh");
     } finally {
       setLoading(false);
@@ -279,7 +280,7 @@ const AttendanceView = () => {
         }
       }
     } catch (error) {
-      console.error("Error loading stats:", error);
+      logger.error("Error loading stats:", error);
     }
   };
 
@@ -505,7 +506,7 @@ const AttendanceView = () => {
         setError(response.message || "Lỗi cập nhật trạng thái");
       }
     } catch (error) {
-      console.error("Error updating attendance:", error);
+      logger.error("Error updating attendance:", error);
       setError("Không thể cập nhật trạng thái điểm danh");
     } finally {
       setUpdating(false);

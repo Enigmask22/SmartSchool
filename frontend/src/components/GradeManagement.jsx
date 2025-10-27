@@ -63,6 +63,7 @@ import api from "../services/api";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import OCRGradeSheet from "./OCRGradeSheet";
+import logger from "../utils/logger";
 
 // Tạo danh sách năm học từ 2024-2025 đến 2035-2036
 const generateAcademicYears = () => {
@@ -146,10 +147,10 @@ const GradeManagement = () => {
         // Reset selected class subject when changing period
         setSelectedClassSubject(null);
       } else {
-        console.error("Failed to fetch teacher info:", response.message);
+        logger.error("Failed to fetch teacher info:", response.message);
       }
     } catch (error) {
-      console.error("Error fetching teacher info:", error);
+      logger.error("Error fetching teacher info:", error);
     } finally {
       setLoading(false);
     }
@@ -193,7 +194,7 @@ const GradeManagement = () => {
         setGradeConfig(null);
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      logger.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
@@ -255,7 +256,7 @@ const GradeManagement = () => {
         alert("Lỗi khi lưu điểm: " + response.message);
       }
     } catch (error) {
-      console.error("Error saving grade:", error);
+      logger.error("Error saving grade:", error);
       alert("Lỗi khi lưu điểm!");
     }
   };
@@ -443,7 +444,7 @@ const GradeManagement = () => {
         alert("❌ Lỗi khi lưu cấu hình: " + response.message);
       }
     } catch (error) {
-      console.error("Error saving config:", error);
+      logger.error("Error saving config:", error);
       alert("❌ Lỗi khi lưu cấu hình!");
     }
   };
@@ -454,7 +455,7 @@ const GradeManagement = () => {
       await api.downloadGradeTemplate(selectedClassSubject.id);
       alert("✅ Tải template thành công!");
     } catch (error) {
-      console.error("Error downloading template:", error);
+      logger.error("Error downloading template:", error);
       alert("❌ Lỗi khi tải template!");
     }
   };
@@ -571,7 +572,7 @@ const GradeManagement = () => {
         setImportErrors([]);
         setShowImportModal(true);
       } catch (error) {
-        console.error("Error parsing file:", error);
+        logger.error("Error parsing file:", error);
         alert("❌ Lỗi khi đọc file! Vui lòng kiểm tra định dạng file.");
       }
     };
@@ -611,7 +612,7 @@ const GradeManagement = () => {
         );
 
         if (response.data.errors && response.data.errors.length > 0) {
-          console.log("Import errors:", response.data.errors);
+          logger.debug("Import errors:", response.data.errors);
         }
 
         // Refresh data
@@ -623,7 +624,7 @@ const GradeManagement = () => {
         alert("❌ Lỗi khi import điểm: " + response.message);
       }
     } catch (error) {
-      console.error("Error importing grades:", error);
+      logger.error("Error importing grades:", error);
       alert("❌ Lỗi khi import điểm!");
     } finally {
       setLoading(false);
@@ -868,7 +869,7 @@ const GradeManagement = () => {
 
       alert("✅ Xuất file Excel thành công!");
     } catch (error) {
-      console.error("Error exporting to Excel:", error);
+      logger.error("Error exporting to Excel:", error);
       alert("❌ Lỗi khi xuất file Excel!");
     }
   };
