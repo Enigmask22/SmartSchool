@@ -2,7 +2,7 @@
 Pydantic models cho Users module
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -34,6 +34,8 @@ class TeacherBase(BaseModel):
     full_name: str = Field(..., description="Họ tên giáo viên")
     email: Optional[str] = None
     phone: Optional[str] = None
+    date_of_birth: Optional[date] = Field(None, description="Ngày sinh")
+    gender: Optional[str] = Field("Nam", description="Giới tính: Nam, Nữ, Khác")
     user_id: Optional[int] = None
 
 class TeacherCreate(TeacherBase):
@@ -43,6 +45,8 @@ class TeacherUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
     user_id: Optional[int] = None
     is_active: Optional[bool] = None
 

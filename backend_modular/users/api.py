@@ -143,16 +143,22 @@ async def get_all_teachers(db=Depends(get_db)):
 async def create_teacher(teacher_data: dict, db=Depends(get_db)):
     """Tạo giáo viên mới"""
     try:
+        logger.info(f"Creating teacher with data: {teacher_data}")
+        
         data = {
             "teacher_code": teacher_data['teacher_code'],
             "full_name": teacher_data['full_name'],
             "email": teacher_data.get('email'),
             "phone": teacher_data.get('phone'),
+            "date_of_birth": teacher_data.get('date_of_birth'),
+            "gender": teacher_data.get('gender', 'Nam'),
             "user_id": teacher_data.get('user_id'),
             "is_active": teacher_data.get('is_active', True),
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
+        
+        logger.info(f"Prepared data for insert: {data}")
         
         response = db.table("teachers").insert(data).execute()
         
@@ -170,7 +176,7 @@ async def update_teacher(teacher_id: int, teacher_data: dict, db=Depends(get_db)
     """Cập nhật thông tin giáo viên"""
     try:
         update_data = {}
-        for field in ['teacher_code', 'full_name', 'email', 'phone', 'user_id', 'is_active']:
+        for field in ['teacher_code', 'full_name', 'email', 'phone', 'date_of_birth', 'gender', 'user_id', 'is_active']:
             if field in teacher_data:
                 update_data[field] = teacher_data[field]
         
@@ -186,6 +192,8 @@ async def update_teacher(teacher_id: int, teacher_data: dict, db=Depends(get_db)
         else:
             raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating teacher: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật giáo viên: {str(e)}")

@@ -60,6 +60,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Label } from "./ui/label";
+import { SimpleDatePicker } from "./ui/simple-date-picker";
 import ApiService from "../services/api";
 import MultipleFaceRegistration from "./MultipleFaceRegistration";
 import { AuthContext } from "../contexts/AuthContext";
@@ -2561,13 +2562,13 @@ const StudentList = () => {
                   <label className="block mb-2 text-sm font-medium text-gray-700">
                     Ngày sinh
                   </label>
-                  <input
-                    type="date"
+                  <SimpleDatePicker
                     value={editForm.date_of_birth || ""}
-                    onChange={(e) =>
-                      handleEditFormChange("date_of_birth", e.target.value)
+                    onChange={(value) =>
+                      handleEditFormChange("date_of_birth", value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Chọn ngày sinh"
+                    className="w-full"
                   />
                 </div>
 

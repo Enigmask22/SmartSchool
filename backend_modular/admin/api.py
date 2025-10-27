@@ -324,19 +324,25 @@ async def create_teacher(
 ):
     """Tạo giáo viên mới"""
     try:
+        
         data = {
-            "user_id": teacher_data.user_id,
             "full_name": teacher_data.full_name,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
         
+        if teacher_data.user_id:
+            data["user_id"] = teacher_data.user_id
         if teacher_data.teacher_code:
             data["teacher_code"] = teacher_data.teacher_code
         if teacher_data.email:
             data["email"] = teacher_data.email
         if teacher_data.phone:
             data["phone"] = teacher_data.phone
+        if teacher_data.date_of_birth:
+            data["date_of_birth"] = str(teacher_data.date_of_birth)
+        if teacher_data.gender:
+            data["gender"] = teacher_data.gender
         if teacher_data.subject_specialization:
             data["subject_specialization"] = teacher_data.subject_specialization
         
@@ -371,6 +377,10 @@ async def update_teacher(
             update_data["email"] = teacher_data.email
         if teacher_data.phone:
             update_data["phone"] = teacher_data.phone
+        if teacher_data.date_of_birth:
+            update_data["date_of_birth"] = str(teacher_data.date_of_birth)
+        if teacher_data.gender:
+            update_data["gender"] = teacher_data.gender
         if teacher_data.subject_specialization:
             update_data["subject_specialization"] = teacher_data.subject_specialization
         

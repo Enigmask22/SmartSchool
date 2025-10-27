@@ -1,18 +1,32 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Badge } from './ui/badge';
-import { Alert, AlertDescription } from './ui/alert';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Key, 
-  GraduationCap, 
-  School, 
+import React, { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../contexts/AuthContext";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Badge } from "./ui/badge";
+import { Alert, AlertDescription } from "./ui/alert";
+import { SimpleDatePicker } from "./ui/simple-date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
+  User,
+  Mail,
+  Phone,
+  Key,
+  GraduationCap,
+  School,
   BookOpen,
   Edit3,
   Save,
@@ -21,9 +35,9 @@ import {
   EyeOff,
   CheckCircle,
   AlertCircle,
-  Loader2
-} from 'lucide-react';
-import api from '../services/api';
+  Loader2,
+} from "lucide-react";
+import api from "../services/api";
 
 const PersonalInfo = () => {
   const { user } = useContext(AuthContext);
@@ -34,22 +48,22 @@ const PersonalInfo = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  
+
   // Edit mode states
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
-  
+
   // Password change states
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
-    confirm: false
+    confirm: false,
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
 
@@ -67,37 +81,40 @@ const PersonalInfo = () => {
       const personalResponse = await api.getPersonalInfo();
       if (personalResponse.success) {
         const data = personalResponse.data;
-        
+
         // Set user data
         setUserData(data.user);
-        
+
         // Set teacher data
         if (data.teacher) {
           setPersonalData(data.teacher);
           setEditData({
-            full_name: data.teacher.full_name || data.user.full_name || '',
-            email: data.teacher.email || data.user.email || '',
-            phone: data.teacher.phone || ''
+            full_name: data.teacher.full_name || data.user.full_name || "",
+            email: data.teacher.email || data.user.email || "",
+            phone: data.teacher.phone || "",
+            date_of_birth: data.teacher.date_of_birth || "",
+            gender: data.teacher.gender || "Nam",
           });
         } else {
           // If no teacher data, use user data
           setEditData({
-            full_name: data.user.full_name || '',
-            email: data.user.email || '',
-            phone: ''
+            full_name: data.user.full_name || "",
+            email: data.user.email || "",
+            phone: "",
+            date_of_birth: "",
+            gender: "Nam",
           });
         }
-        
+
         // Set homeroom classes
         setHomeroomClasses(data.homeroom_classes || []);
-        
+
         // Set subject classes
         setSubjectClasses(data.subject_classes || []);
       }
-
     } catch (error) {
-      console.error('Error loading personal data:', error);
-      setError('Không thể tải thông tin cá nhân');
+      console.error("Error loading personal data:", error);
+      setError("Không thể tải thông tin cá nhân");
     } finally {
       setLoading(false);
     }
@@ -106,18 +123,22 @@ const PersonalInfo = () => {
   const handleEdit = () => {
     setIsEditing(true);
     setEditData({
-      full_name: personalData.full_name || '',
-      email: personalData.email || '',
-      phone: personalData.phone || ''
+      full_name: personalData.full_name || "",
+      email: personalData.email || "",
+      phone: personalData.phone || "",
+      date_of_birth: personalData.date_of_birth || "",
+      gender: personalData.gender || "Nam",
     });
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditData({
-      full_name: personalData.full_name || '',
-      email: personalData.email || '',
-      phone: personalData.phone || ''
+      full_name: personalData.full_name || "",
+      email: personalData.email || "",
+      phone: personalData.phone || "",
+      date_of_birth: personalData.date_of_birth || "",
+      gender: personalData.gender || "Nam",
     });
   };
 
@@ -131,22 +152,24 @@ const PersonalInfo = () => {
       const updateData = {
         full_name: editData.full_name,
         email: editData.email,
-        phone: editData.phone
+        phone: editData.phone,
+        date_of_birth: editData.date_of_birth,
+        gender: editData.gender,
       };
 
       const response = await api.updateTeacherProfile(updateData);
-      
+
       if (response.success) {
         setPersonalData(response.data);
         setIsEditing(false);
-        setSuccess('Cập nhật thông tin thành công');
+        setSuccess("Cập nhật thông tin thành công");
         setTimeout(() => setSuccess(null), 3000);
       } else {
-        setError(response.message || 'Cập nhật thông tin thất bại');
+        setError(response.message || "Cập nhật thông tin thất bại");
       }
     } catch (error) {
-      console.error('Error updating personal data:', error);
-      setError('Có lỗi xảy ra khi cập nhật thông tin');
+      console.error("Error updating personal data:", error);
+      setError("Có lỗi xảy ra khi cập nhật thông tin");
     } finally {
       setLoading(false);
     }
@@ -160,12 +183,12 @@ const PersonalInfo = () => {
 
       // Validate passwords
       if (passwordData.newPassword !== passwordData.confirmPassword) {
-        setError('Mật khẩu mới và xác nhận mật khẩu không khớp');
+        setError("Mật khẩu mới và xác nhận mật khẩu không khớp");
         return;
       }
 
       if (passwordData.newPassword.length < 6) {
-        setError('Mật khẩu mới phải có ít nhất 6 ký tự');
+        setError("Mật khẩu mới phải có ít nhất 6 ký tự");
         return;
       }
 
@@ -175,35 +198,35 @@ const PersonalInfo = () => {
       );
 
       if (response.success) {
-        setSuccess('Đổi mật khẩu thành công');
+        setSuccess("Đổi mật khẩu thành công");
         setShowPasswordChange(false);
         setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
         });
         setTimeout(() => setSuccess(null), 3000);
       } else {
-        setError(response.message || 'Đổi mật khẩu thất bại');
+        setError(response.message || "Đổi mật khẩu thất bại");
       }
     } catch (error) {
-      console.error('Error changing password:', error);
-      setError('Có lỗi xảy ra khi đổi mật khẩu');
+      console.error("Error changing password:", error);
+      setError("Có lỗi xảy ra khi đổi mật khẩu");
     } finally {
       setPasswordLoading(false);
     }
   };
 
   const togglePasswordVisibility = (field) => {
-    setShowPasswords(prev => ({
+    setShowPasswords((prev) => ({
       ...prev,
-      [field]: !prev[field]
+      [field]: !prev[field],
     }));
   };
 
   if (loading && !personalData) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
         <span className="ml-2 text-gray-600">Đang tải thông tin...</span>
       </div>
@@ -224,13 +247,21 @@ const PersonalInfo = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Thông tin cá nhân</h1>
-          <p className="mt-1 text-gray-600">Quản lý thông tin cá nhân và tài khoản</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Thông tin cá nhân
+          </h1>
+          <p className="mt-1 text-gray-600">
+            Quản lý thông tin cá nhân và tài khoản
+          </p>
         </div>
         {!isEditing && (
-          <Button onClick={handleEdit} variant="outline" className="flex gap-2 items-center">
+          <Button
+            onClick={handleEdit}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
             <Edit3 className="w-4 h-4" />
             Chỉnh sửa
           </Button>
@@ -239,9 +270,11 @@ const PersonalInfo = () => {
 
       {/* Success/Error Messages */}
       {success && (
-        <Alert className="bg-green-50 border-green-200">
+        <Alert className="border-green-200 bg-green-50">
           <CheckCircle className="w-4 h-4 text-green-600" />
-          <AlertDescription className="text-green-800">{success}</AlertDescription>
+          <AlertDescription className="text-green-800">
+            {success}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -256,13 +289,11 @@ const PersonalInfo = () => {
         {/* Personal Information */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex gap-2 items-center">
+            <CardTitle className="flex items-center gap-2">
               <User className="w-5 h-5" />
               Thông tin cá nhân
             </CardTitle>
-            <CardDescription>
-              Thông tin cơ bản của tài khoản
-            </CardDescription>
+            <CardDescription>Thông tin cơ bản của tài khoản</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Full Name */}
@@ -272,13 +303,22 @@ const PersonalInfo = () => {
                 <Input
                   id="full_name"
                   value={editData.full_name}
-                  onChange={(e) => setEditData(prev => ({ ...prev, full_name: e.target.value }))}
+                  onChange={(e) =>
+                    setEditData((prev) => ({
+                      ...prev,
+                      full_name: e.target.value,
+                    }))
+                  }
                   placeholder="Nhập họ và tên"
                 />
               ) : (
-                <div className="flex gap-2 items-center p-3 bg-gray-50 rounded-md">
+                <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
                   <User className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-900">{personalData?.full_name || userData?.full_name || 'Chưa cập nhật'}</span>
+                  <span className="text-gray-900">
+                    {personalData?.full_name ||
+                      userData?.full_name ||
+                      "Chưa cập nhật"}
+                  </span>
                 </div>
               )}
             </div>
@@ -291,13 +331,17 @@ const PersonalInfo = () => {
                   id="email"
                   type="email"
                   value={editData.email}
-                  onChange={(e) => setEditData(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) =>
+                    setEditData((prev) => ({ ...prev, email: e.target.value }))
+                  }
                   placeholder="Nhập email"
                 />
               ) : (
-                <div className="flex gap-2 items-center p-3 bg-gray-50 rounded-md">
+                <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
                   <Mail className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-900">{personalData?.email || userData?.email || 'Chưa cập nhật'}</span>
+                  <span className="text-gray-900">
+                    {personalData?.email || userData?.email || "Chưa cập nhật"}
+                  </span>
                 </div>
               )}
             </div>
@@ -305,10 +349,14 @@ const PersonalInfo = () => {
             {/* Username */}
             <div className="space-y-2">
               <Label htmlFor="username">Tên đăng nhập</Label>
-              <div className="flex gap-2 items-center p-3 bg-gray-50 rounded-md">
+              <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
                 <User className="w-4 h-4 text-gray-500" />
-                <span className="text-gray-900">{userData?.username || user?.username || 'Chưa cập nhật'}</span>
-                <Badge variant="secondary" className="ml-auto">Chỉ xem</Badge>
+                <span className="text-gray-900">
+                  {userData?.username || user?.username || "Chưa cập nhật"}
+                </span>
+                <Badge variant="secondary" className="ml-auto">
+                  Chỉ xem
+                </Badge>
               </div>
             </div>
 
@@ -320,13 +368,82 @@ const PersonalInfo = () => {
                   id="phone"
                   type="tel"
                   value={editData.phone}
-                  onChange={(e) => setEditData(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setEditData((prev) => ({ ...prev, phone: e.target.value }))
+                  }
                   placeholder="Nhập số điện thoại"
                 />
               ) : (
-                <div className="flex gap-2 items-center p-3 bg-gray-50 rounded-md">
+                <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
                   <Phone className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-900">{personalData?.phone || 'Chưa cập nhật'}</span>
+                  <span className="text-gray-900">
+                    {personalData?.phone || "Chưa cập nhật"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Date of Birth */}
+            <div className="space-y-2">
+              <Label htmlFor="date_of_birth">Ngày sinh</Label>
+              {isEditing ? (
+                <div className="w-full">
+                  <SimpleDatePicker
+                    value={editData.date_of_birth}
+                    onChange={(date) =>
+                      setEditData((prev) => ({ ...prev, date_of_birth: date }))
+                    }
+                    placeholder="Chọn ngày sinh"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
+                  <User className="w-4 h-4 text-gray-500" />
+                  <span className="text-gray-900">
+                    {personalData?.date_of_birth
+                      ? new Date(personalData.date_of_birth).toLocaleDateString(
+                          "vi-VN"
+                        )
+                      : "Chưa cập nhật"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Gender */}
+            <div className="space-y-2">
+              <Label htmlFor="gender">Giới tính</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.gender}
+                  onValueChange={(value) =>
+                    setEditData((prev) => ({ ...prev, gender: value }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
+                  <User className="w-4 h-4 text-gray-500" />
+                  <Badge
+                    variant="outline"
+                    className={
+                      personalData?.gender === "Nam"
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : personalData?.gender === "Nữ"
+                        ? "bg-pink-50 text-pink-700 border-pink-200"
+                        : "bg-gray-50 text-gray-700 border-gray-200"
+                    }
+                  >
+                    {personalData?.gender || "Chưa cập nhật"}
+                  </Badge>
                 </div>
               )}
             </div>
@@ -334,20 +451,24 @@ const PersonalInfo = () => {
             {/* Teacher Code */}
             <div className="space-y-2">
               <Label htmlFor="teacher_code">Mã giáo viên</Label>
-              <div className="flex gap-2 items-center p-3 bg-gray-50 rounded-md">
+              <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
                 <GraduationCap className="w-4 h-4 text-gray-500" />
-                <span className="text-gray-900">{personalData?.teacher_code || 'Chưa cập nhật'}</span>
-                <Badge variant="secondary" className="ml-auto">Chỉ xem</Badge>
+                <span className="text-gray-900">
+                  {personalData?.teacher_code || "Chưa cập nhật"}
+                </span>
+                <Badge variant="secondary" className="ml-auto">
+                  Chỉ xem
+                </Badge>
               </div>
             </div>
 
             {/* Edit Actions */}
             {isEditing && (
               <div className="flex gap-2 pt-4">
-                <Button 
-                  onClick={handleSaveEdit} 
+                <Button
+                  onClick={handleSaveEdit}
                   disabled={loading}
-                  className="flex gap-2 items-center"
+                  className="flex items-center gap-2"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -356,10 +477,10 @@ const PersonalInfo = () => {
                   )}
                   Lưu thay đổi
                 </Button>
-                <Button 
-                  onClick={handleCancelEdit} 
+                <Button
+                  onClick={handleCancelEdit}
                   variant="outline"
-                  className="flex gap-2 items-center"
+                  className="flex items-center gap-2"
                 >
                   <X className="w-4 h-4" />
                   Hủy
@@ -372,7 +493,7 @@ const PersonalInfo = () => {
         {/* Password Change */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex gap-2 items-center">
+            <CardTitle className="flex items-center gap-2">
               <Key className="w-5 h-5" />
               Bảo mật tài khoản
             </CardTitle>
@@ -382,10 +503,10 @@ const PersonalInfo = () => {
           </CardHeader>
           <CardContent>
             {!showPasswordChange ? (
-              <Button 
+              <Button
                 onClick={() => setShowPasswordChange(true)}
                 variant="outline"
-                className="flex gap-2 items-center w-full"
+                className="flex items-center w-full gap-2"
               >
                 <Key className="w-4 h-4" />
                 Đổi mật khẩu
@@ -400,15 +521,20 @@ const PersonalInfo = () => {
                       id="current_password"
                       type={showPasswords.current ? "text" : "password"}
                       value={passwordData.currentPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({
+                          ...prev,
+                          currentPassword: e.target.value,
+                        }))
+                      }
                       placeholder="Nhập mật khẩu hiện tại"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute top-0 right-0 px-3 py-2 h-full hover:bg-transparent"
-                      onClick={() => togglePasswordVisibility('current')}
+                      className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => togglePasswordVisibility("current")}
                     >
                       {showPasswords.current ? (
                         <EyeOff className="w-4 h-4" />
@@ -427,15 +553,20 @@ const PersonalInfo = () => {
                       id="new_password"
                       type={showPasswords.new ? "text" : "password"}
                       value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({
+                          ...prev,
+                          newPassword: e.target.value,
+                        }))
+                      }
                       placeholder="Nhập mật khẩu mới"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute top-0 right-0 px-3 py-2 h-full hover:bg-transparent"
-                      onClick={() => togglePasswordVisibility('new')}
+                      className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => togglePasswordVisibility("new")}
                     >
                       {showPasswords.new ? (
                         <EyeOff className="w-4 h-4" />
@@ -448,21 +579,28 @@ const PersonalInfo = () => {
 
                 {/* Confirm Password */}
                 <div className="space-y-2">
-                  <Label htmlFor="confirm_password">Xác nhận mật khẩu mới</Label>
+                  <Label htmlFor="confirm_password">
+                    Xác nhận mật khẩu mới
+                  </Label>
                   <div className="relative">
                     <Input
                       id="confirm_password"
                       type={showPasswords.confirm ? "text" : "password"}
                       value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      onChange={(e) =>
+                        setPasswordData((prev) => ({
+                          ...prev,
+                          confirmPassword: e.target.value,
+                        }))
+                      }
                       placeholder="Nhập lại mật khẩu mới"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute top-0 right-0 px-3 py-2 h-full hover:bg-transparent"
-                      onClick={() => togglePasswordVisibility('confirm')}
+                      className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => togglePasswordVisibility("confirm")}
                     >
                       {showPasswords.confirm ? (
                         <EyeOff className="w-4 h-4" />
@@ -475,10 +613,10 @@ const PersonalInfo = () => {
 
                 {/* Password Actions */}
                 <div className="flex gap-2 pt-2">
-                  <Button 
-                    onClick={handlePasswordChange} 
+                  <Button
+                    onClick={handlePasswordChange}
                     disabled={passwordLoading}
-                    className="flex gap-2 items-center"
+                    className="flex items-center gap-2"
                   >
                     {passwordLoading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -487,17 +625,17 @@ const PersonalInfo = () => {
                     )}
                     Đổi mật khẩu
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => {
                       setShowPasswordChange(false);
                       setPasswordData({
-                        currentPassword: '',
-                        newPassword: '',
-                        confirmPassword: ''
+                        currentPassword: "",
+                        newPassword: "",
+                        confirmPassword: "",
                       });
                     }}
                     variant="outline"
-                    className="flex gap-2 items-center"
+                    className="flex items-center gap-2"
                   >
                     <X className="w-4 h-4" />
                     Hủy
@@ -515,7 +653,7 @@ const PersonalInfo = () => {
         {homeroomClasses.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex gap-2 items-center">
+              <CardTitle className="flex items-center gap-2">
                 <School className="w-5 h-5" />
                 Lớp chủ nhiệm
               </CardTitle>
@@ -526,14 +664,21 @@ const PersonalInfo = () => {
             <CardContent>
               <div className="space-y-3">
                 {homeroomClasses.map((classItem, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                    <div className="flex gap-3 items-center">
-                      <div className="flex justify-center items-center w-10 h-10 bg-blue-100 rounded-full">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 rounded-lg bg-blue-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
                         <School className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{classItem.class_name}</p>
-                        <p className="text-sm text-gray-600">Khối {classItem.grade}</p>
+                        <p className="font-medium text-gray-900">
+                          {classItem.class_name}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Khối {classItem.grade}
+                        </p>
                       </div>
                     </div>
                     <Badge variant="secondary">
@@ -550,7 +695,7 @@ const PersonalInfo = () => {
         {subjectClasses.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex gap-2 items-center">
+              <CardTitle className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />
                 Lớp giảng dạy
               </CardTitle>
@@ -561,36 +706,45 @@ const PersonalInfo = () => {
             <CardContent>
               <div className="space-y-3">
                 {subjectClasses.map((item, index) => (
-                  <div key={index} className="p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex gap-3 items-center mb-2">
-                      <div className="flex justify-center items-center w-10 h-10 bg-green-100 rounded-full">
+                  <div
+                    key={index}
+                    className="p-3 border border-green-200 rounded-lg bg-green-50"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
                         <BookOpen className="w-5 h-5 text-green-600" />
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">
-                          {item.subjects?.subject_name || 'N/A'}
+                          {item.subjects?.subject_name || "N/A"}
                         </p>
                         <p className="text-sm text-gray-600">
-                          {item.subjects?.subject_code || 'N/A'}
+                          {item.subjects?.subject_code || "N/A"}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="text-green-800 bg-green-100">
-                        {item.subjects?.subject_code || 'N/A'}
+                      <Badge
+                        variant="secondary"
+                        className="text-green-800 bg-green-100"
+                      >
+                        {item.subjects?.subject_code || "N/A"}
                       </Badge>
                     </div>
                     <div className="ml-13">
                       <p className="text-sm text-gray-700">
-                        <span className="font-medium">Lớp:</span> {item.classes?.class_name || 'N/A'} - Khối {item.classes?.grade || 'N/A'}
+                        <span className="font-medium">Lớp:</span>{" "}
+                        {item.classes?.class_name || "N/A"} - Khối{" "}
+                        {item.classes?.grade || "N/A"}
                       </p>
                       <p className="text-sm text-gray-700">
-                        <span className="font-medium">Trạng thái:</span> 
+                        <span className="font-medium">Trạng thái:</span>
                         <Badge variant="outline" className="ml-1">
-                          {item.is_active ? 'Đang dạy' : 'Tạm dừng'}
+                          {item.is_active ? "Đang dạy" : "Tạm dừng"}
                         </Badge>
                       </p>
                       {item.semester && (
                         <p className="text-sm text-gray-700">
-                          <span className="font-medium">Học kỳ:</span> {item.semester}
+                          <span className="font-medium">Học kỳ:</span>{" "}
+                          {item.semester}
                         </p>
                       )}
                     </div>
@@ -606,8 +760,10 @@ const PersonalInfo = () => {
       {homeroomClasses.length === 0 && subjectClasses.length === 0 && (
         <Card>
           <CardContent className="py-8 text-center">
-            <School className="mx-auto mb-4 w-12 h-12 text-gray-400" />
-            <h3 className="mb-2 text-lg font-medium text-gray-900">Chưa có thông tin giảng dạy</h3>
+            <School className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <h3 className="mb-2 text-lg font-medium text-gray-900">
+              Chưa có thông tin giảng dạy
+            </h3>
             <p className="text-gray-600">
               Bạn chưa được phân công chủ nhiệm lớp hoặc giảng dạy môn học nào.
             </p>
@@ -619,4 +775,3 @@ const PersonalInfo = () => {
 };
 
 export default PersonalInfo;
-
