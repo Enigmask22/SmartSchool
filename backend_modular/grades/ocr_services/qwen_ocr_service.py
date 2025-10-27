@@ -140,36 +140,47 @@ class QwenOCRService:
         prompt = """Bạn là một hệ thống OCR chuyên nghiệp. Đọc bảng điểm học sinh từ ảnh và trích xuất dữ liệu CHÍNH XÁC.
 
 **CẤU TRÚC BẢNG:**
-- Header: id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki
+- Header có thể gồm: id, ho_va_ten, Diem_tx1, Diem_tx2, Diem_tx3, Diem_tx4, Diem_thi_giua_ki, Diem_thi_cuoi_ki
+- HOẶC: id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki (format cũ)
+- QUAN TRỌNG: Đọc chính xác tên cột từ header ảnh, không tự ý sửa
 - Mỗi dòng là thông tin một học sinh
 
 **QUY TẮC:**
 1. **ID học sinh**: Gồm 6 số có dạng 250001, 250002,... 
 2. **Họ tên**: Tên đầy đủ tiếng Việt có dấu
-3. **Điểm số**: 
-   - Số thập phân 0-10, bước 0.25
-   - Chuẩn hóa: 7,25 → 7.25
-   - CHỈ đọc những gì THẤY RÕ, không bịa
+3. **Điểm số - có 3 loại:**
+   - **Điểm số (numeric)**: Số thập phân 0-10, bước 0.25
+     * Chuẩn hóa: 7,25 → 7.25
+   - **Điểm chữ Đ (Đạt)**: "Đ", "D", "Dat", "ĐẠT" → Chuẩn hóa thành "Đ"
+   - **Điểm chữ KĐ (Không Đạt)**: "KĐ", "KD", "Khong Dat" → Chuẩn hóa thành "KĐ"
 4. **Ô trống**: Bỏ qua field đó (không có trong JSON)
+5. **CHỈ đọc những gì THẤY RÕ**, không bịa điểm
 
 **OUTPUT FORMAT (BẮT BUỘC):**
 ```json
 {
   "success": true,
-  "headers": ["id", "ho_va_ten", "diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"],
+  "headers": ["id", "ho_va_ten", "Diem_tx1", "Diem_tx2", "Diem_tx3", "Diem_tx4", "Diem_thi_giua_ki", "Diem_thi_cuoi_ki"],
   "rows": [
     {
       "student_id": "250001",
       "ho_va_ten": "Nguyễn Văn A",
-      "diem_thuong_xuyen": 8.5,
-      "diem_thi_giua_ki": 7.0,
-      "diem_thi_cuoi_ki": 9.0
+      "Diem_tx1": 8.5,
+      "Diem_tx2": 9.0,
+      "Diem_tx3": "Đ",
+      "Diem_tx4": 7.5,
+      "Diem_thi_giua_ki": 8.0,
+      "Diem_thi_cuoi_ki": 9.0
     }
   ],
   "total_rows": 1,
   "errors": []
 }
 ```
+
+**LƯU Ý:**
+- Key JSON phải CHÍNH XÁC theo tên cột header (viết hoa/thường, dấu gạch dưới)
+- Điểm số không hợp lệ (< 0, > 10, hoặc không phải Đ/KĐ) → ghi vào errors
 
 **CHỈ TRẢ VỀ JSON, KHÔNG THÊM VĂN BẢN KHÁC.**
 """
@@ -464,9 +475,11 @@ class QwenOCRService:
         """
         errors = data.get('errors', [])
         rows = data.get('rows', [])
+        headers = data.get('headers', [])
         validated_rows = []
         
-        expected_headers = ['id', 'ho_va_ten', 'diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
+        # Lấy tất cả grade columns (trừ id và ho_va_ten)
+        grade_columns = [col for col in headers if col not in ['id', 'ho_va_ten', 'student_id']]
         
         for idx, row in enumerate(rows, start=1):
             try:
@@ -490,8 +503,8 @@ class QwenOCRService:
                 if 'ho_va_ten' in row:
                     validated_row['ho_va_ten'] = row['ho_va_ten'].strip()
                 
-                # Validate và normalize điểm số
-                for grade_col in ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']:
+                # Validate và normalize TẤT CẢ các cột điểm (dynamic)
+                for grade_col in grade_columns:
                     if grade_col in row:
                         grade = self._normalize_grade(row[grade_col])
                         if grade is not None:
@@ -511,7 +524,7 @@ class QwenOCRService:
         
         return {
             'success': success,
-            'headers': expected_headers,
+            'headers': headers if headers else ['id', 'ho_va_ten'],
             'rows': validated_rows,
             'errors': errors,
             'total_rows': len(validated_rows)
@@ -543,19 +556,32 @@ class QwenOCRService:
         
         return None
     
-    def _normalize_grade(self, grade) -> Optional[float]:
+    def _normalize_grade(self, grade):
         """
-        Chuẩn hóa điểm số
+        Chuẩn hóa điểm số - hỗ trợ cả điểm số (float) và điểm chữ (Đ, KĐ)
         
         Args:
             grade: Raw grade (có thể là int, float, hoặc string)
             
         Returns:
-            Normalized grade (0-10, bước 0.25)
+            - float: Điểm số (0-10, bước 0.25)
+            - str: Điểm chữ ("Đ" hoặc "KĐ")
+            - None: Không hợp lệ
         """
         try:
-            # Convert to float
+            # Nếu là string, check xem có phải điểm chữ không
             if isinstance(grade, str):
+                grade_str = grade.strip().upper()
+                
+                # Điểm chữ "Đ" (Đạt)
+                if grade_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
+                    return 'Đ'
+                
+                # Điểm chữ "KĐ" (Không Đạt)
+                if grade_str in ['KĐ', 'KD', 'KHONG DAT', 'KHÔNG ĐẠT', 'KHONGDAT']:
+                    return 'KĐ'
+                
+                # Nếu không phải điểm chữ, thử convert sang số
                 # Replace comma with dot
                 grade = grade.replace(',', '.')
                 grade = float(grade)

@@ -676,9 +676,8 @@ class ApiService {
   }
 
   async getGradeConfigBySubject(subjectId, academicYear, semester) {
-    return this.request(
-      `/grades/config/${subjectId}?academic_year=${academicYear}&semester=${semester}`
-    );
+    // Sử dụng grade-settings thay vì grade-configs
+    return this.request(`/grade-settings/subject/${subjectId}`);
   }
 
   async getStudentGrade(studentId, classSubjectId, academicYear, semester) {

@@ -100,38 +100,46 @@ Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là 
 **YÊU CẦU QUAN TRỌNG:**
 
 1. **Cấu trúc bảng điểm:**
-   - Header gồm các cột: id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki
+   - Header có thể gồm các cột: id, ho_va_ten, Diem_tx1, Diem_tx2, Diem_tx3, Diem_tx4, Diem_thi_giua_ki, Diem_thi_cuoi_ki
+   - HOẶC: id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki (format cũ)
+   - QUAN TRỌNG: Đọc chính xác tên cột từ header của ảnh, không tự ý thay đổi
    - Mỗi dòng là thông tin của một học sinh
 
 2. **Quy tắc đọc dữ liệu:**
    - **ID học sinh**: Thường có dạng 6 số như 250001, 250002,... 
    - **Họ và tên**: Tên đầy đủ của học sinh (chữ tiếng Việt có dấu)
-   - **Điểm số**: 
-     * Là số thập phân từ 0 đến 10
-     * Bước nhảy 0.25 (ví dụ: 0, 0.25, 0.5, 0.75, 1.0, ..., 9.75, 10)
-     * Giáo viên có thể viết 0.5 hoặc 0,5 (dấu chấm hoặc phẩy đều được)
-     * Hãy chuẩn hóa tất cả điểm số về dạng số thập phân với dấu chấm
+   - **Điểm số - có 3 loại:**
+     * **Điểm số (numeric)**: Số thập phân từ 0 đến 10, bước nhảy 0.25
+       - Ví dụ: 0, 0.25, 0.5, 0.75, 1.0, ..., 9.75, 10
+       - Giáo viên có thể viết 0.5 hoặc 0,5 (dấu chấm hoặc phẩy đều được)
+       - Chuẩn hóa tất cả về dạng số thập phân với dấu chấm
+     * **Điểm chữ Đ (Đạt)**: Viết là "Đ", "D", "Dat", "ĐẠT" - Chuẩn hóa thành chuỗi "Đ"
+     * **Điểm chữ KĐ (Không Đạt)**: Viết là "KĐ", "KD", "Khong Dat", "KHÔNG ĐẠT" - Chuẩn hóa thành chuỗi "KĐ"
 
 3. **Xử lý lỗi OCR thường gặp:**
    - Số 1 có thể bị nhầm với chữ I, l
    - Số 0 có thể bị nhầm với chữ O
    - Số 5 có thể bị nhầm với chữ S
    - Số 7 có thể bị nhầm với dấu /
+   - Chữ "Đ" có thể bị nhầm với "D" hoặc "O"
    - Hãy sửa các lỗi này khi đọc điểm số
 
 4. **Format output (BẮT BUỘC):**
-   Trả về JSON với cấu trúc sau:
+   Trả về JSON với cấu trúc sau (ví dụ với nested columns):
    ```json
    {
      "success": true,
-     "headers": ["id", "ho_va_ten", "diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"],
+     "headers": ["id", "ho_va_ten", "Diem_tx1", "Diem_tx2", "Diem_tx3", "Diem_tx4", "Diem_thi_giua_ki", "Diem_thi_cuoi_ki"],
      "rows": [
        {
          "student_id": "250001",
          "ho_va_ten": "Nguyễn Văn A",
-         "diem_thuong_xuyen": 8.5,
-         "diem_thi_giua_ki": 7.0,
-         "diem_thi_cuoi_ki": 9.0
+         "Diem_tx1": 8.5,
+         "Diem_tx2": 9.0,
+         "Diem_tx3": "Đ",
+         "Diem_tx4": 7.5,
+         "Diem_thi_giua_ki": 8.0,
+         "Diem_thi_cuoi_ki": 9.0
        }
      ],
      "total_rows": 1,
@@ -142,7 +150,8 @@ Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là 
 5. **Xử lý trường hợp đặc biệt:**
    - Nếu ô điểm để trống, bỏ qua trường đó (không có trong JSON)
    - Nếu không đọc được ID học sinh, ghi vào errors
-   - Nếu điểm số không hợp lệ (< 0 hoặc > 10), ghi vào errors
+   - Nếu điểm số không hợp lệ (< 0 hoặc > 10 cho điểm số, hoặc không phải Đ/KĐ cho điểm chữ), ghi vào errors
+   - Key của JSON phải CHÍNH XÁC theo tên cột trong header (viết hoa, viết thường, dấu gạch dưới)
 
 **CHỈ TRẢ VỀ JSON, KHÔNG THÊM BẤT KỲ VÁN BẢN NÀO KHÁC.**
 
@@ -281,9 +290,11 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         """
         errors = data.get('errors', [])
         rows = data.get('rows', [])
+        headers = data.get('headers', [])
         validated_rows = []
         
-        expected_headers = ['id', 'ho_va_ten', 'diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
+        # Lấy tất cả grade columns (trừ id và ho_va_ten)
+        grade_columns = [col for col in headers if col not in ['id', 'ho_va_ten', 'student_id']]
         
         for idx, row in enumerate(rows, start=1):
             try:
@@ -307,8 +318,8 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                 if 'ho_va_ten' in row:
                     validated_row['ho_va_ten'] = row['ho_va_ten'].strip()
                 
-                # Validate và normalize điểm số
-                for grade_col in ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']:
+                # Validate và normalize TẤT CẢ các cột điểm (dynamic)
+                for grade_col in grade_columns:
                     if grade_col in row:
                         grade = self._normalize_grade(row[grade_col])
                         if grade is not None:
@@ -328,7 +339,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         
         return {
             'success': success,
-            'headers': expected_headers,
+            'headers': headers if headers else ['id', 'ho_va_ten'],
             'rows': validated_rows,
             'errors': errors,
             'total_rows': len(validated_rows)
@@ -360,19 +371,32 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         
         return None
     
-    def _normalize_grade(self, grade) -> Optional[float]:
+    def _normalize_grade(self, grade):
         """
-        Chuẩn hóa điểm số
+        Chuẩn hóa điểm số - hỗ trợ cả điểm số (float) và điểm chữ (Đ, KĐ)
         
         Args:
             grade: Raw grade (có thể là int, float, hoặc string)
             
         Returns:
-            Normalized grade (0-10, bước 0.25)
+            - float: Điểm số (0-10, bước 0.25)
+            - str: Điểm chữ ("Đ" hoặc "KĐ")
+            - None: Không hợp lệ
         """
         try:
-            # Convert to float
+            # Nếu là string, check xem có phải điểm chữ không
             if isinstance(grade, str):
+                grade_str = grade.strip().upper()
+                
+                # Điểm chữ "Đ" (Đạt)
+                if grade_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
+                    return 'Đ'
+                
+                # Điểm chữ "KĐ" (Không Đạt)
+                if grade_str in ['KĐ', 'KD', 'KHONG DAT', 'KHÔNG ĐẠT', 'KHONGDAT']:
+                    return 'KĐ'
+                
+                # Nếu không phải điểm chữ, thử convert sang số
                 # Replace comma with dot
                 grade = grade.replace(',', '.')
                 grade = float(grade)

@@ -95,6 +95,18 @@ const AdminManagement = () => {
   const [userSubjects, setUserSubjects] = useState({}); // Map user_id -> [subject_ids] cho import
   const [importLoading, setImportLoading] = useState(false);
 
+  // Grade column config state for grade_settings tab
+  const [gradeColumns, setGradeColumns] = useState([]);
+  const [editingColumnKey, setEditingColumnKey] = useState(null);
+  const [showColumnForm, setShowColumnForm] = useState(false);
+  const [columnFormData, setColumnFormData] = useState({
+    key: "",
+    label: "",
+    he_so: 1,
+    hasSubColumns: false,
+    subColumns: [],
+  });
+
   // Configuration cho từng tab
   const tabConfig = {
     users: {
@@ -197,6 +209,12 @@ const AdminManagement = () => {
       ],
       endpoint: "/admin/class-subjects",
     },
+    grade_settings: {
+      title: "Cấu hình cột điểm",
+      fields: ["subject_id", "grade_column_config"],
+      displayFields: ["id", "subject_name", "grade_column_config", "is_active"],
+      endpoint: "/grade-settings",
+    },
   };
 
   const tabs = [
@@ -206,6 +224,7 @@ const AdminManagement = () => {
     { id: "classes", label: "Lớp học", icon: School },
     // { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck }, // Đã tích hợp vào tab Giáo viên
     { id: "class_subjects", label: "GV-Lớp học", icon: Building },
+    { id: "grade_settings", label: "Cấu hình cột điểm", icon: BookOpen },
     { id: "system_settings", label: "Cấu hình thời gian", icon: Settings },
     { id: "school_config", label: "Cấu hình học tập", icon: School },
   ];
@@ -249,6 +268,15 @@ const AdminManagement = () => {
       const response = await api.request(endpoint);
       if (response.success) {
         let items = response.data || [];
+
+        // Transform data cho grade_settings để lấy subject_name từ nested object
+        if (activeTab === "grade_settings") {
+          items = items.map((item) => ({
+            ...item,
+            subject_name: item.subjects?.subject_name || "-",
+            subject_code: item.subjects?.subject_code || "-",
+          }));
+        }
 
         // No data normalization - keep raw data for form editing
         // Display formatting will be handled in render
@@ -853,310 +881,751 @@ const AdminManagement = () => {
         }}
         className="space-y-4"
       >
-        {currentConfig?.fields?.map((field) => (
-          <div key={field}>
-            <label className="block mb-2 text-sm font-semibold text-gray-800">
-              {field === "password"
-                ? "Mật khẩu"
-                : field === "full_name"
-                ? "Họ tên"
-                : field === "username"
-                ? "Tên đăng nhập"
-                : field === "email"
-                ? "Email"
-                : field === "role"
-                ? "Vai trò"
-                : field === "teacher_code"
-                ? "Mã giáo viên"
-                : field === "subject_code"
-                ? "Mã môn học"
-                : field === "subject_name"
-                ? "Tên môn học"
-                : field === "class_name"
-                ? "Tên lớp"
-                : field === "room_number"
-                ? "Số phòng"
-                : field === "academic_year"
-                ? "Năm học"
-                : field === "teacher_id"
-                ? "Giáo viên"
-                : field === "subject_id"
-                ? "Môn học"
-                : field === "class_id"
-                ? "Lớp học"
-                : field === "homeroom_teacher_id"
-                ? "Giáo viên chủ nhiệm"
-                : field === "phone"
-                ? "Số điện thoại"
-                : field === "date_of_birth"
-                ? "Ngày sinh"
-                : field === "gender"
-                ? "Giới tính"
-                : field === "description"
-                ? "Mô tả"
-                : field === "grade"
-                ? "Khối"
-                : field === "semester"
-                ? "Học kỳ"
-                : field.replace(/_/g, " ")}
-              {field !== "description" &&
-              field !== "phone" &&
-              field !== "homeroom_teacher_id" &&
-              field !== "user_id" &&
-              field !== "username"
-                ? " *"
-                : ""}
-            </label>
+        {currentConfig?.fields
+          ?.filter((field) => {
+            // Skip grade_column_config vì nó có Visual Editor riêng
+            if (
+              activeTab === "grade_settings" &&
+              field === "grade_column_config"
+            ) {
+              return false;
+            }
+            return true;
+          })
+          .map((field) => (
+            <div key={field}>
+              <label className="block mb-2 text-sm font-semibold text-gray-800">
+                {field === "password"
+                  ? "Mật khẩu"
+                  : field === "full_name"
+                  ? "Họ tên"
+                  : field === "username"
+                  ? "Tên đăng nhập"
+                  : field === "email"
+                  ? "Email"
+                  : field === "role"
+                  ? "Vai trò"
+                  : field === "teacher_code"
+                  ? "Mã giáo viên"
+                  : field === "subject_code"
+                  ? "Mã môn học"
+                  : field === "subject_name"
+                  ? "Tên môn học"
+                  : field === "class_name"
+                  ? "Tên lớp"
+                  : field === "room_number"
+                  ? "Số phòng"
+                  : field === "academic_year"
+                  ? "Năm học"
+                  : field === "teacher_id"
+                  ? "Giáo viên"
+                  : field === "subject_id"
+                  ? "Môn học"
+                  : field === "class_id"
+                  ? "Lớp học"
+                  : field === "homeroom_teacher_id"
+                  ? "Giáo viên chủ nhiệm"
+                  : field === "phone"
+                  ? "Số điện thoại"
+                  : field === "date_of_birth"
+                  ? "Ngày sinh"
+                  : field === "gender"
+                  ? "Giới tính"
+                  : field === "description"
+                  ? "Mô tả"
+                  : field === "grade"
+                  ? "Khối"
+                  : field === "semester"
+                  ? "Học kỳ"
+                  : field.replace(/_/g, " ")}
+                {field !== "description" &&
+                field !== "phone" &&
+                field !== "homeroom_teacher_id" &&
+                field !== "user_id" &&
+                field !== "username"
+                  ? " *"
+                  : ""}
+              </label>
 
-            {field === "role" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) => handleChange(field, e.target.value)}
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                required
-              >
-                <option value="">Chọn vai trò</option>
-                <option value="teacher">Giáo viên</option>
-                <option value="homeroom_teacher">Giáo viên chủ nhiệm</option>
-              </select>
-            ) : field === "teacher_id" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) =>
-                  handleChange(
-                    field,
-                    e.target.value ? parseInt(e.target.value) : null
-                  )
-                }
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                required
-                disabled={
-                  activeTab === "class_subjects" && !formData.subject_id
-                }
-              >
-                <option value="">
-                  {activeTab === "class_subjects" && !formData.subject_id
-                    ? "Vui lòng chọn môn học trước"
-                    : "Chọn giáo viên"}
-                </option>
-                {(activeTab === "class_subjects"
-                  ? filteredTeachers
-                  : teachers
-                ).map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.teacher_code} - {teacher.full_name}
-                  </option>
-                ))}
-              </select>
-            ) : field === "subject_id" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) =>
-                  handleChange(
-                    field,
-                    e.target.value ? parseInt(e.target.value) : null
-                  )
-                }
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                required
-              >
-                <option value="">Chọn môn học</option>
-                {subjects.map((subject) => (
-                  <option key={subject.id} value={subject.id}>
-                    {subject.subject_code} - {subject.subject_name}
-                  </option>
-                ))}
-              </select>
-            ) : field === "class_id" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) => handleChange(field, parseInt(e.target.value))}
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                required
-              >
-                <option value="">Chọn lớp</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.class_name} - {cls.grade}
-                  </option>
-                ))}
-              </select>
-            ) : field === "homeroom_teacher_id" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) =>
-                  handleChange(
-                    field,
-                    e.target.value ? parseInt(e.target.value) : null
-                  )
-                }
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Chọn GVCN (tùy chọn)</option>
-                {homeroomTeachers.map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.teacher_code} - {teacher.full_name}
-                  </option>
-                ))}
-              </select>
-            ) : field === "gender" ? (
-              <Select
-                value={
-                  formData[field] ||
-                  (item?.[field] && item[field] !== "-" ? item[field] : "Nam")
-                }
-                onValueChange={(value) => handleChange(field, value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn giới tính" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Nam">Nam</SelectItem>
-                  <SelectItem value="Nữ">Nữ</SelectItem>
-                  <SelectItem value="Khác">Khác</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : field === "date_of_birth" ? (
-              <div className="w-full">
-                <SimpleDatePicker
-                  value={
-                    formData[field] ||
-                    (item?.[field] && item[field] !== "-" ? item[field] : "")
-                  }
-                  onChange={(date) => handleChange(field, date)}
-                  placeholder="Chọn ngày sinh"
-                />
-              </div>
-            ) : field === "user_id" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) =>
-                  handleChange(
-                    field,
-                    e.target.value ? parseInt(e.target.value) : null
-                  )
-                }
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Chọn người dùng (tùy chọn)</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.email} - {user.full_name}
-                  </option>
-                ))}
-              </select>
-            ) : field === "semester" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) => handleChange(field, e.target.value)}
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                required
-              >
-                <option value="">Chọn học kỳ</option>
-                <option value="HK1">Học kỳ 1</option>
-                <option value="HK2">Học kỳ 2</option>
-                <option value="HK3">Học kỳ 3</option>
-              </select>
-            ) : field === "grade" ? (
-              <select
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) => handleChange(field, e.target.value)}
-                className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                required
-              >
-                <option value="">Chọn khối</option>
-                <option value="10">Khối 10</option>
-                <option value="11">Khối 11</option>
-                <option value="12">Khối 12</option>
-              </select>
-            ) : field.includes("description") ? (
-              <textarea
-                value={formData[field] || item?.[field] || ""}
-                onChange={(e) => handleChange(field, e.target.value)}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                rows="3"
-              />
-            ) : field === "password" && isEdit ? (
-              // Bỏ trường password khi edit
-              <div className="flex items-center w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-muted text-muted-foreground">
-                Mật khẩu không thể thay đổi ở đây. Người dùng có thể tự đổi mật
-                khẩu trong phần cài đặt.
-              </div>
-            ) : (
-              <div className="relative">
-                <Input
-                  type={
-                    field.includes("email")
-                      ? "email"
-                      : field.includes("phone")
-                      ? "tel"
-                      : field === "password"
-                      ? showPassword
-                        ? "text"
-                        : "password"
-                      : "text"
-                  }
-                  value={
-                    formData[field] ||
-                    (item?.[field] && item[field] !== "-" ? item[field] : "")
-                  }
+              {field === "role" ? (
+                <select
+                  value={formData[field] || item?.[field] || ""}
                   onChange={(e) => handleChange(field, e.target.value)}
-                  placeholder={
-                    field === "username"
-                      ? "ho_va_ten.ten_truong.ten_tinh"
-                      : field === "phone"
-                      ? "Nhập số điện thoại"
-                      : field === "teacher_code"
-                      ? "Nhập mã giáo viên"
-                      : ""
+                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  required
+                >
+                  <option value="">Chọn vai trò</option>
+                  <option value="teacher">Giáo viên</option>
+                  <option value="homeroom_teacher">Giáo viên chủ nhiệm</option>
+                </select>
+              ) : field === "teacher_id" ? (
+                <select
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(e) =>
+                    handleChange(
+                      field,
+                      e.target.value ? parseInt(e.target.value) : null
+                    )
                   }
-                  required={
-                    field !== "description" &&
-                    field !== "phone" &&
-                    field !== "homeroom_teacher_id" &&
-                    field !== "user_id" &&
-                    field !== "username"
+                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  required
+                  disabled={
+                    activeTab === "class_subjects" && !formData.subject_id
                   }
+                >
+                  <option value="">
+                    {activeTab === "class_subjects" && !formData.subject_id
+                      ? "Vui lòng chọn môn học trước"
+                      : "Chọn giáo viên"}
+                  </option>
+                  {(activeTab === "class_subjects"
+                    ? filteredTeachers
+                    : teachers
+                  ).map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.teacher_code} - {teacher.full_name}
+                    </option>
+                  ))}
+                </select>
+              ) : field === "subject_id" ? (
+                <>
+                  <select
+                    value={formData[field] || item?.[field] || ""}
+                    onChange={(e) =>
+                      handleChange(
+                        field,
+                        e.target.value ? parseInt(e.target.value) : null
+                      )
+                    }
+                    className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    required
+                    disabled={activeTab === "grade_settings" && isEdit}
+                  >
+                    <option value="">Chọn môn học</option>
+                    {subjects.map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.subject_code} - {subject.subject_name}
+                      </option>
+                    ))}
+                  </select>
+                  {activeTab === "grade_settings" && isEdit && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      ⚠️ Môn học không thể thay đổi sau khi tạo
+                    </p>
+                  )}
+                </>
+              ) : field === "class_id" ? (
+                <select
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(e) =>
+                    handleChange(field, parseInt(e.target.value))
+                  }
+                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  required
+                >
+                  <option value="">Chọn lớp</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.class_name} - {cls.grade}
+                    </option>
+                  ))}
+                </select>
+              ) : field === "homeroom_teacher_id" ? (
+                <select
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(e) =>
+                    handleChange(
+                      field,
+                      e.target.value ? parseInt(e.target.value) : null
+                    )
+                  }
+                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Chọn GVCN (tùy chọn)</option>
+                  {homeroomTeachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.teacher_code} - {teacher.full_name}
+                    </option>
+                  ))}
+                </select>
+              ) : field === "gender" ? (
+                <Select
+                  value={
+                    formData[field] ||
+                    (item?.[field] && item[field] !== "-" ? item[field] : "Nam")
+                  }
+                  onValueChange={(value) => handleChange(field, value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nam">Nam</SelectItem>
+                    <SelectItem value="Nữ">Nữ</SelectItem>
+                    <SelectItem value="Khác">Khác</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : field === "date_of_birth" ? (
+                <div className="w-full">
+                  <SimpleDatePicker
+                    value={
+                      formData[field] ||
+                      (item?.[field] && item[field] !== "-" ? item[field] : "")
+                    }
+                    onChange={(date) => handleChange(field, date)}
+                    placeholder="Chọn ngày sinh"
+                  />
+                </div>
+              ) : field === "user_id" ? (
+                <select
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(e) =>
+                    handleChange(
+                      field,
+                      e.target.value ? parseInt(e.target.value) : null
+                    )
+                  }
+                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Chọn người dùng (tùy chọn)</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.email} - {user.full_name}
+                    </option>
+                  ))}
+                </select>
+              ) : field === "semester" ? (
+                <select
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(e) => handleChange(field, e.target.value)}
+                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  required
+                >
+                  <option value="">Chọn học kỳ</option>
+                  <option value="HK1">Học kỳ 1</option>
+                  <option value="HK2">Học kỳ 2</option>
+                  <option value="HK3">Học kỳ 3</option>
+                </select>
+              ) : field === "grade" ? (
+                <select
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(e) => handleChange(field, e.target.value)}
+                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  required
+                >
+                  <option value="">Chọn khối</option>
+                  <option value="10">Khối 10</option>
+                  <option value="11">Khối 11</option>
+                  <option value="12">Khối 12</option>
+                </select>
+              ) : field.includes("description") ? (
+                <textarea
+                  value={formData[field] || item?.[field] || ""}
+                  onChange={(e) => handleChange(field, e.target.value)}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  rows="3"
                 />
-                {field === "password" && !isEdit && (
-                  <div className="absolute flex space-x-1 transform -translate-y-1/2 right-2 top-1/2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleGeneratePassword}
-                      className="w-6 h-6 p-0 text-green-700 hover:bg-green-100"
-                      title="Tạo mật khẩu tự động"
-                    >
-                      <Shuffle className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="w-6 h-6 p-0 text-blue-700 hover:bg-blue-100"
-                      title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-3 h-3" />
-                      ) : (
-                        <Eye className="w-3 h-3" />
-                      )}
-                    </Button>
+              ) : field === "password" && isEdit ? (
+                // Bỏ trường password khi edit
+                <div className="flex items-center w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-muted text-muted-foreground">
+                  Mật khẩu không thể thay đổi ở đây. Người dùng có thể tự đổi
+                  mật khẩu trong phần cài đặt.
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    type={
+                      field.includes("email")
+                        ? "email"
+                        : field.includes("phone")
+                        ? "tel"
+                        : field === "password"
+                        ? showPassword
+                          ? "text"
+                          : "password"
+                        : "text"
+                    }
+                    value={
+                      formData[field] ||
+                      (item?.[field] && item[field] !== "-" ? item[field] : "")
+                    }
+                    onChange={(e) => handleChange(field, e.target.value)}
+                    placeholder={
+                      field === "username"
+                        ? "ho_va_ten.ten_truong.ten_tinh"
+                        : field === "phone"
+                        ? "Nhập số điện thoại"
+                        : field === "teacher_code"
+                        ? "Nhập mã giáo viên"
+                        : ""
+                    }
+                    required={
+                      field !== "description" &&
+                      field !== "phone" &&
+                      field !== "homeroom_teacher_id" &&
+                      field !== "user_id" &&
+                      field !== "username"
+                    }
+                  />
+                  {field === "password" && !isEdit && (
+                    <div className="absolute flex space-x-1 transform -translate-y-1/2 right-2 top-1/2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleGeneratePassword}
+                        className="w-6 h-6 p-0 text-green-700 hover:bg-green-100"
+                        title="Tạo mật khẩu tự động"
+                      >
+                        <Shuffle className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="w-6 h-6 p-0 text-blue-700 hover:bg-blue-100"
+                        title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-3 h-3" />
+                        ) : (
+                          <Eye className="w-3 h-3" />
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {field === "username" && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Tùy chọn. Format: tên.school.province (VD:
+                  nguyen_thi_lan.chuyen_le_quy_don.tphcm)
+                </p>
+              )}
+            </div>
+          ))}
+
+        {/* Grade Column Config Editor for grade_settings tab */}
+        {activeTab === "grade_settings" && (
+          <div className="p-6 mt-6 space-y-4 border rounded-lg border-border bg-muted/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Cấu hình cột điểm
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Thiết lập các cột điểm và hệ số cho môn học
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => {
+                  setShowColumnForm(true);
+                  setEditingColumnKey(null);
+                  setColumnFormData({
+                    key: "",
+                    label: "",
+                    he_so: 1,
+                    hasSubColumns: false,
+                    subColumns: [],
+                  });
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm cột điểm
+              </Button>
+            </div>
+
+            {/* Column Form */}
+            {showColumnForm && (
+              <div className="p-4 space-y-4 border rounded-lg bg-background">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-900">
+                    {editingColumnKey
+                      ? "Chỉnh sửa cột điểm"
+                      : "Thêm cột điểm mới"}
+                  </h4>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowColumnForm(false);
+                      setEditingColumnKey(null);
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block mb-2 text-sm font-medium">
+                      Key (tên trường) *
+                    </label>
+                    <Input
+                      value={columnFormData.key}
+                      onChange={(e) =>
+                        setColumnFormData({
+                          ...columnFormData,
+                          key: e.target.value,
+                        })
+                      }
+                      placeholder="VD: Diem_thuong_xuyen"
+                      disabled={!!editingColumnKey}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Không dấu, viết liền, dùng _
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block mb-2 text-sm font-medium">
+                      Label (hiển thị) *
+                    </label>
+                    <Input
+                      value={columnFormData.label}
+                      onChange={(e) =>
+                        setColumnFormData({
+                          ...columnFormData,
+                          label: e.target.value,
+                        })
+                      }
+                      placeholder="VD: Điểm thường xuyên"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 text-sm font-medium">
+                      Hệ số *
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={columnFormData.he_so}
+                      onChange={(e) =>
+                        setColumnFormData({
+                          ...columnFormData,
+                          he_so: parseInt(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Sub-columns toggle */}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="hasSubColumns"
+                    checked={columnFormData.hasSubColumns}
+                    onChange={(e) => {
+                      setColumnFormData({
+                        ...columnFormData,
+                        hasSubColumns: e.target.checked,
+                        subColumns: e.target.checked
+                          ? columnFormData.subColumns
+                          : [],
+                      });
+                    }}
+                    className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary"
+                  />
+                  <label
+                    htmlFor="hasSubColumns"
+                    className="text-sm font-medium"
+                  >
+                    Có cột con (nested columns)
+                  </label>
+                </div>
+
+                {/* Sub-columns editor */}
+                {columnFormData.hasSubColumns && (
+                  <div className="p-4 space-y-3 border rounded-lg bg-muted/50">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Các cột con</label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setColumnFormData({
+                            ...columnFormData,
+                            subColumns: [
+                              ...columnFormData.subColumns,
+                              { key: "", label: "", he_so: 1 },
+                            ],
+                          });
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Thêm cột con
+                      </Button>
+                    </div>
+
+                    {columnFormData.subColumns.map((subCol, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-background"
+                      >
+                        <div>
+                          <Input
+                            value={subCol.key}
+                            onChange={(e) => {
+                              const newSubCols = [...columnFormData.subColumns];
+                              newSubCols[idx].key = e.target.value;
+                              setColumnFormData({
+                                ...columnFormData,
+                                subColumns: newSubCols,
+                              });
+                            }}
+                            placeholder="Key"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            value={subCol.label}
+                            onChange={(e) => {
+                              const newSubCols = [...columnFormData.subColumns];
+                              newSubCols[idx].label = e.target.value;
+                              setColumnFormData({
+                                ...columnFormData,
+                                subColumns: newSubCols,
+                              });
+                            }}
+                            placeholder="Label"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={subCol.he_so}
+                            onChange={(e) => {
+                              const newSubCols = [...columnFormData.subColumns];
+                              newSubCols[idx].he_so =
+                                parseInt(e.target.value) || 1;
+                              setColumnFormData({
+                                ...columnFormData,
+                                subColumns: newSubCols,
+                              });
+                            }}
+                            placeholder="Hệ số"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              const newSubCols =
+                                columnFormData.subColumns.filter(
+                                  (_, i) => i !== idx
+                                );
+                              setColumnFormData({
+                                ...columnFormData,
+                                subColumns: newSubCols,
+                              });
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowColumnForm(false);
+                      setEditingColumnKey(null);
+                    }}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!columnFormData.key || !columnFormData.label) {
+                        alert("Vui lòng nhập đầy đủ Key và Label");
+                        return;
+                      }
+
+                      const newColumn = {
+                        key: columnFormData.key,
+                        label: columnFormData.label,
+                        he_so: columnFormData.he_so,
+                      };
+
+                      if (
+                        columnFormData.hasSubColumns &&
+                        columnFormData.subColumns.length > 0
+                      ) {
+                        newColumn.data = {};
+                        columnFormData.subColumns.forEach((sub) => {
+                          if (sub.key && sub.label) {
+                            newColumn.data[sub.key] = {
+                              label: sub.label,
+                              he_so: sub.he_so,
+                            };
+                          }
+                        });
+                      }
+
+                      let updatedColumns;
+                      if (editingColumnKey) {
+                        // Update existing column
+                        updatedColumns = gradeColumns.map((col) =>
+                          col.key === editingColumnKey ? newColumn : col
+                        );
+                      } else {
+                        // Add new column
+                        updatedColumns = [...gradeColumns, newColumn];
+                      }
+
+                      setGradeColumns(updatedColumns);
+
+                      // Convert to grade_column_config format
+                      const configObj = {};
+                      updatedColumns.forEach((col) => {
+                        configObj[col.key] = {
+                          label: col.label,
+                          he_so: col.he_so,
+                        };
+                        if (col.data) {
+                          configObj[col.key].data = col.data;
+                        }
+                      });
+
+                      setFormData({
+                        ...formData,
+                        grade_column_config: configObj,
+                      });
+
+                      setShowColumnForm(false);
+                      setEditingColumnKey(null);
+                    }}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {editingColumnKey ? "Cập nhật" : "Thêm"}
+                  </Button>
+                </div>
               </div>
             )}
 
-            {field === "username" && (
-              <p className="mt-1 text-xs text-gray-500">
-                Tùy chọn. Format: tên.school.province (VD:
-                nguyen_thi_lan.chuyen_le_quy_don.tphcm)
-              </p>
+            {/* Display existing columns */}
+            {gradeColumns.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Các cột điểm hiện tại:
+                </label>
+                <div className="space-y-2">
+                  {gradeColumns.map((column, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-background"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="bg-blue-50">
+                            {column.key}
+                          </Badge>
+                          <span className="font-medium">{column.label}</span>
+                          <Badge variant="secondary">
+                            Hệ số: {column.he_so}
+                          </Badge>
+                        </div>
+                        {column.data && Object.keys(column.data).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2 ml-4">
+                            {Object.entries(column.data).map(
+                              ([subKey, subVal]) => (
+                                <Badge
+                                  key={subKey}
+                                  variant="outline"
+                                  className="bg-green-50"
+                                >
+                                  {subKey}: {subVal.label} (HS: {subVal.he_so})
+                                </Badge>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingColumnKey(column.key);
+                            setColumnFormData({
+                              key: column.key,
+                              label: column.label,
+                              he_so: column.he_so,
+                              hasSubColumns: !!column.data,
+                              subColumns: column.data
+                                ? Object.entries(column.data).map(
+                                    ([key, val]) => ({
+                                      key,
+                                      label: val.label,
+                                      he_so: val.he_so,
+                                    })
+                                  )
+                                : [],
+                            });
+                            setShowColumnForm(true);
+                          }}
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            const updatedColumns = gradeColumns.filter(
+                              (_, i) => i !== idx
+                            );
+                            setGradeColumns(updatedColumns);
+
+                            // Update formData
+                            const configObj = {};
+                            updatedColumns.forEach((col) => {
+                              configObj[col.key] = {
+                                label: col.label,
+                                he_so: col.he_so,
+                              };
+                              if (col.data) {
+                                configObj[col.key].data = col.data;
+                              }
+                            });
+
+                            setFormData({
+                              ...formData,
+                              grade_column_config: configObj,
+                            });
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {gradeColumns.length === 0 && !showColumnForm && (
+              <div className="py-8 text-center text-gray-500 rounded-lg bg-gray-50">
+                <BookOpen className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                <p>Chưa có cột điểm nào. Nhấn "Thêm cột điểm" để bắt đầu.</p>
+              </div>
             )}
           </div>
-        ))}
+        )}
 
         {/* Multi-select môn học cho teachers */}
         {activeTab === "teachers" && (
@@ -1215,6 +1684,12 @@ const AdminManagement = () => {
               }
               setFormData({});
               setShowPassword(false);
+              // Reset grade columns
+              if (activeTab === "grade_settings") {
+                setGradeColumns([]);
+                setShowColumnForm(false);
+                setEditingColumnKey(null);
+              }
             }}
           >
             <X className="w-4 h-4 mr-2" />
@@ -1312,6 +1787,9 @@ const AdminManagement = () => {
                       // Khởi tạo formData với giá trị mặc định cho teachers
                       if (activeTab === "teachers") {
                         setFormData({ gender: "Nam" });
+                      } else if (activeTab === "grade_settings") {
+                        setFormData({});
+                        setGradeColumns([]);
                       } else {
                         setFormData({});
                       }
@@ -1336,12 +1814,13 @@ const AdminManagement = () => {
                   />
                 </div>
 
-                {/* Checkbox hiển thị đã xóa - chỉ hiện cho Users, Teachers và Subjects */}
+                {/* Checkbox hiển thị đã xóa - chỉ hiện cho Users, Teachers, Subjects, và Grade Settings */}
                 {(activeTab === "users" ||
                   activeTab === "teachers" ||
                   activeTab === "subjects" ||
                   activeTab === "subject_teachers" ||
-                  activeTab === "class_subjects") && (
+                  activeTab === "class_subjects" ||
+                  activeTab === "grade_settings") && (
                   <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
                     <input
                       type="checkbox"
@@ -1470,6 +1949,8 @@ const AdminManagement = () => {
                               ? "GIỚI TÍNH"
                               : field === "phone"
                               ? "SDT"
+                              : field === "grade_column_config"
+                              ? "CẤU HÌNH CỘT ĐIỂM"
                               : field.replace(/_/g, " ").toUpperCase()}
                           </TableHead>
                         ))}
@@ -1588,6 +2069,45 @@ const AdminManagement = () => {
                                   >
                                     {item[field] ?? "-"}
                                   </span>
+                                ) : field === "grade_column_config" ? (
+                                  // Hiển thị grade_column_config với badges
+                                  <div className="max-w-md">
+                                    {item[field] &&
+                                    typeof item[field] === "object" ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {Object.entries(item[field]).map(
+                                          ([key, value]) => (
+                                            <div
+                                              key={key}
+                                              className="flex items-center gap-1"
+                                            >
+                                              <Badge
+                                                variant="outline"
+                                                className="text-xs text-purple-700 border-purple-200 bg-purple-50"
+                                              >
+                                                {value.label} (HS: {value.he_so}
+                                                )
+                                              </Badge>
+                                              {value.data && (
+                                                <span className="text-xs text-gray-500">
+                                                  [
+                                                  {
+                                                    Object.keys(value.data)
+                                                      .length
+                                                  }{" "}
+                                                  cột con]
+                                                </span>
+                                              )}
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs italic text-gray-400">
+                                        Chưa cấu hình
+                                      </span>
+                                    )}
+                                  </div>
                                 ) : (
                                   item[field] ?? "-"
                                 )}
@@ -1658,6 +2178,26 @@ const AdminManagement = () => {
                                             initData
                                           );
                                           setFormData(initData);
+                                        } else if (
+                                          activeTab === "grade_settings"
+                                        ) {
+                                          // Load grade_column_config khi edit grade settings
+                                          setFormData(item);
+
+                                          // Parse grade_column_config thành gradeColumns array
+                                          if (item.grade_column_config) {
+                                            const columnsArray = Object.entries(
+                                              item.grade_column_config
+                                            ).map(([key, value]) => ({
+                                              key,
+                                              label: value.label,
+                                              he_so: value.he_so,
+                                              data: value.data || null,
+                                            }));
+                                            setGradeColumns(columnsArray);
+                                          } else {
+                                            setGradeColumns([]);
+                                          }
                                         } else {
                                           setFormData(item);
                                         }
@@ -1792,12 +2332,12 @@ const AdminManagement = () => {
                             }`}
                           >
                             <div className="flex items-start justify-between">
-                              <div className="flex items-start space-x-3 flex-1">
+                              <div className="flex items-start flex-1 space-x-3">
                                 <input
                                   type="checkbox"
                                   checked={selectedUserIds.includes(user.id)}
                                   onChange={() => handleUserSelect(user.id)}
-                                  className="mt-1 w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                                  className="w-4 h-4 mt-1 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
                                 />
                                 <div className="flex-1">
                                   <div className="flex items-center space-x-2">
@@ -1865,7 +2405,7 @@ const AdminManagement = () => {
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right ml-4">
+                              <div className="ml-4 text-right">
                                 <p className="text-sm font-medium text-gray-900">
                                   ID: {user.id}
                                 </p>
