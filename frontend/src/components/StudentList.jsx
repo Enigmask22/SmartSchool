@@ -1265,17 +1265,37 @@ const StudentList = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Phiếu điểm");
 
-      // Set column widths
+      // Page setup for A4 and fit-to-width
+      worksheet.pageSetup = {
+        paperSize: 9, // A4
+        orientation: "portrait",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: {
+          left: 0.3,
+          right: 0.3,
+          top: 0.5,
+          bottom: 0.5,
+          header: 0.2,
+          footer: 0.2,
+        },
+        horizontalCentered: true,
+      };
+
+      // Set column widths to fit A4 template: Môn học | TX | GK | CK | TBM HK (không có STT)
       worksheet.columns = [
-        { width: 18 }, // Column A
-        { width: 40 }, // Column B
-        { width: 24 }, // Column C
+        { width: 15 }, // A - Môn học (rộng hơn)
+        { width: 18 }, // B - Điểm, đánh giá thường xuyên (gộp, hẹp hơn)
+        { width: 8 }, // C - GK
+        { width: 8 }, // D - CK
+        { width: 10 }, // E - TBM HK
       ];
 
       let currentRow = 1;
 
-      // Title
-      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      // Title (merge A:E and center)
+      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
       const titleCell = worksheet.getCell(`A${currentRow}`);
       titleCell.value = "PHIẾU ĐIỂM HỌC SINH";
       titleCell.font = { bold: true, size: 14 };
@@ -1298,22 +1318,24 @@ const StudentList = () => {
 
       // Academic year and semester
       worksheet.getCell(`A${currentRow}`).value = `Năm học: ${academicYear}`;
-      worksheet.getCell(`C${currentRow}`).value = `Học kỳ: ${semester}`;
+      const semesterCell = worksheet.getCell(`E${currentRow}`);
+      semesterCell.value = `Học kỳ: ${semester}`;
+      semesterCell.alignment = { horizontal: "right", vertical: "middle" };
       currentRow += 2; // Skip a row
 
       // Student info
       worksheet.getCell(
         `A${currentRow}`
       ).value = `Học sinh: ${student.full_name}`;
-      worksheet.getCell(
-        `C${currentRow}`
-      ).value = `Mã số: ${student.student_id}`;
+      const studentIdCell = worksheet.getCell(`E${currentRow}`);
+      studentIdCell.value = `Mã số: ${student.student_id}`;
+      studentIdCell.alignment = { horizontal: "right", vertical: "middle" };
       currentRow += 2; // Skip a row
 
       // Grades section
       if (grades.length > 0) {
-        // Section title
-        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        // Section title (merge A:E and center)
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
         const gradeTitleCell = worksheet.getCell(`A${currentRow}`);
         gradeTitleCell.value = "BẢNG ĐIỂM TỔNG KẾT";
         gradeTitleCell.font = { bold: true, size: 11 };
@@ -1332,15 +1354,21 @@ const StudentList = () => {
               ).toFixed(2)
             : "N/A";
 
-        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
         worksheet.getCell(
           `A${currentRow}`
         ).value = `Điểm trung bình học kỳ: ${overallAverage}`;
         currentRow += 2; // Skip a row
 
-        // Table headers
+        // Table headers: Môn học | Điểm, đánh giá thường xuyên | GK | CK | TBM HK
         const headerRow = worksheet.getRow(currentRow);
-        headerRow.values = ["STT", "Môn học", "Điểm trung bình"];
+        headerRow.values = [
+          "Môn học",
+          "Điểm thường xuyên",
+          "GK",
+          "CK",
+          "TBM HK",
+        ];
         headerRow.font = { bold: true };
         headerRow.fill = {
           type: "pattern",
@@ -1349,7 +1377,7 @@ const StudentList = () => {
         };
 
         // Apply borders and alignment to header
-        ["A", "B", "C"].forEach((col) => {
+        ["A", "B", "C", "D", "E"].forEach((col) => {
           const cell = worksheet.getCell(`${col}${currentRow}`);
           cell.alignment = { horizontal: "left", vertical: "middle" };
           cell.border = {
@@ -1361,21 +1389,101 @@ const StudentList = () => {
         });
         currentRow++;
 
-        // Grade data rows
-        grades.forEach((grade, index) => {
-          const dataRow = worksheet.getRow(currentRow);
-          dataRow.values = [
-            index + 1,
-            grade.subject_name || "N/A",
-            grade.final_grade !== null && grade.final_grade !== undefined
-              ? grade.final_grade
-              : "",
-          ];
+        // Helpers to extract TX/GK/CK safely from grade_data
+        const getCellScore = (obj) => {
+          if (!obj) return "";
+          const v = obj.Diem ?? obj.diem ?? obj.value ?? obj;
+          return v !== undefined && v !== null ? v : "";
+        };
 
-          // Apply borders and LEFT alignment to all cells
-          ["A", "B", "C"].forEach((col) => {
+        const getTXString = (grade) => {
+          const data = grade?.grade_data || {};
+          // Ưu tiên bắt các khóa dạng Thường xuyên hoặc TX (TX1, TX_2, Diem_tx3...)
+          let keys = Object.keys(data).filter((k) =>
+            /(diem[_ ]?thuong[_ ]?xuyen|^tx[_ ]?\d+|diem[_ ]?tx[_ ]?\d+)/i.test(
+              k
+            )
+          );
+          // Nếu tồn tại parent Diem_thuong_xuyen dạng object lồng, dồn các child vào
+          if (keys.length === 0) {
+            const parentKey = Object.keys(data).find((k) =>
+              /diem[_ ]?thuong[_ ]?xuyen/i.test(k)
+            );
+            const parent =
+              parentKey && typeof data[parentKey] === "object"
+                ? data[parentKey]
+                : null;
+            if (parent) {
+              keys = Object.keys(parent);
+              return keys
+                .map((k) => ({
+                  order: parseInt((k.match(/(\d+)/) || [])[1] || "0", 10),
+                  value: getCellScore(parent[k]),
+                }))
+                .sort((a, b) => a.order - b.order)
+                .map((e) =>
+                  e.value !== null && e.value !== undefined
+                    ? String(e.value)
+                    : ""
+                )
+                .filter((s) => s !== "")
+                .join(" ");
+            }
+          }
+          // Fallback: nếu không tìm thấy, lấy các khóa có số thứ tự nhưng không phải giữa kì/cuối kì
+          if (keys.length === 0) {
+            keys = Object.keys(data).filter(
+              (k) =>
+                /(\d+)/.test(k) &&
+                !/(giua[_ ]?ki|cuoi[_ ]?ki|hk|final|tbm?)/i.test(k)
+            );
+          }
+          const entries = keys
+            .map((k) => ({
+              key: k,
+              order: parseInt((k.match(/(\d+)/) || [])[1] || "0", 10),
+              value: getCellScore(data[k]),
+            }))
+            .sort((a, b) => a.order - b.order);
+          return entries
+            .map((e) =>
+              e.value !== null && e.value !== undefined ? String(e.value) : ""
+            )
+            .filter((s) => s !== "")
+            .join(" ");
+        };
+
+        const getSingleScore = (grade, typeRegex) => {
+          const data = grade?.grade_data || {};
+          // Trường hợp phẳng
+          let key = Object.keys(data).find((k) => typeRegex.test(k));
+          if (key) return getCellScore(data[key]);
+          // Trường hợp lồng: Diem_thi_giua_ki: { Giua_ki: {...} }
+          const parentKey = Object.keys(data).find((k) => typeRegex.test(k));
+          const parent =
+            parentKey && typeof data[parentKey] === "object"
+              ? data[parentKey]
+              : null;
+          if (parent) {
+            const childKey = Object.keys(parent)[0];
+            return childKey ? getCellScore(parent[childKey]) : "";
+          }
+          return "";
+        };
+
+        // Grade data rows
+        grades.forEach((grade) => {
+          const tx = getTXString(grade);
+          const gk = getSingleScore(grade, /giua[_ ]?ki/i);
+          const ck = getSingleScore(grade, /cuoi[_ ]?ki/i);
+          const tbm = grade.final_grade ?? "";
+
+          const dataRow = worksheet.getRow(currentRow);
+          dataRow.values = [grade.subject_name || "N/A", tx, gk, ck, tbm];
+
+          ["A", "B", "C", "D", "E"].forEach((col) => {
             const cell = worksheet.getCell(`${col}${currentRow}`);
-            cell.alignment = { horizontal: "left", vertical: "middle" }; // ALL LEFT
+            cell.alignment = { horizontal: "left", vertical: "middle" };
             cell.border = {
               top: { style: "thin" },
               left: { style: "thin" },
@@ -1390,13 +1498,14 @@ const StudentList = () => {
         currentRow++; // Skip a row after table
       }
 
-      // Comments section
+      // Comments section (center in A:E with bordered block)
       currentRow += 2; // Extra space
-      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
       const commentTitleCell = worksheet.getCell(`A${currentRow}`);
       commentTitleCell.value = "NHẬN XÉT CỦA GIÁO VIÊN";
       commentTitleCell.font = { bold: true, size: 11 };
       commentTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+      const remarksTitleRow = currentRow;
       currentRow += 2; // Skip a row
 
       // Feedback text with wrapping
@@ -1421,39 +1530,56 @@ const StudentList = () => {
 
       const feedbackLines = wrapText(feedbackText);
       feedbackLines.forEach((line) => {
-        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
         const feedbackCell = worksheet.getCell(`A${currentRow}`);
         feedbackCell.value = line;
         feedbackCell.alignment = {
-          horizontal: "left",
+          horizontal: "center",
           vertical: "top",
           wrapText: true,
         };
         worksheet.getRow(currentRow).height = 18;
         currentRow++;
       });
+      const remarksEndRow = currentRow - 1;
 
-      // Signature section
+      // Apply border around the whole remarks block (A:E, from title to last line)
+      for (let r = remarksTitleRow; r <= remarksEndRow; r++) {
+        for (let c = 1; c <= 5; c++) {
+          const cell = worksheet.getCell(r, c); // 1=A ... 5=E
+          const border = {};
+          if (r === remarksTitleRow) border.top = { style: "thin" };
+          if (r === remarksEndRow) border.bottom = { style: "thin" };
+          if (c === 1) border.left = { style: "thin" };
+          if (c === 5) border.right = { style: "thin" };
+          cell.border = { ...cell.border, ...border };
+        }
+      }
+
+      // Signature section (merge A:B for GV, D:E for PH, 2 rows)
       currentRow += 3; // Extra space
-      const signatureRow = worksheet.getRow(currentRow);
-      signatureRow.values = ["Giáo viên chủ nhiệm", "", "Phụ huynh"];
-      ["A", "C"].forEach((col) => {
-        const cell = worksheet.getCell(`${col}${currentRow}`);
-        cell.font = { bold: true };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-      });
+      // Row 1: titles
+      worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+      worksheet.mergeCells(`D${currentRow}:E${currentRow}`);
+      const sigLeftTitle = worksheet.getCell(`A${currentRow}`);
+      sigLeftTitle.value = "Giáo viên chủ nhiệm";
+      sigLeftTitle.font = { bold: true };
+      sigLeftTitle.alignment = { horizontal: "left", vertical: "middle" };
+      const sigRightTitle = worksheet.getCell(`D${currentRow}`);
+      sigRightTitle.value = "Phụ huynh";
+      sigRightTitle.font = { bold: true };
+      sigRightTitle.alignment = { horizontal: "right", vertical: "middle" };
       currentRow++;
 
-      const signatureSubRow = worksheet.getRow(currentRow);
-      signatureSubRow.values = [
-        "(Ký và ghi rõ họ tên)",
-        "",
-        "(Ký và ghi rõ họ tên)",
-      ];
-      ["A", "C"].forEach((col) => {
-        const cell = worksheet.getCell(`${col}${currentRow}`);
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-      });
+      // Row 2: notes
+      worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+      worksheet.mergeCells(`D${currentRow}:E${currentRow}`);
+      const sigLeftNote = worksheet.getCell(`A${currentRow}`);
+      sigLeftNote.value = "(Ký và ghi rõ họ tên)";
+      sigLeftNote.alignment = { horizontal: "left", vertical: "middle" };
+      const sigRightNote = worksheet.getCell(`D${currentRow}`);
+      sigRightNote.value = "(Ký và ghi rõ họ tên)";
+      sigRightNote.alignment = { horizontal: "right", vertical: "middle" };
 
       // Generate buffer and download
       const buffer = await workbook.xlsx.writeBuffer();
@@ -2874,15 +3000,27 @@ const StudentList = () => {
 
                             <td className="px-6 py-4 text-center">
                               <div
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                  gradeRecord.final_grade >= 8.0
-                                    ? "bg-green-100 text-green-800"
-                                    : gradeRecord.final_grade >= 6.5
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : gradeRecord.final_grade >= 5.0
-                                    ? "bg-orange-100 text-orange-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${(() => {
+                                  const grade = gradeRecord.final_grade;
+                                  // Convert to number if string
+                                  const numericGrade =
+                                    typeof grade === "string"
+                                      ? parseFloat(grade)
+                                      : grade;
+                                  if (
+                                    numericGrade === null ||
+                                    isNaN(numericGrade)
+                                  ) {
+                                    return "bg-gray-100 text-gray-800"; // Default for non-numeric grades
+                                  }
+                                  if (numericGrade >= 8.0)
+                                    return "bg-green-100 text-green-800";
+                                  if (numericGrade >= 6.5)
+                                    return "bg-yellow-100 text-yellow-800";
+                                  if (numericGrade >= 5.0)
+                                    return "bg-orange-100 text-orange-800";
+                                  return "bg-red-100 text-red-800";
+                                })()}`}
                               >
                                 {gradeRecord.final_grade}
                               </div>

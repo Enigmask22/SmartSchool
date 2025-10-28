@@ -1436,7 +1436,22 @@ async def get_teacher_dashboard_analytics(
         
         # === TỔNG QUAN ===
         total_students_with_grades = len(grades_data)
-        average_score = sum([g["final_grade"] for g in grades_data if g.get("final_grade")]) / total_students_with_grades if total_students_with_grades > 0 else 0
+        # Chỉ tính với các điểm số (bỏ qua giá trị chữ như "Đ", "KĐ")
+        # Convert string numbers to float if possible
+        numeric_grades = []
+        for g in grades_data:
+            final_grade = g.get("final_grade")
+            if final_grade is None:
+                continue
+            # Check if numeric (int, float, or string number)
+            if isinstance(final_grade, (int, float)):
+                numeric_grades.append(final_grade)
+            elif isinstance(final_grade, str):
+                try:
+                    numeric_grades.append(float(final_grade))
+                except (ValueError, TypeError):
+                    pass  # Ignore non-numeric strings like "Đ", "KĐ"
+        average_score = sum(numeric_grades) / len(numeric_grades) if len(numeric_grades) > 0 else 0
         
         # Lấy tổng số học sinh trong các lớp dạy
         total_students_count = 0
@@ -1453,7 +1468,20 @@ async def get_teacher_dashboard_analytics(
         poor = []       # Kém: < 3.5
         
         for grade in grades_data:
-            final_grade = grade.get("final_grade", 0)
+            final_grade = grade.get("final_grade")
+            if final_grade is None:
+                continue
+            
+            # Convert to float if string, skip if not convertible
+            if isinstance(final_grade, str):
+                try:
+                    final_grade = float(final_grade)
+                except (ValueError, TypeError):
+                    continue  # Ignore non-numeric strings like "Đ", "KĐ"
+            elif not isinstance(final_grade, (int, float)):
+                continue  # Skip other non-numeric types
+            
+            # Now we can safely compare
             if final_grade >= 8.0:
                 excellent.append(grade)
             elif final_grade >= 6.5:
@@ -1503,13 +1531,37 @@ async def get_teacher_dashboard_analytics(
         class_grades_map = {}
         
         for grade in grades_data:
+            # Chỉ xử lý điểm số (bỏ qua giá trị chữ như "Đ", "KĐ")
+            final_grade = grade.get("final_grade")
+            if final_grade is None:
+                continue
+            # Convert to float if string
+            if isinstance(final_grade, str):
+                try:
+                    final_grade = float(final_grade)
+                except (ValueError, TypeError):
+                    continue  # Ignore non-numeric strings like "Đ", "KĐ"
+            
             class_name = grade["class_subjects"]["classes"]["class_name"]
             if class_name not in class_grades_map:
                 class_grades_map[class_name] = []
-            class_grades_map[class_name].append(grade["final_grade"])
+            class_grades_map[class_name].append(final_grade)
         
         for class_name, grades_list in class_grades_map.items():
-            valid_grades = [g for g in grades_list if g is not None]
+            # All grades in list are already validated and converted to numeric in the loop above
+            # Double-check to ensure all are numeric before processing
+            valid_grades = []
+            for g in grades_list:
+                if g is None:
+                    continue
+                if isinstance(g, str):
+                    try:
+                        valid_grades.append(float(g))
+                    except (ValueError, TypeError):
+                        continue
+                elif isinstance(g, (int, float)):
+                    valid_grades.append(g)
+            
             if valid_grades:
                 avg = sum(valid_grades) / len(valid_grades)
                 highest = max(valid_grades)
@@ -1533,21 +1585,61 @@ async def get_teacher_dashboard_analytics(
             student_info = grade.get("students", {})
             class_info = grade.get("class_subjects", {}).get("classes", {})
             
+            # Helper để xác định category (Kém hoặc Yếu)
+            final_grade = grade.get("final_grade")
+            numeric_grade = None
+            if isinstance(final_grade, (int, float)):
+                numeric_grade = final_grade
+            elif isinstance(final_grade, str):
+                try:
+                    numeric_grade = float(final_grade)
+                except (ValueError, TypeError):
+                    numeric_grade = None
+            
+            category = "Yếu"  # default
+            if numeric_grade is not None and numeric_grade < 3.5:
+                category = "Kém"
+            
             students_need_attention.append({
                 "student_id": student_info.get("student_id"),
                 "student_name": student_info.get("full_name"),
                 "class_name": class_info.get("class_name"),
                 "final_grade": grade.get("final_grade"),
-                "category": "Kém" if grade.get("final_grade", 0) < 3.5 else "Yếu",
+                "category": category,
                 "grade_data": grade.get("grade_data", {})
             })
         
         # Sắp xếp theo điểm tăng dần (yếu nhất lên đầu)
-        students_need_attention.sort(key=lambda x: x["final_grade"] if x["final_grade"] else 0)
+        def get_sort_key(item):
+            final_grade = item["final_grade"]
+            if final_grade is None:
+                return 0
+            if isinstance(final_grade, (int, float)):
+                return final_grade
+            if isinstance(final_grade, str):
+                try:
+                    return float(final_grade)
+                except (ValueError, TypeError):
+                    return 0
+            return 0
+        
+        students_need_attention.sort(key=get_sort_key)
         
         # === TOP HỌC SINH XUẤT SẮC ===
+        # Sort key helper để xử lý TEXT column
+        def top_student_sort_key(x):
+            final_grade = x.get("final_grade", 0)
+            if isinstance(final_grade, (int, float)):
+                return final_grade
+            if isinstance(final_grade, str):
+                try:
+                    return float(final_grade)
+                except (ValueError, TypeError):
+                    return 0
+            return 0
+        
         top_students = []
-        for grade in sorted(excellent, key=lambda x: x.get("final_grade", 0), reverse=True)[:10]:
+        for grade in sorted(excellent, key=top_student_sort_key, reverse=True)[:10]:
             student_info = grade.get("students", {})
             class_info = grade.get("class_subjects", {}).get("classes", {})
             
@@ -1560,19 +1652,54 @@ async def get_teacher_dashboard_analytics(
             })
         
         # === PHÂN BỐ ĐIỂM SỐ (Distribution) ===
-        score_distribution = {
-            "9-10": len([g for g in grades_data if g.get("final_grade", 0) >= 9]),
-            "8-9": len([g for g in grades_data if 8 <= g.get("final_grade", 0) < 9]),
-            "7-8": len([g for g in grades_data if 7 <= g.get("final_grade", 0) < 8]),
-            "6-7": len([g for g in grades_data if 6 <= g.get("final_grade", 0) < 7]),
-            "5-6": len([g for g in grades_data if 5 <= g.get("final_grade", 0) < 6]),
-            "4-5": len([g for g in grades_data if 4 <= g.get("final_grade", 0) < 5]),
-            "0-4": len([g for g in grades_data if g.get("final_grade", 0) < 4])
-        }
+        # Helper function to safely convert grade to float (handle TEXT column type)
+        def get_numeric_grade(grade_data):
+            final_grade = grade_data.get("final_grade")
+            if final_grade is None:
+                return None
+            if isinstance(final_grade, (int, float)):
+                return final_grade
+            if isinstance(final_grade, str):
+                try:
+                    return float(final_grade)
+                except (ValueError, TypeError):
+                    return None
+            return None
         
-        # === THỐNG KÊ ĐẠT/KHÔNG ĐẠT ===
-        pass_count = len([g for g in grades_data if g.get("final_grade", 0) >= 5.0])
-        fail_count = total_students_with_grades - pass_count
+        # Check if all grades are letter grades (Đ/KĐ)
+        letter_grade_count = 0
+        for g in grades_data:
+            final_grade = g.get("final_grade")
+            if isinstance(final_grade, str) and final_grade in ['Đ', 'KĐ']:
+                letter_grade_count += 1
+        
+        is_all_letter_grades = letter_grade_count == total_students_with_grades and total_students_with_grades > 0
+        
+        if is_all_letter_grades:
+            # Trường hợp môn học với toàn điểm chữ (vd: GDTC)
+            score_distribution = {
+                "Đ (Đạt)": letter_grade_count,  # Tất cả đạt
+                "KĐ (Không đạt)": total_students_with_grades - letter_grade_count,  # Không đạt
+            }
+            
+            # Count Đ and KĐ
+            pass_count = len([g for g in grades_data if g.get("final_grade") == 'Đ'])
+            fail_count = len([g for g in grades_data if g.get("final_grade") == 'KĐ'])
+        else:
+            # Trường hợp môn học với điểm số
+            score_distribution = {
+                "9-10": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and gr >= 9]),
+                "8-9": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 8 <= gr < 9]),
+                "7-8": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 7 <= gr < 8]),
+                "6-7": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 6 <= gr < 7]),
+                "5-6": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 5 <= gr < 6]),
+                "4-5": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 4 <= gr < 5]),
+                "0-4": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and gr < 4])
+            }
+            
+            # === THỐNG KÊ ĐẠT/KHÔNG ĐẠT ===
+            pass_count = len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and gr >= 5.0])
+            fail_count = total_students_with_grades - pass_count
         
         analytics_data = {
             "academic_year": academic_year,
@@ -1582,10 +1709,11 @@ async def get_teacher_dashboard_analytics(
             "total_students": total_students_count,
             "students_with_grades": total_students_with_grades,
             "students_without_grades": total_students_count - total_students_with_grades,
+            "is_letter_grade_subject": is_all_letter_grades,  # Flag để frontend biết loại điểm
             "overview": {
-                "average_score": round(average_score, 2),
-                "highest_score": round(max([g.get("final_grade", 0) for g in grades_data]), 2) if grades_data else 0,
-                "lowest_score": round(min([g.get("final_grade", 0) for g in grades_data if g.get("final_grade", 0) > 0]), 2) if grades_data else 0,
+                "average_score": round(average_score, 2) if numeric_grades else 0,
+                "highest_score": round(max(numeric_grades), 2) if numeric_grades else 0,
+                "lowest_score": round(min([g for g in numeric_grades if g > 0]), 2) if numeric_grades else 0,
                 "pass_count": pass_count,
                 "fail_count": fail_count,
                 "pass_rate": round(pass_count * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0
