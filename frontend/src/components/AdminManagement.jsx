@@ -147,12 +147,13 @@ const AdminManagement = () => {
     },
     subjects: {
       title: "Quản lý môn học",
-      fields: ["subject_code", "subject_name", "description"],
+      fields: ["subject_code", "subject_name", "description", "is_mandatory"],
       displayFields: [
         "id",
         "subject_code",
         "subject_name",
         "description",
+        "is_mandatory",
         "is_active",
       ],
       endpoint: "/admin/subjects",
@@ -933,6 +934,8 @@ const AdminManagement = () => {
                   ? "Giới tính"
                   : field === "description"
                   ? "Mô tả"
+                  : field === "is_mandatory"
+                  ? "Môn bắt buộc"
                   : field === "grade"
                   ? "Khối"
                   : field === "semester"
@@ -1125,6 +1128,18 @@ const AdminManagement = () => {
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   rows="3"
                 />
+              ) : field === "is_mandatory" ? (
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData[field] || item?.[field] || false}
+                    onChange={(e) => handleChange(field, e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Môn học bắt buộc (hiển thị trong môn chính)
+                  </span>
+                </label>
               ) : field === "password" && isEdit ? (
                 // Bỏ trường password khi edit
                 <div className="flex items-center w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-muted text-muted-foreground">
@@ -1927,6 +1942,8 @@ const AdminManagement = () => {
                               ? "TÊN MÔN HỌC"
                               : field === "description"
                               ? "MÔ TẢ"
+                              : field === "is_mandatory"
+                              ? "BẮT BUỘC"
                               : field === "class_name"
                               ? "TÊN LỚP"
                               : field === "grade"
@@ -2024,6 +2041,22 @@ const AdminManagement = () => {
                                     </Badge>
                                   ) : (
                                     <span className="text-gray-400">-</span>
+                                  )
+                                ) : field === "is_mandatory" ? (
+                                  item[field] ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-purple-800 bg-purple-100 border-purple-200"
+                                    >
+                                      Môn chính
+                                    </Badge>
+                                  ) : (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-gray-800 bg-gray-100 border-gray-200"
+                                    >
+                                      Môn tự chọn
+                                    </Badge>
                                   )
                                 ) : typeof item[field] === "boolean" ? (
                                   item[field] ? (

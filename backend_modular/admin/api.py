@@ -672,12 +672,13 @@ async def create_subject(
             "subject_code": subject_data.subject_code,
             "subject_name": subject_data.subject_name,
             "is_active": subject_data.is_active,
+            "is_mandatory": subject_data.is_mandatory if subject_data.is_mandatory is not None else False,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
         
-        if subject_data.grade_level:
-            data["grade_level"] = subject_data.grade_level
+        if subject_data.description:
+            data["description"] = subject_data.description
         
         response = db.table("subjects").insert(data).execute()
         
@@ -708,8 +709,8 @@ async def update_subject(
             update_data["subject_name"] = subject_data.subject_name
         if subject_data.description is not None:
             update_data["description"] = subject_data.description
-        if subject_data.grade_level:
-            update_data["grade_level"] = subject_data.grade_level
+        if subject_data.is_mandatory is not None:
+            update_data["is_mandatory"] = subject_data.is_mandatory
         if subject_data.is_active is not None:
             update_data["is_active"] = subject_data.is_active
         

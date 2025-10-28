@@ -42,14 +42,15 @@ class TeacherUpdate(BaseModel):
 class SubjectCreate(BaseModel):
     subject_code: str
     subject_name: str
-    grade_level: Optional[int] = None
+    description: Optional[str] = None
+    is_mandatory: Optional[bool] = False
     is_active: Optional[bool] = True
 
 class SubjectUpdate(BaseModel):
     subject_code: Optional[str] = None
     subject_name: Optional[str] = None
     description: Optional[str] = None
-    grade_level: Optional[int] = None
+    is_mandatory: Optional[bool] = None
     is_active: Optional[bool] = None
 
 class ClassCreate(BaseModel):
