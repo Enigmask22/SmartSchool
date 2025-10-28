@@ -147,6 +147,9 @@ const StudentList = () => {
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendError, setTrendError] = useState("");
 
+  // Flag: có dữ liệu điểm để tạo nhận xét hay không
+  const [hasGradeData, setHasGradeData] = useState(false);
+
   // Subject selection states
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [selectedStudentForSubject, setSelectedStudentForSubject] =
@@ -985,6 +988,7 @@ const StudentList = () => {
     setFeedbackSuccess(false);
     setGradeTrendData(null);
     setTrendError("");
+    setHasGradeData(false);
 
     // Initialize form with student name first
     let initialForm = {
@@ -1031,6 +1035,7 @@ const StudentList = () => {
             logger.debug("📊 Calculated average score for feedback:", avgScore);
 
             initialForm.score = avgScore;
+            setHasGradeData(true);
 
             // Try to get grade trend for the subject with HIGHEST score
             // Sắp xếp theo điểm cao nhất và lấy môn đầu tiên
@@ -1088,6 +1093,7 @@ const StudentList = () => {
             }
           } else {
             logger.debug("⚠️ No valid final_grade found in grades");
+            setHasGradeData(false);
           }
         } else {
           logger.debug(
@@ -1095,9 +1101,11 @@ const StudentList = () => {
           );
           logger.debug("📋 Grades type:", typeof grades);
           logger.debug("📋 Is array:", Array.isArray(grades));
+          setHasGradeData(false);
         }
       } else {
         logger.debug("❌ Failed to fetch grades:", gradesResponse);
+        setHasGradeData(false);
       }
     } catch (error) {
       logger.error("Error fetching student grades:", error);
@@ -1145,6 +1153,10 @@ const StudentList = () => {
     }
 
     const scoreNum = parseFloat(score);
+    if (!hasGradeData) {
+      setFeedbackError("Cần có dữ liệu điểm của học sinh để tạo nhận xét");
+      return false;
+    }
     if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
       setFeedbackError("Điểm số phải từ 0 đến 10");
       return false;
@@ -3317,9 +3329,14 @@ const StudentList = () => {
                     </div>
 
                     {/* Generate Button */}
+                    {!hasGradeData && (
+                      <div className="p-3 mb-2 text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded">
+                        ⚠️ Cần có dữ liệu điểm của học sinh để tạo nhận xét.
+                      </div>
+                    )}
                     <button
                       onClick={generateFeedback}
-                      disabled={feedbackLoading}
+                      disabled={feedbackLoading || !hasGradeData}
                       className="flex items-center justify-center w-full px-4 py-2 font-medium text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
                     >
                       {feedbackLoading ? (
@@ -3369,13 +3386,23 @@ const StudentList = () => {
                         <div className="p-4 border border-indigo-200 rounded-lg bg-indigo-50">
                           <div className="flex items-start gap-3">
                             <MessageCircle className="flex-shrink-0 w-5 h-5 mt-1 text-indigo-600" />
-                            <div>
+                            <div className="flex-1">
                               <h4 className="mb-2 font-medium text-indigo-900">
-                                Nhận xét cho {feedbackForm.student_name}:
+                                Nhận xét cho {feedbackForm.student_name} (có thể
+                                chỉnh sửa trước khi gửi):
                               </h4>
-                              <div className="text-sm text-indigo-800 whitespace-pre-wrap">
-                                {generatedFeedback}
-                              </div>
+                              <textarea
+                                value={generatedFeedback}
+                                onChange={(e) =>
+                                  setGeneratedFeedback(e.target.value)
+                                }
+                                rows={6}
+                                className="w-full px-3 py-2 text-sm border border-indigo-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                              />
+                              <p className="mt-2 text-xs text-indigo-700">
+                                Bạn có thể điều chỉnh câu chữ/chi tiết trước khi
+                                gửi cho phụ huynh hoặc xuất phiếu điểm.
+                              </p>
                             </div>
                           </div>
                         </div>
