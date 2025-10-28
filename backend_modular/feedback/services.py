@@ -29,9 +29,10 @@ class FeedbackService:
         self,
         student_name: str,
         score: float,
-        score_trend: str,
         attendance_rate: int,
         subject: str = None,
+        top_subjects: List[str] = None,
+        weak_subjects: List[str] = None,
         notes: str = ""
     ) -> str:
         """
@@ -52,13 +53,23 @@ class FeedbackService:
             # Sử dụng Gemini AI nếu có
             if self.use_ai:
                 try:
+                    # Tạo prompt thủ công để truyền top/weak subjects vào ghi chú
+                    extra_context = []
+                    if top_subjects:
+                        extra_context.append(f"Top môn mạnh: {', '.join(top_subjects[:3])}.")
+                    if weak_subjects:
+                        extra_context.append(f"Môn cần cải thiện (điểm < 8.0): {', '.join(weak_subjects[:3])}.")
+                    combined_notes = (notes or "").strip()
+                    if extra_context:
+                        combined_notes = (combined_notes + "\n" if combined_notes else "") + " ".join(extra_context)
+
                     feedback = await self.gemini_service.generate_student_feedback(
                         student_name=student_name,
                         score=score,
-                        score_trend=score_trend,
+                        score_trend="ổn định",
                         attendance_rate=attendance_rate,
                         subject=subject,
-                        notes=notes
+                        notes=combined_notes
                     )
                     logger.info(f"🤖 AI-generated feedback for {student_name}")
                     return feedback
@@ -82,11 +93,11 @@ class FeedbackService:
             else:
                 feedback_parts.append(f"Em {student_name} cần cố gắng hơn nữa{subject_text} với điểm trung bình hiện tại là {score}.")
             
-            # Xu hướng
-            if score_trend == "tăng":
-                feedback_parts.append("Điểm số có xu hướng tăng dần, thể hiện sự tiến bộ đáng khen.")
-            elif score_trend == "giảm":
-                feedback_parts.append("Cần chú ý vì điểm số đang có xu hướng giảm.")
+            # Tổng hợp môn mạnh/yếu
+            if top_subjects:
+                feedback_parts.append(f"Các môn nổi bật: {', '.join(top_subjects[:3])}.")
+            if weak_subjects:
+                feedback_parts.append(f"Cần cải thiện ở các môn: {', '.join(weak_subjects[:3])}.")
             
             # Chuyên cần
             if attendance_rate >= 90:

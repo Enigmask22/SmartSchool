@@ -22,18 +22,13 @@ router = APIRouter()
 async def generate_student_feedback(request: StudentFeedbackRequest):
     """Tạo nhận xét cho học sinh"""
     try:
-        if request.score_trend not in ['tăng', 'giảm', 'ổn định']:
-            raise HTTPException(
-                status_code=400,
-                detail="score_trend phải là: tăng, giảm, hoặc ổn định"
-            )
-        
         feedback = await feedback_service.generate_feedback(
             student_name=request.student_name,
             score=request.score,
-            score_trend=request.score_trend,
             attendance_rate=request.attendance_rate,
             subject=request.subject,
+            top_subjects=request.top_subjects or [],
+            weak_subjects=request.weak_subjects or [],
             notes=request.notes
         )
         
