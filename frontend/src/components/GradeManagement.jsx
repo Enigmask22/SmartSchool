@@ -931,6 +931,23 @@ const GradeManagement = () => {
       // Create workbook and worksheet
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Bảng điểm");
+      // Cấu hình trang in A4 và tự co theo chiều ngang 1 trang
+      worksheet.pageSetup = {
+        paperSize: 9, // A4
+        orientation: "portrait",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: {
+          left: 0.3,
+          right: 0.3,
+          top: 0.5,
+          bottom: 0.5,
+          header: 0.2,
+          footer: 0.2,
+        },
+        horizontalCentered: true,
+      };
 
       // Get display columns (with hierarchy)
       const displayColumns = getDisplayColumns(
@@ -952,21 +969,21 @@ const GradeManagement = () => {
 
       // Set column widths
       const columnWidths = [
-        { width: 6 }, // STT
-        { width: 10 }, // Mã HS
-        { width: 25 }, // Họ tên
+        { width: 5 }, // STT
+        { width: 9 }, // Mã HS
+        { width: 22 }, // Họ tên
       ];
 
       // Add widths for grade columns
       displayColumns.forEach((col) => {
         if (col.hasChildren) {
-          col.children.forEach(() => columnWidths.push({ width: 10 }));
+          col.children.forEach(() => columnWidths.push({ width: 8 }));
         } else {
-          columnWidths.push({ width: 12 });
+          columnWidths.push({ width: 10 });
         }
       });
 
-      columnWidths.push({ width: 10 }); // Điểm TB
+      columnWidths.push({ width: 9 }); // Điểm TB
       worksheet.columns = columnWidths;
 
       let currentRow = 1;
@@ -1085,7 +1102,15 @@ const GradeManagement = () => {
           // Render child column headers
           col.children.forEach((child) => {
             const cell = worksheet.getCell(currentRow, colIndex);
-            cell.value = child.label;
+            // Convert "Điểm thường xuyên 1" -> "Điểm tx1", "Điểm thường xuyên 2" -> "Điểm tx2", etc.
+            let exportLabel = child.label;
+            if (exportLabel && col.label === "Điểm thường xuyên") {
+              exportLabel = exportLabel.replace(
+                /Điểm thường xuyên (\d+)/i,
+                "Điểm tx$1"
+              );
+            }
+            cell.value = exportLabel;
             cell.fill = {
               type: "pattern",
               pattern: "solid",

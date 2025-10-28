@@ -416,13 +416,21 @@ const SubjectTeacherDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Điểm trung bình
+                  {analytics.is_letter_grade_subject
+                    ? "Số HS đạt"
+                    : "Điểm trung bình"}
                 </p>
                 <h3 className="mt-2 text-4xl font-bold text-emerald-600">
-                  {analytics.overview?.average_score || 0}
+                  {analytics.is_letter_grade_subject
+                    ? `${analytics.overview?.pass_count || 0}/${
+                        analytics.students_with_grades
+                      }`
+                    : analytics.overview?.average_score || 0}
                 </h3>
                 <p className="mt-1 text-xs text-gray-500">
-                  Cao nhất: {analytics.overview?.highest_score || 0}
+                  {analytics.is_letter_grade_subject
+                    ? `${analytics.overview?.fail_count || 0} không đạt`
+                    : `Cao nhất: ${analytics.overview?.highest_score || 0}`}
                 </p>
               </div>
               <div className="flex items-center justify-center w-14 h-14 bg-emerald-100 rounded-xl">
@@ -686,7 +694,19 @@ const SubjectTeacherDashboard = () => {
                         <td className="px-6 py-4 text-center whitespace-nowrap">
                           <span
                             className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full ${
-                              student.final_grade < 3.5
+                              (() => {
+                                const grade = student.final_grade;
+                                // Convert to number if string
+                                const numericGrade =
+                                  typeof grade === "string"
+                                    ? parseFloat(grade)
+                                    : grade;
+                                return (
+                                  numericGrade !== null &&
+                                  !isNaN(numericGrade) &&
+                                  numericGrade < 3.5
+                                );
+                              })()
                                 ? "bg-red-100 text-red-800"
                                 : "bg-orange-100 text-orange-800"
                             }`}
