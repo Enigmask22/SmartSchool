@@ -131,7 +131,8 @@ const StudentList = () => {
   const [feedbackForm, setFeedbackForm] = useState({
     student_name: "",
     score: "",
-    score_trend: "",
+    top_subjects: [], // Top 3 môn cao nhất
+    weak_subjects: [], // Top 3 môn thấp nhất (< 8.0)
     attendance_rate: "100",
     subject: "", // Thêm môn học
     notes: "",
@@ -994,7 +995,8 @@ const StudentList = () => {
     let initialForm = {
       student_name: student.full_name,
       score: "",
-      score_trend: "",
+      top_subjects: [],
+      weak_subjects: [],
       attendance_rate: "100",
       subject: "", // Thêm môn học
       notes: "",
@@ -1037,60 +1039,29 @@ const StudentList = () => {
             initialForm.score = avgScore;
             setHasGradeData(true);
 
-            // Try to get grade trend for the subject with HIGHEST score
-            // Sắp xếp theo điểm cao nhất và lấy môn đầu tiên
-            const sortedGrades = [...validGrades].sort(
-              (a, b) => (b.final_grade || 0) - (a.final_grade || 0)
-            );
-            const highestGrade = sortedGrades[0];
-
-            logger.debug("🏆 Highest grade subject:", {
-              subject: highestGrade.subject_name,
-              score: highestGrade.final_grade,
-              all_grades: sortedGrades.map((g) => ({
+            // Xây dựng danh sách top 3 môn cao nhất và 3 môn thấp nhất (< 8.0)
+            const sortedGrades = [...validGrades]
+              .map((g) => ({
                 subject: g.subject_name,
-                score: g.final_grade,
-              })),
-            });
+                score:
+                  typeof g.final_grade === "string"
+                    ? parseFloat(g.final_grade)
+                    : g.final_grade,
+              }))
+              .filter((g) => typeof g.score === "number" && !isNaN(g.score));
 
-            if (highestGrade && highestGrade.class_subject_id) {
-              // Lưu tên môn học có điểm cao nhất vào form
-              if (highestGrade.subject_name) {
-                initialForm.subject = highestGrade.subject_name;
-                logger.debug(
-                  "📚 Highest score subject added to form:",
-                  highestGrade.subject_name,
-                  "with score:",
-                  highestGrade.final_grade
-                );
-              }
+            const byDesc = [...sortedGrades].sort((a, b) => b.score - a.score);
+            const byAsc = [...sortedGrades].sort((a, b) => a.score - b.score);
 
-              logger.debug(
-                "🔍 Fetching grade trend for highest score class_subject_id:",
-                highestGrade.class_subject_id
-              );
-              logger.debug("🔍 Student ID:", student.id);
-              logger.debug(
-                "🔍 API URL will be:",
-                `${API_BASE_URL}/grades/grade-trend/${student.id}/${highestGrade.class_subject_id}?academic_year=${academicYear}&semester=${semester}`
-              );
+            initialForm.top_subjects = byDesc
+              .slice(0, 3)
+              .map((g) => `${g.subject} (${g.score})`);
+            initialForm.weak_subjects = byAsc
+              .filter((g) => g.score < 8.0)
+              .slice(0, 3)
+              .map((g) => `${g.subject} (${g.score})`);
 
-              const trendData = await fetchGradeTrend(
-                student.id,
-                highestGrade.class_subject_id
-              );
-              if (trendData) {
-                logger.debug("📈 Grade trend data:", trendData);
-                initialForm.score_trend = trendData.label.toLowerCase(); // "tăng", "giảm", "ổn định"
-              } else {
-                logger.debug("❌ No trend data returned");
-              }
-            } else {
-              logger.debug(
-                "⚠️ No class_subject_id found in highest grade:",
-                highestGrade
-              );
-            }
+            // Không tự điền môn học nữa (ẩn phần Môn học ở UI)
           } else {
             logger.debug("⚠️ No valid final_grade found in grades");
             setHasGradeData(false);
@@ -1111,7 +1082,7 @@ const StudentList = () => {
       logger.error("Error fetching student grades:", error);
     }
 
-    // Set form with calculated score and trend
+    // Set form with calculated score and subject lists
     logger.debug("📝 Setting feedback form:", initialForm);
     setFeedbackForm(initialForm);
     setShowFeedbackModal(true);
@@ -1145,7 +1116,7 @@ const StudentList = () => {
   };
 
   const validateFeedbackForm = () => {
-    const { student_name, score, score_trend, attendance_rate } = feedbackForm;
+    const { student_name, score, attendance_rate } = feedbackForm;
 
     if (!student_name.trim()) {
       setFeedbackError("Vui lòng nhập tên học sinh");
@@ -1162,10 +1133,7 @@ const StudentList = () => {
       return false;
     }
 
-    if (!score_trend) {
-      setFeedbackError("Vui lòng chọn xu hướng điểm số");
-      return false;
-    }
+    // score_trend no longer required
 
     const attendanceNum = parseInt(attendance_rate);
     if (isNaN(attendanceNum) || attendanceNum < 0 || attendanceNum > 100) {
@@ -1194,7 +1162,8 @@ const StudentList = () => {
           body: JSON.stringify({
             student_name: feedbackForm.student_name,
             score: parseFloat(feedbackForm.score),
-            score_trend: feedbackForm.score_trend,
+            top_subjects: feedbackForm.top_subjects || [],
+            weak_subjects: feedbackForm.weak_subjects || [],
             attendance_rate: parseInt(feedbackForm.attendance_rate),
             subject: feedbackForm.subject || null, // Thêm môn học
             notes: feedbackForm.notes,
@@ -3192,7 +3161,7 @@ const StudentList = () => {
                         htmlFor="score"
                         className="block mb-1 text-sm font-medium text-gray-700"
                       >
-                        Điểm Số (0-10)
+                        Điểm trung bình học kì
                       </label>
                       <input
                         id="score"
@@ -3210,100 +3179,57 @@ const StudentList = () => {
                     </div>
 
                     {/* Subject */}
-                    {feedbackForm.subject && (
-                      <div>
-                        <label
-                          htmlFor="subject"
-                          className="block mb-1 text-sm font-medium text-gray-700"
-                        >
-                          Môn Học
-                        </label>
-                        <input
-                          id="subject"
-                          type="text"
-                          value={feedbackForm.subject}
-                          readOnly
-                          className="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-md shadow-sm cursor-not-allowed bg-gray-50"
-                        />
-                      </div>
-                    )}
+                    {/* Ẩn phần Môn Học theo yêu cầu */}
 
-                    {/* Score Trend */}
-                    <div>
-                      <label
-                        htmlFor="score_trend"
-                        className="block mb-1 text-sm font-medium text-gray-700"
-                      >
-                        Xu Hướng Điểm Số
-                        {trendLoading && (
-                          <span className="ml-2 text-xs text-blue-600">
-                            <Loader2 className="inline w-3 h-3 animate-spin" />
-                            Đang phân tích...
-                          </span>
-                        )}
-                      </label>
-                      <Select
-                        value={feedbackForm.score_trend || "none"}
-                        onValueChange={(value) =>
-                          handleFeedbackFormChange(
-                            "score_trend",
-                            value === "none" ? "" : value
-                          )
-                        }
-                        disabled={trendLoading}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Chọn xu hướng" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Chọn xu hướng</SelectItem>
-                          <SelectItem value="tăng">Tăng</SelectItem>
-                          <SelectItem value="giảm">Giảm</SelectItem>
-                          <SelectItem value="ổn định">Ổn định</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      {/* Grade Trend Analysis Result */}
-                      {gradeTrendData && (
-                        <div
-                          className="p-3 mt-2 border rounded-md"
-                          style={{
-                            backgroundColor: gradeTrendData.color + "10",
-                            borderColor: gradeTrendData.color + "40",
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <span
-                                className="px-2 py-1 text-xs font-medium text-white rounded-full"
-                                style={{
-                                  backgroundColor: gradeTrendData.color,
-                                }}
-                              >
-                                {gradeTrendData.label}
-                              </span>
-                              <span className="text-xs text-gray-600">
-                                Độ tin cậy:{" "}
-                                {Math.round(gradeTrendData.confidence * 100)}%
-                              </span>
+                    {/* Subject Highlights */}
+                    {(Array.isArray(feedbackForm.top_subjects) &&
+                      feedbackForm.top_subjects.length > 0) ||
+                    (Array.isArray(feedbackForm.weak_subjects) &&
+                      feedbackForm.weak_subjects.length > 0) ? (
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {Array.isArray(feedbackForm.top_subjects) &&
+                          feedbackForm.top_subjects.length > 0 && (
+                            <div>
+                              <p className="mb-1 text-sm font-medium text-green-700">
+                                Những môn học tốt
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {feedbackForm.top_subjects.map((s, idx) => (
+                                  <Badge
+                                    key={`top-${idx}`}
+                                    className="bg-green-50 text-green-800 border-green-200"
+                                  >
+                                    {s}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                          <p
-                            className="mt-2 text-sm"
-                            style={{ color: gradeTrendData.color }}
-                          >
-                            {gradeTrendData.reason}
-                          </p>
-                        </div>
-                      )}
+                          )}
+                        {Array.isArray(feedbackForm.weak_subjects) &&
+                          feedbackForm.weak_subjects.length > 0 && (
+                            <div>
+                              <p className="mb-1 text-sm font-medium text-red-700">
+                                Những môn cần cải thiện
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {feedbackForm.weak_subjects.map((s, idx) => (
+                                  <Badge
+                                    key={`weak-${idx}`}
+                                    className="bg-red-50 text-red-800 border-red-200"
+                                  >
+                                    {s}
+                                  </Badge>
+                                ))}
+                              </div>
+                              <p className="mt-1 text-xs text-red-500">
+                                Chỉ liệt kê các môn có điểm trung bình &lt; 8.0
+                              </p>
+                            </div>
+                          )}
+                      </div>
+                    ) : null}
 
-                      {/* Trend Error */}
-                      {trendError && (
-                        <div className="p-2 mt-2 text-xs text-red-600 border border-red-200 rounded bg-red-50">
-                          ⚠️ {trendError}
-                        </div>
-                      )}
-                    </div>
+                    {/* Bỏ phần Xu Hướng Điểm Số để tập trung vào danh sách môn tốt/yếu */}
 
                     {/* Attendance Rate: mặc định 100% và không hiển thị input */}
                     {/* Trường này được cố định 100% trừ khi giáo viên nêu rõ trong ghi chú */}

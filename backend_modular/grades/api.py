@@ -575,185 +575,185 @@ async def get_students_by_class_subject(
 # GRADE CONFIG ENDPOINTS
 # ===============================================
 
-@router.post("/config/upsert")
-async def upsert_grade_config(
-    config: dict,
-    current_teacher=Depends(get_current_teacher),
-    db=Depends(get_db)
-):
-    """Tạo mới hoặc cập nhật cấu hình cột điểm"""
-    try:
-        from grades.models import GradeConfigCreate
+# @router.post("/config/upsert")
+# async def upsert_grade_config(
+#     config: dict,
+#     current_teacher=Depends(get_current_teacher),
+#     db=Depends(get_db)
+# ):
+#     """Tạo mới hoặc cập nhật cấu hình cột điểm"""
+#     try:
+#         from grades.models import GradeConfigCreate
         
-        config_obj = GradeConfigCreate(**config)
+#         config_obj = GradeConfigCreate(**config)
         
-        # Kiểm tra xem đã có config chưa
-        existing = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", config_obj.subject_id).eq("academic_year", config_obj.academic_year).eq("semester", config_obj.semester).execute()
+#         # Kiểm tra xem đã có config chưa
+#         existing = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", config_obj.subject_id).eq("academic_year", config_obj.academic_year).eq("semester", config_obj.semester).execute()
         
-        if existing.data:
-            # Update existing config
-            update_data = {
-                "grade_column_config": config_obj.grade_column_config,
-                "updated_at": datetime.now().isoformat()
-            }
+#         if existing.data:
+#             # Update existing config
+#             update_data = {
+#                 "grade_column_config": config_obj.grade_column_config,
+#                 "updated_at": datetime.now().isoformat()
+#             }
             
-            response = db.table("grade_configs").update(update_data).eq("id", existing.data[0]["id"]).execute()
-            message = "Cập nhật cấu hình điểm thành công"
-        else:
-            # Create new config
-            config_data = {
-                "teacher_id": current_teacher["id"],
-                "subject_id": config_obj.subject_id,
-                "academic_year": config_obj.academic_year,
-                "semester": config_obj.semester,
-                "grade_column_config": config_obj.grade_column_config,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
+#             response = db.table("grade_configs").update(update_data).eq("id", existing.data[0]["id"]).execute()
+#             message = "Cập nhật cấu hình điểm thành công"
+#         else:
+#             # Create new config
+#             config_data = {
+#                 "teacher_id": current_teacher["id"],
+#                 "subject_id": config_obj.subject_id,
+#                 "academic_year": config_obj.academic_year,
+#                 "semester": config_obj.semester,
+#                 "grade_column_config": config_obj.grade_column_config,
+#                 "created_at": datetime.now().isoformat(),
+#                 "updated_at": datetime.now().isoformat()
+#             }
             
-            response = db.table("grade_configs").insert(config_data).execute()
-            message = "Tạo cấu hình điểm thành công"
+#             response = db.table("grade_configs").insert(config_data).execute()
+#             message = "Tạo cấu hình điểm thành công"
         
-        return {
-            "success": True,
-            "message": message,
-            "data": response.data[0] if response.data else None
-        }
+#         return {
+#             "success": True,
+#             "message": message,
+#             "data": response.data[0] if response.data else None
+#         }
         
-    except Exception as e:
-        logger.error(f"Error upserting grade config: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Error upserting grade config: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-@router.post("/config")
-async def create_grade_config(
-    config: dict,
-    current_teacher=Depends(get_current_teacher),
-    db=Depends(get_db)
-):
-    """Tạo cấu hình cột điểm cho môn học"""
-    try:
-        from grades.models import GradeConfigCreate
+# @router.post("/config")
+# async def create_grade_config(
+#     config: dict,
+#     current_teacher=Depends(get_current_teacher),
+#     db=Depends(get_db)
+# ):
+#     """Tạo cấu hình cột điểm cho môn học"""
+#     try:
+#         from grades.models import GradeConfigCreate
         
-        config_obj = GradeConfigCreate(**config)
+#         config_obj = GradeConfigCreate(**config)
         
-        # Kiểm tra xem đã có config chưa
-        existing = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", config_obj.subject_id).eq("academic_year", config_obj.academic_year).eq("semester", config_obj.semester).execute()
+#         # Kiểm tra xem đã có config chưa
+#         existing = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", config_obj.subject_id).eq("academic_year", config_obj.academic_year).eq("semester", config_obj.semester).execute()
         
-        if existing.data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cấu hình điểm cho môn này đã tồn tại"
-            )
+#         if existing.data:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Cấu hình điểm cho môn này đã tồn tại"
+#             )
         
-        config_data = {
-            "teacher_id": current_teacher["id"],
-            "subject_id": config_obj.subject_id,
-            "academic_year": config_obj.academic_year,
-            "semester": config_obj.semester,
-            "grade_column_config": config_obj.grade_column_config,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        }
+#         config_data = {
+#             "teacher_id": current_teacher["id"],
+#             "subject_id": config_obj.subject_id,
+#             "academic_year": config_obj.academic_year,
+#             "semester": config_obj.semester,
+#             "grade_column_config": config_obj.grade_column_config,
+#             "created_at": datetime.now().isoformat(),
+#             "updated_at": datetime.now().isoformat()
+#         }
         
-        response = db.table("grade_configs").insert(config_data).execute()
+#         response = db.table("grade_configs").insert(config_data).execute()
         
-        return {
-            "success": True,
-            "message": "Tạo cấu hình điểm thành công",
-            "data": response.data[0] if response.data else None
-        }
+#         return {
+#             "success": True,
+#             "message": "Tạo cấu hình điểm thành công",
+#             "data": response.data[0] if response.data else None
+#         }
         
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating grade config: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Error creating grade config: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-@router.get("/config/{subject_id}")
-async def get_grade_config(
-    subject_id: int,
-    academic_year: str,
-    semester: str,
-    current_teacher=Depends(get_current_teacher),
-    db=Depends(get_db)
-):
-    """Lấy cấu hình cột điểm cho môn học"""
-    try:
-        config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+# @router.get("/config/{subject_id}")
+# async def get_grade_config(
+#     subject_id: int,
+#     academic_year: str,
+#     semester: str,
+#     current_teacher=Depends(get_current_teacher),
+#     db=Depends(get_db)
+# ):
+#     """Lấy cấu hình cột điểm cho môn học"""
+#     try:
+#         config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
         
-        if not config.data:
-            # Trả về config mặc định
-            default_config = {
-                "teacher_id": current_teacher["id"],
-                "subject_id": subject_id,
-                "academic_year": academic_year,
-                "semester": semester,
-                "grade_column_config": {
-                    "Diem_thuong_xuyen": {"he_so": 1, "label": "Điểm thường xuyên"},
-                    "Diem_thi_giua_ki": {"he_so": 2, "label": "Điểm thi giữa kì"},
-                    "Diem_thi_cuoi_ki": {"he_so": 3, "label": "Điểm thi cuối kì"}
-                }
-            }
+#         if not config.data:
+#             # Trả về config mặc định
+#             default_config = {
+#                 "teacher_id": current_teacher["id"],
+#                 "subject_id": subject_id,
+#                 "academic_year": academic_year,
+#                 "semester": semester,
+#                 "grade_column_config": {
+#                     "Diem_thuong_xuyen": {"he_so": 1, "label": "Điểm thường xuyên"},
+#                     "Diem_thi_giua_ki": {"he_so": 2, "label": "Điểm thi giữa kì"},
+#                     "Diem_thi_cuoi_ki": {"he_so": 3, "label": "Điểm thi cuối kì"}
+#                 }
+#             }
             
-            return {
-                "success": True,
-                "message": "Sử dụng cấu hình mặc định",
-                "data": default_config
-            }
+#             return {
+#                 "success": True,
+#                 "message": "Sử dụng cấu hình mặc định",
+#                 "data": default_config
+#             }
         
-        return {
-            "success": True,
-            "message": "Lấy cấu hình điểm thành công",
-            "data": config.data[0]
-        }
+#         return {
+#             "success": True,
+#             "message": "Lấy cấu hình điểm thành công",
+#             "data": config.data[0]
+#         }
         
-    except Exception as e:
-        logger.error(f"Error getting grade config: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Error getting grade config: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-@router.put("/config/{config_id}")
-async def update_grade_config(
-    config_id: int,
-    config: dict,
-    current_teacher=Depends(get_current_teacher),
-    db=Depends(get_db)
-):
-    """Cập nhật cấu hình cột điểm"""
-    try:
-        from grades.models import GradeConfigUpdate
+# @router.put("/config/{config_id}")
+# async def update_grade_config(
+#     config_id: int,
+#     config: dict,
+#     current_teacher=Depends(get_current_teacher),
+#     db=Depends(get_db)
+# ):
+#     """Cập nhật cấu hình cột điểm"""
+#     try:
+#         from grades.models import GradeConfigUpdate
         
-        config_obj = GradeConfigUpdate(**config)
+#         config_obj = GradeConfigUpdate(**config)
         
-        # Kiểm tra quyền sở hữu
-        existing = db.table("grade_configs").select("*").eq("id", config_id).eq("teacher_id", current_teacher["id"]).execute()
+#         # Kiểm tra quyền sở hữu
+#         existing = db.table("grade_configs").select("*").eq("id", config_id).eq("teacher_id", current_teacher["id"]).execute()
         
-        if not existing.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Không tìm thấy cấu hình điểm"
-            )
+#         if not existing.data:
+#             raise HTTPException(
+#                 status_code=status.HTTP_404_NOT_FOUND,
+#                 detail="Không tìm thấy cấu hình điểm"
+#             )
         
-        update_data = {
-            "grade_column_config": config_obj.grade_column_config,
-            "updated_at": datetime.now().isoformat()
-        }
+#         update_data = {
+#             "grade_column_config": config_obj.grade_column_config,
+#             "updated_at": datetime.now().isoformat()
+#         }
         
-        response = db.table("grade_configs").update(update_data).eq("id", config_id).execute()
+#         response = db.table("grade_configs").update(update_data).eq("id", config_id).execute()
         
-        return {
-            "success": True,
-            "message": "Cập nhật cấu hình điểm thành công",
-            "data": response.data[0] if response.data else None
-        }
+#         return {
+#             "success": True,
+#             "message": "Cập nhật cấu hình điểm thành công",
+#             "data": response.data[0] if response.data else None
+#         }
         
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating grade config: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Error updating grade config: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
 # ===============================================
@@ -781,13 +781,14 @@ async def create_or_update_grade(
                 detail="Bạn không có quyền nhập điểm cho lớp này"
             )
         
-        # Lấy cấu hình điểm để tính final_grade
+        # Lấy grade settings (schema mới) để tính final_grade
         subject_id = class_subject.data[0]["subject_id"]
-        config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", grade_obj.academic_year).eq("semester", grade_obj.semester).execute()
+        settings_resp = db.table("grade_settings").select("*").eq("subject_id", subject_id).eq("is_active", True).execute()
         
-        if config.data:
-            grade_config = config.data[0]["grade_column_config"]
+        if settings_resp.data:
+            grade_config = settings_resp.data[0]["grade_column_config"]
             final_grade = calculate_final_grade(grade_obj.grade_data, grade_config)
+            # logger.info(f"Final grade: {final_grade}")  
         else:
             final_grade = 0.0
         
@@ -1232,76 +1233,76 @@ async def get_ocr_status(
 # ANALYTICS & TREND ENDPOINTS
 # ===============================================
 
-@router.get("/grade-trend/{student_id}/{class_subject_id}")
-async def get_student_grade_trend(
-    student_id: int,
-    class_subject_id: int,
-    academic_year: str,
-    semester: str,
-    current_teacher=Depends(get_current_teacher),
-    db=Depends(get_db)
-):
-    """Phân tích xu hướng điểm cho một học sinh trong một môn.
+# @router.get("/grade-trend/{student_id}/{class_subject_id}")
+# async def get_student_grade_trend(
+#     student_id: int,
+#     class_subject_id: int,
+#     academic_year: str,
+#     semester: str,
+#     current_teacher=Depends(get_current_teacher),
+#     db=Depends(get_db)
+# ):
+#     """Phân tích xu hướng điểm cho một học sinh trong một môn.
 
-    Dựa trên dữ liệu `grade_data` và `grade_config` của môn để ước lượng
-    xu hướng tăng/giảm/ổn định, trả về cả mô tả ngắn gọn cho UI.
-    """
-    try:
-        from grades.services import analyze_grade_trend
+#     Dựa trên dữ liệu `grade_data` và `grade_config` của môn để ước lượng
+#     xu hướng tăng/giảm/ổn định, trả về cả mô tả ngắn gọn cho UI.
+#     """
+#     try:
+#         from grades.services import analyze_grade_trend
         
-        # Quyền truy cập
-        class_subject = db.table("class_subjects").select("*").eq("id", class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
-        if not class_subject.data:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bạn không có quyền xem điểm của lớp này"
-            )
+#         # Quyền truy cập
+#         class_subject = db.table("class_subjects").select("*").eq("id", class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
+#         if not class_subject.data:
+#             raise HTTPException(
+#                 status_code=status.HTTP_403_FORBIDDEN,
+#                 detail="Bạn không có quyền xem điểm của lớp này"
+#             )
 
-        # Lấy điểm và cấu hình cột điểm
-        grade_resp = db.table("grades").select("*").eq("student_id", student_id).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
-        if not grade_resp.data:
-            return {
-                "success": True,
-                "message": "Chưa có điểm",
-                "data": {
-                    "direction": "stable",
-                    "slope": 0,
-                    "confidence": 0,
-                    "reason": "Chưa có dữ liệu điểm"
-                }
-            }
+#         # Lấy điểm và cấu hình cột điểm
+#         grade_resp = db.table("grades").select("*").eq("student_id", student_id).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+#         if not grade_resp.data:
+#             return {
+#                 "success": True,
+#                 "message": "Chưa có điểm",
+#                 "data": {
+#                     "direction": "stable",
+#                     "slope": 0,
+#                     "confidence": 0,
+#                     "reason": "Chưa có dữ liệu điểm"
+#                 }
+#             }
 
-        subject_id = class_subject.data[0]["subject_id"]
-        config_resp = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
-        grade_config = config_resp.data[0]["grade_column_config"] if config_resp.data else None
+#         subject_id = class_subject.data[0]["subject_id"]
+#         settings_resp = db.table("grade_settings").select("*").eq("subject_id", subject_id).eq("is_active", True).execute()
+#         grade_config = settings_resp.data[0]["grade_column_config"] if settings_resp.data else None
 
-        grade_record = grade_resp.data[0]
-        trend = analyze_grade_trend(grade_record.get("grade_data", {}), grade_config)
+#         grade_record = grade_resp.data[0]
+#         trend = analyze_grade_trend(grade_record.get("grade_data", {}), grade_config)
 
-        # Chuẩn hóa payload cho UI
-        color = "#16A34A" if trend["direction"] == "up" else ("#DC2626" if trend["direction"] == "down" else "#6B7280")
-        label = "Tăng" if trend["direction"] == "up" else ("Giảm" if trend["direction"] == "down" else "Ổn định")
+#         # Chuẩn hóa payload cho UI
+#         color = "#16A34A" if trend["direction"] == "up" else ("#DC2626" if trend["direction"] == "down" else "#6B7280")
+#         label = "Tăng" if trend["direction"] == "up" else ("Giảm" if trend["direction"] == "down" else "Ổn định")
 
-        return {
-            "success": True,
-            "message": "Phân tích xu hướng thành công",
-            "data": {
-                "direction": trend["direction"],
-                "label": label,
-                "color": color,
-                "slope": trend["slope"],
-                "confidence": trend["confidence"],
-                "reason": trend["reason"],
-                "ordered_points": trend["ordered_points"],
-                "final_grade": grade_record.get("final_grade")
-            }
-        }
+#         return {
+#             "success": True,
+#             "message": "Phân tích xu hướng thành công",
+#             "data": {
+#                 "direction": trend["direction"],
+#                 "label": label,
+#                 "color": color,
+#                 "slope": trend["slope"],
+#                 "confidence": trend["confidence"],
+#                 "reason": trend["reason"],
+#                 "ordered_points": trend["ordered_points"],
+#                 "final_grade": grade_record.get("final_grade")
+#             }
+#         }
         
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error analyzing grade trend: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Error analyzing grade trend: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
 @router.get("/teacher/classes")
@@ -1947,16 +1948,16 @@ async def bulk_import_grades(
         academic_year = import_data.get("academic_year") or get_current_academic_year()
         semester = import_data.get("semester") or get_current_semester()
         
-        # Lấy grade config với grade_column_config
-        config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+        # Lấy grade settings (schema mới) để có grade_column_config
+        settings_resp = db.table("grade_settings").select("*").eq("subject_id", subject_id).eq("is_active", True).execute()
         
-        if not config.data:
+        if not settings_resp.data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Chưa có cấu hình cột điểm cho môn này. Vui lòng cấu hình trước khi import."
+                detail="Chưa có Grade Settings (cấu hình cột điểm) cho môn này. Vui lòng cấu hình trong grade_settings trước khi import."
             )
         
-        grade_column_config = config.data[0].get("grade_column_config")
+        grade_column_config = settings_resp.data[0].get("grade_column_config")
         
         if not grade_column_config:
             raise HTTPException(

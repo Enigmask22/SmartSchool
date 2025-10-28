@@ -8,7 +8,8 @@ from typing import Optional, List
 class StudentFeedbackRequest(BaseModel):
     student_name: str = Field(..., description="Tên học sinh")
     score: float = Field(..., ge=0, le=10, description="Điểm số (0-10)")
-    score_trend: str = Field(..., description="Xu hướng: tăng, giảm, ổn định")
+    top_subjects: List[str] = Field(default=[], description="Top 3 môn điểm cao nhất")
+    weak_subjects: List[str] = Field(default=[], description="Top 3 môn điểm thấp nhất (< 8.0)")
     attendance_rate: int = Field(..., ge=0, le=100, description="Tỷ lệ chuyên cần (%)")
     subject: Optional[str] = Field(default=None, description="Môn học (nếu có)")
     notes: Optional[str] = Field(default="", description="Ghi chú thêm")
