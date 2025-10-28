@@ -132,7 +132,7 @@ const StudentList = () => {
     student_name: "",
     score: "",
     score_trend: "",
-    attendance_rate: "",
+    attendance_rate: "100",
     subject: "", // Thêm môn học
     notes: "",
   });
@@ -991,7 +991,7 @@ const StudentList = () => {
       student_name: student.full_name,
       score: "",
       score_trend: "",
-      attendance_rate: "",
+      attendance_rate: "100",
       subject: "", // Thêm môn học
       notes: "",
     };
@@ -1116,7 +1116,7 @@ const StudentList = () => {
       student_name: "",
       score: "",
       score_trend: "",
-      attendance_rate: "",
+      attendance_rate: "100",
       subject: "", // Reset môn học
       notes: "",
     });
@@ -3293,30 +3293,8 @@ const StudentList = () => {
                       )}
                     </div>
 
-                    {/* Attendance Rate */}
-                    <div>
-                      <label
-                        htmlFor="attendance_rate"
-                        className="block mb-1 text-sm font-medium text-gray-700"
-                      >
-                        Tỷ Lệ Chuyên Cần (%)
-                      </label>
-                      <input
-                        id="attendance_rate"
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={feedbackForm.attendance_rate}
-                        onChange={(e) =>
-                          handleFeedbackFormChange(
-                            "attendance_rate",
-                            e.target.value
-                          )
-                        }
-                        placeholder="95"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                    </div>
+                    {/* Attendance Rate: mặc định 100% và không hiển thị input */}
+                    {/* Trường này được cố định 100% trừ khi giáo viên nêu rõ trong ghi chú */}
 
                     {/* Notes */}
                     <div>
@@ -3332,7 +3310,7 @@ const StudentList = () => {
                         onChange={(e) =>
                           handleFeedbackFormChange("notes", e.target.value)
                         }
-                        placeholder="Ví dụ: Học sinh rất tích cực tham gia hoạt động lớp..."
+                        placeholder="Mặc định: học sinh chuyên cần 100%. Nếu có vắng mặt/chuyên cần kém, vui lòng ghi rõ tại đây (ví dụ: vắng 2 buổi do ốm, hay thường xuyên đi học muộn, ...)."
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                       />
