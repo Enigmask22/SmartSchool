@@ -1811,6 +1811,10 @@ async def bulk_import_grades(
         
         subject_id = class_subject.data[0]["subject_id"]
         
+        # Lấy thông tin subject để thêm Mon_hoc vào grade_data
+        subject_info = db.table("subjects").select("subject_name").eq("id", subject_id).execute()
+        subject_name = subject_info.data[0]["subject_name"] if subject_info.data else ""
+        
         # Lấy giá trị mặc định từ system settings
         academic_year = import_data.get("academic_year") or get_current_academic_year()
         semester = import_data.get("semester") or get_current_semester()
@@ -1925,11 +1929,9 @@ async def bulk_import_grades(
                         parent_col, child_col = column_mapping[import_col_name]
                         
                         if parent_col:
-                            # This is a child column (nested)
-                            if parent_col not in grade_data:
-                                grade_data[parent_col] = {}
-                            
-                            grade_data[parent_col][child_col] = {
+                            # This is a child column - save as flat structure with child name as key
+                            # Ví dụ: Diem_tx1, Diem_tx2 thay vì Diem_thuong_xuyen->Diem_tx1
+                            grade_data[child_col] = {
                                 'He_so': grade_column_config[parent_col]['data'][child_col].get('he_so', 1),
                                 'Diem': normalized_value
                             }
@@ -1939,6 +1941,23 @@ async def bulk_import_grades(
                                 'He_so': grade_column_config[import_col_name].get('he_so', 1),
                                 'Diem': normalized_value
                             }
+                    else:
+                        # Xử lý các cột không có trong mapping (vd: Diem_tx1, Diem_tx2, Diem_tx3, Diem_tx4)
+                        # Các cột Diem_tx* được coi là children của Diem_thuong_xuyen
+                        if import_col_name.startswith('Diem_tx'):
+                            # Tìm he_so từ Diem_thuong_xuyen config (nếu tồn tại)
+                            he_so = 1  # Default
+                            if 'Diem_thuong_xuyen' in grade_column_config:
+                                he_so = grade_column_config['Diem_thuong_xuyen'].get('he_so', 1)
+                            
+                            grade_data[import_col_name] = {
+                                'He_so': he_so,
+                                'Diem': normalized_value
+                            }
+                        # Bỏ qua các cột khác không có trong mapping
+                
+                # Thêm Mon_hoc vào grade_data
+                grade_data['Mon_hoc'] = subject_name
                 
                 # Tính final grade với transformed data
                 final_grade = calculate_final_grade(grade_data, grade_column_config)

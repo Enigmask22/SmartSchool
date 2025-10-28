@@ -278,7 +278,21 @@ const GradeManagement = () => {
       }
     });
 
-    return flatColumns;
+    // Sắp xếp các cột theo thứ tự: Điểm thường xuyên -> Điểm giữa kì -> Điểm cuối kì
+    const columnOrder = {
+      Diem_tx1: 1,
+      Diem_tx2: 2,
+      Diem_tx3: 3,
+      Diem_tx4: 4,
+      Diem_thi_giua_ki: 10,
+      Diem_thi_cuoi_ki: 11,
+    };
+
+    return flatColumns.sort((a, b) => {
+      const orderA = columnOrder[a.key] || 999;
+      const orderB = columnOrder[b.key] || 999;
+      return orderA - orderB;
+    });
   };
 
   const initializeGradeForm = (student, existingGrade = null) => {
@@ -446,21 +460,112 @@ const GradeManagement = () => {
   const calculateFinalGrade = (gradeData) => {
     if (!gradeData || !gradeConfig?.grade_column_config) return 0;
 
-    let totalScore = 0;
-    let totalWeight = 0;
-
     // Use flattened columns to calculate (includes all child columns)
     const flatColumns = flattenGradeColumns(gradeConfig.grade_column_config);
 
+    // Gom tất cả các cột điểm thường xuyên (Diem_tx*)
+    let txScores = [];
+
+    // Gom các cột điểm thi
+    let giuaKiScore = null;
+    let giuaKiWeight = 0;
+    let cuoiKiScore = null;
+    let cuoiKiWeight = 0;
+
+    // Kiểm tra xem tất cả điểm có phải là chữ không
+    let isAllLetterGrades = true;
+    let hasAnyGrade = false;
+
     flatColumns.forEach((column) => {
       if (gradeData[column.key]?.Diem) {
-        const score = parseFloat(gradeData[column.key].Diem);
-        const weight = parseFloat(column.he_so);
-
-        totalScore += score * weight;
-        totalWeight += weight;
+        hasAnyGrade = true;
+        const diemValue = gradeData[column.key].Diem;
+        const isLetter =
+          typeof diemValue === "string" &&
+          (diemValue === "Đ" || diemValue === "KĐ");
+        if (!isLetter) {
+          isAllLetterGrades = false;
+        }
       }
     });
+
+    if (!hasAnyGrade) return 0;
+
+    flatColumns.forEach((column) => {
+      if (gradeData[column.key]?.Diem) {
+        const diemValue = gradeData[column.key].Diem;
+
+        let score;
+
+        // Nếu là điểm chữ, convert sang số
+        if (
+          isAllLetterGrades &&
+          typeof diemValue === "string" &&
+          (diemValue === "Đ" || diemValue === "KĐ")
+        ) {
+          score = diemValue === "Đ" ? 1 : 0;
+        } else if (
+          typeof diemValue === "string" &&
+          (diemValue === "Đ" || diemValue === "KĐ")
+        ) {
+          return; // Skip nếu không phải tất cả là chữ
+        } else {
+          score = parseFloat(diemValue);
+        }
+
+        // Skip if score is not a valid number
+        if (isNaN(score)) {
+          return; // Skip this column
+        }
+
+        const weight = parseFloat(column.he_so);
+
+        // Phân loại theo loại cột
+        if (column.key.startsWith("Diem_tx")) {
+          // Điểm thường xuyên
+          txScores.push(score);
+        } else if (column.key === "Diem_thi_giua_ki") {
+          // Điểm giữa kì
+          giuaKiScore = score;
+          giuaKiWeight = weight;
+        } else if (column.key === "Diem_thi_cuoi_ki") {
+          // Điểm cuối kì
+          cuoiKiScore = score;
+          cuoiKiWeight = weight;
+        }
+      }
+    });
+
+    // Tính điểm thường xuyên trung bình
+    let txAverage = 0;
+    if (txScores.length > 0) {
+      txAverage =
+        txScores.reduce((sum, score) => sum + score, 0) / txScores.length;
+    }
+
+    // Áp dụng công thức: (Điểm_thường_xuyên × 1 + Điểm_giữa_kì × 2 + Điểm_cuối_kì × 3) / 6
+    let totalScore = 0;
+    let totalWeight = 0;
+
+    if (txScores.length > 0) {
+      totalScore += txAverage * 1;
+      totalWeight += 1;
+    }
+
+    if (giuaKiScore !== null) {
+      totalScore += giuaKiScore * giuaKiWeight;
+      totalWeight += giuaKiWeight;
+    }
+
+    if (cuoiKiScore !== null) {
+      totalScore += cuoiKiScore * cuoiKiWeight;
+      totalWeight += cuoiKiWeight;
+    }
+
+    // Nếu là điểm chữ, không chia cho totalWeight, so sánh trực tiếp với 5
+    if (isAllLetterGrades) {
+      return totalScore >= 5 ? "Đ" : "KĐ";
+    }
 
     return totalWeight > 0 ? (totalScore / totalWeight).toFixed(2) : 0;
   };
@@ -1699,12 +1804,12 @@ const GradeManagement = () => {
                               <th
                                 key={column.key}
                                 colSpan={column.children.length}
-                                className="px-3 py-3 text-center border-b-2 border-gray-300 border-x bg-blue-50"
+                                className="px-3 py-3 text-center border-b-2 border-gray-300 border-x bg-gray-50"
                               >
-                                <div className="text-xs font-semibold tracking-wider text-blue-700 uppercase">
+                                <div className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
                                   {column.label}
                                 </div>
-                                <div className="text-xs text-blue-600 normal-case font-normal mt-0.5">
+                                <div className="text-xs text-gray-600 normal-case font-normal mt-0.5">
                                   {column.children.length} điểm
                                 </div>
                               </th>
@@ -1756,12 +1861,12 @@ const GradeManagement = () => {
                             return column.children.map((child) => (
                               <th
                                 key={child.key}
-                                className="px-3 py-2 text-center border-gray-200 border-x bg-blue-50"
+                                className="px-3 py-2 text-center border-b-2 border-gray-300 border-x bg-gray-50"
                               >
                                 <div className="text-xs font-medium text-gray-700">
                                   {child.label}
                                 </div>
-                                <div className="text-xs text-blue-500 normal-case font-normal mt-0.5">
+                                <div className="text-xs text-gray-600 normal-case font-normal mt-0.5">
                                   Hệ số: {child.he_so}
                                 </div>
                               </th>

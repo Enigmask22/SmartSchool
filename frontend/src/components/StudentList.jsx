@@ -153,8 +153,8 @@ const StudentList = () => {
     useState(null);
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [selectedSubjects, setSelectedSubjects] = useState({
-    core_subjects: ["TOAN", "VAN", "ANH"], // Mặc định 3 môn chính
-    elective_subjects: [], // Môn tự chọn
+    core_subjects: [], // Sẽ được populate từ API khi fetch subjects
+    elective_subjects: [], // Sẽ được populate từ API khi fetch subjects
   });
   const [subjectLoading, setSubjectLoading] = useState(false);
 
@@ -362,14 +362,13 @@ const StudentList = () => {
           logger.debug("📚 Setting homeroom classes:", classNames);
           setAvailableClasses(classNames);
         } else {
-          logger.warn(
-            "📚 Invalid homeroom classes response:",
-            classesResponse
-          );
+          logger.warn("📚 Invalid homeroom classes response:", classesResponse);
           setAvailableClasses([]);
         }
       } else {
-        logger.debug("📚 Fetching all students to extract classes for admin...");
+        logger.debug(
+          "📚 Fetching all students to extract classes for admin..."
+        );
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
 
@@ -936,7 +935,10 @@ const StudentList = () => {
 
     try {
       const token = localStorage.getItem("access_token");
-      logger.debug("🔑 Token from localStorage:", token ? "Present" : "Missing");
+      logger.debug(
+        "🔑 Token from localStorage:",
+        token ? "Present" : "Missing"
+      );
       logger.debug("🔑 Token length:", token ? token.length : 0);
 
       const url = `${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`;
@@ -996,7 +998,10 @@ const StudentList = () => {
 
     // Fetch student's average grade and grade trend analysis
     try {
-      logger.debug("🎯 Fetching grades for feedback form for student:", student);
+      logger.debug(
+        "🎯 Fetching grades for feedback form for student:",
+        student
+      );
       const gradesResponse = await ApiService.getStudentGrades(student.id);
       logger.debug("📊 Grades response for feedback:", gradesResponse);
 
@@ -1085,7 +1090,9 @@ const StudentList = () => {
             logger.debug("⚠️ No valid final_grade found in grades");
           }
         } else {
-          logger.debug("⚠️ No grades found for student - not an array or empty");
+          logger.debug(
+            "⚠️ No grades found for student - not an array or empty"
+          );
           logger.debug("📋 Grades type:", typeof grades);
           logger.debug("📋 Is array:", Array.isArray(grades));
         }
@@ -1529,16 +1536,22 @@ const StudentList = () => {
         logger.debug("Setting selected subjects:", subjectData);
         setSelectedSubjects(subjectData);
       } else {
-        // Reset về mặc định nếu data không hợp lệ
+        // Reset về mặc định - auto-select từ available subjects
+        const mandatorySubjects = availableSubjects
+          .filter((s) => s.is_mandatory)
+          .map((s) => s.subject_code);
         setSelectedSubjects({
-          core_subjects: ["TOAN", "VAN", "ANH"],
+          core_subjects: mandatorySubjects,
           elective_subjects: [],
         });
       }
     } else {
-      // Reset về mặc định
+      // Reset về mặc định - auto-select từ available subjects
+      const mandatorySubjects = availableSubjects
+        .filter((s) => s.is_mandatory)
+        .map((s) => s.subject_code);
       setSelectedSubjects({
-        core_subjects: ["TOAN", "VAN", "ANH"],
+        core_subjects: mandatorySubjects,
         elective_subjects: [],
       });
     }
@@ -1559,10 +1572,16 @@ const StudentList = () => {
           [type]: currentSubjects.filter((code) => code !== subjectCode),
         };
       } else {
-        // Add subject (max 3 cho mỗi loại)
-        if (currentSubjects.length >= 3) {
+        // Add subject - Tính max từ available subjects
+        const mandatoryCount = availableSubjects.filter(
+          (s) => s.is_mandatory
+        ).length;
+        const maxSubjects = type === "core_subjects" ? mandatoryCount : 4; // Dynamic môn chính, 4 môn tự chọn
+        if (currentSubjects.length >= maxSubjects) {
           alert(
-            `Tối đa 3 môn ${type === "core_subjects" ? "chính" : "tự chọn"}`
+            `Tối đa ${maxSubjects} môn ${
+              type === "core_subjects" ? "chính" : "tự chọn"
+            }`
           );
           return prev;
         }
@@ -1619,8 +1638,11 @@ const StudentList = () => {
   const closeSubjectModal = () => {
     setShowSubjectModal(false);
     setSelectedStudentForSubject(null);
+    const mandatorySubjects = availableSubjects
+      .filter((s) => s.is_mandatory)
+      .map((s) => s.subject_code);
     setSelectedSubjects({
-      core_subjects: ["TOAN", "VAN", "ANH"],
+      core_subjects: mandatorySubjects,
       elective_subjects: [],
     });
   };
@@ -3341,17 +3363,18 @@ const StudentList = () => {
                   <div className="px-6 py-4 border-b border-gray-200">
                     <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
                       <BookOpen className="w-5 h-5 text-blue-600" /> Môn học
-                      chính (3 môn)
+                      chính (
+                      {availableSubjects.filter((s) => s.is_mandatory).length}{" "}
+                      môn)
                     </h3>
                     <p className="text-sm text-gray-600">
-                      Bắt buộc: Toán, Văn, Anh
+                      Bắt buộc: Tất cả môn được đánh dấu "Môn bắt buộc" trong
+                      quản trị
                     </p>
                   </div>
                   <div className="px-6 py-4 space-y-3 overflow-y-auto max-h-64">
                     {availableSubjects
-                      .filter((subject) =>
-                        ["TOAN", "VAN", "ANH"].includes(subject.subject_code)
-                      )
+                      .filter((subject) => subject.is_mandatory)
                       .map((subject) => (
                         <label
                           key={subject.subject_code}
@@ -3381,8 +3404,9 @@ const StudentList = () => {
                   </div>
                   <div className="px-6 py-3 border-t border-gray-200 bg-blue-50">
                     <p className="text-xs text-blue-700">
-                      Đã chọn: {selectedSubjects.core_subjects.length}/3 môn
-                      chính
+                      Đã chọn: {selectedSubjects.core_subjects.length}/
+                      {availableSubjects.filter((s) => s.is_mandatory).length}{" "}
+                      môn chính
                     </p>
                   </div>
                 </div>
@@ -3392,18 +3416,15 @@ const StudentList = () => {
                   <div className="px-6 py-4 border-b border-gray-200">
                     <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
                       <Target className="w-5 h-5 text-green-600" /> Môn tự chọn
-                      (3 môn)
+                      (4 môn)
                     </h3>
                     <p className="text-sm text-gray-600">
-                      Chọn 3 môn từ danh sách
+                      Chọn 4 môn từ danh sách
                     </p>
                   </div>
                   <div className="px-6 py-4 space-y-3 overflow-y-auto max-h-64">
                     {availableSubjects
-                      .filter(
-                        (subject) =>
-                          !["TOAN", "VAN", "ANH"].includes(subject.subject_code)
-                      )
+                      .filter((subject) => !subject.is_mandatory)
                       .map((subject) => (
                         <label
                           key={subject.subject_code}
@@ -3433,7 +3454,7 @@ const StudentList = () => {
                   </div>
                   <div className="px-6 py-3 border-t border-gray-200 bg-green-50">
                     <p className="text-xs text-green-700">
-                      Đã chọn: {selectedSubjects.elective_subjects.length}/3 môn
+                      Đã chọn: {selectedSubjects.elective_subjects.length}/4 môn
                       tự chọn
                     </p>
                   </div>
@@ -3481,17 +3502,21 @@ const StudentList = () => {
                   onClick={saveSubjectSelection}
                   disabled={
                     subjectLoading ||
-                    selectedSubjects.core_subjects.length !== 3 ||
-                    selectedSubjects.elective_subjects.length !== 3
+                    selectedSubjects.core_subjects.length !==
+                      availableSubjects.filter((s) => s.is_mandatory).length ||
+                    selectedSubjects.elective_subjects.length !== 4
                   }
                 >
                   {subjectLoading ? "Đang lưu..." : "Lưu môn học"}
                 </Button>
               </div>
-              {selectedSubjects.core_subjects.length !== 3 ||
-              selectedSubjects.elective_subjects.length !== 3 ? (
+              {selectedSubjects.core_subjects.length !==
+                availableSubjects.filter((s) => s.is_mandatory).length ||
+              selectedSubjects.elective_subjects.length !== 4 ? (
                 <p className="mt-2 text-xs text-center text-red-600">
-                  ⚠️ Vui lòng chọn đúng 3 môn chính và 3 môn tự chọn
+                  Vui lòng chọn đúng{" "}
+                  {availableSubjects.filter((s) => s.is_mandatory).length} môn
+                  chính và 4 môn tự chọn
                 </p>
               ) : null}
             </div>

@@ -12,36 +12,179 @@ logger = setup_logger("grades_service")
 def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
     """Tính điểm tổng kết dựa trên grade_data và config"""
     try:
+        # Helper function to flatten nested grade_config
+        def flatten_grade_config(config):
+            """Flatten nested config structure to handle child columns"""
+            flattened = {}
+            for column_name, column_config in config.items():
+                if isinstance(column_config, dict) and 'data' in column_config:
+                    # Parent column with children - extract each child
+                    for child_key, child_config in column_config['data'].items():
+                        flattened[child_key] = child_config
+                else:
+                    # Regular column
+                    flattened[column_name] = column_config
+            return flattened
+        
         if grade_config:
-            # Use config weights
+            # Flatten the config first to handle nested structures
+            flat_config = flatten_grade_config(grade_config)
+            
+            # Gom tất cả các cột điểm thường xuyên (Diem_tx*)
+            tx_scores = []
+            # Gom các cột điểm thi
+            giua_ki_score = None
+            giua_ki_weight = 0
+            cuoi_ki_score = None
+            cuoi_ki_weight = 0
+            
+            # Kiểm tra xem tất cả điểm có phải là chữ không
+            is_all_letter_grades = True
+            has_any_grade = False
+            
+            for column_name, column_config in flat_config.items():
+                if column_name in grade_data and "Diem" in grade_data[column_name]:
+                    has_any_grade = True
+                    diem_value = grade_data[column_name]["Diem"]
+                    is_letter = isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']
+                    if not is_letter:
+                        is_all_letter_grades = False
+            
+            if not has_any_grade:
+                return 0.0
+            
+            for column_name, column_config in flat_config.items():
+                if column_name in grade_data and "Diem" in grade_data[column_name]:
+                    diem_value = grade_data[column_name]["Diem"]
+                    
+                    # Nếu là điểm chữ, convert sang số
+                    if is_all_letter_grades and isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']:
+                        score = 1.0 if diem_value == 'Đ' else 0.0
+                    elif isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']:
+                        continue  # Skip nếu không phải tất cả là chữ
+                    else:
+                        score = float(diem_value)
+                    weight = float(column_config.get("he_so", 1))
+                    
+                    # Phân loại theo loại cột
+                    if column_name.startswith('Diem_tx'):
+                        # Điểm thường xuyên
+                        tx_scores.append(score)
+                    elif column_name == 'Diem_thi_giua_ki':
+                        # Điểm giữa kì
+                        giua_ki_score = score
+                        giua_ki_weight = weight
+                    elif column_name == 'Diem_thi_cuoi_ki':
+                        # Điểm cuối kì
+                        cuoi_ki_score = score
+                        cuoi_ki_weight = weight
+            
+            # Tính điểm thường xuyên trung bình
+            tx_average = 0
+            if tx_scores:
+                tx_average = sum(tx_scores) / len(tx_scores)
+            
+            # Áp dụng công thức: (Điểm_thường_xuyên × 1 + Điểm_giữa_kì × 2 + Điểm_cuối_kì × 3) / 6
             total_score = 0
             total_weight = 0
             
-            for column_name, column_config in grade_config.items():
-                if column_name in grade_data and "Diem" in grade_data[column_name]:
-                    score = float(grade_data[column_name]["Diem"])
-                    weight = float(column_config.get("he_so", 1))
-                    
-                    total_score += score * weight
-                    total_weight += weight
+            if tx_scores:
+                total_score += tx_average * 1
+                total_weight += 1
+            
+            if giua_ki_score is not None:
+                total_score += giua_ki_score * giua_ki_weight
+                total_weight += giua_ki_weight
+            
+            if cuoi_ki_score is not None:
+                total_score += cuoi_ki_score * cuoi_ki_weight
+                total_weight += cuoi_ki_weight
             
             if total_weight > 0:
-                return round(total_score / total_weight, 2)
+                # Nếu là điểm chữ, không chia cho total_weight, so sánh trực tiếp với 5
+                if is_all_letter_grades:
+                    return "Đ" if total_score >= 5 else "KĐ"
+                final_numeric_score = total_score / total_weight
+                return round(final_numeric_score, 2)
             return 0.0
         else:
             # Use weights from grade_data
-            total_score = 0
-            total_weight = 0
+            # Gom tất cả các cột điểm thường xuyên (Diem_tx*)
+            tx_scores = []
+            # Gom các cột điểm thi
+            giua_ki_score = None
+            giua_ki_weight = 0
+            cuoi_ki_score = None
+            cuoi_ki_weight = 0
+            
+            # Kiểm tra xem tất cả điểm có phải là chữ không
+            is_all_letter_grades = True
+            has_any_grade = False
             
             for column_name, value in grade_data.items():
                 if isinstance(value, dict) and "Diem" in value:
-                    score = float(value.get("Diem", 0))
+                    has_any_grade = True
+                    diem_value = value.get("Diem", 0)
+                    is_letter = isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']
+                    if not is_letter:
+                        is_all_letter_grades = False
+            
+            if not has_any_grade:
+                return 0.0
+            
+            for column_name, value in grade_data.items():
+                if isinstance(value, dict) and "Diem" in value:
+                    diem_value = value.get("Diem", 0)
+                    
+                    # Nếu là điểm chữ, convert sang số
+                    if is_all_letter_grades and isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']:
+                        score = 1.0 if diem_value == 'Đ' else 0.0
+                    elif isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']:
+                        continue  # Skip nếu không phải tất cả là chữ
+                    else:
+                        score = float(diem_value)
                     weight = float(value.get("He_so", 1))
-                    total_score += score * weight
-                    total_weight += weight
+                    
+                    # Phân loại theo loại cột
+                    if column_name.startswith('Diem_tx'):
+                        # Điểm thường xuyên
+                        tx_scores.append(score)
+                    elif column_name == 'Diem_thi_giua_ki':
+                        # Điểm giữa kì
+                        giua_ki_score = score
+                        giua_ki_weight = weight
+                    elif column_name == 'Diem_thi_cuoi_ki':
+                        # Điểm cuối kì
+                        cuoi_ki_score = score
+                        cuoi_ki_weight = weight
+            
+            # Tính điểm thường xuyên trung bình
+            tx_average = 0
+            if tx_scores:
+                tx_average = sum(tx_scores) / len(tx_scores)
+            
+            # Áp dụng công thức: (Điểm_thường_xuyên × 1 + Điểm_giữa_kì × 2 + Điểm_cuối_kì × 3) / 6
+            total_score = 0
+            total_weight = 0
+            
+            if tx_scores:
+                total_score += tx_average * 1
+                total_weight += 1
+            
+            if giua_ki_score is not None:
+                total_score += giua_ki_score * giua_ki_weight
+                total_weight += giua_ki_weight
+            
+            if cuoi_ki_score is not None:
+                total_score += cuoi_ki_score * cuoi_ki_weight
+                total_weight += cuoi_ki_weight
             
             if total_weight > 0:
-                return round(total_score / total_weight, 2)
+                # Nếu là điểm chữ, không chia cho total_weight, so sánh trực tiếp với 5
+                if is_all_letter_grades:
+                    return "Đ" if total_score >= 5 else "KĐ"
+                final_numeric_score = total_score / total_weight
+                return round(final_numeric_score, 2)
             return 0.0
     except Exception as e:
         logger.error(f"Error calculating grade: {str(e)}")
