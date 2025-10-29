@@ -104,6 +104,7 @@ class StudentCreate(BaseModel):
     gender: str
     class_name: str
     grade: str
+    class_id: Optional[int] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     parent_name: Optional[str] = None

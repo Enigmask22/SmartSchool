@@ -13,7 +13,6 @@ import StudentList from "./components/StudentList";
 import AttendanceView from "./components/AttendanceView";
 import FaceManagement from "./components/FaceManagement";
 import ContinuousRecognition from "./components/ContinuousRecognition";
-import SchoolDaysConfig from "./components/SchoolDaysConfig";
 import Login from "./components/Login";
 import GradeManagement from "./components/GradeManagement";
 import HomeroomDashboard from "./components/HomeroomDashboard";
@@ -114,8 +113,6 @@ function AppContent() {
           return <ContinuousRecognition isAdmin={true} />;
         // case 'faces':
         //   return <FaceManagement />;
-        case "school-config":
-          return <SchoolDaysConfig />;
         case "class-management":
           return <ClassManagement />;
         // case 'grades':

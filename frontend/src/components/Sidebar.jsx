@@ -122,12 +122,12 @@ const Sidebar = ({
         { id: "continuous", label: "Điểm danh tự động", icon: "continuous" },
         {
           id: "class-management",
-          label: "Quản trị lớp học",
+          label: "Quản lý học sinh",
           icon: "class-management",
         },
         {
           id: "admin-management",
-          label: "Quản trị hệ thống",
+          label: "Quản lý hệ thống",
           icon: "admin-management",
         },
         { id: "ui-demo", label: "UI Demo", icon: "dashboard" },

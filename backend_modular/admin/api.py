@@ -19,6 +19,7 @@ from admin.services import generate_student_id
 from core.database import get_db
 from core.logger import setup_logger
 from auth.api import get_current_user
+from core.system_settings import get_current_academic_year
 
 logger = setup_logger("admin_api")
 router = APIRouter()
@@ -646,15 +647,32 @@ async def get_all_subjects(
 ):
     """Lấy danh sách tất cả môn học"""
     try:
-        query = db.table("subjects").select("*")
+        # Join nhẹ với grade_settings để lấy cấu hình cột điểm đang active (nếu có)
+        query = db.table("subjects").select(
+            "*, grade_settings:grade_settings(id, grade_column_config, is_active)"
+        )
         
         # Nếu không show_deleted, chỉ lấy các môn học active
         if not show_deleted:
             query = query.eq("is_active", True)
         
         response = query.order("subject_code").execute()
+
+        # Flatten: gắn trực tiếp grade_column_config vào mỗi subject
+        subjects = []
+        for subj in (response.data or []):
+            subj_copy = dict(subj)
+            if isinstance(subj.get("grade_settings"), dict):
+                if subj["grade_settings"].get("is_active"):
+                    subj_copy["grade_column_config"] = subj["grade_settings"].get("grade_column_config")
+            elif isinstance(subj.get("grade_settings"), list) and subj["grade_settings"]:
+                # Nếu trả về list, lấy bản ghi active đầu tiên
+                active = next((g for g in subj["grade_settings"] if g.get("is_active")), None)
+                if active:
+                    subj_copy["grade_column_config"] = active.get("grade_column_config")
+            subjects.append(subj_copy)
         
-        return {"success": True, "data": response.data}
+        return {"success": True, "data": subjects}
     except Exception as e:
         logger.error(f"Error getting subjects: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách môn học: {str(e)}")
@@ -834,18 +852,41 @@ async def permanent_delete_subject(
 
 @router.get("/classes")
 async def get_all_classes(
+    academic_year: str | None = Query(None, description="Lọc theo năm học, ví dụ 2024-2025"),
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Lấy danh sách tất cả lớp học"""
+    """Lấy danh sách lớp học, có thể lọc theo năm học.
+
+    Ghi chú: Danh sách lớp vẫn lấy từ bảng classes (để kiểm soát metadata như academic_year),
+    còn danh sách học sinh sẽ dựa trên bảng homeroom_students_history ở endpoint khác.
+    """
     try:
-        response = db.table("classes").select(
+        query = db.table("classes").select(
             "*, teachers:homeroom_teacher_id(id, full_name, teacher_code)"
-        ).order("grade, class_name").execute()
-        
+        )
+        if academic_year:
+            query = query.eq("academic_year", academic_year)
+
+        response = query.order("grade, class_name").execute()
         return {"success": True, "data": response.data}
     except Exception as e:
         logger.error(f"Error getting classes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+
+
+@router.get("/classes/academic-years")
+async def get_class_academic_years(
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Lấy danh sách năm học khả dụng từ bảng classes (phục vụ filter)."""
+    try:
+        response = db.table("classes").select("academic_year").execute()
+        years = sorted(list({item.get("academic_year") for item in (response.data or []) if item.get("academic_year")}))
+        return {"success": True, "data": years}
+    except Exception as e:
+        logger.error(f"Error getting academic years: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
@@ -855,20 +896,23 @@ async def get_class_students(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Lấy danh sách học sinh trong một lớp"""
+    """Lấy danh sách học sinh trong một lớp dựa vào bảng homeroom_students_history"""
     try:
-        # Lấy thông tin lớp học trước
-        class_response = db.table("classes").select("*").eq("id", class_id).execute()
+        # Đảm bảo lớp tồn tại (và lấy metadata nếu cần)
+        class_response = db.table("classes").select("id, class_name").eq("id", class_id).execute()
         if not class_response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
-        
-        class_info = class_response.data[0]
-        
-        # Lấy danh sách học sinh trong lớp theo class_name (giống backend gốc)
-        # Backend gốc KHÔNG filter is_active, để frontend tự filter
-        response = db.table("students").select("*").eq("class_name", class_info["class_name"]).execute()
-        
-        return {"success": True, "data": response.data}
+
+        # Lấy danh sách student_id từ bảng lịch sử
+        history_resp = db.table("homeroom_students_history").select("student_id").eq("class_id", class_id).execute()
+        student_ids = [row["student_id"] for row in (history_resp.data or []) if row.get("student_id")]
+
+        if not student_ids:
+            return {"success": True, "data": []}
+
+        # Lấy thông tin học sinh theo danh sách id
+        students_resp = db.table("students").select("*").in_("id", student_ids).execute()
+        return {"success": True, "data": students_resp.data}
     except HTTPException:
         raise
     except Exception as e:
@@ -1517,13 +1561,21 @@ async def create_student_admin(
 ):
     """Tạo học sinh mới"""
     try:
+        # Nếu có class_id, lấy thông tin lớp để đảm bảo tính nhất quán class_name/grade
+        class_info = None
+        if getattr(student_data, "class_id", None):
+            class_resp = db.table("classes").select("id, class_name, grade, homeroom_teacher_id").eq("id", student_data.class_id).execute()
+            if not class_resp.data:
+                raise HTTPException(status_code=400, detail="class_id không hợp lệ")
+            class_info = class_resp.data[0]
+
         data = {
             "student_id": student_data.student_id,
             "full_name": student_data.full_name,
             "date_of_birth": student_data.date_of_birth,
             "gender": student_data.gender,
-            "class_name": student_data.class_name,
-            "grade": student_data.grade,
+            "class_name": class_info["class_name"] if class_info else student_data.class_name,
+            "grade": str(class_info["grade"]) if class_info else student_data.grade,
             "is_active": True,  # Default value
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
@@ -1541,9 +1593,17 @@ async def create_student_admin(
             data["address"] = student_data.address
         
         response = db.table("students").insert(data).execute()
-        
+
+        # Nếu tạo thành công và có class_id -> ghi lịch sử vào homeroom_students_history
         if response.data:
-            return {"success": True, "data": response.data[0], "message": "Tạo học sinh thành công"}
+            created_student = response.data[0]
+            if class_info:
+                db.table("homeroom_students_history").insert({
+                    "teacher_id": class_info.get("homeroom_teacher_id"),
+                    "class_id": class_info["id"],
+                    "student_id": created_student["id"]
+                }).execute()
+            return {"success": True, "data": created_student, "message": "Tạo học sinh thành công"}
         else:
             raise HTTPException(status_code=500, detail="Không thể tạo học sinh")
         
@@ -1802,264 +1862,7 @@ async def bulk_import_students(
 # DASHBOARD ANALYTICS ENDPOINTS
 # ===============================================
 
-@router.get("/dashboard/overview")
-async def get_dashboard_overview(
-    admin_user=Depends(get_admin_user),
-    db=Depends(get_db)
-):
-    """Lấy tổng quan hệ thống cho admin dashboard"""
-    try:
-        from datetime import timedelta
-        
-        # Tổng số users, students, teachers, classes
-        users_count = db.table("users").select("id").execute()
-        students_count = db.table("students").select("id").eq("is_active", True).execute()
-        teachers_count = db.table("teachers").select("id").execute()
-        classes_count = db.table("classes").select("id").execute()
-        
-        # Thống kê điểm danh hôm nay
-        today = datetime.now().date().isoformat()
-        tomorrow = (datetime.now().date() + timedelta(days=1)).isoformat()
-        attendance_today = db.table("attendance").select("id, status").gte("date", today).lt("date", tomorrow).execute()
-        
-        present_today = len([r for r in attendance_today.data if r.get('status') == 'present'])
-        absent_today = len([r for r in attendance_today.data if r.get('status') == 'absent'])
-        total_attendance_today = len(attendance_today.data)
-        attendance_rate = (present_today / total_attendance_today * 100) if total_attendance_today > 0 else 0
-        
-        # Thống kê hoạt động gần đây (7 ngày qua)
-        week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-        recent_logins = db.table("users").select("last_login").gte("last_login", week_ago).execute()
-        
-        return {
-            "success": True,
-            "data": {
-                "overview": {
-                    "total_users": len(users_count.data),
-                    "total_students": len(students_count.data),
-                    "total_teachers": len(teachers_count.data),
-                    "total_classes": len(classes_count.data)
-                },
-                "attendance_today": {
-                    "present": present_today,
-                    "absent": absent_today,
-                    "total": total_attendance_today,
-                    "rate": round(attendance_rate, 1)
-                },
-                "activity": {
-                    "recent_logins": len(recent_logins.data)
-                }
-            }
-        }
-    except Exception as e:
-        logger.error(f"Error getting dashboard overview: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
-
-
-@router.get("/dashboard/attendance-trends")
-async def get_attendance_trends(
-    days: int = 30,
-    admin_user=Depends(get_admin_user),
-    db=Depends(get_db)
-):
-    """Lấy xu hướng điểm danh theo thời gian"""
-    try:
-        from datetime import timedelta
-        
-        end_date = datetime.now().date()
-        start_date = (end_date - timedelta(days=days)).isoformat()
-        end_date = end_date.isoformat()
-        
-        # Lấy dữ liệu điểm danh theo ngày
-        attendance_data = db.table("attendance").select("date, status").gte("date", start_date).lte("date", end_date).execute()
-        
-        # Nhóm theo ngày
-        daily_stats = {}
-        for record in attendance_data.data:
-            date = record['date']
-            if date not in daily_stats:
-                daily_stats[date] = {'present': 0, 'absent': 0, 'total': 0}
-            
-            daily_stats[date]['total'] += 1
-            if record['status'] == 'present':
-                daily_stats[date]['present'] += 1
-            elif record['status'] == 'absent':
-                daily_stats[date]['absent'] += 1
-        
-        # Tạo dữ liệu cho chart
-        chart_data = []
-        for date in sorted(daily_stats.keys()):
-            stats = daily_stats[date]
-            rate = (stats['present'] / stats['total'] * 100) if stats['total'] > 0 else 0
-            chart_data.append({
-                "date": date,
-                "present": stats['present'],
-                "absent": stats['absent'],
-                "total": stats['total'],
-                "rate": round(rate, 1)
-            })
-        
-        return {
-            "success": True,
-            "data": chart_data
-        }
-    except Exception as e:
-        logger.error(f"Error getting attendance trends: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
-
-
-@router.get("/dashboard/class-performance")
-async def get_class_performance(
-    admin_user=Depends(get_admin_user),
-    db=Depends(get_db)
-):
-    """Lấy hiệu suất học tập theo lớp"""
-    try:
-        # Lấy dữ liệu điểm số gần đây
-        grades_data = db.table("grades").select("student_id, class_subject_id, final_grade, semester, academic_year").execute()
-        
-        # Lấy thông tin học sinh và lớp
-        students_data = db.table("students").select("id, full_name, class_name").eq("is_active", True).execute()
-        students_dict = {s['id']: s for s in students_data.data}
-        
-        # Nhóm điểm theo lớp
-        class_performance = {}
-        for grade in grades_data.data:
-            student_id = grade['student_id']
-            if student_id in students_dict and grade['final_grade'] is not None:
-                class_name = students_dict[student_id]['class_name']
-                if class_name not in class_performance:
-                    class_performance[class_name] = []
-                class_performance[class_name].append(float(grade['final_grade']))
-        
-        # Tính toán thống kê cho mỗi lớp
-        result = []
-        for class_name, grades in class_performance.items():
-            if grades:
-                avg_grade = sum(grades) / len(grades)
-                result.append({
-                    "class_name": class_name,
-                    "total_students": len(set([g['student_id'] for g in grades_data.data if students_dict.get(g['student_id'], {}).get('class_name') == class_name])),
-                    "average_grade": round(avg_grade, 1),
-                    "total_grades": len(grades),
-                    "excellent_count": len([g for g in grades if g >= 8.0]),
-                    "good_count": len([g for g in grades if 6.5 <= g < 8.0]),
-                    "average_count": len([g for g in grades if 5.0 <= g < 6.5]),
-                    "poor_count": len([g for g in grades if g < 5.0])
-                })
-        
-        # Sắp xếp theo điểm trung bình
-        result.sort(key=lambda x: x['average_grade'], reverse=True)
-        
-        return {
-            "success": True,
-            "data": result
-        }
-    except Exception as e:
-        logger.error(f"Error getting class performance: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy hiệu suất lớp học: {str(e)}")
-
-
-@router.get("/dashboard/system-health")
-async def get_system_health(
-    admin_user=Depends(get_admin_user),
-    db=Depends(get_db)
-):
-    """Lấy tình trạng sức khỏe hệ thống"""
-    try:
-        from datetime import timedelta
-        
-        # Kiểm tra kết nối database
-        db_status = "healthy"
-        try:
-            db.table("users").select("id").limit(1).execute()
-        except:
-            db_status = "error"
-        
-        # Thống kê hoạt động API gần đây
-        yesterday = (datetime.now() - timedelta(days=1)).isoformat()
-        recent_activity = db.table("users").select("last_login").gte("last_login", yesterday).execute()
-        
-        return {
-            "success": True,
-            "data": {
-                "database_status": db_status,
-                "error_count_24h": 0,
-                "active_users_24h": len(recent_activity.data),
-                "uptime": "99.9%",
-                "last_backup": datetime.now().isoformat(),
-                "timestamp": datetime.now().isoformat()
-            }
-        }
-    except Exception as e:
-        logger.error(f"Error getting system health: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
-
-
-@router.get("/dashboard/teacher-performance")
-async def get_teacher_performance(
-    admin_user=Depends(get_admin_user),
-    db=Depends(get_db)
-):
-    """Lấy hiệu suất giảng dạy của giáo viên"""
-    try:
-        from datetime import timedelta
-        
-        # Lấy dữ liệu giáo viên
-        teachers_data = db.table("teachers").select("id, full_name, teacher_code").execute()
-        
-        # Lấy dữ liệu lớp học
-        classes_data = db.table("classes").select("id, class_name, homeroom_teacher_id").execute()
-        
-        # Lấy dữ liệu điểm danh 30 ngày qua
-        thirty_days_ago = (datetime.now().date() - timedelta(days=30)).isoformat()
-        attendance_data = db.table("attendance").select("student_id, status, date").gte("date", thirty_days_ago).execute()
-        
-        # Lấy dữ liệu học sinh
-        students_data = db.table("students").select("id, class_name").eq("is_active", True).execute()
-        students_dict = {s['id']: s for s in students_data.data}
-        
-        result = []
-        for teacher in teachers_data.data:
-            # Tìm các lớp mà giáo viên này chủ nhiệm
-            teacher_classes = [c for c in classes_data.data if c.get('homeroom_teacher_id') == teacher['id']]
-            
-            total_students = 0
-            total_attendance = 0
-            present_count = 0
-            
-            for class_info in teacher_classes:
-                class_students = [s for s in students_data.data if s['class_name'] == class_info['class_name']]
-                total_students += len(class_students)
-                
-                # Tính điểm danh cho lớp này
-                class_student_ids = [s['id'] for s in class_students]
-                class_attendance = [a for a in attendance_data.data if a['student_id'] in class_student_ids]
-                total_attendance += len(class_attendance)
-                present_count += len([a for a in class_attendance if a['status'] == 'present'])
-            
-            attendance_rate = (present_count / total_attendance * 100) if total_attendance > 0 else 0
-            
-            result.append({
-                "teacher_id": teacher['id'],
-                "teacher_name": teacher['full_name'],
-                "teacher_code": teacher.get('teacher_code'),
-                "classes_count": len(teacher_classes),
-                "total_students": total_students,
-                "attendance_rate": round(attendance_rate, 1),
-                "total_attendance_records": total_attendance
-            })
-        
-        # Sắp xếp theo tỷ lệ điểm danh
-        result.sort(key=lambda x: x['attendance_rate'], reverse=True)
-        
-        return {
-            "success": True,
-            "data": result
-        }
-    except Exception as e:
-        logger.error(f"Error getting teacher performance: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy hiệu suất giáo viên: {str(e)}")
+# Dashboard analytics endpoints removed as per requirements
 
 
 # ===============================================
@@ -2138,3 +1941,60 @@ async def update_system_setting(
     except Exception as e:
         logger.error(f"Error updating system setting: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật cấu hình: {str(e)}")
+
+@router.get("/classes/default-academic-year")
+async def get_default_academic_year(admin_user=Depends(get_admin_user)):
+    """Lấy năm học mặc định từ system_settings."""
+    return {"success": True, "data": get_current_academic_year()}
+
+
+# ===============================================
+# BULK MOVE STUDENTS BETWEEN CLASSES
+# ===============================================
+@router.post("/students/move-class")
+async def move_students_class(
+    payload: dict,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Chuyển lớp cho nhiều học sinh và ghi lịch sử vào homeroom_students_history.
+
+    Body: { "student_ids": [int], "target_class_id": int }
+    """
+    try:
+        student_ids = payload.get("student_ids") or []
+        target_class_id = payload.get("target_class_id")
+
+        if not isinstance(student_ids, list) or len(student_ids) == 0:
+            raise HTTPException(status_code=400, detail="Danh sách student_ids không hợp lệ")
+        if not target_class_id:
+            raise HTTPException(status_code=400, detail="Thiếu target_class_id")
+
+        # Lấy thông tin lớp đích
+        class_resp = db.table("classes").select("id, class_name, grade, homeroom_teacher_id").eq("id", target_class_id).execute()
+        if not class_resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp đích")
+        target_class = class_resp.data[0]
+
+        # Cập nhật students
+        db.table("students").update({
+            "class_name": target_class["class_name"],
+            "grade": str(target_class["grade"]),
+            "updated_at": datetime.now().isoformat()
+        }).in_("id", student_ids).execute()
+
+        # Ghi lịch sử
+        history_rows = [{
+            "teacher_id": target_class.get("homeroom_teacher_id"),
+            "class_id": target_class["id"],
+            "student_id": sid
+        } for sid in student_ids]
+        if history_rows:
+            db.table("homeroom_students_history").insert(history_rows).execute()
+
+        return {"success": True, "message": "Chuyển lớp thành công", "data": {"updated_count": len(student_ids)}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error moving students class: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi chuyển lớp: {str(e)}")
