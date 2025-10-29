@@ -23,6 +23,7 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { Label } from "./ui/label";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,9 @@ const FaceManagement = () => {
   // Filter states
   const [selectedClass, setSelectedClass] = useState("all");
   const [availableClasses, setAvailableClasses] = useState([]);
+  const [homeroomClasses, setHomeroomClasses] = useState([]); // objects with id
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,6 +68,14 @@ const FaceManagement = () => {
   useEffect(() => {
     fetchAvailableClasses();
   }, []);
+
+  // Reload classes when academic year changes
+  useEffect(() => {
+    if (isHomeroomTeacher()) {
+      fetchAvailableClasses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAcademicYear]);
 
   useEffect(() => {
     fetchStudentsData();
@@ -87,29 +99,42 @@ const FaceManagement = () => {
 
       if (isHomeroomTeacher()) {
         logger.debug("📚 Fetching homeroom classes for face management...");
-        // If homeroom teacher, only get their homeroom classes
-        classesResponse = await ApiService.getHomeroomClasses();
+        // Năm học: danh sách + mặc định
+        const [yearsResp, defaultYearResp] = await Promise.all([
+          ApiService.request("/homeroom/academic-years"),
+          ApiService.request("/homeroom/default-academic-year"),
+        ]);
+        if (yearsResp.success) setAcademicYears(yearsResp.data || []);
+        const defaultYear = defaultYearResp.success ? defaultYearResp.data : "";
+        const year =
+          selectedAcademicYear || defaultYear || yearsResp.data?.[0] || "";
+        if (!selectedAcademicYear) setSelectedAcademicYear(year);
+
+        // Lấy lớp theo năm học
+        classesResponse = await ApiService.request(
+          `/homeroom/classes${
+            year ? `?academic_year=${encodeURIComponent(year)}` : ""
+          }`
+        );
 
         if (classesResponse.success && classesResponse.data) {
-          // Deduplicate class names using Set
-          const classNames = [
-            ...new Set(
-              classesResponse.data
-                .map((cls) => cls.class_name)
-                .filter((name) => name) // Remove null/undefined
-            ),
-          ].sort();
-          logger.debug("📚 Setting homeroom classes:", classNames);
+          setHomeroomClasses(classesResponse.data);
+          const classNames = classesResponse.data
+            .map((c) => c.class_name)
+            .filter(Boolean)
+            .sort();
           setAvailableClasses(classNames);
+          if (!selectedClass || selectedClass === "all") {
+            setSelectedClass(classNames[0] || "all");
+          }
         } else {
-          logger.warn(
-            "📚 Invalid homeroom classes response:",
-            classesResponse
-          );
+          setHomeroomClasses([]);
           setAvailableClasses([]);
         }
       } else {
-        logger.debug("📚 Fetching all students to extract classes for admin...");
+        logger.debug(
+          "📚 Fetching all students to extract classes for admin..."
+        );
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
 
@@ -160,8 +185,18 @@ const FaceManagement = () => {
       let studentsResponse;
 
       if (isHomeroomTeacher()) {
-        // If homeroom teacher, get only their homeroom students
-        studentsResponse = await ApiService.getHomeroomStudents(selectedClass);
+        // If homeroom teacher, get only their homeroom students by class/year
+        const found = homeroomClasses.find(
+          (c) => c.class_name === selectedClass
+        );
+        const classId = found?.id;
+        studentsResponse = await ApiService.request(
+          classId
+            ? `/homeroom/students?class_id=${classId}`
+            : `/homeroom/students?class_name=${encodeURIComponent(
+                selectedClass
+              )}&academic_year=${encodeURIComponent(selectedAcademicYear)}`
+        );
       } else {
         // If admin or other roles, get all students
         studentsResponse = await ApiService.getStudents({});
@@ -423,6 +458,26 @@ const FaceManagement = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {isHomeroomTeacher() && (
+              <div className="space-y-2">
+                <Label>Năm học</Label>
+                <Select
+                  value={selectedAcademicYear || ""}
+                  onValueChange={(v) => setSelectedAcademicYear(v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn năm học" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Lớp

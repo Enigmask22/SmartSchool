@@ -44,8 +44,11 @@ import {
 const HomeroomDashboard = () => {
   const { user } = useContext(AuthContext);
   const [homeroomInfo, setHomeroomInfo] = useState(null);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
   const [teacherClasses, setTeacherClasses] = useState([]); // Danh sách các lớp GV chủ nhiệm
-  const [selectedClass, setSelectedClass] = useState(null); // Lớp đang được chọn
+  const [selectedClass, setSelectedClass] = useState(null); // class_name
+  const [selectedClassId, setSelectedClassId] = useState(null); // id lớp
   const [students, setStudents] = useState([]);
   const [attendanceStats, setAttendanceStats] = useState(null);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -64,7 +67,7 @@ const HomeroomDashboard = () => {
 
     try {
       const response = await api.request(
-        `/homeroom/attendance/stats?target_date=${selectedDate}&class_name=${selectedClass}`
+        `/homeroom/attendance/stats?target_date=${selectedDate}&class_name=${selectedClass}&academic_year=${selectedAcademicYear}`
       );
       if (response.success) {
         setAttendanceStats(response.data.stats);
@@ -72,7 +75,7 @@ const HomeroomDashboard = () => {
     } catch (error) {
       logger.error("Error fetching attendance stats:", error);
     }
-  }, [selectedDate, selectedClass]);
+  }, [selectedDate, selectedClass, selectedAcademicYear]);
 
   const fetchAttendanceRecords = useCallback(async () => {
     if (!selectedClass) return;
@@ -95,79 +98,113 @@ const HomeroomDashboard = () => {
     try {
       setLoading(true);
 
-      // Fetch danh sách lớp chủ nhiệm
-      const classesResponse = await api.request("/homeroom/classes");
-      if (classesResponse.success && classesResponse.data.length > 0) {
+      // Load năm học: danh sách + mặc định
+      const [yearsResp, defaultYearResp] = await Promise.all([
+        api.request("/homeroom/academic-years"),
+        api.request("/homeroom/default-academic-year"),
+      ]);
+      if (yearsResp.success) setAcademicYears(yearsResp.data || []);
+      const defaultYear = defaultYearResp.success ? defaultYearResp.data : "";
+      const year =
+        selectedAcademicYear || defaultYear || yearsResp.data?.[0] || "";
+      if (!selectedAcademicYear) setSelectedAcademicYear(year);
+
+      // Fetch danh sách lớp chủ nhiệm theo năm học
+      const classesResponse = await api.request(
+        `/homeroom/classes${
+          year ? `?academic_year=${encodeURIComponent(year)}` : ""
+        }`
+      );
+      if (classesResponse.success) {
         // Deduplicate classes by class_name
         const uniqueClasses = Array.from(
           new Map(
-            classesResponse.data.map((cls) => [cls.class_name, cls])
+            (classesResponse.data || []).map((cls) => [cls.class_name, cls])
           ).values()
         );
         setTeacherClasses(uniqueClasses);
 
-        // Tự động chọn lớp đầu tiên nếu chưa có lớp nào được chọn
-        if (!selectedClass) {
-          const firstClass = uniqueClasses[0].class_name;
-          setSelectedClass(firstClass);
-        }
-      }
-
-      // Fetch homeroom info cho lớp đã chọn
-      if (selectedClass) {
-        const infoResponse = await api.request("/homeroom/info");
-        if (infoResponse.success) {
-          setHomeroomInfo(infoResponse.data);
-        }
-
-        // Fetch students của lớp đã chọn
-        const studentsResponse = await api.request(
-          `/homeroom/students?class_name=${selectedClass}`
+        // Nếu lớp hiện tại không thuộc năm học đang chọn, chọn lớp đầu tiên của danh sách mới
+        const currentInList = uniqueClasses.find(
+          (c) => c.class_name === selectedClass
         );
-        logger.debug("👥 Students response:", studentsResponse);
-        if (studentsResponse.success) {
-          logger.debug("👥 Students data:", studentsResponse.data);
-          // Filter chỉ hiển thị học sinh đang hoạt động (is_active !== false)
-          const activeStudents = (studentsResponse.data || []).filter(
-            (student) => student.is_active !== false
-          );
-
-          // Sắp xếp học sinh theo student_id tăng dần (250001, 250002, 250003...)
-          const sortedStudents = activeStudents.sort((a, b) => {
-            const aId = parseInt(a.student_id) || 0;
-            const bId = parseInt(b.student_id) || 0;
-            return aId - bId;
-          });
-
-          setStudents(sortedStudents);
-          logger.debug("👥 Sorted students:", sortedStudents);
+        if (!selectedClass || !currentInList) {
+          const first = uniqueClasses[0] || null;
+          setSelectedClass(first ? first.class_name : null);
+          setSelectedClassId(first ? first.id : null);
+        } else {
+          // Đồng bộ lại id phòng trường hợp dữ liệu thay đổi
+          setSelectedClassId(currentInList.id);
         }
       }
 
-      // Fetch attendance stats and records
-      await Promise.all([fetchAttendanceStats(), fetchAttendanceRecords()]);
+      // Không tải dashboard data ở đây để tránh lặp; effect riêng sẽ gọi khi có lớp/ngày
     } catch (error) {
       logger.error("Error fetching homeroom data:", error);
     } finally {
       setLoading(false);
     }
-  }, [selectedClass, fetchAttendanceStats, fetchAttendanceRecords]);
+  }, [
+    selectedClass,
+    selectedAcademicYear,
+    fetchAttendanceStats,
+    fetchAttendanceRecords,
+  ]);
 
   useEffect(() => {
     fetchHomeroomData();
   }, [fetchHomeroomData]);
 
-  // Refresh data when selectedClass or date changes
+  // Chỉ gọi API tổng hợp nhanh khi thay đổi lớp/ngày
   useEffect(() => {
-    if (selectedClass) {
-      Promise.all([fetchAttendanceStats(), fetchAttendanceRecords()]);
-    }
-  }, [
-    selectedClass,
-    selectedDate,
-    fetchAttendanceStats,
-    fetchAttendanceRecords,
-  ]);
+    const loadDashboardData = async () => {
+      try {
+        if (!selectedClass) return;
+        setLoading(true);
+        const infoResponse = await api.request("/homeroom/info");
+        if (infoResponse.success) setHomeroomInfo(infoResponse.data);
+
+        const found = teacherClasses.find(
+          (c) => c.class_name === selectedClass
+        );
+        const classId = found?.id;
+        const dashResp = await api.request(
+          `/homeroom/dashboard/data?target_date=${selectedDate}` +
+            (classId
+              ? `&class_id=${classId}`
+              : `&class_name=${encodeURIComponent(
+                  selectedClass
+                )}&academic_year=${encodeURIComponent(selectedAcademicYear)}`)
+        );
+        if (dashResp.success) {
+          const rows = dashResp.data?.students || [];
+          const mappedStudents = rows.map((r) => ({
+            id: r.student_id,
+            student_id: r.student_code,
+            full_name: r.student_name,
+            class_name: r.class_name,
+          }));
+          setStudents(mappedStudents);
+          const mappedRecords = rows.map((r) => ({
+            student_id: r.student_id,
+            status: r.status,
+            check_in_time: r.check_in_time,
+            check_out_time: r.check_out_time,
+            method: r.method,
+            confidence_score: r.confidence_score,
+            notes: r.notes,
+          }));
+          setAttendanceRecords(mappedRecords);
+          setAttendanceStats(dashResp.data?.stats || null);
+        }
+      } catch (err) {
+        logger.error("Error loading dashboard data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (selectedClass) loadDashboardData();
+  }, [selectedClass, selectedDate, selectedAcademicYear, teacherClasses]);
 
   const handleViewAllStudents = () => {
     setShowAllStudents(true);
@@ -252,12 +289,39 @@ const HomeroomDashboard = () => {
           </div>
 
           {/* Dropdown chọn lớp (chỉ hiển thị nếu giáo viên chủ nhiệm > 1 lớp) */}
-          {teacherClasses.length > 1 && (
+          {academicYears.length > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500">Năm học</span>
+              <Select
+                value={selectedAcademicYear || ""}
+                onValueChange={(v) => setSelectedAcademicYear(v)}
+              >
+                <SelectTrigger className="min-w-[160px]">
+                  <SelectValue placeholder="Chọn năm học" />
+                </SelectTrigger>
+                <SelectContent>
+                  {academicYears.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {teacherClasses.length > 0 && (
             <div className="flex items-center gap-3">
               <GraduationCap className="flex-shrink-0 w-5 h-5 text-gray-500" />
               <Select
                 value={selectedClass || ""}
-                onValueChange={(value) => setSelectedClass(value)}
+                onValueChange={(value) => {
+                  setSelectedClass(value);
+                  const found = teacherClasses.find(
+                    (c) => c.class_name === value
+                  );
+                  setSelectedClassId(found?.id || null);
+                }}
               >
                 <SelectTrigger className="min-w-[200px]">
                   <SelectValue />
@@ -268,7 +332,8 @@ const HomeroomDashboard = () => {
                       key={classInfo.class_name}
                       value={classInfo.class_name}
                     >
-                      Lớp {classInfo.class_name} - {classInfo.grade}
+                      Lớp {classInfo.class_name} - {classInfo.grade} (
+                      {classInfo.academic_year})
                     </SelectItem>
                   ))}
                 </SelectContent>
