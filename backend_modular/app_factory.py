@@ -28,6 +28,10 @@ from homeroom.api import router as homeroom_router
 from feedback.api import router as feedback_router
 from ai_services.api import router as ai_router
 from grade_settings.api import router as grade_settings_router
+import threading
+import datetime
+import schedule
+from core.database import db as core_db
 
 logger = setup_logger(level=LOG_LEVEL)
 
@@ -173,6 +177,84 @@ def create_app() -> FastAPI:
             raise
         
         logger.info("🚀 Application startup complete!")
+
+        # ================= Daily scheduler for auto-absence =================
+        def run_daily_auto_absence():
+            try:
+                client = core_db.client
+                today = datetime.date.today()
+                y = today.year
+                m = today.month
+                d = today.day
+                for grade in [10, 11, 12]:
+                    # Check holiday config
+                    cfg = (
+                        client.table("config_holidays")
+                        .select("holidays_list")
+                        .eq("year", y)
+                        .eq("month", m)
+                        .eq("grade", grade)
+                        .execute()
+                    )
+                    if cfg.data and cfg.data[0].get("holidays_list"):
+                        try:
+                            if d in (cfg.data[0]["holidays_list"] or []):
+                                logger.info(f"Skip auto-absence for grade {grade} - holiday {today}")
+                                continue
+                        except Exception:
+                            pass
+                    # Fetch students by grade (support both numeric and string)
+                    students_resp = (
+                        client.table("students")
+                        .select("id, grade, is_active")
+                        .or_(f"grade.eq.{grade},grade.eq.{str(grade)}")
+                        .eq("is_active", True)
+                        .execute()
+                    )
+                    student_ids = [s["id"] for s in (students_resp.data or [])]
+                    if not student_ids:
+                        continue
+                    # Existing attendance for today
+                    attend_resp = (
+                        client.table("attendance")
+                        .select("student_id")
+                        .eq("date", today.isoformat())
+                        .in_("student_id", student_ids)
+                        .execute()
+                    )
+                    existing_ids = {r["student_id"] for r in (attend_resp.data or [])}
+                    missing = [sid for sid in student_ids if sid not in existing_ids]
+                    rows = [
+                        {
+                            "student_id": sid,
+                            "date": today.isoformat(),
+                            "status": "absent",
+                            "method": "auto",
+                            "created_at": datetime.datetime.now().isoformat(),
+                        }
+                        for sid in missing
+                    ]
+                    if rows:
+                        client.table("attendance").insert(rows).execute()
+                        logger.info(f"Auto-absence inserted: grade {grade} - {len(rows)} records on {today}")
+            except Exception as e:
+                logger.error(f"Auto-absence scheduler error: {str(e)}")
+
+        # Schedule at 00:05 server time
+        try:
+            schedule.clear()
+            schedule.every().day.at("18:24").do(run_daily_auto_absence)
+
+            def scheduler_loop():
+                while True:
+                    schedule.run_pending()
+                    time.sleep(60)
+
+            t = threading.Thread(target=scheduler_loop, daemon=True)
+            t.start()
+            logger.info("✅ Daily auto-absence scheduler started (00:05)")
+        except Exception as e:
+            logger.error(f"Failed to start scheduler: {str(e)}")
     
     # Shutdown event
     @app.on_event("shutdown")

@@ -1949,6 +1949,109 @@ async def get_default_academic_year(admin_user=Depends(get_admin_user)):
 
 
 # ===============================================
+# CONFIG HOLIDAYS (Ngày nghỉ theo khối)
+# ===============================================
+
+@router.get("/holidays")
+async def list_holidays(
+    year: Optional[int] = Query(None),
+    month: Optional[int] = Query(None),
+    grade: Optional[int] = Query(None, description="10/11/12"),
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db),
+):
+    """Liệt kê cấu hình ngày nghỉ. Có thể lọc theo year, month, grade."""
+    try:
+        query = db.table("config_holidays").select("*")
+        if year is not None:
+            query = query.eq("year", year)
+        if month is not None:
+            query = query.eq("month", month)
+        if grade is not None:
+            query = query.eq("grade", grade)
+        resp = query.order("year, month, grade").execute()
+        return {"success": True, "data": resp.data or []}
+    except Exception as e:
+        logger.error(f"Error list holidays: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy cấu hình ngày nghỉ: {str(e)}")
+
+
+@router.post("/holidays")
+async def create_holiday_config(
+    payload: dict,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db),
+):
+    """Tạo cấu hình ngày nghỉ: body {year, month, grade, holidays_list: [int,...]}"""
+    try:
+        required = ["year", "month", "grade", "holidays_list"]
+        for k in required:
+            if k not in payload:
+                raise HTTPException(status_code=400, detail=f"Thiếu trường {k}")
+        data = {
+            "year": int(payload["year"]),
+            "month": int(payload["month"]),
+            "grade": int(payload["grade"]),
+            "holidays_list": payload.get("holidays_list") or [],
+            "updated_at": datetime.now().isoformat(),
+        }
+        # nếu đã tồn tại thì cập nhật thay vì tạo mới
+        existing = (
+            db.table("config_holidays")
+            .select("id")
+            .eq("year", data["year"]).eq("month", data["month"]).eq("grade", data["grade"])  
+            .execute()
+        )
+        if existing.data:
+            resp = db.table("config_holidays").update(data).eq("id", existing.data[0]["id"]).execute()
+        else:
+            resp = db.table("config_holidays").insert(data).execute()
+        return {"success": True, "data": resp.data[0] if resp.data else None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error create holiday config: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo cấu hình ngày nghỉ: {str(e)}")
+
+
+@router.put("/holidays/{config_id}")
+async def update_holiday_config(
+    config_id: int,
+    payload: dict,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db),
+):
+    try:
+        update_data = {"updated_at": datetime.now().isoformat()}
+        for f in ["year", "month", "grade", "holidays_list"]:
+            if f in payload:
+                update_data[f] = payload[f]
+        resp = db.table("config_holidays").update(update_data).eq("id", config_id).execute()
+        if not resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi cấu hình")
+        return {"success": True, "data": resp.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error update holiday config: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật cấu hình ngày nghỉ: {str(e)}")
+
+
+@router.delete("/holidays/{config_id}")
+async def delete_holiday_config(
+    config_id: int,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db),
+):
+    try:
+        resp = db.table("config_holidays").delete().eq("id", config_id).execute()
+        return {"success": True, "data": None}
+    except Exception as e:
+        logger.error(f"Error delete holiday config: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa cấu hình ngày nghỉ: {str(e)}")
+
+
+# ===============================================
 # BULK MOVE STUDENTS BETWEEN CLASSES
 # ===============================================
 @router.post("/students/move-class")

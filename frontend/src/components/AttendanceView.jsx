@@ -44,14 +44,16 @@ const AttendanceView = () => {
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [classes, setClasses] = useState([]);
+  const [classesLoading, setClassesLoading] = useState(false);
   const [homeroomClasses, setHomeroomClasses] = useState([]); // objects when homeroom teacher
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  const [bootstrapLoading, setBootstrapLoading] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [total, setTotal] = useState(0);
+  // total computed from attendanceRecords.length
 
   // Edit states
   const [editingRecord, setEditingRecord] = useState(null);
@@ -64,107 +66,88 @@ const AttendanceView = () => {
   const [showFullList, setShowFullList] = useState(true);
 
   useEffect(() => {
+    if (bootstrapLoading) return;
     loadAttendanceData();
     loadStats();
-  }, [selectedDate, selectedClass, selectedStatus, page, showFullList]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedDate,
+    selectedClass,
+    selectedStatus,
+    page,
+    showFullList,
+    bootstrapLoading,
+  ]);
 
-  // Load classes when user changes (for role-based filtering)
-  useEffect(() => {
-    loadClasses();
-  }, [user]);
-
-  // Reload classes when academic year changes for homeroom teachers
+  // Load bootstrap when user changes (role-based)
   useEffect(() => {
     if (isHomeroomTeacher()) {
-      loadClasses();
+      attendanceBootstrap({ date: selectedDate });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAcademicYear]);
+  }, [user]);
 
-  // Initial load
+  // Đổi năm học: đã gọi attendanceBootstrap trực tiếp trong onValueChange
+
+  // Initial load with attendance bootstrap
   useEffect(() => {
-    loadClasses();
+    const run = async () => {
+      if (!isHomeroomTeacher()) return;
+      await attendanceBootstrap({ date: selectedDate });
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadClasses = async () => {
+  const attendanceBootstrap = async ({ year, date, className } = {}) => {
     try {
-      logger.debug("📚 Loading classes for attendance filter...", {
-        user,
-        isHomeroomTeacher: isHomeroomTeacher(),
-        userRole: user?.role,
-      });
-
-      let classesResponse;
-
-      if (isHomeroomTeacher()) {
-        logger.debug("📚 Fetching homeroom classes for attendance...");
-        // Nếu là GVCN: chọn năm học trước, rồi lấy lớp theo năm học
-        const [yearsResp, defaultYearResp] = await Promise.all([
-          ApiService.request("/homeroom/academic-years"),
-          ApiService.request("/homeroom/default-academic-year"),
-        ]);
-        if (yearsResp.success) setAcademicYears(yearsResp.data || []);
-        const defaultYear = defaultYearResp.success ? defaultYearResp.data : "";
-        const year =
-          selectedAcademicYear || defaultYear || yearsResp.data?.[0] || "";
-        if (!selectedAcademicYear) setSelectedAcademicYear(year);
-
-        classesResponse = await ApiService.request(
-          `/homeroom/classes${
-            year ? `?academic_year=${encodeURIComponent(year)}` : ""
-          }`
+      setBootstrapLoading(true);
+      setClassesLoading(true);
+      const params = new URLSearchParams();
+      if (year) params.set("academic_year", year);
+      if (date) params.set("target_date", date);
+      if (className) params.set("class_name", className);
+      const url = `/homeroom/attendance/bootstrap${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+      const resp = await ApiService.request(url);
+      if (resp.success && resp.data) {
+        const {
+          academic_years,
+          year: resolvedYear,
+          classes: cls,
+          selected_class,
+          records,
+          stats,
+        } = resp.data;
+        if (Array.isArray(academic_years)) setAcademicYears(academic_years);
+        if (!selectedAcademicYear && resolvedYear)
+          setSelectedAcademicYear(resolvedYear);
+        setHomeroomClasses(Array.isArray(cls) ? cls : []);
+        const classNames = (cls || [])
+          .map((c) => c.class_name)
+          .filter(Boolean)
+          .sort();
+        setClasses(classNames);
+        const exists =
+          selected_class?.class_name &&
+          classNames.includes(selected_class.class_name);
+        setSelectedClass(
+          exists ? selected_class.class_name : classNames[0] || "all"
         );
-
-        if (classesResponse.success && classesResponse.data) {
-          setHomeroomClasses(classesResponse.data);
-          const classNames = classesResponse.data
-            .map((c) => c.class_name)
-            .filter(Boolean)
-            .sort();
-          setClasses(classNames);
-          const inList = classNames.includes(selectedClass);
-          if (!selectedClass || selectedClass === "all" || !inList) {
-            setSelectedClass(classNames[0] || "all");
-          }
-        } else {
-          setHomeroomClasses([]);
-          setClasses([]);
-        }
-      } else {
-        logger.debug(
-          "📚 Fetching all students to extract classes for admin..."
-        );
-        // If admin, get all students and extract unique class names
-        const studentsResponse = await ApiService.getStudents({});
-
-        if (studentsResponse.success && studentsResponse.data) {
-          // Extract unique class names from students
-          const uniqueClasses = [
-            ...new Set(
-              studentsResponse.data
-                .map((student) => student.class_name)
-                .filter((className) => className) // Remove null/undefined
-            ),
-          ].sort();
-
-          logger.debug(
-            "📚 Extracted unique classes from students:",
-            uniqueClasses
-          );
-          setClasses(uniqueClasses);
-        } else {
-          logger.warn(
-            "📚 Invalid students response for classes:",
-            studentsResponse
-          );
-          setClasses([]);
-        }
+        // Attendance data + stats
+        setAttendanceRecords(records || []);
+        setStats(stats || null);
       }
-    } catch (error) {
-      logger.error("Error loading classes:", error);
-      setClasses([]);
+    } catch (e) {
+      logger.error("attendance bootstrap error", e);
+    } finally {
+      setClassesLoading(false);
+      setBootstrapLoading(false);
     }
   };
+
+  // loadClasses: đã thay thế hoàn toàn bằng attendanceBootstrap
 
   const loadAttendanceData = async () => {
     setLoading(true);
@@ -239,7 +222,6 @@ const AttendanceView = () => {
           }
 
           setAttendanceRecords(filteredData);
-          setTotal(filteredData.length);
 
           // Calculate stats from full list data - but use full data not filtered data
           const fullData = response.data || [];
@@ -272,7 +254,6 @@ const AttendanceView = () => {
               }
 
               setAttendanceRecords(filteredData);
-              setTotal(filteredData.length);
             }
           } else {
             // For other dates, get all records and filter by class on frontend
@@ -295,7 +276,6 @@ const AttendanceView = () => {
               }
 
               setAttendanceRecords(filteredData);
-              setTotal(filteredData.length);
             }
           }
         } else {
@@ -307,7 +287,6 @@ const AttendanceView = () => {
           logger.debug("📡 API Response:", response);
           if (response.success) {
             setAttendanceRecords(response.data || []);
-            setTotal(response.total || 0);
           }
         }
       }
@@ -698,7 +677,10 @@ const AttendanceView = () => {
                 </label>
                 <Select
                   value={selectedAcademicYear || ""}
-                  onValueChange={(value) => setSelectedAcademicYear(value)}
+                  onValueChange={(value) => {
+                    setSelectedAcademicYear(value);
+                    attendanceBootstrap({ year: value, date: selectedDate });
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Chọn năm học" />
@@ -728,13 +710,21 @@ const AttendanceView = () => {
               <Select
                 value={selectedClass}
                 onValueChange={(value) => handleClassChange(value)}
+                disabled={classesLoading}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full flex items-center justify-between">
                   <SelectValue
                     placeholder={
-                      isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"
+                      classesLoading
+                        ? "Đang tải lớp…"
+                        : isHomeroomTeacher()
+                        ? "Chọn lớp chủ nhiệm"
+                        : "Tất cả lớp"
                     }
                   />
+                  {classesLoading && (
+                    <span className="ml-2 inline-block w-3 h-3 border-2 border-transparent border-b-muted-foreground rounded-full animate-spin" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">
@@ -773,7 +763,20 @@ const AttendanceView = () => {
               <Button variant="outline" onClick={resetFilters}>
                 Đặt lại
               </Button>
-              <Button onClick={loadAttendanceData}>Tìm kiếm</Button>
+              <Button
+                onClick={() =>
+                  attendanceBootstrap({
+                    year: selectedAcademicYear,
+                    date: selectedDate,
+                    className:
+                      selectedClass && selectedClass !== "all"
+                        ? selectedClass
+                        : undefined,
+                  })
+                }
+              >
+                Tìm kiếm
+              </Button>
             </div>
           </div>
         </CardContent>

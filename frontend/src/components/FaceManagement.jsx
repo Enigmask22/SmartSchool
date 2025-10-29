@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   Users,
   Camera,
@@ -60,110 +60,87 @@ const FaceManagement = () => {
   const [homeroomClasses, setHomeroomClasses] = useState([]); // objects with id
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  const [classesLoading, setClassesLoading] = useState(false);
+  const classesReqIdRef = useRef(0);
+  const [bootstrapLoading, setBootstrapLoading] = useState(false);
+  const hasBootstrappedRef = useRef(false);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
-    fetchAvailableClasses();
+    if (!hasBootstrappedRef.current) {
+      hasBootstrappedRef.current = true;
+      faceBootstrap({});
+    }
   }, []);
 
   // Reload classes when academic year changes
   useEffect(() => {
     if (isHomeroomTeacher()) {
-      fetchAvailableClasses();
+      faceBootstrap({ year: selectedAcademicYear });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAcademicYear]);
 
+  // Không tự động gọi bootstrap theo selectedClass để tránh vòng lặp;
+  // chỉ gọi khi người dùng chọn lớp (handler onValueChange phía dưới)
   useEffect(() => {
-    fetchStudentsData();
-    setCurrentPage(1); // Reset to page 1 when class changes
+    setCurrentPage(1);
   }, [selectedClass]);
 
+  // Khi đổi user, chỉ bootstrap 1 lần nếu cần
   useEffect(() => {
-    fetchAvailableClasses();
+    if (!bootstrapLoading) {
+      faceBootstrap({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Fetch available classes based on user role
-  const fetchAvailableClasses = async () => {
+  const faceBootstrap = async ({ year, className } = {}) => {
     try {
-      logger.debug("👤 Face Management - User role check:", {
-        user,
-        isHomeroomTeacher: isHomeroomTeacher(),
-        userRole: user?.role,
-      });
-
-      let classesResponse;
-
-      if (isHomeroomTeacher()) {
-        logger.debug("📚 Fetching homeroom classes for face management...");
-        // Năm học: danh sách + mặc định
-        const [yearsResp, defaultYearResp] = await Promise.all([
-          ApiService.request("/homeroom/academic-years"),
-          ApiService.request("/homeroom/default-academic-year"),
-        ]);
-        if (yearsResp.success) setAcademicYears(yearsResp.data || []);
-        const defaultYear = defaultYearResp.success ? defaultYearResp.data : "";
-        const year =
-          selectedAcademicYear || defaultYear || yearsResp.data?.[0] || "";
-        if (!selectedAcademicYear) setSelectedAcademicYear(year);
-
-        // Lấy lớp theo năm học
-        classesResponse = await ApiService.request(
-          `/homeroom/classes${
-            year ? `?academic_year=${encodeURIComponent(year)}` : ""
-          }`
+      setBootstrapLoading(true);
+      setClassesLoading(true);
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (year) params.set("academic_year", year);
+      if (className) params.set("class_name", className);
+      const url = `/homeroom/face/bootstrap${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+      const resp = await ApiService.request(url);
+      if (resp.success && resp.data) {
+        const {
+          academic_years,
+          year: resolvedYear,
+          classes,
+          selected_class,
+          students: stu,
+        } = resp.data;
+        if (Array.isArray(academic_years)) setAcademicYears(academic_years);
+        if (!selectedAcademicYear && resolvedYear)
+          setSelectedAcademicYear(resolvedYear);
+        setHomeroomClasses(Array.isArray(classes) ? classes : []);
+        const classNames = (classes || [])
+          .map((c) => c.class_name)
+          .filter(Boolean)
+          .sort();
+        setAvailableClasses(classNames);
+        const exists =
+          selected_class?.class_name &&
+          classNames.includes(selected_class.class_name);
+        setSelectedClass(
+          exists ? selected_class.class_name : classNames[0] || "all"
         );
-
-        if (classesResponse.success && classesResponse.data) {
-          setHomeroomClasses(classesResponse.data);
-          const classNames = classesResponse.data
-            .map((c) => c.class_name)
-            .filter(Boolean)
-            .sort();
-          setAvailableClasses(classNames);
-          if (!selectedClass || selectedClass === "all") {
-            setSelectedClass(classNames[0] || "all");
-          }
-        } else {
-          setHomeroomClasses([]);
-          setAvailableClasses([]);
-        }
-      } else {
-        logger.debug(
-          "📚 Fetching all students to extract classes for admin..."
-        );
-        // If admin, get all students and extract unique class names
-        const studentsResponse = await ApiService.getStudents({});
-
-        if (studentsResponse.success && studentsResponse.data) {
-          // Extract unique class names from students
-          const uniqueClasses = [
-            ...new Set(
-              studentsResponse.data
-                .map((student) => student.class_name)
-                .filter((className) => className) // Remove null/undefined
-            ),
-          ].sort();
-
-          logger.debug(
-            "📚 Extracted unique classes from students:",
-            uniqueClasses
-          );
-          setAvailableClasses(uniqueClasses);
-        } else {
-          logger.warn(
-            "📚 Invalid students response for classes:",
-            studentsResponse
-          );
-          setAvailableClasses([]);
-        }
+        setStudents(Array.isArray(stu) ? stu : []);
       }
-    } catch (error) {
-      logger.error("Error fetching available classes:", error);
-      setAvailableClasses([]);
+    } catch (e) {
+      logger.error("face bootstrap error", e);
+    } finally {
+      setClassesLoading(false);
+      setBootstrapLoading(false);
+      setLoading(false);
     }
   };
 
@@ -257,7 +234,10 @@ const FaceManagement = () => {
   };
 
   const fetchData = async () => {
-    await Promise.all([fetchAIStatus(), fetchStudentsData()]);
+    await Promise.all([
+      fetchAIStatus(),
+      faceBootstrap({ year: selectedAcademicYear, className: selectedClass }),
+    ]);
   };
 
   const deleteFaceEncoding = async (studentId, studentName) => {
@@ -463,7 +443,10 @@ const FaceManagement = () => {
                 <Label>Năm học</Label>
                 <Select
                   value={selectedAcademicYear || ""}
-                  onValueChange={(v) => setSelectedAcademicYear(v)}
+                  onValueChange={(v) => {
+                    setSelectedAcademicYear(v);
+                    faceBootstrap({ year: v });
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Chọn năm học" />
@@ -484,14 +467,28 @@ const FaceManagement = () => {
               </label>
               <Select
                 value={selectedClass}
-                onValueChange={(value) => setSelectedClass(value)}
+                onValueChange={(value) => {
+                  setSelectedClass(value);
+                  faceBootstrap({
+                    year: selectedAcademicYear,
+                    className: value,
+                  });
+                }}
+                disabled={classesLoading}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full flex items-center justify-between">
                   <SelectValue
                     placeholder={
-                      isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"
+                      classesLoading
+                        ? "Đang tải lớp…"
+                        : isHomeroomTeacher()
+                        ? "Chọn lớp chủ nhiệm"
+                        : "Tất cả lớp"
                     }
                   />
+                  {classesLoading && (
+                    <span className="ml-2 inline-block w-3 h-3 border-2 border-transparent border-b-muted-foreground rounded-full animate-spin" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">
@@ -504,13 +501,21 @@ const FaceManagement = () => {
                   ))}
                 </SelectContent>
               </Select>
+              {classesLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Đang tải lớp…
+                </p>
+              )}
             </div>
 
             <div className="flex items-end">
               <Button
                 onClick={() => {
                   fetchAIStatus();
-                  fetchStudentsData();
+                  faceBootstrap({
+                    year: selectedAcademicYear,
+                    className: selectedClass,
+                  });
                 }}
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
