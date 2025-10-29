@@ -1058,66 +1058,76 @@ const AdminManagement = () => {
               </label>
 
               {field === "role" ? (
-                <select
+                <Select
                   value={formData[field] || item?.[field] || ""}
-                  onChange={(e) => handleChange(field, e.target.value)}
-                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
+                  onValueChange={(value) => handleChange(field, value)}
                 >
-                  <option value="">Chọn vai trò</option>
-                  <option value="teacher">Giáo viên</option>
-                  <option value="homeroom_teacher">Giáo viên chủ nhiệm</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn vai trò" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="teacher">Giáo viên</SelectItem>
+                    <SelectItem value="homeroom_teacher">
+                      Giáo viên chủ nhiệm
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               ) : field === "teacher_id" ? (
-                <select
-                  value={formData[field] || item?.[field] || ""}
-                  onChange={(e) =>
-                    handleChange(
-                      field,
-                      e.target.value ? parseInt(e.target.value) : null
-                    )
+                <Select
+                  value={(formData[field] || item?.[field] || "")?.toString()}
+                  onValueChange={(value) =>
+                    handleChange(field, value ? parseInt(value) : null)
                   }
-                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
                   disabled={
                     activeTab === "class_subjects" && !formData.subject_id
                   }
                 >
-                  <option value="">
-                    {activeTab === "class_subjects" && !formData.subject_id
-                      ? "Vui lòng chọn môn học trước"
-                      : "Chọn giáo viên"}
-                  </option>
-                  {(activeTab === "class_subjects"
-                    ? filteredTeachers
-                    : teachers
-                  ).map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.teacher_code} - {teacher.full_name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        activeTab === "class_subjects" && !formData.subject_id
+                          ? "Vui lòng chọn môn học trước"
+                          : "Chọn giáo viên"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(activeTab === "class_subjects"
+                      ? filteredTeachers
+                      : teachers
+                    ).map((teacher) => (
+                      <SelectItem
+                        key={teacher.id}
+                        value={teacher.id.toString()}
+                      >
+                        {teacher.teacher_code} - {teacher.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : field === "subject_id" ? (
                 <>
-                  <select
-                    value={formData[field] || item?.[field] || ""}
-                    onChange={(e) =>
-                      handleChange(
-                        field,
-                        e.target.value ? parseInt(e.target.value) : null
-                      )
+                  <Select
+                    value={(formData[field] || item?.[field] || "")?.toString()}
+                    onValueChange={(value) =>
+                      handleChange(field, value ? parseInt(value) : null)
                     }
-                    className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    required
                     disabled={activeTab === "grade_settings" && isEdit}
                   >
-                    <option value="">Chọn môn học</option>
-                    {subjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>
-                        {subject.subject_code} - {subject.subject_name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Chọn môn học" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map((subject) => (
+                        <SelectItem
+                          key={subject.id}
+                          value={subject.id.toString()}
+                        >
+                          {subject.subject_code} - {subject.subject_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {activeTab === "grade_settings" && isEdit && (
                     <p className="mt-1 text-xs text-amber-600">
                       ⚠️ Môn học không thể thay đổi sau khi tạo
@@ -1125,39 +1135,44 @@ const AdminManagement = () => {
                   )}
                 </>
               ) : field === "class_id" ? (
-                <select
-                  value={formData[field] || item?.[field] || ""}
-                  onChange={(e) =>
-                    handleChange(field, parseInt(e.target.value))
+                <Select
+                  value={(formData[field] || item?.[field] || "")?.toString()}
+                  onValueChange={(value) =>
+                    handleChange(field, parseInt(value))
                   }
-                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
                 >
-                  <option value="">Chọn lớp</option>
-                  {classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.class_name} - {cls.grade}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn lớp" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id.toString()}>
+                        {cls.class_name} - {cls.grade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : field === "homeroom_teacher_id" ? (
-                <select
-                  value={formData[field] || item?.[field] || ""}
-                  onChange={(e) =>
-                    handleChange(
-                      field,
-                      e.target.value ? parseInt(e.target.value) : null
-                    )
+                <Select
+                  value={(formData[field] || item?.[field] || "")?.toString()}
+                  onValueChange={(value) =>
+                    handleChange(field, value ? parseInt(value) : null)
                   }
-                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="">Chọn GVCN (tùy chọn)</option>
-                  {homeroomTeachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.teacher_code} - {teacher.full_name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn GVCN (tùy chọn)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {homeroomTeachers.map((teacher) => (
+                      <SelectItem
+                        key={teacher.id}
+                        value={teacher.id.toString()}
+                      >
+                        {teacher.teacher_code} - {teacher.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : field === "gender" ? (
                 <Select
                   value={
@@ -1187,47 +1202,51 @@ const AdminManagement = () => {
                   />
                 </div>
               ) : field === "user_id" ? (
-                <select
-                  value={formData[field] || item?.[field] || ""}
-                  onChange={(e) =>
-                    handleChange(
-                      field,
-                      e.target.value ? parseInt(e.target.value) : null
-                    )
+                <Select
+                  value={(formData[field] || item?.[field] || "")?.toString()}
+                  onValueChange={(value) =>
+                    handleChange(field, value ? parseInt(value) : null)
                   }
-                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="">Chọn người dùng (tùy chọn)</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.email} - {user.full_name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn người dùng (tùy chọn)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id.toString()}>
+                        {user.email} - {user.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : field === "semester" ? (
-                <select
+                <Select
                   value={formData[field] || item?.[field] || ""}
-                  onChange={(e) => handleChange(field, e.target.value)}
-                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
+                  onValueChange={(value) => handleChange(field, value)}
                 >
-                  <option value="">Chọn học kỳ</option>
-                  <option value="HK1">Học kỳ 1</option>
-                  <option value="HK2">Học kỳ 2</option>
-                  <option value="HK3">Học kỳ 3</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn học kỳ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HK1">Học kỳ 1</SelectItem>
+                    <SelectItem value="HK2">Học kỳ 2</SelectItem>
+                    <SelectItem value="HK3">Học kỳ 3</SelectItem>
+                  </SelectContent>
+                </Select>
               ) : field === "grade" ? (
-                <select
+                <Select
                   value={formData[field] || item?.[field] || ""}
-                  onChange={(e) => handleChange(field, e.target.value)}
-                  className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
+                  onValueChange={(value) => handleChange(field, value)}
                 >
-                  <option value="">Chọn khối</option>
-                  <option value="10">Khối 10</option>
-                  <option value="11">Khối 11</option>
-                  <option value="12">Khối 12</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn khối" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">Khối 10</SelectItem>
+                    <SelectItem value="11">Khối 11</SelectItem>
+                    <SelectItem value="12">Khối 12</SelectItem>
+                  </SelectContent>
+                </Select>
               ) : field.includes("description") ? (
                 <textarea
                   value={formData[field] || item?.[field] || ""}
