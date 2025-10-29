@@ -18,6 +18,13 @@ import {
 } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription } from "./ui/alert";
@@ -34,6 +41,8 @@ const SystemSettings = () => {
     semester: "",
     attendance_cutoff_time: "",
   });
+  const [cutoffHour, setCutoffHour] = useState("00");
+  const [cutoffMinute, setCutoffMinute] = useState("00");
 
   // Load settings
   useEffect(() => {
@@ -64,6 +73,13 @@ const SystemSettings = () => {
           attendance_cutoff_time:
             settingsMap.attendance_cutoff_time?.setting_value || "",
         });
+
+        // Sync hour/minute state from loaded value
+        const timeVal =
+          settingsMap.attendance_cutoff_time?.setting_value || "00:00";
+        const [h, m] = timeVal.split(":");
+        setCutoffHour(h?.padStart(2, "0") || "00");
+        setCutoffMinute(m?.padStart(2, "0") || "00");
       } else {
         setError(response.message || "Không thể tải cấu hình");
       }
@@ -142,6 +158,16 @@ const SystemSettings = () => {
       setSaving(false);
     }
   };
+
+  // Whenever hour/minute changes, update combined time string
+  useEffect(() => {
+    const next = `${cutoffHour}:${cutoffMinute}`;
+    setFormData((prev) => ({ ...prev, attendance_cutoff_time: next }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cutoffHour, cutoffMinute]);
+
+  const hours = Array.from({ length: 24 }, (_, i) => `${i}`.padStart(2, "0"));
+  const minutes = Array.from({ length: 60 }, (_, i) => `${i}`.padStart(2, "0"));
 
   if (loading) {
     return (
@@ -266,17 +292,19 @@ const SystemSettings = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="semester">Học kỳ</Label>
-              <select
-                id="semester"
-                value={formData.semester}
-                onChange={(e) => handleChange("semester", e.target.value)}
-                className="flex w-full h-10 px-3 py-2 text-lg font-semibold border rounded-md border-input bg-background ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              <Select
+                value={formData.semester || ""}
+                onValueChange={(v) => handleChange("semester", v)}
               >
-                <option value="">Chọn học kỳ</option>
-                <option value="HK1">Học kỳ 1</option>
-                <option value="HK2">Học kỳ 2</option>
-                <option value="HK3">Học kỳ 3</option>
-              </select>
+                <SelectTrigger id="semester" className="text-lg font-semibold">
+                  <SelectValue placeholder="Chọn học kỳ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="HK1">Học kỳ 1</SelectItem>
+                  <SelectItem value="HK2">Học kỳ 2</SelectItem>
+                  <SelectItem value="HK3">Học kỳ 3</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground">
                 Chọn học kỳ hiện tại (HK1, HK2, hoặc HK3)
               </p>
@@ -334,18 +362,40 @@ const SystemSettings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="attendance_cutoff_time">
-                Giờ điểm danh (HH:MM)
-              </Label>
-              <Input
-                id="attendance_cutoff_time"
-                type="time"
-                value={formData.attendance_cutoff_time}
-                onChange={(e) =>
-                  handleChange("attendance_cutoff_time", e.target.value)
-                }
-                className="text-lg font-semibold"
-              />
+              <Label>Giờ điểm danh (HH:MM)</Label>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={cutoffHour}
+                  onValueChange={(v) => setCutoffHour(v)}
+                >
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {hours.map((h) => (
+                      <SelectItem key={h} value={h}>
+                        {h}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="font-semibold">:</span>
+                <Select
+                  value={cutoffMinute}
+                  onValueChange={(v) => setCutoffMinute(v)}
+                >
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {minutes.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Học sinh đến sau giờ này sẽ bị tính là đi muộn
               </p>
