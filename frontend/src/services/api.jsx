@@ -339,6 +339,16 @@ class ApiService {
     });
   }
 
+  async createManualAttendance(attendanceData) {
+    return this.request("/attendance/manual", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(attendanceData),
+    });
+  }
+
   async getStudent(id) {
     return this.request(`/students/${id}`);
   }
@@ -930,8 +940,11 @@ class ApiService {
   }
 
   // Classes Management
-  async getClassesAdmin() {
-    return this.request("/admin/classes");
+  async getClassesAdmin(academicYear) {
+    const qs = academicYear
+      ? `?academic_year=${encodeURIComponent(academicYear)}`
+      : "";
+    return this.request(`/admin/classes${qs}`);
   }
 
   async createClass(classData) {

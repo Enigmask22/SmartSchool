@@ -474,31 +474,19 @@ const StudentList = () => {
           setAvailableClasses([]);
         }
       } else {
-        logger.debug(
-          "📚 Fetching all students to extract classes for admin..."
-        );
-        // If admin, get all students and extract unique class names
-        const studentsResponse = await ApiService.getStudents({});
-
+        // Admin: lấy danh sách lớp đã lọc theo năm học từ API backend
+        logger.debug("📚 Fetching admin classes filtered by academic year...");
+        const year = yearOverride ?? selectedAcademicYear;
+        const classesResp = await ApiService.getClassesAdmin(year);
         if (reqId !== classesReqIdRef.current) return; // ignore stale
-        if (studentsResponse.success && studentsResponse.data) {
-          const uniqueClasses = [
-            ...new Set(
-              studentsResponse.data
-                .map((student) => student.class_name)
-                .filter((className) => className)
-            ),
-          ].sort();
-          logger.debug(
-            "📚 Extracted unique classes from students:",
-            uniqueClasses
-          );
-          setAvailableClasses(uniqueClasses);
+        if (classesResp.success && Array.isArray(classesResp.data)) {
+          const classNames = classesResp.data
+            .map((c) => c.class_name)
+            .filter(Boolean)
+            .sort();
+          setAvailableClasses(classNames);
         } else {
-          logger.warn(
-            "📚 Invalid students response for classes:",
-            studentsResponse
-          );
+          logger.warn("📚 Invalid admin classes response:", classesResp);
           setAvailableClasses([]);
         }
       }

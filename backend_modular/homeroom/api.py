@@ -77,7 +77,14 @@ async def homeroom_bootstrap(
             hsh2 = db.table("homeroom_students_history").select("student_id").eq("class_id", selected_class_id).execute()
             sids = [r["student_id"] for r in (hsh2.data or []) if r.get("student_id") is not None]
             if sids:
-                sresp = db.table("students").select("id, student_id, full_name, email, phone, class_name, grade, is_active").in_("id", sids).execute()
+                sresp = (
+                    db.table("students")
+                    .select(
+                        "id, student_id, full_name, email, phone, date_of_birth, parent_name, parent_phone, address, profile_image, class_name, grade, gender, subject_selected, is_active"
+                    )
+                    .in_("id", sids)
+                    .execute()
+                )
                 students = sresp.data or []
 
         return {
@@ -165,12 +172,22 @@ async def homeroom_attendance_bootstrap(
             if student_ids:
                 # students map
                 sresp = db.table("students").select("id, student_id, full_name, class_name").in_("id", student_ids).execute()
-                smap = {s["id"]: s for s in (sresp.data or [])}
+                students_list = sresp.data or []
+                # sort by student_code (students.student_id) tăng dần, ưu tiên số
+                def sort_key(stu):
+                    code = stu.get("student_id")
+                    try:
+                        return (0, int(code))
+                    except Exception:
+                        return (1, str(code) if code is not None else "")
+                students_list.sort(key=sort_key)
+                smap = {s["id"]: s for s in students_list}
                 # attendance map
-                att = db.table("attendance").select("student_id, status, check_in_time, check_out_time, method, confidence_score, notes").eq("date", target_date.isoformat()).in_("student_id", student_ids).execute()
+                att = db.table("attendance").select("id, student_id, status, check_in_time, check_out_time, method, confidence_score, notes").eq("date", target_date.isoformat()).in_("student_id", student_ids).execute()
                 amap = {a["student_id"]: a for a in (att.data or [])}
                 present = late = 0
-                for sid in student_ids:
+                # iterate theo danh sách students đã sort để records có thứ tự mã HS
+                for sid in [s["id"] for s in students_list]:
                     info = smap.get(sid, {})
                     a = amap.get(sid)
                     status = a["status"] if a else "absent"
@@ -179,6 +196,7 @@ async def homeroom_attendance_bootstrap(
                     elif status == "late":
                         late += 1
                     records.append({
+                        "id": a.get("id") if a else None,  # Include attendance record ID if exists
                         "student_id": sid,
                         "students": {
                             "student_id": info.get("student_id"),
