@@ -1592,6 +1592,10 @@ async def create_student_admin(
         if student_data.address:
             data["address"] = student_data.address
         
+        # Sanitize: đảm bảo không có class_id trong payload insert
+        if "class_id" in data:
+            data.pop("class_id", None)
+        logger.debug(f"📝 Create student inserting keys: {list(data.keys())}")
         response = db.table("students").insert(data).execute()
 
         # Nếu tạo thành công và có class_id -> ghi lịch sử vào homeroom_students_history
@@ -1763,6 +1767,16 @@ async def bulk_import_students(
 ):
     """Nhập học sinh hàng loạt từ file Excel/CSV"""
     try:
+        # Lấy class_info từ class_id filter nếu có (giống create_student_admin)
+        class_info = None
+        if import_data.class_id:
+            class_resp = db.table("classes").select("id, class_name, grade, homeroom_teacher_id").eq("id", import_data.class_id).execute()
+            if class_resp.data:
+                class_info = class_resp.data[0]
+                logger.debug(f"✅ Sử dụng class_id filter: {class_info['class_name']} (grade {class_info['grade']})")
+            else:
+                logger.warn(f"⚠️ class_id {import_data.class_id} không tồn tại trong database")
+        
         success_count = 0
         error_count = 0
         errors = []
@@ -1771,13 +1785,28 @@ async def bulk_import_students(
         for student_record in import_data.students:
             try:
                 # Validate required fields
-                if not student_record.ho_va_ten or not student_record.lop_hoc or not student_record.khoi:
-                    errors.append(f"Thiếu thông tin bắt buộc cho học sinh: {student_record.ho_va_ten or 'Unknown'}")
+                # Nếu có class_info từ filter, không cần lop_hoc và khoi từ file
+                if not student_record.ho_va_ten:
+                    errors.append(f"Thiếu thông tin bắt buộc (Họ tên) cho học sinh")
                     error_count += 1
                     continue
                 
-                # Generate student ID
-                student_id = generate_student_id(student_record.khoi, db)
+                # Xác định class_name và grade (ưu tiên từ class_info nếu có, giống create_student_admin)
+                if class_info:
+                    # Dùng class_name và grade từ class_info (bỏ qua giá trị từ file)
+                    final_class_name = class_info["class_name"]
+                    final_grade = str(class_info["grade"])
+                else:
+                    # Không có filter, yêu cầu lop_hoc và khoi từ file
+                    if not student_record.lop_hoc or not student_record.khoi:
+                        errors.append(f"Thiếu thông tin lớp/khối cho học sinh: {student_record.ho_va_ten}")
+                        error_count += 1
+                        continue
+                    final_class_name = student_record.lop_hoc
+                    final_grade = student_record.khoi
+                
+                # Generate student ID (dùng final_grade)
+                student_id = generate_student_id(final_grade, db)
                 
                 # Check if student ID already exists
                 existing = db.table("students").select("student_id").eq("student_id", student_id).execute()
@@ -1799,37 +1828,62 @@ async def bulk_import_students(
                     error_count += 1
                     continue
                 
-                # Prepare student data
+                # Prepare student data (dùng final_class_name và final_grade, giống create_student_admin)
                 student_data = {
                     "student_id": student_id,
                     "full_name": student_record.ho_va_ten,
-                    "email": student_record.email,
-                    "phone": student_record.so_dien_thoai,
-                    "class_name": student_record.lop_hoc,
-                    "grade": student_record.khoi,
-                    "date_of_birth": student_record.ngay_sinh,
-                    "address": student_record.dia_chi,
-                    "parent_name": student_record.ten_phu_huynh,
-                    "parent_phone": student_record.sdt_phu_huynh,
+                    "class_name": final_class_name,
+                    "grade": final_grade,
                     "gender": gender,
                     "is_active": True,
                     "created_at": datetime.now().isoformat(),
                     "updated_at": datetime.now().isoformat()
                 }
                 
-                # Remove None values
-                student_data = {k: v for k, v in student_data.items() if v is not None}
+                # Chỉ thêm các optional fields nếu có giá trị (giống create_student_admin)
+                if student_record.email:
+                    student_data["email"] = student_record.email
+                if student_record.so_dien_thoai:
+                    student_data["phone"] = student_record.so_dien_thoai
+                if student_record.ngay_sinh:
+                    student_data["date_of_birth"] = student_record.ngay_sinh
+                if student_record.dia_chi:
+                    student_data["address"] = student_record.dia_chi
+                if student_record.ten_phu_huynh:
+                    student_data["parent_name"] = student_record.ten_phu_huynh
+                if student_record.sdt_phu_huynh:
+                    student_data["parent_phone"] = student_record.sdt_phu_huynh
                 
-                # Insert student
-                response = db.table("students").insert(student_data).execute()
+                # Insert student (whitelist field để tuyệt đối không lọt class_id)
+                allowed_fields = [
+                    "student_id", "full_name", "class_name", "grade", "gender",
+                    "email", "phone", "date_of_birth", "address", "parent_name",
+                    "parent_phone", "is_active", "created_at", "updated_at"
+                ]
+                student_row = {k: student_data.get(k) for k in allowed_fields if student_data.get(k) is not None}
+                logger.debug(f"📝 Bulk import inserting student with keys: {list(student_row.keys())}")
+                response = db.table("students").insert(student_row).execute()
                 
                 if response.data:
+                    created_student = response.data[0]
                     success_count += 1
                     created_students.append({
                         "student_id": student_id,
                         "full_name": student_record.ho_va_ten,
-                        "class_name": student_record.lop_hoc
+                        "class_name": final_class_name
                     })
+                    
+                    # Nếu có class_info, insert vào homeroom_students_history (giống create_student_admin)
+                    if class_info:
+                        try:
+                            db.table("homeroom_students_history").insert({
+                                "teacher_id": class_info.get("homeroom_teacher_id"),
+                                "class_id": class_info["id"],
+                                "student_id": created_student["id"]
+                            }).execute()
+                            logger.debug(f"✅ Đã ghi vào homeroom_students_history cho học sinh {created_student['id']} (class_id={class_info['id']})")
+                        except Exception as hist_err:
+                            logger.warn(f"⚠️ Không thể ghi vào homeroom_students_history: {str(hist_err)}")
                 else:
                     errors.append(f"Không thể tạo học sinh: {student_record.ho_va_ten}")
                     error_count += 1

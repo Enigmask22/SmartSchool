@@ -140,6 +140,8 @@ class StudentImportRecord(BaseModel):
 
 class BulkStudentImport(BaseModel):
     students: List[StudentImportRecord]
+    academic_year: Optional[str] = None
+    class_id: Optional[int] = None
 
 class ResponseModel(BaseModel):
     success: bool

@@ -533,6 +533,10 @@ const ClassManagement = () => {
 
       const importPayload = {
         students: importedData,
+        academic_year: selectedAcademicYear || undefined,
+        class_id: selectedClassForManagement
+          ? parseInt(selectedClassForManagement)
+          : undefined,
       };
 
       const response = await api.bulkImportStudents(importPayload);
