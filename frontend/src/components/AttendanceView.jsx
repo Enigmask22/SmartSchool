@@ -196,6 +196,7 @@ const AttendanceView = () => {
           if (response.success) {
             // Chuyển dữ liệu thành cấu trúc giống API full list: { students: {...}, ... }
             const records = (response.data?.records || []).map((r) => ({
+              id: r.id ?? null,
               ...r,
               students: {
                 student_id: r.student_code || r.student_id,
@@ -476,10 +477,26 @@ const AttendanceView = () => {
     setShowFullList(showFullListMode);
   };
 
+  // Helper function to get stable identifier for a record
+  const getRecordKey = (record) => {
+    if (!record) return null;
+    // Use student_id (ID in students table) as the unique key
+    return record.student_id ?? record.students?.student_id ?? null;
+  };
+
+  // Helper function to check if a record is being edited
+  const isEditingRecord = (record) => {
+    if (!editingRecord || !record) return false;
+    const editingKey = getRecordKey(editingRecord);
+    const recordKey = getRecordKey(record);
+    // Compare as strings to handle type mismatches
+    return String(editingKey) === String(recordKey) && editingKey !== null;
+  };
+
   const handleEditRecord = (record) => {
     // Store the entire record including student_id for unique identification
     setEditingRecord(record);
-    setEditStatus(record.status);
+    setEditStatus(record.status || "absent");
     setEditNotes(record.notes || "");
   };
 
@@ -498,7 +515,7 @@ const AttendanceView = () => {
 
       if (editingRecord.id === null) {
         // Create new attendance record for student who hasn't been marked
-        response = await ApiService.markAttendance({
+        response = await ApiService.createManualAttendance({
           student_id: editingRecord.student_id,
           date: selectedDate,
           status: editStatus,
@@ -839,8 +856,11 @@ const AttendanceView = () => {
                       endIndex
                     );
 
-                    return paginatedRecords.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-muted/50">
+                    return paginatedRecords.map((record, idx) => (
+                      <TableRow
+                        key={record.id ?? `record-${record.student_id}-${idx}`}
+                        className="hover:bg-muted/50"
+                      >
                         <TableCell className="font-medium">
                           {record.students?.student_id || "N/A"}
                         </TableCell>
@@ -864,7 +884,7 @@ const AttendanceView = () => {
                           {formatTime(record.check_out_time)}
                         </TableCell>
                         <TableCell>
-                          {editingRecord?.student_id === record.student_id ? (
+                          {isEditingRecord(record) ? (
                             <Select
                               value={editStatus}
                               onValueChange={(value) => setEditStatus(value)}
@@ -890,7 +910,7 @@ const AttendanceView = () => {
                             : "-"}
                         </TableCell>
                         <TableCell>
-                          {editingRecord?.student_id === record.student_id ? (
+                          {isEditingRecord(record) ? (
                             <Input
                               type="text"
                               value={editNotes}
@@ -908,7 +928,7 @@ const AttendanceView = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-center">
-                          {editingRecord?.student_id === record.student_id ? (
+                          {isEditingRecord(record) ? (
                             <div className="flex justify-center gap-2">
                               <Button
                                 size="sm"
@@ -932,7 +952,10 @@ const AttendanceView = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleEditRecord(record)}
+                              onClick={() => {
+                                logger.debug("🖱️ Click Sửa button", { record });
+                                handleEditRecord(record);
+                              }}
                               className="h-8 text-xs"
                             >
                               Sửa

@@ -81,6 +81,69 @@ async def check_in_attendance(
         logger.error(f"Error in check-in: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
+@router.post("/manual")
+async def create_manual_attendance_record(
+    attendance: AttendanceCreate,
+    db=Depends(get_db)
+):
+    """Tạo bản ghi điểm danh thủ công KHÔNG cập nhật giờ vào/ra.
+
+    Dùng khi giáo viên chỉ muốn cập nhật trạng thái/ghi chú mà không muốn ảnh hưởng check_in/check_out.
+    """
+    try:
+        today = get_vietnam_date_string()
+        now_time = get_vietnam_time_string()
+
+        # Upsert theo (student_id, date): nếu đã tồn tại thì chỉ UPDATE status/notes
+        existing = (
+            db.table("attendance")
+            .select("id, status, notes")
+            .eq("student_id", attendance.student_id)
+            .eq("date", today)
+            .limit(1)
+            .execute()
+        )
+
+        if existing.data:
+            att_id = existing.data[0]["id"]
+            response = (
+                db.table("attendance")
+                .update(
+                    {
+                        "status": attendance.status or existing.data[0].get("status", "absent"),
+                        "notes": attendance.notes,
+                        "method": "manual",
+                        "updated_at": now_time,
+                    }
+                )
+                .eq("id", att_id)
+                .execute()
+            )
+            return {
+                "success": True,
+                "message": "Cập nhật trạng thái điểm danh thành công",
+                "data": response.data[0] if response.data else None,
+            }
+        else:
+            payload = {
+                "student_id": attendance.student_id,
+                "date": today,
+                "status": attendance.status or "absent",
+                "notes": attendance.notes,
+                "method": "manual",
+                "created_at": now_time,
+                "updated_at": now_time,
+            }
+            response = db.table("attendance").insert(payload).execute()
+            return {
+                "success": True,
+                "message": "Tạo bản ghi điểm danh thủ công thành công",
+                "data": response.data[0] if response.data else None,
+            }
+    except Exception as e:
+        logger.error(f"Error creating manual attendance: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
 @router.get("/")
 async def get_attendance_records(
     page: int = Query(1, ge=1),
