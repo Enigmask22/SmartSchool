@@ -57,6 +57,7 @@ class ClassCreate(BaseModel):
     class_name: str
     grade: int
     homeroom_teacher_id: Optional[int] = None
+    room_number: Optional[str] = None
     academic_year: str
     is_active: Optional[bool] = True
 

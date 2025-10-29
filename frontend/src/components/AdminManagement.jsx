@@ -1833,6 +1833,7 @@ const AdminManagement = () => {
                 {(activeTab === "users" ||
                   activeTab === "teachers" ||
                   activeTab === "subjects" ||
+                  activeTab === "classes" ||
                   activeTab === "subject_teachers" ||
                   activeTab === "class_subjects" ||
                   activeTab === "grade_settings") && (
