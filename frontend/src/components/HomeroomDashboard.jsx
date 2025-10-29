@@ -50,161 +50,138 @@ const HomeroomDashboard = () => {
   const [selectedClass, setSelectedClass] = useState(null); // class_name
   const [selectedClassId, setSelectedClassId] = useState(null); // id lớp
   const [students, setStudents] = useState([]);
+  const [topAbsent, setTopAbsent] = useState([]);
+  const [topLate, setTopLate] = useState([]);
   const [attendanceStats, setAttendanceStats] = useState(null);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   // State cho modal xem tất cả học sinh
   const [showAllStudents, setShowAllStudents] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [studentsPerPage] = useState(12); // Hiển thị 12 học sinh mỗi trang
 
-  const fetchAttendanceStats = useCallback(async () => {
-    if (!selectedClass) return;
-
-    try {
-      const response = await api.request(
-        `/homeroom/attendance/stats?target_date=${selectedDate}&class_name=${selectedClass}&academic_year=${selectedAcademicYear}`
-      );
-      if (response.success) {
-        setAttendanceStats(response.data.stats);
+  // Bootstrap tổng hợp cho Dashboard – thay thế chuỗi nhiều API
+  const dashboardBootstrap = useCallback(
+    async ({ ay, y, m, clsName, clsId } = {}) => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams();
+        if (ay) params.set("academic_year", ay);
+        if (y) params.set("year", String(y));
+        if (m) params.set("month", String(m));
+        if (clsName) params.set("class_name", clsName);
+        if (clsId) params.set("class_id", String(clsId));
+        const resp = await api.request(
+          `/homeroom/dashboard/bootstrap${
+            params.toString() ? `?${params.toString()}` : ""
+          }`
+        );
+        if (resp.success && resp.data) {
+          const {
+            academic_years,
+            classes,
+            selected_class,
+            students: studentRows,
+            top_absent,
+            top_late,
+            homeroom_info,
+          } = resp.data;
+          if (Array.isArray(academic_years)) setAcademicYears(academic_years);
+          if (!selectedAcademicYear && resp.data.year)
+            setSelectedAcademicYear(
+              resp.data.default_year || selectedAcademicYear
+            );
+          const uniqueClasses = Array.from(
+            new Map((classes || []).map((c) => [c.class_name, c])).values()
+          );
+          setTeacherClasses(uniqueClasses);
+          const sName =
+            selected_class?.class_name || uniqueClasses[0]?.class_name || null;
+          const sId = selected_class?.id || uniqueClasses[0]?.id || null;
+          setSelectedClass(sName);
+          setSelectedClassId(sId);
+          setHomeroomInfo(homeroom_info || null);
+          const mapped = (studentRows || []).map((r) => ({
+            id: r.student_id,
+            student_id: r.student_code,
+            full_name: r.student_name,
+            class_name: r.class_name,
+            absent_count: r.absent_count,
+            late_count: r.late_count,
+            early_count: r.early_count,
+          }));
+          setStudents(mapped);
+          const sortByCodeAsc = (arr) =>
+            (arr || []).slice().sort((a, b) => {
+              const aId = parseInt(a.student_code) || 0;
+              const bId = parseInt(b.student_code) || 0;
+              return aId - bId;
+            });
+          setTopAbsent(sortByCodeAsc(top_absent));
+          setTopLate(sortByCodeAsc(top_late));
+          // Stats tổng hợp từ rows
+          setAttendanceStats({
+            absent_count: mapped.reduce((s, x) => s + (x.absent_count || 0), 0),
+            late_count: mapped.reduce((s, x) => s + (x.late_count || 0), 0),
+            attendance_rate: 0,
+          });
+          setAttendanceRecords([]);
+        }
+      } catch (e) {
+        logger.error("dashboard bootstrap error", e);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      logger.error("Error fetching attendance stats:", error);
-    }
-  }, [selectedDate, selectedClass, selectedAcademicYear]);
-
-  const fetchAttendanceRecords = useCallback(async () => {
-    if (!selectedClass) return;
-
-    try {
-      // Sử dụng API getFullAttendanceList giống như AttendanceView
-      const response = await api.getFullAttendanceList(
-        selectedDate,
-        selectedClass
-      );
-      if (response.success) {
-        setAttendanceRecords(response.data || []);
-      }
-    } catch (error) {
-      logger.error("Error fetching attendance records:", error);
-    }
-  }, [selectedDate, selectedClass]);
+    },
+    [selectedAcademicYear]
+  );
 
   const fetchHomeroomData = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      // Load năm học: danh sách + mặc định
-      const [yearsResp, defaultYearResp] = await Promise.all([
-        api.request("/homeroom/academic-years"),
-        api.request("/homeroom/default-academic-year"),
-      ]);
-      if (yearsResp.success) setAcademicYears(yearsResp.data || []);
-      const defaultYear = defaultYearResp.success ? defaultYearResp.data : "";
-      const year =
-        selectedAcademicYear || defaultYear || yearsResp.data?.[0] || "";
-      if (!selectedAcademicYear) setSelectedAcademicYear(year);
-
-      // Fetch danh sách lớp chủ nhiệm theo năm học
-      const classesResponse = await api.request(
-        `/homeroom/classes${
-          year ? `?academic_year=${encodeURIComponent(year)}` : ""
-        }`
-      );
-      if (classesResponse.success) {
-        // Deduplicate classes by class_name
-        const uniqueClasses = Array.from(
-          new Map(
-            (classesResponse.data || []).map((cls) => [cls.class_name, cls])
-          ).values()
-        );
-        setTeacherClasses(uniqueClasses);
-
-        // Nếu lớp hiện tại không thuộc năm học đang chọn, chọn lớp đầu tiên của danh sách mới
-        const currentInList = uniqueClasses.find(
-          (c) => c.class_name === selectedClass
-        );
-        if (!selectedClass || !currentInList) {
-          const first = uniqueClasses[0] || null;
-          setSelectedClass(first ? first.class_name : null);
-          setSelectedClassId(first ? first.id : null);
-        } else {
-          // Đồng bộ lại id phòng trường hợp dữ liệu thay đổi
-          setSelectedClassId(currentInList.id);
-        }
-      }
-
-      // Không tải dashboard data ở đây để tránh lặp; effect riêng sẽ gọi khi có lớp/ngày
-    } catch (error) {
-      logger.error("Error fetching homeroom data:", error);
-    } finally {
-      setLoading(false);
-    }
+    await dashboardBootstrap({
+      ay: selectedAcademicYear,
+      y: selectedYear,
+      m: selectedMonth,
+      clsName: selectedClass,
+      clsId: selectedClassId,
+    });
   }, [
-    selectedClass,
+    dashboardBootstrap,
     selectedAcademicYear,
-    fetchAttendanceStats,
-    fetchAttendanceRecords,
+    selectedYear,
+    selectedMonth,
+    selectedClass,
+    selectedClassId,
   ]);
 
   useEffect(() => {
     fetchHomeroomData();
   }, [fetchHomeroomData]);
 
-  // Chỉ gọi API tổng hợp nhanh khi thay đổi lớp/ngày
+  // Tải lại khi thay đổi tham số chính
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        if (!selectedClass) return;
-        setLoading(true);
-        const infoResponse = await api.request("/homeroom/info");
-        if (infoResponse.success) setHomeroomInfo(infoResponse.data);
-
-        const found = teacherClasses.find(
-          (c) => c.class_name === selectedClass
-        );
-        const classId = found?.id;
-        const dashResp = await api.request(
-          `/homeroom/dashboard/data?target_date=${selectedDate}` +
-            (classId
-              ? `&class_id=${classId}`
-              : `&class_name=${encodeURIComponent(
-                  selectedClass
-                )}&academic_year=${encodeURIComponent(selectedAcademicYear)}`)
-        );
-        if (dashResp.success) {
-          const rows = dashResp.data?.students || [];
-          const mappedStudents = rows.map((r) => ({
-            id: r.student_id,
-            student_id: r.student_code,
-            full_name: r.student_name,
-            class_name: r.class_name,
-          }));
-          setStudents(mappedStudents);
-          const mappedRecords = rows.map((r) => ({
-            student_id: r.student_id,
-            status: r.status,
-            check_in_time: r.check_in_time,
-            check_out_time: r.check_out_time,
-            method: r.method,
-            confidence_score: r.confidence_score,
-            notes: r.notes,
-          }));
-          setAttendanceRecords(mappedRecords);
-          setAttendanceStats(dashResp.data?.stats || null);
-        }
-      } catch (err) {
-        logger.error("Error loading dashboard data:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (selectedClass) loadDashboardData();
-  }, [selectedClass, selectedDate, selectedAcademicYear, teacherClasses]);
+    if (selectedClass || selectedClassId) {
+      dashboardBootstrap({
+        ay: selectedAcademicYear,
+        y: selectedYear,
+        m: selectedMonth,
+        clsName: selectedClass,
+        clsId: selectedClassId,
+      });
+    }
+  }, [
+    dashboardBootstrap,
+    selectedAcademicYear,
+    selectedYear,
+    selectedMonth,
+    selectedClass,
+    selectedClassId,
+  ]);
 
   const handleViewAllStudents = () => {
     setShowAllStudents(true);
@@ -338,6 +315,43 @@ const HomeroomDashboard = () => {
                   ))}
                 </SelectContent>
               </Select>
+              {/* Chọn tháng/năm thống kê */}
+              <span className="text-sm text-gray-500">Tháng</span>
+              <Select
+                value={String(selectedMonth)}
+                onValueChange={(v) => setSelectedMonth(parseInt(v, 10))}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <SelectItem key={m} value={String(m)}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-gray-500">Năm</span>
+              <Select
+                value={String(selectedYear)}
+                onValueChange={(v) => setSelectedYear(parseInt(v, 10))}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    new Date().getFullYear() - 1,
+                    new Date().getFullYear(),
+                    new Date().getFullYear() + 1,
+                  ].map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>
@@ -371,10 +385,10 @@ const HomeroomDashboard = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Có mặt hôm nay
+                  Tổng số lần muộn (tháng)
                 </p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {attendanceStats?.present_count || 0}
+                  {attendanceStats?.late_count || 0}
                 </p>
               </div>
             </div>
@@ -388,7 +402,9 @@ const HomeroomDashboard = () => {
                 <UserX className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Vắng mặt</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Tổng số lần vắng (tháng)
+                </p>
                 <p className="text-2xl font-bold text-gray-900">
                   {attendanceStats?.absent_count || 0}
                 </p>
@@ -436,6 +452,86 @@ const HomeroomDashboard = () => {
         </CardContent>
       </Card>
 
+      {/* Top vắng / Top muộn trong tháng */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Top vắng nhiều nhất (tháng)</CardTitle>
+            <CardDescription>
+              Top 10 học sinh có số lần vắng cao nhất trong tháng{" "}
+              {selectedMonth}/{selectedYear}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!topAbsent || topAbsent.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                Không có dữ liệu
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {topAbsent.map((s, idx) => (
+                  <div
+                    key={s.student_id}
+                    className="flex items-center justify-between p-2 border rounded"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 text-xs font-bold text-center rounded-full bg-muted">
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <div className="font-medium">{s.student_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {s.student_code} • Lớp {s.class_name}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant="destructive">{s.absent_count}</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Top đi muộn nhiều nhất (tháng)</CardTitle>
+            <CardDescription>
+              Top 10 học sinh có số lần đi muộn cao nhất trong tháng{" "}
+              {selectedMonth}/{selectedYear}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!topLate || topLate.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                Không có dữ liệu
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {topLate.map((s, idx) => (
+                  <div
+                    key={s.student_id}
+                    className="flex items-center justify-between p-2 border rounded"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 text-xs font-bold text-center rounded-full bg-muted">
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <div className="font-medium">{s.student_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {s.student_code} • Lớp {s.class_name}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant="warning">{s.late_count}</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Students Grid */}
       <Card>
         <CardHeader>
@@ -443,7 +539,8 @@ const HomeroomDashboard = () => {
             <div>
               <CardTitle>Học sinh lớp {homeroomInfo?.class_name}</CardTitle>
               <CardDescription>
-                Danh sách học sinh và trạng thái điểm danh ngày {selectedDate}
+                Danh sách học sinh – thống kê tháng {selectedMonth}/
+                {selectedYear}
               </CardDescription>
             </div>
             <Button
@@ -480,6 +577,14 @@ const HomeroomDashboard = () => {
                           <p className="text-sm text-gray-500">
                             Mã: {student.student_id}
                           </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Badge variant="destructive">
+                              Vắng {student.absent_count ?? 0}
+                            </Badge>
+                            <Badge variant="warning">
+                              Muộn {student.late_count ?? 0}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                       {getStatusIcon(status)}
@@ -559,6 +664,14 @@ const HomeroomDashboard = () => {
                             <p className="text-sm text-gray-500">
                               Mã: {student.student_id}
                             </p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <Badge variant="destructive">
+                                Vắng {student.absent_count ?? 0}
+                              </Badge>
+                              <Badge variant="warning">
+                                Muộn {student.late_count ?? 0}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
                         {getStatusIcon(status)}

@@ -13,6 +13,291 @@ from auth.api import get_current_user
 logger = setup_logger("homeroom_api")
 router = APIRouter()
 
+@router.get("/bootstrap")
+async def homeroom_bootstrap(
+    academic_year: Optional[str] = Query(default=None),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Gộp các dữ liệu khởi tạo: academic_years, default_year, classes theo năm, 
+    auto-chọn lớp đầu tiên và trả về luôn danh sách học sinh của lớp đó.
+
+    Mục tiêu: 1 lần gọi API thay cho 4-6 lần gọi rời rạc ở FE.
+    """
+    try:
+        # Teacher id
+        teacher_resp = (
+            db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        )
+        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+        if not teacher_id:
+            return {"success": True, "data": {
+                "academic_years": [],
+                "default_year": None,
+                "classes": [],
+                "selected_class": None,
+                "students": []
+            }}
+
+        # Years GV có lớp
+        hsh = db.table("homeroom_students_history").select("class_id").eq("teacher_id", teacher_id).execute()
+        class_ids = list({r.get("class_id") for r in (hsh.data or []) if r.get("class_id") is not None})
+        years: List[str] = []
+        if class_ids:
+            cls = db.table("classes").select("academic_year").in_("id", class_ids).execute()
+            years = sorted(list({c.get("academic_year") for c in (cls.data or []) if c.get("academic_year")}))
+
+        # Default year nếu chưa chọn
+        default_year_resp = (
+            db.table("system_settings").select("setting_value").eq("setting_key", "academic_year").limit(1).execute()
+        )
+        default_year = default_year_resp.data[0]["setting_value"] if default_year_resp.data else None
+        year = academic_year or default_year or (years[0] if years else None)
+
+        # Lớp theo năm học
+        classes = []
+        selected_class_name = None
+        selected_class_id = None
+        if class_ids:
+            q = db.table("classes").select("id, class_name, grade, academic_year").in_("id", class_ids)
+            if year:
+                q = q.eq("academic_year", year)
+            cls2 = q.order("class_name").execute()
+            classes = [
+                {"id": r.get("id"), "class_name": r.get("class_name"), "grade": r.get("grade"), "academic_year": r.get("academic_year")}
+                for r in (cls2.data or [])
+            ]
+            if classes:
+                selected_class_id = classes[0]["id"]
+                selected_class_name = classes[0]["class_name"]
+
+        # Học sinh của lớp được chọn
+        students = []
+        if selected_class_id:
+            hsh2 = db.table("homeroom_students_history").select("student_id").eq("class_id", selected_class_id).execute()
+            sids = [r["student_id"] for r in (hsh2.data or []) if r.get("student_id") is not None]
+            if sids:
+                sresp = db.table("students").select("id, student_id, full_name, email, phone, class_name, grade, is_active").in_("id", sids).execute()
+                students = sresp.data or []
+
+        return {
+            "success": True,
+            "data": {
+                "academic_years": years,
+                "default_year": default_year,
+                "year": year,
+                "classes": classes,
+                "selected_class": {"id": selected_class_id, "class_name": selected_class_name} if selected_class_id else None,
+                "students": students,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error bootstrap homeroom: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.get("/attendance/bootstrap")
+async def homeroom_attendance_bootstrap(
+    target_date: Optional[date] = Query(default=None),
+    academic_year: Optional[str] = Query(default=None),
+    class_name: Optional[str] = Query(default=None),
+    class_id: Optional[int] = Query(default=None),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Bootstrap chuyên cho màn Điểm danh lớp: trả về năm học, lớp (lọc theo năm),
+    lớp được chọn, cùng bảng điểm danh và thống kê cho ngày target_date.
+    """
+    try:
+        if target_date is None:
+            target_date = date.today()
+
+        # Teacher id
+        teacher_resp = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+        if not teacher_id:
+            return {"success": True, "data": {"academic_years": [], "classes": [], "selected_class": None, "records": [], "stats": {"total_students": 0, "present_count": 0, "absent_count": 0, "late_count": 0}}}
+
+        # Years by teacher
+        hsh = db.table("homeroom_students_history").select("class_id").eq("teacher_id", teacher_id).execute()
+        class_ids = list({r.get("class_id") for r in (hsh.data or []) if r.get("class_id") is not None})
+        years: List[str] = []
+        if class_ids:
+            cls = db.table("classes").select("academic_year").in_("id", class_ids).execute()
+            years = sorted(list({c.get("academic_year") for c in (cls.data or []) if c.get("academic_year")}))
+
+        default_year_resp = db.table("system_settings").select("setting_value").eq("setting_key", "academic_year").limit(1).execute()
+        default_year = default_year_resp.data[0]["setting_value"] if default_year_resp.data else None
+        year = academic_year or default_year or (years[0] if years else None)
+
+        # Classes list filtered by year
+        classes = []
+        if class_ids:
+            q = db.table("classes").select("id, class_name, grade, academic_year").in_("id", class_ids)
+            if year:
+                q = q.eq("academic_year", year)
+            c2 = q.order("class_name").execute()
+            classes = c2.data or []
+
+        # resolve selected class
+        resolved_class_id = class_id
+        resolved_class_name = None
+        if not resolved_class_id and class_name:
+            # find by name in filtered classes
+            for c in classes:
+                if c.get("class_name") == class_name:
+                    resolved_class_id = c.get("id")
+                    break
+        if not resolved_class_id and classes:
+            resolved_class_id = classes[0].get("id")
+        if resolved_class_id:
+            for c in classes:
+                if c.get("id") == resolved_class_id:
+                    resolved_class_name = c.get("class_name")
+                    break
+
+        # Collect records and stats for the resolved class
+        records: List[dict] = []
+        stats = {"total_students": 0, "present_count": 0, "absent_count": 0, "late_count": 0}
+        if resolved_class_id:
+            h2 = db.table("homeroom_students_history").select("student_id").eq("class_id", resolved_class_id).execute()
+            student_ids = [r["student_id"] for r in (h2.data or []) if r.get("student_id") is not None]
+            stats["total_students"] = len(set(student_ids))
+            if student_ids:
+                # students map
+                sresp = db.table("students").select("id, student_id, full_name, class_name").in_("id", student_ids).execute()
+                smap = {s["id"]: s for s in (sresp.data or [])}
+                # attendance map
+                att = db.table("attendance").select("student_id, status, check_in_time, check_out_time, method, confidence_score, notes").eq("date", target_date.isoformat()).in_("student_id", student_ids).execute()
+                amap = {a["student_id"]: a for a in (att.data or [])}
+                present = late = 0
+                for sid in student_ids:
+                    info = smap.get(sid, {})
+                    a = amap.get(sid)
+                    status = a["status"] if a else "absent"
+                    if status == "present":
+                        present += 1
+                    elif status == "late":
+                        late += 1
+                    records.append({
+                        "student_id": sid,
+                        "students": {
+                            "student_id": info.get("student_id"),
+                            "full_name": info.get("full_name"),
+                            "class_name": info.get("class_name"),
+                        },
+                        "status": status,
+                        "check_in_time": a.get("check_in_time") if a else None,
+                        "check_out_time": a.get("check_out_time") if a else None,
+                        "confidence_score": a.get("confidence_score") if a else None,
+                        "notes": a.get("notes") if a else None,
+                    })
+                stats["present_count"] = present
+                stats["late_count"] = late
+                stats["absent_count"] = max(stats["total_students"] - present - late, 0)
+
+        return {"success": True, "data": {
+            "academic_years": years,
+            "default_year": default_year,
+            "year": year,
+            "classes": classes,
+            "selected_class": {"id": resolved_class_id, "class_name": resolved_class_name} if resolved_class_id else None,
+            "date": target_date.isoformat(),
+            "records": records,
+            "stats": stats,
+        }}
+    except Exception as e:
+        logger.error(f"Error attendance bootstrap: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.get("/face/bootstrap")
+async def homeroom_face_bootstrap(
+    academic_year: Optional[str] = Query(default=None),
+    class_name: Optional[str] = Query(default=None),
+    class_id: Optional[int] = Query(default=None),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Bootstrap cho màn Quản lý khuôn mặt.
+
+    Trả về: academic_years, year, classes (lọc theo năm), selected_class, students list
+    (các trường tối thiểu phục vụ UI khuôn mặt).
+    """
+    try:
+        # Teacher id
+        teacher_resp = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+        if not teacher_id:
+            return {"success": True, "data": {"academic_years": [], "classes": [], "selected_class": None, "students": []}}
+
+        # Years list of teacher
+        hsh = db.table("homeroom_students_history").select("class_id").eq("teacher_id", teacher_id).execute()
+        class_ids = list({r.get("class_id") for r in (hsh.data or []) if r.get("class_id") is not None})
+        years: List[str] = []
+        if class_ids:
+            cls_years = db.table("classes").select("academic_year").in_("id", class_ids).execute()
+            years = sorted(list({c.get("academic_year") for c in (cls_years.data or []) if c.get("academic_year")}))
+
+        default_year_resp = db.table("system_settings").select("setting_value").eq("setting_key", "academic_year").limit(1).execute()
+        default_year = default_year_resp.data[0]["setting_value"] if default_year_resp.data else None
+        year = academic_year or default_year or (years[0] if years else None)
+
+        # Classes by year
+        classes = []
+        if class_ids:
+            q = db.table("classes").select("id, class_name, grade, academic_year").in_("id", class_ids)
+            if year:
+                q = q.eq("academic_year", year)
+            c2 = q.order("class_name").execute()
+            classes = c2.data or []
+
+        # resolve selected class
+        resolved_class_id = class_id
+        resolved_class_name = None
+        if not resolved_class_id and class_name:
+            for c in classes:
+                if c.get("class_name") == class_name:
+                    resolved_class_id = c.get("id")
+                    break
+        if not resolved_class_id and classes:
+            resolved_class_id = classes[0].get("id")
+        if resolved_class_id:
+            for c in classes:
+                if c.get("id") == resolved_class_id:
+                    resolved_class_name = c.get("class_name")
+                    break
+
+        # Students list for face management
+        students = []
+        if resolved_class_id:
+            h2 = db.table("homeroom_students_history").select("student_id").eq("class_id", resolved_class_id).execute()
+            sids = [r["student_id"] for r in (h2.data or []) if r.get("student_id") is not None]
+            if sids:
+                sresp = (
+                    db.table("students")
+                    .select("id, student_id, full_name, email, phone, class_name, grade, is_active, insightface_encoding, face_samples_count, recognition_enabled, encoding_version")
+                    .in_("id", sids)
+                    .execute()
+                )
+                # sort by student_code asc
+                def sort_key(s):
+                    try:
+                        return (0, int(s.get("student_id")))
+                    except Exception:
+                        return (1, str(s.get("student_id")))
+                students = sorted((sresp.data or []), key=sort_key)
+
+        return {"success": True, "data": {
+            "academic_years": years,
+            "default_year": default_year,
+            "year": year,
+            "classes": classes,
+            "selected_class": {"id": resolved_class_id, "class_name": resolved_class_name} if resolved_class_id else None,
+            "students": students,
+        }}
+    except Exception as e:
+        logger.error(f"Error face bootstrap: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
 @router.get("/default-academic-year")
 async def get_default_academic_year(
     current_user=Depends(get_current_user),
@@ -666,4 +951,227 @@ async def get_homeroom_dashboard_data(
         raise
     except Exception as e:
         logger.error(f"Error getting dashboard data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+
+@router.get("/dashboard/monthly")
+async def get_homeroom_dashboard_monthly(
+    class_name: Optional[str] = Query(default=None, description="Tên lớp (tương thích cũ)"),
+    class_id: Optional[int] = Query(default=None, description="ID lớp để lọc chính xác"),
+    year: int = Query(..., description="Năm, ví dụ 2025"),
+    month: int = Query(..., description="Tháng 1-12"),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Tổng hợp vắng/muộn/sớm theo tháng cho lớp chủ nhiệm.
+
+    Truy vấn duy nhất attendance theo (student_ids, month range), aggregate ở backend (một lớp ~50 HS ⇒ đủ nhanh).
+    """
+    try:
+        # Resolve class_id
+        resolved_class_id = class_id
+        if not resolved_class_id and class_name:
+            c_q = db.table("classes").select("id").eq("class_name", class_name)
+            c_resp = c_q.limit(1).execute()
+            if c_resp.data:
+                resolved_class_id = c_resp.data[0]["id"]
+
+        # Get student list from history (hiển thị theo danh sách hiện tại)
+        if not resolved_class_id:
+            # Fallback: theo user → lấy lớp chủ nhiệm đầu tiên
+            info = db.rpc("get_homeroom_teacher_info", {"p_user_id": current_user["id"]}).execute()
+            if not info.data:
+                return {"success": True, "data": {"students": [], "top_absent": [], "top_late": []}}
+            resolved_class_id = info.data[0].get("class_id") or None
+
+        hsh = (
+            db.table("homeroom_students_history")
+            .select("student_id")
+            .eq("class_id", resolved_class_id)
+            .execute()
+        )
+        student_ids = [r["student_id"] for r in (hsh.data or []) if r.get("student_id") is not None]
+        if not student_ids:
+            return {"success": True, "data": {"students": [], "top_absent": [], "top_late": []}}
+
+        # Fetch attendance for the whole month in one query
+        from datetime import date, timedelta
+        start_date = date(year, month, 1)
+        if month == 12:
+            next_month = date(year + 1, 1, 1)
+        else:
+            next_month = date(year, month + 1, 1)
+
+        att = (
+            db.table("attendance")
+            .select("student_id, status")
+            .in_("student_id", student_ids)
+            .gte("date", start_date.isoformat())
+            .lt("date", next_month.isoformat())
+            .execute()
+        )
+        # Aggregate counts per student
+        counters = {sid: {"absent": 0, "late": 0, "early": 0} for sid in student_ids}
+        for row in (att.data or []):
+            sid = row.get("student_id")
+            status = row.get("status")
+            if sid in counters:
+                if status == "absent":
+                    counters[sid]["absent"] += 1
+                elif status == "late":
+                    counters[sid]["late"] += 1
+                elif status == "early":
+                    counters[sid]["early"] += 1
+
+        # Join students info
+        students_resp = db.table("students").select("id, student_id, full_name, class_name").in_("id", student_ids).execute()
+        result_rows = []
+        for s in (students_resp.data or []):
+            c = counters.get(s["id"], {"absent": 0, "late": 0, "early": 0})
+            result_rows.append({
+                "student_id": s["id"],
+                "student_code": s.get("student_id"),
+                "student_name": s.get("full_name"),
+                "class_name": s.get("class_name"),
+                "absent_count": c["absent"],
+                "late_count": c["late"],
+                "early_count": c["early"],
+            })
+
+        # Top lists
+        top_absent = sorted(result_rows, key=lambda x: x["absent_count"], reverse=True)[:10]
+        top_late = sorted(result_rows, key=lambda x: x["late_count"], reverse=True)[:10]
+
+        return {
+            "success": True,
+            "data": {
+                "year": year,
+                "month": month,
+                "students": result_rows,
+                "top_absent": top_absent,
+                "top_late": top_late,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error get monthly dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.get("/dashboard/bootstrap")
+async def homeroom_dashboard_bootstrap(
+    academic_year: Optional[str] = Query(default=None),
+    year: Optional[int] = Query(default=None),
+    month: Optional[int] = Query(default=None),
+    class_name: Optional[str] = Query(default=None),
+    class_id: Optional[int] = Query(default=None),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Bootstrap tổng hợp cho Dashboard chủ nhiệm: trả về năm học, lớp, lớp chọn,
+    thông tin lớp, dữ liệu monthly (students + top lists) trong một lần gọi.
+    """
+    try:
+        # defaults for month/year
+        from datetime import date
+        today = date.today()
+        y = year or today.year
+        m = month or today.month
+
+        # teacher id
+        t_resp = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        teacher_id = t_resp.data[0]["id"] if t_resp.data else None
+        if not teacher_id:
+            return {"success": True, "data": {"academic_years": [], "classes": [], "selected_class": None, "students": [], "top_absent": [], "top_late": [], "homeroom_info": None}}
+
+        # academic years list
+        h = db.table("homeroom_students_history").select("class_id").eq("teacher_id", teacher_id).execute()
+        class_ids = list({r.get("class_id") for r in (h.data or []) if r.get("class_id") is not None})
+        years: List[str] = []
+        if class_ids:
+            yrs = db.table("classes").select("academic_year").in_("id", class_ids).execute()
+            years = sorted(list({c.get("academic_year") for c in (yrs.data or []) if c.get("academic_year")}))
+        def_year_resp = db.table("system_settings").select("setting_value").eq("setting_key", "academic_year").limit(1).execute()
+        def_year = def_year_resp.data[0]["setting_value"] if def_year_resp.data else None
+        ay = academic_year or def_year or (years[0] if years else None)
+
+        # classes in academic year
+        classes = []
+        if class_ids:
+            q = db.table("classes").select("id, class_name, grade, academic_year").in_("id", class_ids)
+            if ay:
+                q = q.eq("academic_year", ay)
+            c = q.order("class_name").execute()
+            classes = c.data or []
+
+        # resolve selected class
+        sel_id = class_id
+        sel_name = None
+        if not sel_id and class_name:
+            for c in classes:
+                if c.get("class_name") == class_name:
+                    sel_id = c.get("id")
+                    break
+        if not sel_id and classes:
+            sel_id = classes[0].get("id")
+        if sel_id:
+            for c in classes:
+                if c.get("id") == sel_id:
+                    sel_name = c.get("class_name")
+                    break
+
+        # homeroom info via RPC (nếu có)
+        info = db.rpc("get_homeroom_teacher_info", {"p_user_id": current_user["id"]}).execute()
+        homeroom_info = info.data[0] if info.data else None
+
+        # monthly data using existing function logic
+        top_absent = []
+        top_late = []
+        students_rows = []
+        if sel_id:
+            # reuse monthly endpoint logic
+            hsh = db.table("homeroom_students_history").select("student_id").eq("class_id", sel_id).execute()
+            student_ids = [r["student_id"] for r in (hsh.data or []) if r.get("student_id") is not None]
+            if student_ids:
+                from datetime import date
+                start_date = date(y, m, 1)
+                next_month = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
+                att = db.table("attendance").select("student_id, status").in_("student_id", student_ids).gte("date", start_date.isoformat()).lt("date", next_month.isoformat()).execute()
+                counters = {sid: {"absent": 0, "late": 0, "early": 0} for sid in student_ids}
+                for row in (att.data or []):
+                    sid = row.get("student_id")
+                    st = row.get("status")
+                    if sid in counters:
+                        if st == "absent": counters[sid]["absent"] += 1
+                        elif st == "late": counters[sid]["late"] += 1
+                        elif st == "early": counters[sid]["early"] += 1
+                sresp = db.table("students").select("id, student_id, full_name, class_name").in_("id", student_ids).execute()
+                for s in (sresp.data or []):
+                    c = counters.get(s["id"], {"absent": 0, "late": 0, "early": 0})
+                    students_rows.append({
+                        "student_id": s["id"],
+                        "student_code": s.get("student_id"),
+                        "student_name": s.get("full_name"),
+                        "class_name": s.get("class_name"),
+                        "absent_count": c["absent"],
+                        "late_count": c["late"],
+                        "early_count": c["early"],
+                    })
+                top_absent = sorted(students_rows, key=lambda x: x["absent_count"], reverse=True)[:10]
+                top_late = sorted(students_rows, key=lambda x: x["late_count"], reverse=True)[:10]
+
+        return {"success": True, "data": {
+            "academic_years": years,
+            "year": y,
+            "month": m,
+            "default_year": def_year,
+            "classes": classes,
+            "selected_class": {"id": sel_id, "class_name": sel_name} if sel_id else None,
+            "students": students_rows,
+            "top_absent": top_absent,
+            "top_late": top_late,
+            "homeroom_info": homeroom_info,
+        }}
+    except Exception as e:
+        logger.error(f"Error dashboard bootstrap: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")

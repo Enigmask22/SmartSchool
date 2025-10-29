@@ -169,6 +169,168 @@ const SystemSettings = () => {
   const hours = Array.from({ length: 24 }, (_, i) => `${i}`.padStart(2, "0"));
   const minutes = Array.from({ length: 60 }, (_, i) => `${i}`.padStart(2, "0"));
 
+  // ===== Holidays per grade (10/11/12) =====
+  const grades = [10, 11, 12];
+  const currentYear = new Date().getFullYear();
+  const [holidayYear, setHolidayYear] = useState({
+    10: currentYear,
+    11: currentYear,
+    12: currentYear,
+  });
+  const [holidayMonth, setHolidayMonth] = useState({
+    10: new Date().getMonth() + 1,
+    11: new Date().getMonth() + 1,
+    12: new Date().getMonth() + 1,
+  });
+  const [holidayDays, setHolidayDays] = useState({
+    10: new Set(),
+    11: new Set(),
+    12: new Set(),
+  });
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const loadHolidayConfig = async (g) => {
+    try {
+      const y = holidayYear[g];
+      const m = holidayMonth[g];
+      const resp = await api.request(
+        `/admin/holidays?year=${y}&month=${m}&grade=${g}`
+      );
+      if (resp.success && resp.data && resp.data.length > 0) {
+        const list = resp.data[0].holidays_list || [];
+        setHolidayDays((prev) => ({ ...prev, [g]: new Set(list) }));
+      } else {
+        setHolidayDays((prev) => ({ ...prev, [g]: new Set() }));
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const saveHolidayConfig = async (g) => {
+    try {
+      setSaving(true);
+      const y = holidayYear[g];
+      const m = holidayMonth[g];
+      const list = Array.from(holidayDays[g]).sort((a, b) => a - b);
+      const resp = await api.request(`/admin/holidays`, {
+        method: "POST",
+        body: JSON.stringify({
+          year: y,
+          month: m,
+          grade: g,
+          holidays_list: list,
+        }),
+      });
+      if (resp.success) setSuccess(`Lưu ngày nghỉ khối ${g} thành công`);
+      else setError(resp.message || `Không thể lưu ngày nghỉ khối ${g}`);
+    } catch (e) {
+      setError(`Lỗi khi lưu ngày nghỉ khối ${g}: ${e.message}`);
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSuccess(null), 2500);
+    }
+  };
+
+  const renderHolidaySection = (g) => {
+    const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
+    const selected = holidayDays[g] || new Set();
+    const toggleDay = (d) => {
+      setHolidayDays((prev) => {
+        const setCopy = new Set(prev[g] || []);
+        if (setCopy.has(d)) setCopy.delete(d);
+        else setCopy.add(d);
+        return { ...prev, [g]: setCopy };
+      });
+    };
+    return (
+      <Card className="transition-shadow hover:shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-xl">
+            Quản lý ngày nghỉ - Khối {g}
+          </CardTitle>
+          <CardDescription>Chọn năm, tháng và các ngày nghỉ</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Năm</Label>
+              <Select
+                value={String(holidayYear[g])}
+                onValueChange={(v) => {
+                  setHolidayYear((p) => ({ ...p, [g]: parseInt(v, 10) }));
+                  setTimeout(() => loadHolidayConfig(g), 0);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tháng</Label>
+              <Select
+                value={String(holidayMonth[g])}
+                onValueChange={(v) => {
+                  setHolidayMonth((p) => ({ ...p, [g]: parseInt(v, 10) }));
+                  setTimeout(() => loadHolidayConfig(g), 0);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((m) => (
+                    <SelectItem key={m} value={String(m)}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Chọn ngày nghỉ</Label>
+            <div className="mt-2 grid grid-cols-7 gap-2">
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                <Button
+                  key={d}
+                  type="button"
+                  variant={selected.has(d) ? "default" : "outline"}
+                  className={`h-9 ${
+                    selected.has(d) ? "bg-primary text-primary-foreground" : ""
+                  }`}
+                  onClick={() => toggleDay(d)}
+                >
+                  {d}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => loadHolidayConfig(g)}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Tải cấu hình
+            </Button>
+            <Button onClick={() => saveHolidayConfig(g)} disabled={saving}>
+              <Save className="w-4 h-4 mr-2" />
+              Lưu ngày nghỉ khối {g}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -489,6 +651,13 @@ const SystemSettings = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Holidays per grade */}
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+        {grades.map((g) => (
+          <div key={g}>{renderHolidaySection(g)}</div>
+        ))}
+      </div>
     </div>
   );
 };
