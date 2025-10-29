@@ -82,6 +82,9 @@ const StudentList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
   const [availableClasses, setAvailableClasses] = useState([]);
+  const [homeroomClasses, setHomeroomClasses] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
 
   // Face registration states
   const [showFaceModal, setShowFaceModal] = useState(false);
@@ -205,6 +208,14 @@ const StudentList = () => {
     fetchAvailableClasses();
   }, []);
 
+  // Reload classes when academic year changes (GVCN)
+  useEffect(() => {
+    if (isHomeroomTeacher()) {
+      fetchAvailableClasses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAcademicYear]);
+
   useEffect(() => {
     fetchStudents();
   }, [selectedClass]);
@@ -230,8 +241,18 @@ const StudentList = () => {
           setLoading(false);
           return;
         }
-        // If homeroom teacher, get only their homeroom students (luôn lấy tất cả, kể cả inactive)
-        response = await ApiService.getHomeroomStudents(selectedClass);
+        // If homeroom teacher, get only their homeroom students theo class/year
+        const found = homeroomClasses.find(
+          (c) => c.class_name === selectedClass
+        );
+        const classId = found?.id;
+        response = await ApiService.request(
+          classId
+            ? `/homeroom/students?class_id=${classId}`
+            : `/homeroom/students?class_name=${encodeURIComponent(
+                selectedClass
+              )}&academic_year=${encodeURIComponent(selectedAcademicYear)}`
+        );
       } else {
         // If admin or other roles, get all students (luôn lấy tất cả, kể cả inactive)
         // Frontend sẽ filter theo showInactive
@@ -351,22 +372,38 @@ const StudentList = () => {
 
       if (isHomeroomTeacher()) {
         logger.debug("📚 Fetching homeroom classes...");
-        // If homeroom teacher, only get their homeroom classes
-        classesResponse = await ApiService.getHomeroomClasses();
+        // Load academic years and default
+        const [yearsResp, defaultYearResp] = await Promise.all([
+          ApiService.request("/homeroom/academic-years"),
+          ApiService.request("/homeroom/default-academic-year"),
+        ]);
+        if (yearsResp.success) setAcademicYears(yearsResp.data || []);
+        const defaultYear = defaultYearResp.success ? defaultYearResp.data : "";
+        const year =
+          selectedAcademicYear || defaultYear || yearsResp.data?.[0] || "";
+        if (!selectedAcademicYear) setSelectedAcademicYear(year);
+
+        // Lấy lớp theo năm học
+        classesResponse = await ApiService.request(
+          `/homeroom/classes${
+            year ? `?academic_year=${encodeURIComponent(year)}` : ""
+          }`
+        );
 
         if (classesResponse.success && classesResponse.data) {
-          // Deduplicate class names using Set
-          const classNames = [
-            ...new Set(
-              classesResponse.data
-                .map((cls) => cls.class_name)
-                .filter((name) => name) // Remove null/undefined
-            ),
-          ].sort();
-          logger.debug("📚 Setting homeroom classes:", classNames);
+          const list = classesResponse.data;
+          setHomeroomClasses(list);
+          const classNames = list
+            .map((c) => c.class_name)
+            .filter(Boolean)
+            .sort();
           setAvailableClasses(classNames);
+          const currentInList = classNames.includes(selectedClass);
+          if (!selectedClass || selectedClass === "all" || !currentInList) {
+            setSelectedClass(classNames[0] || "all");
+          }
         } else {
-          logger.warn("📚 Invalid homeroom classes response:", classesResponse);
+          setHomeroomClasses([]);
           setAvailableClasses([]);
         }
       } else {
@@ -1809,6 +1846,27 @@ const StudentList = () => {
               </div>
             </div>
 
+            {isHomeroomTeacher() && (
+              <div className="space-y-2">
+                <Label>Năm học</Label>
+                <Select
+                  value={selectedAcademicYear || ""}
+                  onValueChange={(v) => setSelectedAcademicYear(v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn năm học" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="class-select">Lớp</Label>
               <Select
@@ -2637,6 +2695,8 @@ const StudentList = () => {
                     onChange={(e) =>
                       handleEditFormChange("class_name", e.target.value)
                     }
+                    readOnly={isHomeroomTeacher()}
+                    disabled={isHomeroomTeacher()}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="VD: 10A1"
                   />
@@ -2654,8 +2714,12 @@ const StudentList = () => {
                         value === "none" ? "" : value
                       )
                     }
+                    disabled={isHomeroomTeacher()}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger
+                      className="w-full"
+                      disabled={isHomeroomTeacher()}
+                    >
                       <SelectValue placeholder="Chọn khối" />
                     </SelectTrigger>
                     <SelectContent>

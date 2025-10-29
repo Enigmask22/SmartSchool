@@ -44,6 +44,9 @@ const AttendanceView = () => {
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [classes, setClasses] = useState([]);
+  const [homeroomClasses, setHomeroomClasses] = useState([]); // objects when homeroom teacher
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -70,6 +73,14 @@ const AttendanceView = () => {
     loadClasses();
   }, [user]);
 
+  // Reload classes when academic year changes for homeroom teachers
+  useEffect(() => {
+    if (isHomeroomTeacher()) {
+      loadClasses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAcademicYear]);
+
   // Initial load
   useEffect(() => {
     loadClasses();
@@ -87,29 +98,42 @@ const AttendanceView = () => {
 
       if (isHomeroomTeacher()) {
         logger.debug("📚 Fetching homeroom classes for attendance...");
-        // If homeroom teacher, only get their homeroom classes
-        classesResponse = await ApiService.getHomeroomClasses();
+        // Nếu là GVCN: chọn năm học trước, rồi lấy lớp theo năm học
+        const [yearsResp, defaultYearResp] = await Promise.all([
+          ApiService.request("/homeroom/academic-years"),
+          ApiService.request("/homeroom/default-academic-year"),
+        ]);
+        if (yearsResp.success) setAcademicYears(yearsResp.data || []);
+        const defaultYear = defaultYearResp.success ? defaultYearResp.data : "";
+        const year =
+          selectedAcademicYear || defaultYear || yearsResp.data?.[0] || "";
+        if (!selectedAcademicYear) setSelectedAcademicYear(year);
+
+        classesResponse = await ApiService.request(
+          `/homeroom/classes${
+            year ? `?academic_year=${encodeURIComponent(year)}` : ""
+          }`
+        );
 
         if (classesResponse.success && classesResponse.data) {
-          // Deduplicate class names using Set
-          const classNames = [
-            ...new Set(
-              classesResponse.data
-                .map((cls) => cls.class_name)
-                .filter((name) => name) // Remove null/undefined
-            ),
-          ].sort();
-          logger.debug("📚 Setting homeroom classes:", classNames);
+          setHomeroomClasses(classesResponse.data);
+          const classNames = classesResponse.data
+            .map((c) => c.class_name)
+            .filter(Boolean)
+            .sort();
           setClasses(classNames);
+          const inList = classNames.includes(selectedClass);
+          if (!selectedClass || selectedClass === "all" || !inList) {
+            setSelectedClass(classNames[0] || "all");
+          }
         } else {
-          logger.warn(
-            "📚 Invalid homeroom classes response:",
-            classesResponse
-          );
+          setHomeroomClasses([]);
           setClasses([]);
         }
       } else {
-        logger.debug("📚 Fetching all students to extract classes for admin...");
+        logger.debug(
+          "📚 Fetching all students to extract classes for admin..."
+        );
         // If admin, get all students and extract unique class names
         const studentsResponse = await ApiService.getStudents({});
 
@@ -175,10 +199,35 @@ const AttendanceView = () => {
 
       if (showFullList) {
         // Use full list API - shows all students with their attendance status
-        const response = await ApiService.getFullAttendanceList(
-          selectedDate,
-          selectedClass === "all" ? "" : selectedClass
-        );
+        let response;
+        if (isHomeroomTeacher() && selectedClass && selectedClass !== "all") {
+          const found = homeroomClasses.find(
+            (c) => c.class_name === selectedClass
+          );
+          const classId = found?.id;
+          response = await ApiService.request(
+            `/homeroom/attendance/records?target_date=${selectedDate}${
+              classId ? `&class_id=${classId}` : ""
+            }`
+          );
+          if (response.success) {
+            // Chuyển dữ liệu thành cấu trúc giống API full list: { students: {...}, ... }
+            const records = (response.data?.records || []).map((r) => ({
+              ...r,
+              students: {
+                student_id: r.student_code || r.student_id,
+                full_name: r.student_name,
+                class_name: r.class_name,
+              },
+            }));
+            response = { success: true, data: records };
+          }
+        } else {
+          response = await ApiService.getFullAttendanceList(
+            selectedDate,
+            selectedClass === "all" ? "" : selectedClass
+          );
+        }
         if (response.success) {
           let filteredData = response.data || [];
 
@@ -642,6 +691,28 @@ const AttendanceView = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            {isHomeroomTeacher() && (
+              <div className="flex-1 max-w-[200px]">
+                <label className="block mb-2 text-sm font-medium">
+                  Năm học
+                </label>
+                <Select
+                  value={selectedAcademicYear || ""}
+                  onValueChange={(value) => setSelectedAcademicYear(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn năm học" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex-1 max-w-[160px]">
               <label className="block mb-2 text-sm font-medium">Ngày</label>
               <SimpleDatePicker
