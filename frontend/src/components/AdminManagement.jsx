@@ -57,7 +57,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import SystemSettings from "./SystemSettings";
-import SchoolDaysConfig from "./SchoolDaysConfig";
+// import SchoolDaysConfig from "./SchoolDaysConfig";
 
 const AdminManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
@@ -107,6 +107,26 @@ const AdminManagement = () => {
     subColumns: [],
   });
 
+  // Helper: fetch grade settings by subject and populate editor
+  const fetchSubjectGradeSettings = useCallback(async (subjectId) => {
+    try {
+      const res = await api.getGradeConfigBySubject(subjectId);
+      if (res && res.success && res.data && res.data.grade_column_config) {
+        const gc = res.data.grade_column_config;
+        const columnsArray = Object.entries(gc).map(([key, value]) => ({
+          key,
+          label: value.label,
+          he_so: value.he_so,
+          data: value.data || null,
+        }));
+        setGradeColumns(columnsArray);
+        setFormData((prev) => ({ ...prev, grade_column_config: gc }));
+      }
+    } catch (e) {
+      // Silent fallback; will rely on joined data if available
+    }
+  }, []);
+
   // Configuration cho từng tab
   const tabConfig = {
     users: {
@@ -154,6 +174,7 @@ const AdminManagement = () => {
         "subject_name",
         "description",
         "is_mandatory",
+        "grade_column_config",
         "is_active",
       ],
       endpoint: "/admin/subjects",
@@ -224,10 +245,10 @@ const AdminManagement = () => {
     { id: "subjects", label: "Môn học", icon: BookOpen },
     { id: "classes", label: "Lớp học", icon: School },
     // { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck }, // Đã tích hợp vào tab Giáo viên
-    { id: "class_subjects", label: "GV-Lớp học", icon: Building },
-    { id: "grade_settings", label: "Cấu hình cột điểm", icon: BookOpen },
+    { id: "class_subjects", label: "Phân công giảng dạy", icon: Building },
+    // Đã tích hợp Cấu hình cột điểm vào tab Môn học
     { id: "system_settings", label: "Cấu hình thời gian", icon: Settings },
-    { id: "school_config", label: "Cấu hình học tập", icon: School },
+    // { id: "school_config", label: "Cấu hình học tập", icon: School },
   ];
 
   const currentConfig = tabConfig[activeTab];
@@ -269,6 +290,14 @@ const AdminManagement = () => {
       const response = await api.request(endpoint);
       if (response.success) {
         let items = response.data || [];
+
+        // Nếu là tab Môn học, chuẩn hóa dữ liệu grade settings đã join
+        if (activeTab === "subjects") {
+          items = items.map((s) => ({
+            ...s,
+            grade_column_config: s.grade_column_config || null,
+          }));
+        }
 
         // Transform data cho grade_settings để lấy subject_name từ nested object
         if (activeTab === "grade_settings") {
@@ -493,12 +522,54 @@ const AdminManagement = () => {
         );
       } else {
         // Xử lý bình thường cho các tab khác
+        // Sanitize payload cho tab Môn học: chỉ gửi các field hợp lệ, tránh gửi 'id'
+        const payload =
+          activeTab === "subjects"
+            ? {
+                subject_code: data.subject_code,
+                subject_name: data.subject_name,
+                description: data.description ?? null,
+                is_mandatory: data.is_mandatory ?? false,
+                is_active: true,
+              }
+            : data;
         const response = await api.request(currentConfig.endpoint, {
           method: "POST",
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         });
 
         if (response.success) {
+          // Nếu là tạo mới môn học và có cấu hình cột điểm → tạo/ cập nhật grade_settings
+          if (activeTab === "subjects" && data.grade_column_config) {
+            try {
+              const subjectId = response.data?.id;
+              if (subjectId) {
+                // Kiểm tra đã có settings chưa
+                let existing = null;
+                try {
+                  const getRes = await api.getGradeConfigBySubject(subjectId);
+                  if (getRes.success) existing = getRes.data;
+                } catch (e) {
+                  existing = null;
+                }
+
+                if (existing && existing.id) {
+                  await api.updateGradeSettings(existing.id, {
+                    grade_column_config: data.grade_column_config,
+                    is_active: true,
+                  });
+                } else {
+                  await api.createGradeSettings({
+                    subject_id: subjectId,
+                    grade_column_config: data.grade_column_config,
+                    is_active: true,
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Sync grade settings failed:", e);
+            }
+          }
           setShowAddForm(false);
           setFormData({});
           loadData();
@@ -610,12 +681,48 @@ const AdminManagement = () => {
         alert(`Cập nhật giáo viên thành công!`);
       } else {
         // Xử lý bình thường cho các tab khác
+        // Sanitize payload update cho Môn học
+        const updatePayload =
+          activeTab === "subjects"
+            ? {
+                subject_code: data.subject_code,
+                subject_name: data.subject_name,
+                description: data.description ?? null,
+                is_mandatory: data.is_mandatory ?? false,
+                is_active: data.is_active ?? true,
+              }
+            : data;
         const response = await api.request(`${currentConfig.endpoint}/${id}`, {
           method: "PUT",
-          body: JSON.stringify(data),
+          body: JSON.stringify(updatePayload),
         });
 
         if (response.success) {
+          if (activeTab === "subjects" && data.grade_column_config) {
+            try {
+              let existing = null;
+              try {
+                const getRes = await api.getGradeConfigBySubject(id);
+                if (getRes.success) existing = getRes.data;
+              } catch (e) {
+                existing = null;
+              }
+              if (existing && existing.id) {
+                await api.updateGradeSettings(existing.id, {
+                  grade_column_config: data.grade_column_config,
+                  is_active: true,
+                });
+              } else {
+                await api.createGradeSettings({
+                  subject_id: id,
+                  grade_column_config: data.grade_column_config,
+                  is_active: true,
+                });
+              }
+            } catch (e) {
+              console.error("Sync grade settings failed:", e);
+            }
+          }
           setEditingItem(null);
           setFormData({});
           loadData();
@@ -1223,7 +1330,7 @@ const AdminManagement = () => {
           ))}
 
         {/* Grade Column Config Editor for grade_settings tab */}
-        {activeTab === "grade_settings" && (
+        {(activeTab === "grade_settings" || activeTab === "subjects") && (
           <div className="p-6 mt-6 space-y-4 border rounded-lg border-border bg-muted/30">
             <div className="flex items-center justify-between">
               <div>
@@ -1726,7 +1833,7 @@ const AdminManagement = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-4xl font-bold text-primary">
-              Quản trị hệ thống
+              Quản lý hệ thống
             </CardTitle>
             <CardDescription className="text-lg">
               Quản lý người dùng, lớp học, môn học và cấu hình hệ thống
@@ -1763,11 +1870,9 @@ const AdminManagement = () => {
         </Card>
       </div>
 
-      {/* Conditional Content - System Settings, School Config hoặc Table-based Content */}
+      {/* Conditional Content - System Settings hoặc Table-based Content */}
       {activeTab === "system_settings" ? (
         <SystemSettings />
-      ) : activeTab === "school_config" ? (
-        <SchoolDaysConfig />
       ) : (
         <>
           {/* Enhanced Content */}
@@ -1803,6 +1908,9 @@ const AdminManagement = () => {
                       if (activeTab === "teachers") {
                         setFormData({ gender: "Nam" });
                       } else if (activeTab === "grade_settings") {
+                        setFormData({});
+                        setGradeColumns([]);
+                      } else if (activeTab === "subjects") {
                         setFormData({});
                         setGradeColumns([]);
                       } else {
@@ -2047,14 +2155,14 @@ const AdminManagement = () => {
                                   item[field] ? (
                                     <Badge
                                       variant="outline"
-                                      className="text-purple-800 bg-purple-100 border-purple-200"
+                                      className="px-3 py-1 text-xs inline-flex items-center justify-center whitespace-nowrap text-purple-800 bg-purple-100 border-purple-200"
                                     >
                                       Môn chính
                                     </Badge>
                                   ) : (
                                     <Badge
                                       variant="outline"
-                                      className="text-gray-800 bg-gray-100 border-gray-200"
+                                      className="px-3 py-1 text-xs inline-flex items-center justify-center whitespace-nowrap text-gray-800 bg-gray-100 border-gray-200"
                                     >
                                       Môn tự chọn
                                     </Badge>
@@ -2217,11 +2325,27 @@ const AdminManagement = () => {
                                         ) {
                                           // Load grade_column_config khi edit grade settings
                                           setFormData(item);
-
-                                          // Parse grade_column_config thành gradeColumns array
                                           if (item.grade_column_config) {
                                             const columnsArray = Object.entries(
                                               item.grade_column_config
+                                            ).map(([key, value]) => ({
+                                              key,
+                                              label: value.label,
+                                              he_so: value.he_so,
+                                              data: value.data || null,
+                                            }));
+                                            setGradeColumns(columnsArray);
+                                          } else {
+                                            setGradeColumns([]);
+                                          }
+                                        } else if (activeTab === "subjects") {
+                                          setFormData(item);
+                                          // Luôn fetch từ backend để đảm bảo dữ liệu mới nhất
+                                          fetchSubjectGradeSettings(item.id);
+                                          if (item.grade_column_config) {
+                                            const gc = item.grade_column_config;
+                                            const columnsArray = Object.entries(
+                                              gc
                                             ).map(([key, value]) => ({
                                               key,
                                               label: value.label,

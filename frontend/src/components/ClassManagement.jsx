@@ -77,6 +77,7 @@ const ClassManagement = () => {
     phone: "",
     class_name: "",
     grade: "",
+    class_id: null,
     date_of_birth: "",
     address: "",
     parent_name: "",
@@ -99,18 +100,34 @@ const ClassManagement = () => {
   // Reference data cho dropdowns
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState(null);
+  // Academic year filter
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+
+  // Move class modal states
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [moveYear, setMoveYear] = useState("");
+  const [moveClasses, setMoveClasses] = useState([]);
+  const [moveTargetClassId, setMoveTargetClassId] = useState("");
+  const [moveLoading, setMoveLoading] = useState(false);
 
   // Load dữ liệu cho Class Management tab
   const loadClassManagementData = useCallback(async () => {
     try {
-      const response = await api.request("/admin/classes");
+      const endpoint = selectedAcademicYear
+        ? `/admin/classes?academic_year=${encodeURIComponent(
+            selectedAcademicYear
+          )}`
+        : "/admin/classes";
+      const response = await api.request(endpoint);
       if (response.success) {
         setClasses(response.data || []);
       }
     } catch (err) {
       logger.error("Error loading classes:", err);
     }
-  }, []);
+  }, [selectedAcademicYear]);
 
   // Load học sinh của lớp được chọn
   const loadClassStudents = useCallback(async () => {
@@ -289,6 +306,11 @@ const ClassManagement = () => {
         }
       });
 
+      // Bổ sung class_id từ filter nếu chưa có
+      if (!cleanData.class_id && selectedClassForManagement) {
+        cleanData.class_id = parseInt(selectedClassForManagement);
+      }
+
       const response = await api.request("/admin/students", {
         method: "POST",
         body: JSON.stringify(cleanData),
@@ -334,6 +356,7 @@ const ClassManagement = () => {
       phone: "",
       class_name: "",
       grade: "",
+      class_id: null,
       date_of_birth: "",
       address: "",
       parent_name: "",
@@ -556,13 +579,55 @@ const ClassManagement = () => {
 
   // Load dữ liệu khi component mount
   useEffect(() => {
+    // Load academic years and default year song song
+    (async () => {
+      try {
+        const [yearsRes, defaultYearRes] = await Promise.all([
+          api.request("/admin/classes/academic-years"),
+          api.request("/admin/classes/default-academic-year"),
+        ]);
+        if (yearsRes.success) {
+          const years = yearsRes.data || [];
+          setAcademicYears(years);
+          let toSelect = "";
+          if (defaultYearRes.success && years.includes(defaultYearRes.data)) {
+            toSelect = defaultYearRes.data;
+          } else if (years.length > 0) {
+            toSelect = years[years.length - 1];
+          }
+          setSelectedAcademicYear(toSelect);
+        }
+      } catch (e) {
+        logger.error("Error loading academic years:", e);
+      }
+    })();
+  }, []);
+
+  // Load classes when academic year changes
+  useEffect(() => {
     loadClassManagementData();
-  }, [loadClassManagementData]);
+    // Reset lớp khi đổi năm học
+    setSelectedClassForManagement("");
+    setHomeroomTeacher(null);
+    setClassStudents([]);
+  }, [selectedAcademicYear, loadClassManagementData]);
 
   // Load học sinh khi chọn lớp
   useEffect(() => {
     if (selectedClassForManagement) {
       loadClassStudents();
+      // Auto fill form class_name, grade, class_id theo lớp chọn
+      const cls = classes.find(
+        (c) => c.id === parseInt(selectedClassForManagement)
+      );
+      if (cls) {
+        setStudentFormData((prev) => ({
+          ...prev,
+          class_name: cls.class_name || "",
+          grade: String(cls.grade || ""),
+          class_id: cls.id,
+        }));
+      }
     }
   }, [selectedClassForManagement, loadClassStudents]);
 
@@ -742,7 +807,7 @@ const ClassManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-3">
             <GraduationCap className="w-8 h-8 text-primary" />
-            <span className="text-3xl font-bold">Quản trị lớp học</span>
+            <span className="text-3xl font-bold">Quản lý học sinh</span>
           </CardTitle>
           <CardDescription className="text-lg">
             Quản lý học sinh và lớp học trong hệ thống
@@ -757,6 +822,31 @@ const ClassManagement = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-end">
+            {/* Academic Year Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="year-select" className="text-sm font-medium">
+                Chọn năm học
+              </Label>
+              <Select
+                value={selectedAcademicYear || "none"}
+                onValueChange={(value) =>
+                  setSelectedAcademicYear(value === "none" ? "" : value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-56">
+                  <SelectValue placeholder="Chọn năm học" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Chọn năm học</SelectItem>
+                  {academicYears.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Class Selection */}
             <div className="flex-1 space-y-2">
               <Label htmlFor="class-select" className="text-sm font-medium">
@@ -775,7 +865,7 @@ const ClassManagement = () => {
                   <SelectItem value="none">Chọn lớp học</SelectItem>
                   {classes.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>
-                      {cls.class_name} - Khối {cls.grade}
+                      {cls.class_name} ({cls.academic_year})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -896,6 +986,18 @@ const ClassManagement = () => {
                   <Plus className="w-4 h-4" />
                   <span>Thêm học sinh</span>
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowMoveModal(true);
+                    setMoveYear(selectedAcademicYear || "");
+                    setMoveTargetClassId("");
+                  }}
+                  className="flex items-center space-x-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Chuyển lớp</span>
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -932,7 +1034,7 @@ const ClassManagement = () => {
                     <TableRow>
                       <TableHead>MÃ HS</TableHead>
                       <TableHead>HỌ TÊN</TableHead>
-                      <TableHead>LỚP</TableHead>
+                      <TableHead>LỚP HIỆN TẠI</TableHead>
                       <TableHead>TRẠNG THÁI KHUÔN MẶT</TableHead>
                       <TableHead>HÀNH ĐỘNG</TableHead>
                     </TableRow>
@@ -941,6 +1043,18 @@ const ClassManagement = () => {
                     {paginatedStudents.map((student) => (
                       <TableRow key={student.id}>
                         <TableCell className="font-medium">
+                          <input
+                            type="checkbox"
+                            className="mr-2"
+                            checked={selectedStudentIds.includes(student.id)}
+                            onChange={(e) => {
+                              setSelectedStudentIds((prev) =>
+                                e.target.checked
+                                  ? [...prev, student.id]
+                                  : prev.filter((id) => id !== student.id)
+                              );
+                            }}
+                          />
                           {student.student_id}
                         </TableCell>
                         <TableCell>
@@ -1243,6 +1357,8 @@ const ClassManagement = () => {
                   onChange={(e) =>
                     handleStudentFormChange("class_name", e.target.value)
                   }
+                  disabled
+                  readOnly
                   className={
                     studentFormErrors.class_name ? "border-destructive" : ""
                   }
@@ -1266,6 +1382,7 @@ const ClassManagement = () => {
                       value === "none" ? "" : value
                     )
                   }
+                  disabled
                 >
                   <SelectTrigger
                     className={
@@ -1729,6 +1846,122 @@ const ClassManagement = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move Class Modal */}
+      <Dialog open={showMoveModal} onOpenChange={setShowMoveModal}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Chuyển lớp cho học sinh</DialogTitle>
+            <DialogDescription>
+              Chọn năm học và lớp đích. Các học sinh được chọn sẽ cập nhật lớp
+              và ghi lịch sử.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Năm học</Label>
+              <Select
+                value={moveYear || "none"}
+                onValueChange={async (value) => {
+                  const y = value === "none" ? "" : value;
+                  setMoveYear(y);
+                  setMoveTargetClassId("");
+                  try {
+                    const res = await api.request(
+                      y
+                        ? `/admin/classes?academic_year=${encodeURIComponent(
+                            y
+                          )}`
+                        : "/admin/classes"
+                    );
+                    if (res.success) setMoveClasses(res.data || []);
+                  } catch (e) {
+                    logger.error("Error loading classes for move:", e);
+                    setMoveClasses([]);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Chọn năm học" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Chọn năm học</SelectItem>
+                  {academicYears.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Lớp đích</Label>
+              <Select
+                value={moveTargetClassId || "none"}
+                onValueChange={(value) =>
+                  setMoveTargetClassId(value === "none" ? "" : value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Chọn lớp" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Chọn lớp</SelectItem>
+                  {(moveClasses.length ? moveClasses : classes).map((cls) => (
+                    <SelectItem key={cls.id} value={String(cls.id)}>
+                      {cls.class_name} ({cls.academic_year})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMoveModal(false)}>
+              Hủy
+            </Button>
+            <Button
+              disabled={
+                moveLoading ||
+                !moveTargetClassId ||
+                selectedStudentIds.length === 0
+              }
+              onClick={async () => {
+                try {
+                  setMoveLoading(true);
+                  const res = await api.moveStudentsClass(
+                    selectedStudentIds,
+                    parseInt(moveTargetClassId)
+                  );
+                  if (res.success) {
+                    setShowMoveModal(false);
+                    setSelectedStudentIds([]);
+                    await loadClassStudents();
+                  } else {
+                    alert(res.message || "Không thể chuyển lớp");
+                  }
+                } catch (e) {
+                  alert("Lỗi khi chuyển lớp: " + e.message);
+                } finally {
+                  setMoveLoading(false);
+                }
+              }}
+            >
+              {moveLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Đang chuyển...
+                </>
+              ) : (
+                "Xác nhận"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

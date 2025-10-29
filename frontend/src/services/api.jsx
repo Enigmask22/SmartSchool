@@ -363,6 +363,16 @@ class ApiService {
     });
   }
 
+  async moveStudentsClass(studentIds, targetClassId) {
+    return this.request(`/admin/students/move-class`, {
+      method: "POST",
+      body: JSON.stringify({
+        student_ids: studentIds,
+        target_class_id: targetClassId,
+      }),
+    });
+  }
+
   async restoreStudent(id) {
     return this.request(`/students/${id}/restore`, {
       method: "POST",
@@ -678,6 +688,21 @@ class ApiService {
   async getGradeConfigBySubject(subjectId, academicYear, semester) {
     // Sử dụng grade-settings thay vì grade-configs
     return this.request(`/grade-settings/subject/${subjectId}`);
+  }
+
+  // Grade Settings management (for admin integration in Subjects tab)
+  async createGradeSettings(payload) {
+    return this.request(`/grade-settings`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateGradeSettings(settingsId, payload) {
+    return this.request(`/grade-settings/${settingsId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
   }
 
   async getStudentGrade(studentId, classSubjectId, academicYear, semester) {
