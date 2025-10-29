@@ -26,7 +26,6 @@ from attendance.api import router as attendance_router
 from grades.api import router as grades_router
 from homeroom.api import router as homeroom_router
 from feedback.api import router as feedback_router
-from school_config.api import router as school_config_router
 from ai_services.api import router as ai_router
 from grade_settings.api import router as grade_settings_router
 
@@ -140,7 +139,6 @@ def create_app() -> FastAPI:
     app.include_router(grades_router, prefix="/api/grades", tags=["Grades"])
     app.include_router(homeroom_router, prefix="/api/homeroom", tags=["Homeroom"])
     app.include_router(feedback_router, prefix="/api/feedback", tags=["AI Feedback"])
-    app.include_router(school_config_router, prefix="/api/school-days-config", tags=["School Config"])
     app.include_router(ai_router, prefix="/api/ai", tags=["AI Services"])
     app.include_router(grade_settings_router, prefix="/api/grade-settings", tags=["Grade Settings"])
     

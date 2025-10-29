@@ -895,6 +895,8 @@ async def create_class(
         
         if class_data.homeroom_teacher_id:
             data["homeroom_teacher_id"] = class_data.homeroom_teacher_id
+        if class_data.room_number:
+            data["room_number"] = class_data.room_number
         
         response = db.table("classes").insert(data).execute()
         
@@ -952,18 +954,89 @@ async def delete_class(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Xóa lớp học"""
+    """Soft delete lớp học (set is_active = false)"""
     try:
-        response = db.table("classes").delete().eq("id", class_id).execute()
-        
-        if response.data:
-            return {"success": True, "message": "Xóa lớp học thành công"}
-        else:
+        # Kiểm tra tồn tại
+        existing = db.table("classes").select("id, is_active").eq("id", class_id).execute()
+        if not existing.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+
+        # Soft delete
+        response = db.table("classes").update({
+            "is_active": False,
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", class_id).execute()
+
+        return {
+            "success": True,
+            "message": "Xóa lớp học thành công (soft delete)",
+            "data": response.data[0] if response.data else None
+        }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error deleting class: {str(e)}")
+        logger.error(f"Error soft deleting class: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa lớp học: {str(e)}")
+
+@router.post("/classes/{class_id}/restore")
+async def restore_class(
+    class_id: int,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Khôi phục lớp học đã soft delete"""
+    try:
+        check = db.table("classes").select("id, is_active").eq("id", class_id).execute()
+        if not check.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+        if check.data[0].get("is_active"):
+            raise HTTPException(status_code=400, detail="Lớp học chưa bị xóa")
+
+        response = db.table("classes").update({
+            "is_active": True,
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", class_id).execute()
+
+        return {
+            "success": True,
+            "message": "Khôi phục lớp học thành công",
+            "data": response.data[0] if response.data else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restoring class: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi khôi phục lớp học: {str(e)}")
+
+@router.delete("/classes/{class_id}/permanent")
+async def permanent_delete_class(
+    class_id: int,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Xóa vĩnh viễn lớp học (hard delete)"""
+    try:
+        # Tồn tại và đã soft delete
+        check = db.table("classes").select("id, is_active").eq("id", class_id).execute()
+        if not check.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+        if check.data[0].get("is_active"):
+            raise HTTPException(status_code=400, detail="Vui lòng soft delete trước khi xóa vĩnh viễn")
+
+        # Cân nhắc xóa dữ liệu phụ thuộc nếu có: class_subjects, homeroom_teacher_classes
+        db.table("class_subjects").delete().eq("class_id", class_id).execute()
+        db.table("homeroom_teacher_classes").delete().eq("class_id", class_id).execute()
+
+        response = db.table("classes").delete().eq("id", class_id).execute()
+
+        return {"success": True, "message": "Xóa vĩnh viễn lớp học thành công"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error permanently deleting class: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa vĩnh viễn lớp học: {str(e)}")
 
 
 # ===============================================
