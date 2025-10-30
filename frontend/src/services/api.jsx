@@ -568,8 +568,13 @@ class ApiService {
     });
   }
 
+  /**
+   * Batch generate feedback comments via AI.
+   * Payload must match BE: { students: [ { student_name, score, attendance_rate, top_subjects, weak_subjects, subject, notes } ] }
+   * Recommend: always provide all fields for each student.
+   */
   async getBatchFeedback(studentsData) {
-    return this.request("/feedback/batch", {
+    return this.request("/feedback/generate-batch-feedback", {
       method: "POST",
       body: JSON.stringify({ students: studentsData }),
     });

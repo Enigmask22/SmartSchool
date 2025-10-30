@@ -46,7 +46,7 @@ class GeminiFeedbackService:
             return api_key
         
         # Fallback API key (chỉ dùng cho development)
-        return 'AIzaSyAJLXNgLaKPxTv_rn_iERKxgiUhMPvLlMw'
+        return 'AIzaSyA_95bYqbFt3mBxTZtp75fxhuZCwBH34es'
     
     def _initialize_model(self):
         """
@@ -72,61 +72,85 @@ class GeminiFeedbackService:
             self.logger.error(f"❌ ERROR: Lỗi khi khởi tạo Gemini model: {e}")
             raise
     
-    def create_feedback_prompt(self, student_name: str, score: float, score_trend: str, 
-                             attendance_rate: int, subject: str = None, notes: str = "") -> str:
+    def create_feedback_prompt(
+        self,
+        student_name: str,
+        score: float,
+        attendance_rate: int,
+        top_subjects: Optional[list] = None,
+        weak_subjects: Optional[list] = None,
+        notes: str = "",
+    ) -> str:
         """
         Tạo ra một prompt chi tiết để yêu cầu model viết nhận xét
         
         Args:
             student_name: Tên học sinh
             score: Điểm số hiện tại (0-10)
-            score_trend: Xu hướng điểm ('tăng', 'giảm', 'ổn định')
             attendance_rate: Tỷ lệ chuyên cần (%)
-            subject: Môn học cụ thể (nếu có)
-            notes: Ghi chú thêm từ giáo viên
+            top_subjects: Danh sách môn học tốt (nếu có)
+            weak_subjects: Danh sách môn học chưa tốt (nếu có)
+            notes: Ghi chú thêm từ giáo viên (ưu tiên về chuyên cần: vắng/đi trễ)
             
         Returns:
             Prompt đã được định dạng
         """
         
-        # Tạo text môn học
-        subject_context = f" môn {subject}" if subject else ""
-        subject_data = f"- Môn học: {subject}" if subject else "- Môn học: Tổng hợp các môn"
-        
+        # Chuẩn hoá dữ liệu môn học
+        top_subjects = top_subjects or []
+        weak_subjects = weak_subjects or []
+        top_text = ", ".join(top_subjects[:5]) if top_subjects else "Không có"
+        weak_text = ", ".join(weak_subjects[:5]) if weak_subjects else "Không có"
+        # Kiểm tra ghi chú tiêu cực
+        NEGATIVE_WORDS = ["vắng", "nghỉ", "trốn", "đi trễ", "không chuyên cần", "muộn học", "bỏ tiết", "trốn học", "cúp học"]
+        negative_attendance = any(word in (notes or "").lower() for word in NEGATIVE_WORDS)
+
+        attendance_hint = ""
+        if not negative_attendance:
+            attendance_hint = "- Lưu ý: Nếu không có ghi chú tiêu cực về chuyên cần, hãy TẶNG THÊM một câu khen em có ý thức đi học đầy đủ, đúng giờ, ngay sau câu khen về thành tích. Không cần sáng tạo thêm lý do hoặc chi tiết khác."
+
         prompt = f"""
-Bạn là một trợ lý AI cho giáo viên, bạn sẽ vào vai là một giáo viên và chuyên viết nhận xét ngắn gọn và chuyên nghiệp cho học sinh (không phải sinh viên) để gửi về cho phụ huynh.
+Bạn là trợ lý AI của giáo viên chủ nhiệm. Hãy nhập vai giáo viên và viết nhận xét ngắn gọn, chuyên nghiệp cho học sinh (không phải sinh viên) để gửi cho phụ huynh.
 
 **QUY TẮC BẮT BUỘC:**
-- Chỉ trả lời bằng nội dung nhận xét, KHÔNG thêm lời chào, câu giới thiệu hay bất kỳ văn bản thừa nào.
-- BẮT BUỘC phải đề cập đến môn học{subject_context} trong nhận xét.
-- Văn phong: Tích cực, mang tính xây dựng, khích lệ. Nếu xu hướng điểm số dưới 7 hay tỷ lệ chuyên cần dưới 80% thì cần phải phê bình học sinh và góp ý cho phụ huynh. 
-- Có thể dựa trên ghi chú thêm của giáo viên để tạo nhận xét cho phù hợp
-- Ngôn ngữ: Tiếng Việt chuẩn, trang trọng.
-- Độ dài: Khoảng 2-3 câu.
+- Chỉ trả lời đúng nội dung nhận xét, KHÔNG thêm lời chào hay tiêu đề.
+- Văn phong: tích cực, mang tính xây dựng, khích lệ; nhưng rõ ràng và cụ thể.
+- Nếu điểm trung bình < 7.0 hoặc có môn yếu thì cần đưa gợi ý cải thiện cụ thể.
+- Mặc định chuyên cần tốt (đi học đầy đủ, đúng giờ); NẾU ghi chú nêu vắng/đi trễ thì phải đề cập và khuyến nghị khắc phục.
+- Ưu tiên sử dụng thông tin môn mạnh/yếu nếu có; không suy diễn ngoài dữ liệu.
+- Ngôn ngữ: Tiếng Việt chuẩn, trang trọng. Độ dài: 2–3 câu, không dùng markdown.
+{attendance_hint}
 
 **DỮ LIỆU HỌC SINH:**
 - Tên: {student_name}
-{subject_data}
-- Điểm số gần nhất: {score}/10
-- Xu hướng điểm số: {score_trend}
-- Tỷ lệ chuyên cần: {attendance_rate}%
-- Ghi chú thêm của giáo viên: {notes if notes else "Không có"}
+- Điểm trung bình học kì: {score}/10
+- Môn học tốt: {top_text}
+- Môn học chưa tốt: {weak_text}
+- Chuyên cần (mặc định tốt nếu không ghi chú tiêu cực): {attendance_rate}%
+- Ghi chú của GVCN (ưu tiên về chuyên cần): {notes if notes else 'Không có'}
 
-Dựa vào các dữ liệu trên, hãy viết một đoạn nhận xét.
-        """
+Dựa trên dữ liệu trên, viết nhận xét cho học sinh này.
+"""
         return prompt.strip()
     
-    async def generate_student_feedback(self, student_name: str, score: float, 
-                                      score_trend: str, attendance_rate: int, 
-                                      subject: str = None, notes: str = "") -> str:
+    async def generate_student_feedback(
+        self,
+        student_name: str,
+        score: float,
+        attendance_rate: int,
+        top_subjects: Optional[list] = None,
+        weak_subjects: Optional[list] = None,
+        notes: str = "",
+    ) -> str:
         """
         Tạo nhận xét cho học sinh dựa trên dữ liệu đầu vào
         
         Args:
             student_name: Tên học sinh
             score: Điểm số (0-10)
-            score_trend: Xu hướng điểm ('tăng', 'giảm', 'ổn định')
             attendance_rate: Tỷ lệ chuyên cần (%)
+            top_subjects: Danh sách môn học tốt (nếu có)
+            weak_subjects: Danh sách môn học chưa tốt (nếu có)
             notes: Ghi chú thêm từ giáo viên
             
         Returns:
@@ -136,11 +160,16 @@ Dựa vào các dữ liệu trên, hãy viết một đoạn nhận xét.
             Exception: Nếu có lỗi khi tạo nhận xét
         """
         try:
-            self.logger.info(f"🤖 Đang tạo nhận xét AI cho học sinh: {student_name}" + (f" - Môn: {subject}" if subject else ""))
+            self.logger.info(f"🤖 Đang tạo nhận xét AI cho học sinh: {student_name}")
             
             # Tạo prompt
             prompt = self.create_feedback_prompt(
-                student_name, score, score_trend, attendance_rate, subject, notes
+                student_name=student_name,
+                score=score,
+                attendance_rate=attendance_rate,
+                top_subjects=top_subjects,
+                weak_subjects=weak_subjects,
+                notes=notes,
             )
             
             # Gửi request tới Gemini
@@ -166,7 +195,7 @@ Dựa vào các dữ liệu trên, hãy viết một đoạn nhận xét.
         
         Args:
             students_data: Danh sách thông tin học sinh
-            Format: [{"name": str, "score": float, "trend": str, "attendance": int, "notes": str}]
+            Format: [{"name": str, "score": float, "attendance": int, "top_subjects": [str], "weak_subjects": [str], "notes": str}]
             
         Returns:
             Dictionary chứa kết quả và danh sách feedbacks
@@ -181,10 +210,10 @@ Dựa vào các dữ liệu trên, hãy viết một đoạn nhận xét.
                 feedback_text = await self.generate_student_feedback(
                     student_name=student_data.get("name"),
                     score=student_data.get("score"),
-                    score_trend=student_data.get("trend"),
                     attendance_rate=student_data.get("attendance"),
-                    subject=student_data.get("subject"),
-                    notes=student_data.get("notes", "")
+                    top_subjects=student_data.get("top_subjects"),
+                    weak_subjects=student_data.get("weak_subjects"),
+                    notes=student_data.get("notes", ""),
                 )
                 
                 feedbacks.append({

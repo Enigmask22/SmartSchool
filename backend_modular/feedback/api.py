@@ -64,25 +64,17 @@ async def generate_batch_feedback(request: BatchFeedbackRequest):
                 detail="Số lượng học sinh không được vượt quá 50"
             )
         
-        # Validate score_trend cho tất cả học sinh
-        valid_trends = ['tăng', 'giảm', 'ổn định']
-        for student in request.students:
-            if student.score_trend not in valid_trends:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"score_trend của {student.student_name} phải là một trong: {', '.join(valid_trends)}"
-                )
-        
         # Chuyển đổi request thành format cho service
         students_data = []
         for student in request.students:
             students_data.append({
                 "name": student.student_name,
                 "score": student.score,
-                "trend": student.score_trend,
                 "attendance": student.attendance_rate,
                 "subject": student.subject,
-                "notes": student.notes or ""
+                "top_subjects": student.top_subjects or [],
+                "weak_subjects": student.weak_subjects or [],
+                "notes": student.notes or "",
             })
         
         # Tạo nhận xét hàng loạt
@@ -124,10 +116,11 @@ async def test_feedback_generation():
         test_feedback = await feedback_service.generate_feedback(
             student_name="Nguyễn Văn A",
             score=8.5,
-            score_trend="tăng",
             attendance_rate=95,
-            subject="Toán",
-            notes="Học sinh rất chăm chỉ và tích cực tham gia hoạt động lớp"
+            subject=None,
+            top_subjects=["Toán", "Vật lý"],
+            weak_subjects=["Ngữ văn"],
+            notes="",
         )
         
         return StudentFeedbackResponse(
