@@ -53,23 +53,13 @@ class FeedbackService:
             # Sử dụng Gemini AI nếu có
             if self.use_ai:
                 try:
-                    # Tạo prompt thủ công để truyền top/weak subjects vào ghi chú
-                    extra_context = []
-                    if top_subjects:
-                        extra_context.append(f"Top môn mạnh: {', '.join(top_subjects[:3])}.")
-                    if weak_subjects:
-                        extra_context.append(f"Môn cần cải thiện (điểm < 8.0): {', '.join(weak_subjects[:3])}.")
-                    combined_notes = (notes or "").strip()
-                    if extra_context:
-                        combined_notes = (combined_notes + "\n" if combined_notes else "") + " ".join(extra_context)
-
                     feedback = await self.gemini_service.generate_student_feedback(
                         student_name=student_name,
                         score=score,
-                        score_trend="ổn định",
                         attendance_rate=attendance_rate,
-                        subject=subject,
-                        notes=combined_notes
+                        top_subjects=top_subjects,
+                        weak_subjects=weak_subjects,
+                        notes=(notes or "").strip(),
                     )
                     logger.info(f"🤖 AI-generated feedback for {student_name}")
                     return feedback
@@ -149,10 +139,11 @@ class FeedbackService:
                     feedback_text = await self.generate_feedback(
                         student_name=student["name"],
                         score=student["score"],
-                        score_trend=student["trend"],
                         attendance_rate=student["attendance"],
                         subject=student.get("subject"),
-                        notes=student.get("notes", "")
+                        top_subjects=student.get("top_subjects"),
+                        weak_subjects=student.get("weak_subjects"),
+                        notes=student.get("notes", ""),
                     )
                     
                     feedbacks.append({
