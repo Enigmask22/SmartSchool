@@ -63,7 +63,7 @@
 - **🏠 Homeroom** - Dashboard riêng cho GVCN với class insights
 - **👨‍💼 Admin** - User management, permissions, system monitoring
 - **� OTP Email** - Email verification với Mailtrap/Gmail SMTP
-- **📅 School Config** - School days, holidays, academic calendar
+- **📅 School Config** - School days, dayoffs, academic calendar
 
 ### 🔐 Enterprise Security
 
@@ -499,8 +499,8 @@ GET    /api/admin/logs                # Application logs
 ```http
 GET    /api/school-config/days        # Get school days configuration
 PUT    /api/school-config/days        # Update school calendar
-GET    /api/school-config/holidays    # Get holiday list
-POST   /api/school-config/holidays    # Add holiday
+GET    /api/school-config/dayoffs    # Get dayoff list
+POST   /api/school-config/dayoffs    # Add dayoff
 ```
 
 ### 👤 Users

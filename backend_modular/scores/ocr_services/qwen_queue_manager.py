@@ -126,7 +126,7 @@ class QwenQueueManager:
             start_time = time.time()
             
             # Process OCR
-            result = service.parse_grade_sheet(request.image_path)
+            result = service.parse_score_sheet(request.image_path)
             
             elapsed = time.time() - start_time
             

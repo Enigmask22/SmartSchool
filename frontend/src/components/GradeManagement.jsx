@@ -89,9 +89,9 @@ const GradeManagement = () => {
   const [teacherInfo, setTeacherInfo] = useState(null);
   const [selectedClassSubject, setSelectedClassSubject] = useState(null);
   const [students, setStudents] = useState([]);
-  const [gradeConfig, setGradeConfig] = useState(null);
+  const [scoreConfig, setScoreConfig] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
-  const [gradeForm, setGradeForm] = useState({});
+  const [scoreForm, setScoreForm] = useState({});
   const [showConfigEditor, setShowConfigEditor] = useState(false);
   const [configForm, setConfigForm] = useState({});
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
@@ -180,30 +180,54 @@ const GradeManagement = () => {
         setStudents(sortedStudents);
       }
 
-      // Fetch grade config for this subject
-      const configResponse = await api.getGradeConfigBySubject(
+      // Fetch score config for this subject
+      const configResponse = await api.getScoreConfigBySubject(
         classSubject.subject_id,
         academicYear,
         semester
       );
 
-      if (configResponse.success) {
-        setGradeConfig(configResponse.data);
+      logger.debug("Config response:", configResponse);
+
+      if (configResponse && configResponse.success && configResponse.data) {
+        // Kiểm tra xem score_column_config có rỗng không
+        const scoreColumnConfig = configResponse.data.score_column_config;
+        logger.debug("score_column_config:", scoreColumnConfig);
+
+        // Kiểm tra nếu score_column_config là object và có keys
+        if (
+          scoreColumnConfig &&
+          typeof scoreColumnConfig === "object" &&
+          Object.keys(scoreColumnConfig).length > 0
+        ) {
+          logger.debug("Setting scoreConfig with data:", configResponse.data);
+          setScoreConfig(configResponse.data);
+        } else {
+          // Config tồn tại nhưng chưa có cấu hình cột điểm
+          logger.debug(
+            "score_column_config is empty, setting scoreConfig to null"
+          );
+          setScoreConfig(null);
+        }
       } else {
         // No config exists yet, use default
-        setGradeConfig(null);
+        logger.debug(
+          "No config response or failed, setting scoreConfig to null"
+        );
+        setScoreConfig(null);
       }
     } catch (error) {
       logger.error("Error fetching data:", error);
+      setScoreConfig(null);
     } finally {
       setLoading(false);
     }
   };
 
   // Helper: Get columns with hierarchy for display (parent + children structure)
-  const getDisplayColumns = (gradeColumnConfig) => {
+  const getDisplayColumns = (scoreColumnConfig) => {
     const columns = [];
-    if (!gradeColumnConfig) return columns;
+    if (!scoreColumnConfig) return columns;
 
     // Sort keys: Thường xuyên -> Giữa kì -> Cuối kì
     const priorityOrder = {
@@ -215,12 +239,12 @@ const GradeManagement = () => {
       diem_thi_cuoi_ki: 3,
     };
 
-    const sortedKeys = Object.keys(gradeColumnConfig).sort((a, b) => {
+    const sortedKeys = Object.keys(scoreColumnConfig).sort((a, b) => {
       return (priorityOrder[a] || 999) - (priorityOrder[b] || 999);
     });
 
     sortedKeys.forEach((columnName) => {
-      const columnConfig = gradeColumnConfig[columnName];
+      const columnConfig = scoreColumnConfig[columnName];
 
       if (columnConfig.data && typeof columnConfig.data === "object") {
         // Parent column with children
@@ -251,12 +275,12 @@ const GradeManagement = () => {
   };
 
   // Helper: Flatten nested columns to get all input fields (child columns)
-  const flattenGradeColumns = (gradeColumnConfig) => {
+  const flattenScoreColumns = (scoreColumnConfig) => {
     const flatColumns = [];
-    if (!gradeColumnConfig) return flatColumns;
+    if (!scoreColumnConfig) return flatColumns;
 
-    Object.keys(gradeColumnConfig).forEach((columnName) => {
-      const columnConfig = gradeColumnConfig[columnName];
+    Object.keys(scoreColumnConfig).forEach((columnName) => {
+      const columnConfig = scoreColumnConfig[columnName];
 
       // Check if column has nested data (children)
       if (columnConfig.data && typeof columnConfig.data === "object") {
@@ -295,17 +319,17 @@ const GradeManagement = () => {
     });
   };
 
-  const initializeGradeForm = (student, existingGrade = null) => {
+  const initializeScoreForm = (student, existingScore = null) => {
     const form = {};
 
-    if (gradeConfig && gradeConfig.grade_column_config) {
+    if (scoreConfig && scoreConfig.score_column_config) {
       // Use flattened columns (all child columns, not parent)
-      const flatColumns = flattenGradeColumns(gradeConfig.grade_column_config);
+      const flatColumns = flattenScoreColumns(scoreConfig.score_column_config);
 
       flatColumns.forEach((column) => {
         form[column.key] = {
           He_so: column.he_so,
-          Diem: existingGrade?.grade_data?.[column.key]?.Diem || "",
+          Diem: existingScore?.score_data?.[column.key]?.Diem || "",
         };
       });
     }
@@ -313,13 +337,13 @@ const GradeManagement = () => {
     return form;
   };
 
-  const handleEditGrade = (student) => {
+  const handleEditScore = (student) => {
     setEditingStudent(student);
-    const form = initializeGradeForm(student.student, student.grade);
-    setGradeForm(form);
+    const form = initializeScoreForm(student.student, student.score);
+    setScoreForm(form);
   };
 
-  const handleGradeInputChange = (columnName, value) => {
+  const handleScoreInputChange = (columnName, value) => {
     // Normalize letter grades
     let normalizedValue = value.trim();
 
@@ -349,7 +373,7 @@ const GradeManagement = () => {
       // For numeric values, keep as is (will be parsed as float later)
     }
 
-    setGradeForm((prev) => ({
+    setScoreForm((prev) => ({
       ...prev,
       [columnName]: {
         ...prev[columnName],
@@ -358,18 +382,18 @@ const GradeManagement = () => {
     }));
   };
 
-  const handleSaveGrade = async () => {
+  const handleSaveScore = async () => {
     try {
-      // Validate grade values before saving
-      for (const [columnName, columnData] of Object.entries(gradeForm)) {
-        const gradeValue = columnData?.Diem;
+      // Validate score values before saving
+      for (const [columnName, columnData] of Object.entries(scoreForm)) {
+        const scoreValue = columnData?.Diem;
 
         if (
-          gradeValue !== "" &&
-          gradeValue !== null &&
-          gradeValue !== undefined
+          scoreValue !== "" &&
+          scoreValue !== null &&
+          scoreValue !== undefined
         ) {
-          const valueStr = String(gradeValue).trim().toUpperCase();
+          const valueStr = String(scoreValue).trim().toUpperCase();
 
           // Check if it's a letter grade
           const isLetterGrade =
@@ -386,7 +410,7 @@ const GradeManagement = () => {
 
           // If not a letter grade, validate as number
           if (!isLetterGrade) {
-            const numValue = parseFloat(gradeValue);
+            const numValue = parseFloat(scoreValue);
             if (isNaN(numValue) || numValue < 0 || numValue > 10) {
               alert(
                 `Điểm ${columnName} không hợp lệ! Phải là số (0-10) hoặc Đ/KĐ`
@@ -397,39 +421,39 @@ const GradeManagement = () => {
         }
       }
 
-      const gradeData = {
+      const scoreData = {
         student_id: editingStudent.student.id,
         class_subject_id: selectedClassSubject.id,
         academic_year: academicYear,
         semester: semester,
-        grade_data: {
+        score_data: {
           Mon_hoc: selectedClassSubject.subjects.subject_name,
-          ...gradeForm,
+          ...scoreForm,
         },
       };
 
-      const response = await api.createOrUpdateGrade(gradeData);
+      const response = await api.createOrUpdateScore(scoreData);
 
       if (response.success) {
         // Refresh students data
         handleClassSubjectSelect(selectedClassSubject);
         setEditingStudent(null);
-        setGradeForm({});
+        setScoreForm({});
         alert("Lưu điểm thành công!");
       } else {
         alert("Lỗi khi lưu điểm: " + response.message);
       }
     } catch (error) {
-      logger.error("Error saving grade:", error);
+      logger.error("Error saving score:", error);
       alert("Lỗi khi lưu điểm!");
     }
   };
 
-  // Helper function to sort grade columns in desired order
-  const getSortedColumnNames = (gradeColumnConfig) => {
-    if (!gradeColumnConfig) return [];
+  // Helper function to sort score columns in desired order
+  const getSortedColumnNames = (scoreColumnConfig) => {
+    if (!scoreColumnConfig) return [];
 
-    const columnNames = Object.keys(gradeColumnConfig);
+    const columnNames = Object.keys(scoreColumnConfig);
 
     // Define desired order: Điểm cuối kì -> Điểm giữa kì -> Điểm thường xuyên -> Others
     const orderPriority = {
@@ -458,10 +482,10 @@ const GradeManagement = () => {
   };
 
   const calculateFinalGrade = (gradeData) => {
-    if (!gradeData || !gradeConfig?.grade_column_config) return 0;
+    if (!gradeData || !scoreConfig?.score_column_config) return 0;
 
     // Use flattened columns to calculate (includes all child columns)
-    const flatColumns = flattenGradeColumns(gradeConfig.grade_column_config);
+    const flatColumns = flattenScoreColumns(scoreConfig.score_column_config);
 
     // Gom tất cả các cột điểm thường xuyên (Diem_tx*)
     let txScores = [];
@@ -572,8 +596,8 @@ const GradeManagement = () => {
 
   // Grade Config Management
   const handleShowConfigEditor = () => {
-    if (gradeConfig) {
-      setConfigForm({ ...gradeConfig.grade_column_config });
+    if (scoreConfig) {
+      setConfigForm({ ...scoreConfig.score_column_config });
     } else {
       // Default config
       setConfigForm({
@@ -685,13 +709,13 @@ const GradeManagement = () => {
         subject_id: selectedClassSubject.subject_id,
         academic_year: academicYear,
         semester: semester,
-        grade_column_config: configForm,
+        score_column_config: configForm,
       };
 
-      const response = await api.upsertGradeConfig(gradeConfig?.id, configData);
+      const response = await api.upsertScoreConfig(scoreConfig?.id, configData);
 
       if (response.success) {
-        setGradeConfig(response.data);
+        setScoreConfig(response.data);
         setShowConfigEditor(false);
         alert("✅ Lưu cấu hình cột điểm thành công!");
         // Refresh current view
@@ -708,7 +732,7 @@ const GradeManagement = () => {
   // Import điểm từ file
   const handleDownloadTemplate = async () => {
     try {
-      await api.downloadGradeTemplate(selectedClassSubject.id);
+      await api.downloadScoreTemplate(selectedClassSubject.id);
       alert("✅ Tải template thành công!");
     } catch (error) {
       logger.error("Error downloading template:", error);
@@ -738,9 +762,9 @@ const GradeManagement = () => {
           return;
         }
 
-        // Get all expected columns from gradeConfig (flattened)
-        const flatColumns = flattenGradeColumns(
-          gradeConfig?.grade_column_config || {}
+        // Get all expected columns from scoreConfig (flattened)
+        const flatColumns = flattenScoreColumns(
+          scoreConfig?.score_column_config || {}
         );
         const expectedColumnKeys = flatColumns.map((col) => col.key);
 
@@ -887,7 +911,7 @@ const GradeManagement = () => {
         grades: importedData,
       };
 
-      const response = await api.bulkImportGrades(importPayload);
+      const response = await api.bulkImportScores(importPayload);
 
       if (response.success) {
         alert(
@@ -922,7 +946,7 @@ const GradeManagement = () => {
 
   // Function to export grades to Excel using ExcelJS
   const handleExportToExcel = async () => {
-    if (!selectedClassSubject || !gradeConfig) {
+    if (!selectedClassSubject || !scoreConfig) {
       alert("Vui lòng chọn lớp và có cấu hình điểm!");
       return;
     }
@@ -951,7 +975,7 @@ const GradeManagement = () => {
 
       // Get display columns (with hierarchy)
       const displayColumns = getDisplayColumns(
-        gradeConfig?.grade_column_config || {}
+        scoreConfig?.score_column_config || {}
       );
 
       // Calculate total grade columns (flatten nested)
@@ -1149,7 +1173,7 @@ const GradeManagement = () => {
       // Data rows
       students.forEach((studentData, index) => {
         const student = studentData.student;
-        const grade = studentData.grade;
+        const score = studentData.score;
 
         const dataRow = worksheet.getRow(currentRow);
         const rowValues = [
@@ -1158,28 +1182,28 @@ const GradeManagement = () => {
           student?.full_name || "",
         ];
 
-        // Add grade columns (flattened)
+        // Add score columns (flattened)
         displayColumns.forEach((col) => {
           if (col.hasChildren) {
             col.children.forEach((child) => {
-              const gradeValue = grade?.grade_data?.[child.key]?.Diem;
+              const scoreValue = score?.score_data?.[child.key]?.Diem;
               rowValues.push(
-                gradeValue !== undefined && gradeValue !== null
-                  ? gradeValue
+                scoreValue !== undefined && scoreValue !== null
+                  ? scoreValue
                   : ""
               );
             });
           } else {
-            const gradeValue = grade?.grade_data?.[col.key]?.Diem;
+            const scoreValue = score?.score_data?.[col.key]?.Diem;
             rowValues.push(
-              gradeValue !== undefined && gradeValue !== null ? gradeValue : ""
+              scoreValue !== undefined && scoreValue !== null ? scoreValue : ""
             );
           }
         });
 
-        // Add final grade
+        // Add final score
         rowValues.push(
-          grade?.grade_data ? calculateFinalGrade(grade.grade_data) : ""
+          score?.score_data ? calculateFinalGrade(score.score_data) : ""
         );
 
         dataRow.values = rowValues;
@@ -1222,7 +1246,7 @@ const GradeManagement = () => {
             cell.font = { bold: true };
           }
 
-          // Highlight grade cells with values
+          // Highlight score cells with values
           if (col > 3 && col < totalColumns && cell.value !== "") {
             cell.fill = {
               type: "pattern",
@@ -1257,23 +1281,23 @@ const GradeManagement = () => {
       summaryCell.font = { bold: true, size: 11 };
       summaryCell.alignment = { horizontal: "left", vertical: "middle" };
 
-      // Calculate students with grades
-      const studentsWithGrades = students.filter(
+      // Calculate students with scores
+      const studentsWithScores = students.filter(
         (s) =>
-          s.grade?.final_grade !== undefined && s.grade?.final_grade !== null
+          s.score?.final_score !== undefined && s.score?.final_score !== null
       ).length;
       worksheet.mergeCells(currentRow, 4, currentRow, totalColumns);
-      const gradesSummaryCell = worksheet.getCell(currentRow, 4);
-      gradesSummaryCell.value = `Đã có điểm: ${studentsWithGrades}/${students.length}`;
-      gradesSummaryCell.font = {
+      const scoresSummaryCell = worksheet.getCell(currentRow, 4);
+      scoresSummaryCell.value = `Đã có điểm: ${studentsWithScores}/${students.length}`;
+      scoresSummaryCell.font = {
         bold: true,
         size: 11,
         color: {
           argb:
-            studentsWithGrades === students.length ? "FF008000" : "FFFF0000",
+            studentsWithScores === students.length ? "FF008000" : "FFFF0000",
         },
       };
-      gradesSummaryCell.alignment = { horizontal: "right", vertical: "middle" };
+      scoresSummaryCell.alignment = { horizontal: "right", vertical: "middle" };
 
       // Generate buffer and download
       const buffer = await workbook.xlsx.writeBuffer();
@@ -1482,7 +1506,7 @@ const GradeManagement = () => {
                   </div>
 
                   {/* Import/Export Buttons */}
-                  {gradeConfig && (
+                  {scoreConfig && (
                     <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-border">
                       <Button
                         onClick={handleDownloadTemplate}
@@ -1772,7 +1796,7 @@ const GradeManagement = () => {
             </Dialog>
 
             {/* Students Grade Table */}
-            {gradeConfig ? (
+            {scoreConfig ? (
               <div className="overflow-hidden bg-white rounded-lg shadow-md">
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1821,7 +1845,7 @@ const GradeManagement = () => {
                           </span>
                         </th>
                         {getDisplayColumns(
-                          gradeConfig?.grade_column_config || {}
+                          scoreConfig?.score_column_config || {}
                         ).map((column) => {
                           if (column.hasChildren) {
                             // Parent column with children - use colspan
@@ -1879,7 +1903,7 @@ const GradeManagement = () => {
                       {/* Second header row: Child columns */}
                       <tr className="bg-gray-50">
                         {getDisplayColumns(
-                          gradeConfig?.grade_column_config || {}
+                          scoreConfig?.score_column_config || {}
                         ).map((column) => {
                           if (column.hasChildren) {
                             // Render child column headers
@@ -1934,7 +1958,7 @@ const GradeManagement = () => {
                               </div>
                             </td>
                             {getDisplayColumns(
-                              gradeConfig?.grade_column_config || {}
+                              scoreConfig?.score_column_config || {}
                             ).map((column) => {
                               if (column.hasChildren) {
                                 // Render cells for all child columns
@@ -1943,11 +1967,11 @@ const GradeManagement = () => {
                                     key={child.key}
                                     className="px-3 py-3 text-center"
                                   >
-                                    {studentData.grade?.grade_data?.[child.key]
+                                    {studentData.score?.score_data?.[child.key]
                                       ?.Diem ? (
                                       <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
                                         {
-                                          studentData.grade.grade_data[
+                                          studentData.score.score_data[
                                             child.key
                                           ].Diem
                                         }
@@ -1966,11 +1990,11 @@ const GradeManagement = () => {
                                     key={column.key}
                                     className="px-5 py-3 text-center"
                                   >
-                                    {studentData.grade?.grade_data?.[column.key]
+                                    {studentData.score?.score_data?.[column.key]
                                       ?.Diem ? (
                                       <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
                                         {
-                                          studentData.grade.grade_data[
+                                          studentData.score.score_data[
                                             column.key
                                           ].Diem
                                         }
@@ -1985,10 +2009,10 @@ const GradeManagement = () => {
                               }
                             })}
                             <td className="px-5 py-3">
-                              {studentData.grade?.grade_data ? (
+                              {studentData.score?.score_data ? (
                                 <span className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-bold">
                                   {calculateFinalGrade(
-                                    studentData.grade.grade_data
+                                    studentData.score.score_data
                                   )}
                                 </span>
                               ) : (
@@ -1999,16 +2023,16 @@ const GradeManagement = () => {
                             </td>
                             <td className="px-5 py-3">
                               <button
-                                onClick={() => handleEditGrade(studentData)}
+                                onClick={() => handleEditScore(studentData)}
                                 className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium text-sm"
                               >
-                                {studentData.grade ? (
+                                {studentData.score ? (
                                   <Pencil className="w-4 h-4" />
                                 ) : (
                                   <Plus className="w-4 h-4" />
                                 )}
                                 <span>
-                                  {studentData.grade ? "Sửa" : "Nhập điểm"}
+                                  {studentData.score ? "Sửa" : "Nhập điểm"}
                                 </span>
                               </button>
                             </td>
@@ -2158,9 +2182,9 @@ const GradeManagement = () => {
             </DialogHeader>
 
             <div className="space-y-4">
-              {editingStudent && gradeConfig && (
+              {editingStudent && scoreConfig && (
                 <>
-                  {getDisplayColumns(gradeConfig.grade_column_config).map(
+                  {getDisplayColumns(scoreConfig.score_column_config).map(
                     (column) => {
                       if (column.hasChildren) {
                         // Parent column with children - show grouped inputs
@@ -2190,9 +2214,9 @@ const GradeManagement = () => {
                                   <Input
                                     type="text"
                                     placeholder="-"
-                                    value={gradeForm[child.key]?.Diem || ""}
+                                    value={scoreForm[child.key]?.Diem || ""}
                                     onChange={(e) =>
-                                      handleGradeInputChange(
+                                      handleScoreInputChange(
                                         child.key,
                                         e.target.value
                                       )
@@ -2227,9 +2251,9 @@ const GradeManagement = () => {
                               <Input
                                 type="text"
                                 placeholder="0.0, Đ, hoặc KĐ"
-                                value={gradeForm[column.key]?.Diem || ""}
+                                value={scoreForm[column.key]?.Diem || ""}
                                 onChange={(e) =>
-                                  handleGradeInputChange(
+                                  handleScoreInputChange(
                                     column.key,
                                     e.target.value
                                   )
@@ -2254,7 +2278,7 @@ const GradeManagement = () => {
               <Button variant="outline" onClick={() => setEditingStudent(null)}>
                 Hủy
               </Button>
-              <Button onClick={handleSaveGrade}>Lưu điểm</Button>
+              <Button onClick={handleSaveScore}>Lưu điểm</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2300,9 +2324,9 @@ const GradeManagement = () => {
                       <TableHead>STT</TableHead>
                       <TableHead>Mã HS</TableHead>
                       <TableHead>Họ và tên</TableHead>
-                      {gradeConfig &&
-                        flattenGradeColumns(
-                          gradeConfig.grade_column_config
+                      {scoreConfig &&
+                        flattenScoreColumns(
+                          scoreConfig.score_column_config
                         ).map((column) => (
                           <TableHead key={column.key} className="text-center">
                             {column.label}
@@ -2318,9 +2342,9 @@ const GradeManagement = () => {
                           {row.student_id}
                         </TableCell>
                         <TableCell>{row.ho_va_ten}</TableCell>
-                        {gradeConfig &&
-                          flattenGradeColumns(
-                            gradeConfig.grade_column_config
+                        {scoreConfig &&
+                          flattenScoreColumns(
+                            scoreConfig.score_column_config
                           ).map((column) => (
                             <TableCell key={column.key} className="text-center">
                               {row[column.key] !== null &&

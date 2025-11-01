@@ -10,7 +10,7 @@ from users.models import UserCreate, UserUpdate, TeacherCreate, TeacherUpdate
 from users.services import hash_password
 from core.database import get_db
 from core.logger import setup_logger
-from auth.api import get_current_user
+from core.dependencies import get_current_user
 
 logger = setup_logger("users_api")
 router = APIRouter()
@@ -322,7 +322,7 @@ async def get_class_performance(db=Depends(get_db)):
     """Lấy hiệu suất học tập theo lớp"""
     try:
         # Lấy dữ liệu điểm số
-        grades_data = db.table("grades").select("student_id, class_subject_id, final_grade, semester, academic_year").execute()
+        scores_data = db.table("scores").select("student_id, class_subject_id, final_score, semester, academic_year").execute()
         
         # Lấy thông tin học sinh và lớp
         students_data = db.table("students").select("id, full_name, class_name").eq("is_active", True).execute()
@@ -330,28 +330,28 @@ async def get_class_performance(db=Depends(get_db)):
         
         # Nhóm điểm theo lớp
         class_performance = {}
-        for grade in grades_data.data:
-            student_id = grade['student_id']
-            if student_id in students_dict and grade.get('final_grade') is not None:
+        for score in scores_data.data:
+            student_id = score['student_id']
+            if student_id in students_dict and score.get('final_score') is not None:
                 class_name = students_dict[student_id]['class_name']
                 if class_name not in class_performance:
                     class_performance[class_name] = []
-                class_performance[class_name].append(float(grade['final_grade']))
+                class_performance[class_name].append(float(score['final_score']))
         
         # Tính toán thống kê cho mỗi lớp
         result = []
-        for class_name, grades in class_performance.items():
-            if grades:
-                avg_grade = sum(grades) / len(grades)
+        for class_name, scores in class_performance.items():
+            if scores:
+                avg_score = sum(scores) / len(scores)
                 result.append({
                     "class_name": class_name,
-                    "total_students": len(set([g['student_id'] for g in grades_data.data if students_dict.get(g['student_id'], {}).get('class_name') == class_name])),
-                    "average_grade": round(avg_grade, 1),
-                    "total_grades": len(grades),
-                    "excellent_count": len([g for g in grades if g >= 8.0]),
-                    "good_count": len([g for g in grades if 6.5 <= g < 8.0]),
-                    "average_count": len([g for g in grades if 5.0 <= g < 6.5]),
-                    "poor_count": len([g for g in grades if g < 5.0])
+                    "total_students": len(set([s['student_id'] for s in scores_data.data if students_dict.get(s['student_id'], {}).get('class_name') == class_name])),
+                    "average_grade": round(avg_score, 1),
+                    "total_grades": len(scores),
+                    "excellent_count": len([s for s in scores if s >= 8.0]),
+                    "good_count": len([s for s in scores if 6.5 <= s < 8.0]),
+                    "average_count": len([s for s in scores if 5.0 <= s < 6.5]),
+                    "poor_count": len([s for s in scores if s < 5.0])
                 })
         
         # Sắp xếp theo điểm trung bình

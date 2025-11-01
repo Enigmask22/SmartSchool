@@ -122,12 +122,12 @@ const StudentList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12); // 12 students per page (3x4 grid)
 
-  // View grades states
-  const [showGradesModal, setShowGradesModal] = useState(false);
-  const [selectedStudentForGrades, setSelectedStudentForGrades] =
+  // View scores states
+  const [showScoresModal, setShowScoresModal] = useState(false);
+  const [selectedStudentForScores, setSelectedStudentForScores] =
     useState(null);
-  const [studentGrades, setStudentGrades] = useState([]);
-  const [gradesLoading, setGradesLoading] = useState(false);
+  const [studentScores, setStudentScores] = useState([]);
+  const [scoresLoading, setScoresLoading] = useState(false);
 
   // Feedback states
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -148,13 +148,13 @@ const StudentList = () => {
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
 
-  // Grade trend analysis states
-  const [gradeTrendData, setGradeTrendData] = useState(null);
+  // Score trend analysis states
+  const [scoreTrendData, setScoreTrendData] = useState(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendError, setTrendError] = useState("");
 
   // Flag: có dữ liệu điểm để tạo nhận xét hay không
-  const [hasGradeData, setHasGradeData] = useState(false);
+  const [hasScoreData, setHasScoreData] = useState(false);
 
   // Subject selection states
   const [showSubjectModal, setShowSubjectModal] = useState(false);
@@ -964,37 +964,37 @@ const StudentList = () => {
     }
   };
 
-  const handleViewGrades = async (student) => {
-    setSelectedStudentForGrades(student);
-    setShowGradesModal(true);
-    setGradesLoading(true);
-    setStudentGrades([]);
+  const handleViewScores = async (student) => {
+    setSelectedStudentForScores(student);
+    setShowScoresModal(true);
+    setScoresLoading(true);
+    setStudentScores([]);
 
     try {
-      // Get all grades for this student across all subjects
-      const response = await ApiService.getStudentGrades(student.id);
+      // Get all scores for this student across all subjects
+      const response = await ApiService.getStudentScores(student.id);
 
       if (response.success) {
-        setStudentGrades(response.data?.grades || []);
+        setStudentScores(response.data?.scores || []);
       } else {
-        logger.error("Failed to fetch grades:", response.message);
-        setStudentGrades([]);
+        logger.error("Failed to fetch scores:", response.message);
+        setStudentScores([]);
       }
     } catch (error) {
-      logger.error("Error fetching student grades:", error);
+      logger.error("Error fetching student scores:", error);
       // Mock data for demonstration
-      setStudentGrades([
+      setStudentScores([
         {
           subject_name: "Toán",
           class_name: student.class_name,
           academic_year: academicYear,
           semester: semester,
-          grade_data: {
+          score_data: {
             Diem_thuong_xuyen: { Diem: 8.5, He_so: 1 },
             Diem_thi_giua_ki: { Diem: 9.0, He_so: 2 },
             Diem_thi_cuoi_ki: { Diem: 8.0, He_so: 3 },
           },
-          final_grade: 8.4,
+          final_score: 8.4,
           teacher_name: "Nguyễn Thị Lan",
         },
         {
@@ -1002,75 +1002,25 @@ const StudentList = () => {
           class_name: student.class_name,
           academic_year: academicYear,
           semester: semester,
-          grade_data: {
+          score_data: {
             Diem_mieng: { Diem: 7.5, He_so: 1 },
             Diem_15_phut: { Diem: 8.0, He_so: 1 },
             Diem_1_tiet: { Diem: 8.5, He_so: 2 },
             Diem_cuoi_ki: { Diem: 8.0, He_so: 3 },
           },
-          final_grade: 8.1,
+          final_score: 8.1,
           teacher_name: "Trần Văn Nam",
         },
       ]);
     } finally {
-      setGradesLoading(false);
+      setScoresLoading(false);
     }
   };
 
-  const closeGradesModal = () => {
-    setShowGradesModal(false);
-    setSelectedStudentForGrades(null);
-    setStudentGrades([]);
-  };
-
-  // Grade trend analysis function
-  const fetchGradeTrend = async (studentId, classSubjectId) => {
-    setTrendLoading(true);
-    setTrendError("");
-    setGradeTrendData(null);
-
-    try {
-      const token = localStorage.getItem("access_token");
-      logger.debug(
-        "🔑 Token from localStorage:",
-        token ? "Present" : "Missing"
-      );
-      logger.debug("🔑 Token length:", token ? token.length : 0);
-
-      const url = `${API_BASE_URL}/grades/grade-trend/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`;
-      logger.debug("🌐 Making request to:", url);
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      logger.debug("📡 Response status:", response.status);
-      logger.debug(
-        "📡 Response headers:",
-        Object.fromEntries(response.headers.entries())
-      );
-
-      const result = await response.json();
-      logger.debug("📊 Response data:", result);
-
-      if (result.success && result.data) {
-        setGradeTrendData(result.data);
-        return result.data;
-      } else {
-        setTrendError(result.message || "Không thể phân tích xu hướng điểm");
-        return null;
-      }
-    } catch (error) {
-      logger.error("❌ Error fetching grade trend:", error);
-      setTrendError("Lỗi kết nối server khi phân tích xu hướng");
-      return null;
-    } finally {
-      setTrendLoading(false);
-    }
+  const closeScoresModal = () => {
+    setShowScoresModal(false);
+    setSelectedStudentForScores(null);
+    setStudentScores([]);
   };
 
   // Feedback functions
@@ -1079,9 +1029,9 @@ const StudentList = () => {
     setGeneratedFeedback("");
     setFeedbackError("");
     setFeedbackSuccess(false);
-    setGradeTrendData(null);
+    setScoreTrendData(null);
     setTrendError("");
-    setHasGradeData(false);
+    setHasScoreData(false);
 
     // Initialize form with student name first
     let initialForm = {
@@ -1094,56 +1044,56 @@ const StudentList = () => {
       notes: "",
     };
 
-    // Fetch student's average grade and grade trend analysis
+    // Fetch student's average score and score trend analysis
     try {
       logger.debug(
-        "🎯 Fetching grades for feedback form for student:",
+        "🎯 Fetching scores for feedback form for student:",
         student
       );
-      const gradesResponse = await ApiService.getStudentGrades(student.id);
-      logger.debug("📊 Grades response for feedback:", gradesResponse);
+      const scoresResponse = await ApiService.getStudentScores(student.id);
+      logger.debug("📊 Scores response for feedback:", scoresResponse);
 
-      if (gradesResponse.success && gradesResponse.data) {
-        const responseData = gradesResponse.data;
-        const grades = responseData.grades; // Access the grades array from the response object
+      if (scoresResponse.success && scoresResponse.data) {
+        const responseData = scoresResponse.data;
+        const scores = responseData.scores; // Access the scores array from the response object
         logger.debug("📋 Full response data:", responseData);
-        logger.debug("📋 Grades array:", grades);
-        logger.debug("📏 Grades array length:", grades?.length);
-        logger.debug("🔍 First grade object:", grades?.[0]);
+        logger.debug("📋 Scores array:", scores);
+        logger.debug("📏 Scores array length:", scores?.length);
+        logger.debug("🔍 First score object:", scores?.[0]);
 
-        if (Array.isArray(grades) && grades.length > 0) {
-          // Use final_grade (điểm trung bình môn) instead of individual scores
-          const validGrades = grades.filter(
-            (grade) =>
-              grade.final_grade !== null && grade.final_grade !== undefined
+        if (Array.isArray(scores) && scores.length > 0) {
+          // Use final_score (điểm trung bình môn) instead of individual scores
+          const validScores = scores.filter(
+            (score) =>
+              score.final_score !== null && score.final_score !== undefined
           );
-          logger.debug("✅ Valid grades with final_grade:", validGrades);
+          logger.debug("✅ Valid scores with final_score:", validScores);
 
-          if (validGrades.length > 0) {
+          if (validScores.length > 0) {
             const avgScore = (
-              validGrades.reduce(
-                (sum, grade) => sum + (grade.final_grade || 0),
+              validScores.reduce(
+                (sum, score) => sum + (score.final_score || 0),
                 0
-              ) / validGrades.length
+              ) / validScores.length
             ).toFixed(1);
             logger.debug("📊 Calculated average score for feedback:", avgScore);
 
             initialForm.score = avgScore;
-            setHasGradeData(true);
+            setHasScoreData(true);
 
             // Xây dựng danh sách top 3 môn cao nhất và 3 môn thấp nhất (< 8.0)
-            const sortedGrades = [...validGrades]
+            const sortedScores = [...validScores]
               .map((g) => ({
                 subject: g.subject_name,
                 score:
-                  typeof g.final_grade === "string"
-                    ? parseFloat(g.final_grade)
-                    : g.final_grade,
+                  typeof g.final_score === "string"
+                    ? parseFloat(g.final_score)
+                    : g.final_score,
               }))
               .filter((g) => typeof g.score === "number" && !isNaN(g.score));
 
-            const byDesc = [...sortedGrades].sort((a, b) => b.score - a.score);
-            const byAsc = [...sortedGrades].sort((a, b) => a.score - b.score);
+            const byDesc = [...sortedScores].sort((a, b) => b.score - a.score);
+            const byAsc = [...sortedScores].sort((a, b) => a.score - b.score);
 
             initialForm.top_subjects = byDesc
               .slice(0, 3)
@@ -1155,23 +1105,24 @@ const StudentList = () => {
 
             // Không tự điền môn học nữa (ẩn phần Môn học ở UI)
           } else {
-            logger.debug("⚠️ No valid final_grade found in grades");
-            setHasGradeData(false);
+            logger.debug("⚠️ No valid final_score found in scores");
+            setHasScoreData(false);
           }
         } else {
           logger.debug(
-            "⚠️ No grades found for student - not an array or empty"
+            "⚠️ No scores found for student - not an array or empty"
           );
-          logger.debug("📋 Grades type:", typeof grades);
-          logger.debug("📋 Is array:", Array.isArray(grades));
-          setHasGradeData(false);
+          logger.debug("📋 Scores type:", typeof scores);
+          logger.debug("📋 Is array:", Array.isArray(scores));
+          setHasScoreData(false);
         }
       } else {
-        logger.debug("❌ Failed to fetch grades:", gradesResponse);
-        setHasGradeData(false);
+        logger.debug("❌ Failed to fetch scores:", scoresResponse);
+        setHasScoreData(false);
       }
     } catch (error) {
-      logger.error("Error fetching student grades:", error);
+      logger.error("Error fetching student scores:", error);
+      setHasScoreData(false);
     }
 
     // Set form with calculated score and subject lists
@@ -1194,7 +1145,7 @@ const StudentList = () => {
     setGeneratedFeedback("");
     setFeedbackError("");
     setFeedbackSuccess(false);
-    setGradeTrendData(null);
+    setScoreTrendData(null);
     setTrendError("");
   };
 
@@ -1216,7 +1167,7 @@ const StudentList = () => {
     }
 
     const scoreNum = parseFloat(score);
-    if (!hasGradeData) {
+    if (!hasScoreData) {
       setFeedbackError("Cần có dữ liệu điểm của học sinh để tạo nhận xét");
       return false;
     }
@@ -1320,17 +1271,17 @@ const StudentList = () => {
     try {
       const student = selectedStudentForFeedback;
 
-      // Fetch grades if not already loaded
-      let grades = studentGrades;
-      if (!grades || grades.length === 0) {
-        const response = await ApiService.getStudentGrades(student.id);
-        if (response.success && response.data?.grades) {
-          grades = response.data.grades;
+      // Fetch scores if not already loaded
+      let scores = studentScores;
+      if (!scores || scores.length === 0) {
+        const response = await ApiService.getStudentScores(student.id);
+        if (response.success && response.data?.scores) {
+          scores = response.data.scores;
         } else {
           alert(
             "⚠️ Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét."
           );
-          grades = [];
+          scores = [];
         }
       }
 
@@ -1405,25 +1356,25 @@ const StudentList = () => {
       studentIdCell.alignment = { horizontal: "right", vertical: "middle" };
       currentRow += 2; // Skip a row
 
-      // Grades section
-      if (grades.length > 0) {
+      // Scores section
+      if (scores.length > 0) {
         // Section title (merge A:E and center)
         worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
-        const gradeTitleCell = worksheet.getCell(`A${currentRow}`);
-        gradeTitleCell.value = "BẢNG ĐIỂM TỔNG KẾT";
-        gradeTitleCell.font = { bold: true, size: 11 };
-        gradeTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+        const scoreTitleCell = worksheet.getCell(`A${currentRow}`);
+        scoreTitleCell.value = "BẢNG ĐIỂM TỔNG KẾT";
+        scoreTitleCell.font = { bold: true, size: 11 };
+        scoreTitleCell.alignment = { horizontal: "center", vertical: "middle" };
         currentRow += 2; // Skip a row
 
         // Calculate overall average
-        const validGrades = grades.filter(
-          (g) => g.final_grade !== null && g.final_grade !== undefined
+        const validScores = scores.filter(
+          (g) => g.final_score !== null && g.final_score !== undefined
         );
         const overallAverage =
-          validGrades.length > 0
+          validScores.length > 0
             ? (
-                validGrades.reduce((sum, g) => sum + g.final_grade, 0) /
-                validGrades.length
+                validScores.reduce((sum, g) => sum + g.final_score, 0) /
+                validScores.length
               ).toFixed(2)
             : "N/A";
 
@@ -1462,15 +1413,15 @@ const StudentList = () => {
         });
         currentRow++;
 
-        // Helpers to extract TX/GK/CK safely from grade_data
+        // Helpers to extract TX/GK/CK safely from score_data
         const getCellScore = (obj) => {
           if (!obj) return "";
           const v = obj.Diem ?? obj.diem ?? obj.value ?? obj;
           return v !== undefined && v !== null ? v : "";
         };
 
-        const getTXString = (grade) => {
-          const data = grade?.grade_data || {};
+        const getTXString = (score) => {
+          const data = score?.score_data || {};
           // Ưu tiên bắt các khóa dạng Thường xuyên hoặc TX (TX1, TX_2, Diem_tx3...)
           let keys = Object.keys(data).filter((k) =>
             /(diem[_ ]?thuong[_ ]?xuyen|^tx[_ ]?\d+|diem[_ ]?tx[_ ]?\d+)/i.test(
@@ -1526,8 +1477,8 @@ const StudentList = () => {
             .join(" ");
         };
 
-        const getSingleScore = (grade, typeRegex) => {
-          const data = grade?.grade_data || {};
+        const getSingleScore = (score, typeRegex) => {
+          const data = score?.score_data || {};
           // Trường hợp phẳng
           let key = Object.keys(data).find((k) => typeRegex.test(k));
           if (key) return getCellScore(data[key]);
@@ -1544,15 +1495,15 @@ const StudentList = () => {
           return "";
         };
 
-        // Grade data rows
-        grades.forEach((grade) => {
-          const tx = getTXString(grade);
-          const gk = getSingleScore(grade, /giua[_ ]?ki/i);
-          const ck = getSingleScore(grade, /cuoi[_ ]?ki/i);
-          const tbm = grade.final_grade ?? "";
+        // Score data rows
+        scores.forEach((score) => {
+          const tx = getTXString(score);
+          const gk = getSingleScore(score, /giua[_ ]?ki/i);
+          const ck = getSingleScore(score, /cuoi[_ ]?ki/i);
+          const tbm = score.final_score ?? "";
 
           const dataRow = worksheet.getRow(currentRow);
-          dataRow.values = [grade.subject_name || "N/A", tx, gk, ck, tbm];
+          dataRow.values = [score.subject_name || "N/A", tx, gk, ck, tbm];
 
           ["A", "B", "C", "D", "E"].forEach((col) => {
             const cell = worksheet.getCell(`${col}${currentRow}`);
@@ -2227,7 +2178,7 @@ const StudentList = () => {
 
                       <div className="grid grid-cols-2 gap-2">
                         <Button
-                          onClick={() => handleViewGrades(student)}
+                          onClick={() => handleViewScores(student)}
                           variant="outline"
                           size="sm"
                           className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
@@ -2921,10 +2872,10 @@ const StudentList = () => {
       )}
 
       {/* Student Grades Modal */}
-      {showGradesModal && selectedStudentForGrades && (
+      {showScoresModal && selectedStudentForScores && (
         <Dialog
-          open={showGradesModal}
-          onOpenChange={(open) => !open && closeGradesModal()}
+          open={showScoresModal}
+          onOpenChange={(open) => !open && closeScoresModal()}
         >
           <DialogContent className="max-w-6xl">
             <DialogHeader>
@@ -2932,23 +2883,23 @@ const StudentList = () => {
                 <BarChart3 className="w-5 h-5 text-primary" /> Bảng điểm
               </DialogTitle>
               <DialogDescription>
-                {selectedStudentForGrades.full_name} -{" "}
-                {selectedStudentForGrades.student_id} | Lớp{" "}
-                {selectedStudentForGrades.class_name} - Khối{" "}
-                {selectedStudentForGrades.grade}
+                {selectedStudentForScores.full_name} -{" "}
+                {selectedStudentForScores.student_id} | Lớp{" "}
+                {selectedStudentForScores.class_name} - Khối{" "}
+                {selectedStudentForScores.grade}
               </DialogDescription>
             </DialogHeader>
 
             {/* Modal Content */}
             <div className="p-6">
-              {gradesLoading ? (
+              {scoresLoading ? (
                 <div className="flex items-center justify-center h-64">
                   <div className="w-16 h-16 border-b-2 border-purple-600 rounded-full animate-spin"></div>
                   <span className="ml-4 text-lg text-gray-600">
                     Đang tải điểm số...
                   </span>
                 </div>
-              ) : studentGrades.length === 0 ? (
+              ) : studentScores.length === 0 ? (
                 <div className="py-12 text-center">
                   <div className="mb-4 text-6xl text-gray-400">📝</div>
                   <h4 className="mb-2 text-lg font-medium text-gray-900">
@@ -2974,7 +2925,7 @@ const StudentList = () => {
                       <div className="text-right">
                         <p className="text-sm text-gray-600">Tổng số môn học</p>
                         <p className="text-2xl font-bold text-purple-600">
-                          {studentGrades.length}
+                          {studentScores.length}
                         </p>
                       </div>
                     </div>
@@ -3000,21 +2951,21 @@ const StudentList = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {studentGrades.map((gradeRecord, index) => (
+                        {studentScores.map((scoreRecord, index) => (
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="flex items-center">
                                 <div className="flex items-center justify-center w-10 h-10 text-sm font-bold rounded-full text-primary-foreground bg-primary">
-                                  {gradeRecord.subject_name
+                                  {scoreRecord.subject_name
                                     ?.charAt(0)
                                     ?.toUpperCase() || "?"}
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900">
-                                    {gradeRecord.subject_name}
+                                    {scoreRecord.subject_name}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {gradeRecord.class_name}
+                                    {scoreRecord.class_name}
                                   </div>
                                 </div>
                               </div>
@@ -3022,18 +2973,18 @@ const StudentList = () => {
 
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-900">
-                                {gradeRecord.teacher_name ||
+                                {scoreRecord.teacher_name ||
                                   "Chưa có thông tin"}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {gradeRecord.academic_year} -{" "}
-                                {gradeRecord.semester}
+                                {scoreRecord.academic_year} -{" "}
+                                {scoreRecord.semester}
                               </div>
                             </td>
 
                             <td className="px-6 py-4">
                               <div className="flex flex-wrap justify-center gap-2">
-                                {gradeRecord.grade_data &&
+                                {scoreRecord.score_data &&
                                   (() => {
                                     // Sắp xếp các cột điểm theo: trọng số tăng dần, rồi theo giai đoạn (thường xuyên -> giữa kì -> cuối kì)
                                     const getPriority = (name) => {
@@ -3051,19 +3002,19 @@ const StudentList = () => {
                                       return 99;
                                     };
                                     const keys = Object.keys(
-                                      gradeRecord.grade_data
+                                      scoreRecord.score_data
                                     )
                                       .filter(
                                         (key) =>
                                           key !== "Mon_hoc" &&
-                                          gradeRecord.grade_data[key]?.Diem
+                                          scoreRecord.score_data[key]?.Diem
                                       )
                                       .sort((a, b) => {
                                         const wa = Number(
-                                          gradeRecord.grade_data[a]?.He_so ?? 1
+                                          scoreRecord.score_data[a]?.He_so ?? 1
                                         );
                                         const wb = Number(
-                                          gradeRecord.grade_data[b]?.He_so ?? 1
+                                          scoreRecord.score_data[b]?.He_so ?? 1
                                         );
                                         if (wa !== wb) return wa - wb;
                                         return getPriority(a) - getPriority(b);
@@ -3098,13 +3049,13 @@ const StudentList = () => {
                                         </div>
                                         <div className="text-sm font-bold text-blue-800">
                                           {
-                                            gradeRecord.grade_data[columnName]
+                                            scoreRecord.score_data[columnName]
                                               ?.Diem
                                           }
                                           <span className="ml-1 text-xs text-blue-600">
                                             (HS:{" "}
                                             {
-                                              gradeRecord.grade_data[columnName]
+                                              scoreRecord.score_data[columnName]
                                                 ?.He_so
                                             }
                                             )
@@ -3119,28 +3070,28 @@ const StudentList = () => {
                             <td className="px-6 py-4 text-center">
                               <div
                                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${(() => {
-                                  const grade = gradeRecord.final_grade;
+                                  const score = scoreRecord.final_score;
                                   // Convert to number if string
-                                  const numericGrade =
-                                    typeof grade === "string"
-                                      ? parseFloat(grade)
-                                      : grade;
+                                  const numericScore =
+                                    typeof score === "string"
+                                      ? parseFloat(score)
+                                      : score;
                                   if (
-                                    numericGrade === null ||
-                                    isNaN(numericGrade)
+                                    numericScore === null ||
+                                    isNaN(numericScore)
                                   ) {
-                                    return "bg-gray-100 text-gray-800"; // Default for non-numeric grades
+                                    return "bg-gray-100 text-gray-800"; // Default for non-numeric scores
                                   }
-                                  if (numericGrade >= 8.0)
+                                  if (numericScore >= 8.0)
                                     return "bg-green-100 text-green-800";
-                                  if (numericGrade >= 6.5)
+                                  if (numericScore >= 6.5)
                                     return "bg-yellow-100 text-yellow-800";
-                                  if (numericGrade >= 5.0)
+                                  if (numericScore >= 5.0)
                                     return "bg-orange-100 text-orange-800";
                                   return "bg-red-100 text-red-800";
                                 })()}`}
                               >
-                                {gradeRecord.final_grade}
+                                {scoreRecord.final_score}
                               </div>
                             </td>
                           </tr>
@@ -3160,13 +3111,13 @@ const StudentList = () => {
                           Điểm trung bình chung
                         </p>
                         <p className="text-2xl font-bold text-purple-600">
-                          {studentGrades.length > 0
+                          {studentScores.length > 0
                             ? (
-                                studentGrades.reduce(
-                                  (sum, grade) =>
-                                    sum + (grade.final_grade || 0),
+                                studentScores.reduce(
+                                  (sum, score) =>
+                                    sum + (score.final_score || 0),
                                   0
-                                ) / studentGrades.length
+                                ) / studentScores.length
                               ).toFixed(2)
                             : "0.00"}
                         </p>
@@ -3177,8 +3128,8 @@ const StudentList = () => {
                         </p>
                         <p className="text-2xl font-bold text-green-600">
                           {
-                            studentGrades.filter(
-                              (grade) => (grade.final_grade || 0) >= 8.0
+                            studentScores.filter(
+                              (score) => (score.final_score || 0) >= 8.0
                             ).length
                           }
                         </p>
@@ -3187,8 +3138,8 @@ const StudentList = () => {
                         <p className="text-sm text-gray-600">Số môn &lt; 5.0</p>
                         <p className="text-2xl font-bold text-red-600">
                           {
-                            studentGrades.filter(
-                              (grade) => (grade.final_grade || 0) < 5.0
+                            studentScores.filter(
+                              (score) => (score.final_score || 0) < 5.0
                             ).length
                           }
                         </p>
@@ -3202,7 +3153,7 @@ const StudentList = () => {
             {/* Modal Footer */}
             <div className="px-6 py-4 rounded-b-lg bg-gray-50">
               <div className="flex justify-end">
-                <Button variant="secondary" onClick={closeGradesModal}>
+                <Button variant="secondary" onClick={closeScoresModal}>
                   Đóng
                 </Button>
               </div>
@@ -3392,14 +3343,14 @@ const StudentList = () => {
                     </div>
 
                     {/* Generate Button */}
-                    {!hasGradeData && (
+                    {!hasScoreData && (
                       <div className="p-3 mb-2 text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded">
                         ⚠️ Cần có dữ liệu điểm của học sinh để tạo nhận xét.
                       </div>
                     )}
                     <button
                       onClick={generateFeedback}
-                      disabled={feedbackLoading || !hasGradeData}
+                      disabled={feedbackLoading || !hasScoreData}
                       className="flex items-center justify-center w-full px-4 py-2 font-medium text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
                     >
                       {feedbackLoading ? (

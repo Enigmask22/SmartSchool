@@ -18,7 +18,7 @@ from admin.models import (
 from admin.services import generate_student_id
 from core.database import get_db
 from core.logger import setup_logger
-from auth.api import get_current_user
+from core.dependencies import get_current_user
 from core.system_settings import get_current_academic_year
 
 logger = setup_logger("admin_api")
@@ -276,7 +276,7 @@ async def permanent_delete_user(
                     student_id = student["id"]
                     # Xóa các bản ghi liên quan
                     db.table("attendance").delete().eq("student_id", student_id).execute()
-                    db.table("grades").delete().eq("student_id", student_id).execute()
+                    db.table("scores").delete().eq("student_id", student_id).execute()
                 
                 # Xóa student record
                 db.table("students").delete().eq("user_id", user_id).execute()
@@ -647,10 +647,8 @@ async def get_all_subjects(
 ):
     """Lấy danh sách tất cả môn học"""
     try:
-        # Join nhẹ với grade_settings để lấy cấu hình cột điểm đang active (nếu có)
-        query = db.table("subjects").select(
-            "*, grade_settings:grade_settings(id, grade_column_config, is_active)"
-        )
+        # Lấy subjects với score_column_config (không cần join vì đã merge vào subjects table)
+        query = db.table("subjects").select("*")
         
         # Nếu không show_deleted, chỉ lấy các môn học active
         if not show_deleted:
@@ -658,19 +656,10 @@ async def get_all_subjects(
         
         response = query.order("subject_code").execute()
 
-        # Flatten: gắn trực tiếp grade_column_config vào mỗi subject
+        # Map score_column_config (giữ nguyên tên để nhất quán)
         subjects = []
         for subj in (response.data or []):
-            subj_copy = dict(subj)
-            if isinstance(subj.get("grade_settings"), dict):
-                if subj["grade_settings"].get("is_active"):
-                    subj_copy["grade_column_config"] = subj["grade_settings"].get("grade_column_config")
-            elif isinstance(subj.get("grade_settings"), list) and subj["grade_settings"]:
-                # Nếu trả về list, lấy bản ghi active đầu tiên
-                active = next((g for g in subj["grade_settings"] if g.get("is_active")), None)
-                if active:
-                    subj_copy["grade_column_config"] = active.get("grade_column_config")
-            subjects.append(subj_copy)
+            subjects.append(dict(subj))
         
         return {"success": True, "data": subjects}
     except Exception as e:
@@ -1743,7 +1732,7 @@ async def permanent_delete_student_admin(
         
         # Xóa các bản ghi liên quan
         db.table("attendance").delete().eq("student_id", student_id).execute()
-        db.table("grades").delete().eq("student_id", student_id).execute()
+        db.table("scores").delete().eq("student_id", student_id).execute()
         
         # Xóa vĩnh viễn student record
         response = db.table("students").delete().eq("id", student_id).execute()
@@ -2003,11 +1992,11 @@ async def get_default_academic_year(admin_user=Depends(get_admin_user)):
 
 
 # ===============================================
-# CONFIG HOLIDAYS (Ngày nghỉ theo khối)
+# CONFIG DAYOFFS (Ngày nghỉ theo khối)
 # ===============================================
 
-@router.get("/holidays")
-async def list_holidays(
+@router.get("/dayoffs")
+async def list_dayoffs(
     year: Optional[int] = Query(None),
     month: Optional[int] = Query(None),
     grade: Optional[int] = Query(None, description="10/11/12"),
@@ -2016,7 +2005,7 @@ async def list_holidays(
 ):
     """Liệt kê cấu hình ngày nghỉ. Có thể lọc theo year, month, grade."""
     try:
-        query = db.table("config_holidays").select("*")
+        query = db.table("dayoff").select("*")
         if year is not None:
             query = query.eq("year", year)
         if month is not None:
@@ -2026,19 +2015,19 @@ async def list_holidays(
         resp = query.order("year, month, grade").execute()
         return {"success": True, "data": resp.data or []}
     except Exception as e:
-        logger.error(f"Error list holidays: {str(e)}")
+        logger.error(f"Error list dayoffs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy cấu hình ngày nghỉ: {str(e)}")
 
 
-@router.post("/holidays")
-async def create_holiday_config(
+@router.post("/dayoffs")
+async def create_dayoff_config(
     payload: dict,
     admin_user=Depends(get_admin_user),
     db=Depends(get_db),
 ):
-    """Tạo cấu hình ngày nghỉ: body {year, month, grade, holidays_list: [int,...]}"""
+    """Tạo cấu hình ngày nghỉ: body {year, month, grade, dayoffs_list: [int,...]}"""
     try:
-        required = ["year", "month", "grade", "holidays_list"]
+        required = ["year", "month", "grade", "dayoffs_list"]
         for k in required:
             if k not in payload:
                 raise HTTPException(status_code=400, detail=f"Thiếu trường {k}")
@@ -2046,30 +2035,30 @@ async def create_holiday_config(
             "year": int(payload["year"]),
             "month": int(payload["month"]),
             "grade": int(payload["grade"]),
-            "holidays_list": payload.get("holidays_list") or [],
+            "dayoffs_list": payload.get("dayoffs_list") or [],
             "updated_at": datetime.now().isoformat(),
         }
         # nếu đã tồn tại thì cập nhật thay vì tạo mới
         existing = (
-            db.table("config_holidays")
+            db.table("dayoff")
             .select("id")
             .eq("year", data["year"]).eq("month", data["month"]).eq("grade", data["grade"])  
             .execute()
         )
         if existing.data:
-            resp = db.table("config_holidays").update(data).eq("id", existing.data[0]["id"]).execute()
+            resp = db.table("dayoff").update(data).eq("id", existing.data[0]["id"]).execute()
         else:
-            resp = db.table("config_holidays").insert(data).execute()
+            resp = db.table("dayoff").insert(data).execute()
         return {"success": True, "data": resp.data[0] if resp.data else None}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error create holiday config: {str(e)}")
+        logger.error(f"Error create dayoff config: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo cấu hình ngày nghỉ: {str(e)}")
 
 
-@router.put("/holidays/{config_id}")
-async def update_holiday_config(
+@router.put("/dayoffs/{config_id}")
+async def update_dayoff_config(
     config_id: int,
     payload: dict,
     admin_user=Depends(get_admin_user),
@@ -2077,31 +2066,31 @@ async def update_holiday_config(
 ):
     try:
         update_data = {"updated_at": datetime.now().isoformat()}
-        for f in ["year", "month", "grade", "holidays_list"]:
+        for f in ["year", "month", "grade", "dayoffs_list"]:
             if f in payload:
                 update_data[f] = payload[f]
-        resp = db.table("config_holidays").update(update_data).eq("id", config_id).execute()
+        resp = db.table("dayoff").update(update_data).eq("id", config_id).execute()
         if not resp.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi cấu hình")
         return {"success": True, "data": resp.data[0]}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error update holiday config: {str(e)}")
+        logger.error(f"Error update dayoff config: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật cấu hình ngày nghỉ: {str(e)}")
 
 
-@router.delete("/holidays/{config_id}")
-async def delete_holiday_config(
+@router.delete("/dayoffs/{config_id}")
+async def delete_dayoff_config(
     config_id: int,
     admin_user=Depends(get_admin_user),
     db=Depends(get_db),
 ):
     try:
-        resp = db.table("config_holidays").delete().eq("id", config_id).execute()
+        resp = db.table("dayoff").delete().eq("id", config_id).execute()
         return {"success": True, "data": None}
     except Exception as e:
-        logger.error(f"Error delete holiday config: {str(e)}")
+        logger.error(f"Error delete dayoff config: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa cấu hình ngày nghỉ: {str(e)}")
 
 

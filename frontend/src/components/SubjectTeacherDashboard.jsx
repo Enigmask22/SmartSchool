@@ -695,7 +695,7 @@ const SubjectTeacherDashboard = () => {
                           <span
                             className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full ${
                               (() => {
-                                const grade = student.final_grade;
+                                const grade = student.final_score;
                                 // Convert to number if string
                                 const numericGrade =
                                   typeof grade === "string"
@@ -711,7 +711,7 @@ const SubjectTeacherDashboard = () => {
                                 : "bg-orange-100 text-orange-800"
                             }`}
                           >
-                            {student.final_grade || 0}
+                            {student.final_score || 0}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center whitespace-nowrap">
@@ -823,7 +823,7 @@ const SubjectTeacherDashboard = () => {
                         </td>
                         <td className="px-6 py-4 text-center whitespace-nowrap">
                           <span className="inline-flex px-4 py-2 text-lg font-bold leading-5 rounded-full shadow-md bg-primary text-primary-foreground">
-                            {student.final_grade || 0}
+                            {student.final_score || 0}
                           </span>
                         </td>
                       </tr>

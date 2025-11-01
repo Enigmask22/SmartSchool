@@ -10,7 +10,8 @@ from attendance.models import AttendanceCreate, AttendanceUpdate, AttendanceStat
 from attendance.services import get_vietnam_time_string, get_vietnam_date_string
 from core.database import get_db
 from core.logger import setup_logger
-from auth.api import get_current_user
+from core.dependencies import get_current_user
+from core.system_settings import get_attendance_cutoff_time
 
 logger = setup_logger("attendance_api")
 router = APIRouter()
@@ -21,9 +22,18 @@ async def check_in_attendance(
     attendance: AttendanceCreate,
     db=Depends(get_db)
 ):
-    """Điểm danh vào cho học sinh"""
+    """Điểm danh vào cho học sinh
+    
+    Note: Stored procedure process_attendance_checkin tự động đọc attendance_cutoff_time 
+    từ system_settings để xác định status (Dung gio/Tre). Không cần pass cutoff_time 
+    vào stored procedure.
+    """
     try:
         current_vietnam_time = get_vietnam_time_string()
+        
+        # Log cutoff time được sử dụng (để debug/monitoring)
+        cutoff_time = get_attendance_cutoff_time()
+        logger.debug(f"Using attendance_cutoff_time from settings: {cutoff_time}")
         
         function_result = db.rpc('process_attendance_checkin', {
             'p_student_id': attendance.student_id,

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from homeroom.models import ResponseModel
 from core.database import get_db
 from core.logger import setup_logger
-from auth.api import get_current_user
+from core.dependencies import get_current_user
 
 logger = setup_logger("homeroom_api")
 router = APIRouter()

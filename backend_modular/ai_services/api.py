@@ -728,7 +728,12 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
         }
 
 async def create_auto_attendance(student_data: dict, db, confidence: float = 0.85):
-    """Tạo attendance record tự động cho học sinh"""
+    """Tạo attendance record tự động cho học sinh
+    
+    Note: Stored procedure process_attendance_checkin tự động đọc attendance_cutoff_time 
+    từ system_settings để xác định status (Dung gio/Tre). Không cần pass cutoff_time 
+    vào stored procedure.
+    """
     try:
         student_id = student_data["id"]
         student_name = student_data["full_name"]
@@ -742,6 +747,7 @@ async def create_auto_attendance(student_data: dict, db, confidence: float = 0.8
         current_vietnam_date = datetime.now(vietnam_tz).date().isoformat()
         
         # Try to use database function if available
+        # Stored procedure sẽ tự động đọc attendance_cutoff_time từ system_settings
         try:
             function_result = db.rpc('process_attendance_checkin', {
                 'p_student_id': student_id,
