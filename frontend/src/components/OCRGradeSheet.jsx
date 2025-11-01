@@ -265,7 +265,7 @@ const OCRGradeSheet = ({
         grades: grades,
       };
 
-      const response = await api.bulkImportGrades(importPayload);
+      const response = await api.bulkImportScores(importPayload);
 
       if (response.success) {
         alert(

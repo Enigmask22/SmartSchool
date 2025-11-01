@@ -159,7 +159,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
 """
         return prompt.strip()
     
-    def parse_grade_sheet(self, image_path: str) -> Dict:
+    def parse_score_sheet(self, image_path: str) -> Dict:
         """
         Phân tích toàn bộ bảng điểm sử dụng Gemini Vision API
         
@@ -175,7 +175,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         }
         """
         try:
-            logger.debug(f"Processing grade sheet: {image_path}")
+            logger.debug(f"Processing score sheet: {image_path}")
             
             # Bước 1: Mở và validate ảnh
             if not os.path.exists(image_path):
@@ -227,7 +227,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
             return validated_data
             
         except Exception as e:
-            logger.error(f"❌ Error parsing grade sheet: {str(e)}", exc_info=True)
+            logger.error(f"❌ Error parsing score sheet: {str(e)}", exc_info=True)
             return {
                 'success': False,
                 'headers': [],
@@ -293,8 +293,8 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         headers = data.get('headers', [])
         validated_rows = []
         
-        # Lấy tất cả grade columns (trừ id và ho_va_ten)
-        grade_columns = [col for col in headers if col not in ['id', 'ho_va_ten', 'student_id']]
+        # Lấy tất cả score columns (trừ id và ho_va_ten)
+        score_columns = [col for col in headers if col not in ['id', 'ho_va_ten', 'student_id']]
         
         for idx, row in enumerate(rows, start=1):
             try:
@@ -319,13 +319,13 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                     validated_row['ho_va_ten'] = row['ho_va_ten'].strip()
                 
                 # Validate và normalize TẤT CẢ các cột điểm (dynamic)
-                for grade_col in grade_columns:
-                    if grade_col in row:
-                        grade = self._normalize_grade(row[grade_col])
-                        if grade is not None:
-                            validated_row[grade_col] = grade
+                for score_col in score_columns:
+                    if score_col in row:
+                        score = self._normalize_score(row[score_col])
+                        if score is not None:
+                            validated_row[score_col] = score
                         else:
-                            errors.append(f"Row {idx}: {grade_col} không hợp lệ ({row[grade_col]})")
+                            errors.append(f"Row {idx}: {score_col} không hợp lệ ({row[score_col]})")
                 
                 # Phải có ít nhất student_id
                 if validated_row.get('student_id'):
@@ -371,12 +371,12 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         
         return None
     
-    def _normalize_grade(self, grade):
+    def _normalize_score(self, score):
         """
         Chuẩn hóa điểm số - hỗ trợ cả điểm số (float) và điểm chữ (Đ, KĐ)
         
         Args:
-            grade: Raw grade (có thể là int, float, hoặc string)
+            score: Raw score (có thể là int, float, hoặc string)
             
         Returns:
             - float: Điểm số (0-10, bước 0.25)
@@ -385,39 +385,39 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         """
         try:
             # Nếu là string, check xem có phải điểm chữ không
-            if isinstance(grade, str):
-                grade_str = grade.strip().upper()
+            if isinstance(score, str):
+                score_str = score.strip().upper()
                 
                 # Điểm chữ "Đ" (Đạt)
-                if grade_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
+                if score_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
                     return 'Đ'
                 
                 # Điểm chữ "KĐ" (Không Đạt)
-                if grade_str in ['KĐ', 'KD', 'KHONG DAT', 'KHÔNG ĐẠT', 'KHONGDAT']:
+                if score_str in ['KĐ', 'KD', 'KHONG DAT', 'KHÔNG ĐẠT', 'KHONGDAT']:
                     return 'KĐ'
                 
                 # Nếu không phải điểm chữ, thử convert sang số
                 # Replace comma with dot
-                grade = grade.replace(',', '.')
-                grade = float(grade)
-            elif isinstance(grade, (int, float)):
-                grade = float(grade)
+                score = score.replace(',', '.')
+                score = float(score)
+            elif isinstance(score, (int, float)):
+                score = float(score)
             else:
                 return None
             
             # Validate range
-            if not (0 <= grade <= 10):
-                logger.warning(f"⚠️ Grade {grade} out of range 0-10")
+            if not (0 <= score <= 10):
+                logger.warning(f"⚠️ Score {score} out of range 0-10")
                 return None
             
             # Round to nearest 0.25
-            grade = round(grade * 4) / 4
-            grade = min(10.0, max(0.0, grade))
+            score = round(score * 4) / 4
+            score = min(10.0, max(0.0, score))
             
-            return grade
+            return score
             
         except (ValueError, TypeError) as e:
-            logger.error(f"❌ Error normalizing grade '{grade}': {e}")
+            logger.error(f"❌ Error normalizing score '{score}': {e}")
             return None
     
     def export_to_excel_format(self, parsed_data: Dict) -> List[Dict]:
@@ -425,7 +425,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         Convert parsed data sang format phù hợp với bulk import
         
         Args:
-            parsed_data: Data từ parse_grade_sheet()
+            parsed_data: Data từ parse_score_sheet()
             
         Returns: 
             List[{student_id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki}]

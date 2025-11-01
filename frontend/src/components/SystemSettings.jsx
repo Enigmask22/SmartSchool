@@ -169,57 +169,57 @@ const SystemSettings = () => {
   const hours = Array.from({ length: 24 }, (_, i) => `${i}`.padStart(2, "0"));
   const minutes = Array.from({ length: 60 }, (_, i) => `${i}`.padStart(2, "0"));
 
-  // ===== Holidays per grade (10/11/12) =====
+  // ===== Dayoffs per grade (10/11/12) =====
   const grades = [10, 11, 12];
   const currentYear = new Date().getFullYear();
-  const [holidayYear, setHolidayYear] = useState({
+  const [dayoffYear, setDayoffYear] = useState({
     10: currentYear,
     11: currentYear,
     12: currentYear,
   });
-  const [holidayMonth, setHolidayMonth] = useState({
+  const [dayoffMonth, setDayoffMonth] = useState({
     10: new Date().getMonth() + 1,
     11: new Date().getMonth() + 1,
     12: new Date().getMonth() + 1,
   });
-  const [holidayDays, setHolidayDays] = useState({
+  const [dayoffDays, setDayoffDays] = useState({
     10: new Set(),
     11: new Set(),
     12: new Set(),
   });
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  const loadHolidayConfig = async (g) => {
+  const loadDayoffConfig = async (g) => {
     try {
-      const y = holidayYear[g];
-      const m = holidayMonth[g];
+      const y = dayoffYear[g];
+      const m = dayoffMonth[g];
       const resp = await api.request(
-        `/admin/holidays?year=${y}&month=${m}&grade=${g}`
+        `/admin/dayoffs?year=${y}&month=${m}&grade=${g}`
       );
       if (resp.success && resp.data && resp.data.length > 0) {
-        const list = resp.data[0].holidays_list || [];
-        setHolidayDays((prev) => ({ ...prev, [g]: new Set(list) }));
+        const list = resp.data[0].dayoffs_list || [];
+        setDayoffDays((prev) => ({ ...prev, [g]: new Set(list) }));
       } else {
-        setHolidayDays((prev) => ({ ...prev, [g]: new Set() }));
+        setDayoffDays((prev) => ({ ...prev, [g]: new Set() }));
       }
     } catch (e) {
       // ignore
     }
   };
 
-  const saveHolidayConfig = async (g) => {
+  const saveDayoffConfig = async (g) => {
     try {
       setSaving(true);
-      const y = holidayYear[g];
-      const m = holidayMonth[g];
-      const list = Array.from(holidayDays[g]).sort((a, b) => a - b);
-      const resp = await api.request(`/admin/holidays`, {
+      const y = dayoffYear[g];
+      const m = dayoffMonth[g];
+      const list = Array.from(dayoffDays[g]).sort((a, b) => a - b);
+      const resp = await api.request(`/admin/dayoffs`, {
         method: "POST",
         body: JSON.stringify({
           year: y,
           month: m,
           grade: g,
-          holidays_list: list,
+          dayoffs_list: list,
         }),
       });
       if (resp.success) setSuccess(`Lưu ngày nghỉ khối ${g} thành công`);
@@ -232,11 +232,25 @@ const SystemSettings = () => {
     }
   };
 
-  const renderHolidaySection = (g) => {
+  // Auto-load dayoff config for all grades when component mounts
+  useEffect(() => {
+    // Load config for all grades (10, 11, 12) after initial render
+    // Small delay to ensure state (dayoffYear, dayoffMonth) is initialized
+    const timer = setTimeout(() => {
+      grades.forEach((g) => {
+        loadDayoffConfig(g);
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  const renderDayoffSection = (g) => {
     const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
-    const selected = holidayDays[g] || new Set();
+    const selected = dayoffDays[g] || new Set();
     const toggleDay = (d) => {
-      setHolidayDays((prev) => {
+      setDayoffDays((prev) => {
         const setCopy = new Set(prev[g] || []);
         if (setCopy.has(d)) setCopy.delete(d);
         else setCopy.add(d);
@@ -256,10 +270,10 @@ const SystemSettings = () => {
             <div>
               <Label>Năm</Label>
               <Select
-                value={String(holidayYear[g])}
+                value={String(dayoffYear[g])}
                 onValueChange={(v) => {
-                  setHolidayYear((p) => ({ ...p, [g]: parseInt(v, 10) }));
-                  setTimeout(() => loadHolidayConfig(g), 0);
+                  setDayoffYear((p) => ({ ...p, [g]: parseInt(v, 10) }));
+                  setTimeout(() => loadDayoffConfig(g), 0);
                 }}
               >
                 <SelectTrigger>
@@ -277,10 +291,10 @@ const SystemSettings = () => {
             <div>
               <Label>Tháng</Label>
               <Select
-                value={String(holidayMonth[g])}
+                value={String(dayoffMonth[g])}
                 onValueChange={(v) => {
-                  setHolidayMonth((p) => ({ ...p, [g]: parseInt(v, 10) }));
-                  setTimeout(() => loadHolidayConfig(g), 0);
+                  setDayoffMonth((p) => ({ ...p, [g]: parseInt(v, 10) }));
+                  setTimeout(() => loadDayoffConfig(g), 0);
                 }}
               >
                 <SelectTrigger>
@@ -317,11 +331,11 @@ const SystemSettings = () => {
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => loadHolidayConfig(g)}>
+            <Button variant="outline" onClick={() => loadDayoffConfig(g)}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Tải cấu hình
             </Button>
-            <Button onClick={() => saveHolidayConfig(g)} disabled={saving}>
+            <Button onClick={() => saveDayoffConfig(g)} disabled={saving}>
               <Save className="w-4 h-4 mr-2" />
               Lưu ngày nghỉ khối {g}
             </Button>
@@ -652,10 +666,10 @@ const SystemSettings = () => {
         </CardContent>
       </Card>
 
-      {/* Holidays per grade */}
+      {/* Dayoffs per grade */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
         {grades.map((g) => (
-          <div key={g}>{renderHolidaySection(g)}</div>
+          <div key={g}>{renderDayoffSection(g)}</div>
         ))}
       </div>
     </div>

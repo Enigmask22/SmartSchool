@@ -1,5 +1,5 @@
 """
-API Router cho Grades management
+API Router cho Scores management
 """
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, BackgroundTasks, status
@@ -10,16 +10,16 @@ import uuid
 import os
 import asyncio
 
-from grades.models import GradeCreate, GradeUpdate, ResponseModel
-from grades.services import calculate_final_grade
+from scores.models import ScoreCreate, ScoreUpdate, ResponseModel
+from scores.services import calculate_final_grade
 from core.database import get_db
 from core.logger import setup_logger
 from core.system_settings import get_current_academic_year, get_current_semester
-from auth.api import get_current_user
-from grades.ocr_services.qwen_queue_manager import get_queue_manager
-from grades.ocr_services.ocr_factory import OCRFactory
+from core.dependencies import get_current_user
+from scores.ocr_services.qwen_queue_manager import get_queue_manager
+from scores.ocr_services.ocr_factory import OCRFactory
 
-logger = setup_logger("grades_api")
+logger = setup_logger("scores_api")
 router = APIRouter()
 
 # Global dict to store OCR results (in production, use Redis or database)
@@ -71,8 +71,8 @@ async def get_subjects(db=Depends(get_db)):
         logger.error(f"Error getting subjects: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
-@router.get("/students/{student_id}/grades")
-async def get_student_grades(
+@router.get("/students/{student_id}/scores")
+async def get_student_scores(
     student_id: int,
     academic_year: Optional[str] = None,
     semester: Optional[str] = None,
@@ -80,7 +80,7 @@ async def get_student_grades(
 ):
     """Lấy điểm của học sinh"""
     try:
-        query = db.table("grades").select("*").eq("student_id", student_id)
+        query = db.table("scores").select("*").eq("student_id", student_id)
         
         if academic_year:
             query = query.eq("academic_year", academic_year)
@@ -90,11 +90,11 @@ async def get_student_grades(
         response = query.execute()
         return {"success": True, "data": response.data}
     except Exception as e:
-        logger.error(f"Error getting grades: {str(e)}")
+        logger.error(f"Error getting scores: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 @router.get("/student/{student_id}")
-async def get_student_all_grades(
+async def get_student_all_scores(
     student_id: int,
     academic_year: str = None,
     semester: str = None,
@@ -120,7 +120,7 @@ async def get_student_all_grades(
         student_info = student.data[0]
         
         # Lấy tất cả điểm của học sinh với JOIN
-        grades = db.table("grades").select("""
+        scores = db.table("scores").select("""
             *,
             class_subjects!inner(
                 id,
@@ -130,25 +130,25 @@ async def get_student_all_grades(
             )
         """).eq("student_id", student_id).eq("academic_year", academic_year).eq("semester", semester).execute()
         
-        student_grades = []
+        student_scores = []
         
-        if grades.data:
-            for grade_record in grades.data:
-                class_subject = grade_record.get("class_subjects", {})
+        if scores.data:
+            for score_record in scores.data:
+                class_subject = score_record.get("class_subjects", {})
                 subject = class_subject.get("subjects", {})
                 class_info = class_subject.get("classes", {})
                 teacher = class_subject.get("teachers", {})
                 
-                student_grades.append({
-                    "id": grade_record["id"],
+                student_scores.append({
+                    "id": score_record["id"],
                     "class_subject_id": class_subject.get("id"),
                     "subject_name": subject.get("subject_name", "N/A"),
                     "class_name": class_info.get("class_name", "N/A"),
                     "teacher_name": teacher.get("full_name", "N/A"),
-                    "academic_year": grade_record["academic_year"],
-                    "semester": grade_record["semester"],
-                    "grade_data": grade_record["grade_data"],
-                    "final_grade": grade_record["final_grade"]
+                    "academic_year": score_record["academic_year"],
+                    "semester": score_record["semester"],
+                    "score_data": score_record["score_data"],
+                    "final_score": score_record["final_score"]
                 })
         
         return {
@@ -156,7 +156,7 @@ async def get_student_all_grades(
             "message": "Lấy điểm học sinh thành công",
             "data": {
                 "student": student_info,
-                "grades": student_grades,
+                "scores": student_scores,
                 "academic_year": academic_year,
                 "semester": semester
             }
@@ -165,21 +165,21 @@ async def get_student_all_grades(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting student grades: {str(e)}")
+        logger.error(f"Error getting student scores: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Lỗi server: {str(e)}"
         )
 
 @router.post("/")
-async def create_grade(grade: GradeCreate, db=Depends(get_db)):
+async def create_score(score: ScoreCreate, db=Depends(get_db)):
     """Tạo điểm mới"""
     try:
-        grade_data = grade.dict()
-        final_grade = calculate_final_grade(grade_data["grade_data"])
-        grade_data["final_grade"] = final_grade
+        score_data_dict = score.dict()
+        final_score = calculate_final_grade(score_data_dict["score_data"])
+        score_data_dict["final_score"] = final_score
         
-        response = db.table("grades").insert(grade_data).execute()
+        response = db.table("scores").insert(score_data_dict).execute()
         
         if response.data:
             return {
@@ -190,23 +190,23 @@ async def create_grade(grade: GradeCreate, db=Depends(get_db)):
         else:
             raise HTTPException(status_code=500, detail="Lỗi tạo điểm")
     except Exception as e:
-        logger.error(f"Error creating grade: {str(e)}")
+        logger.error(f"Error creating score: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
-@router.put("/{grade_id}")
-async def update_grade(
-    grade_id: int,
-    grade: GradeUpdate,
+@router.put("/{score_id}")
+async def update_score(
+    score_id: int,
+    score: ScoreUpdate,
     db=Depends(get_db)
 ):
     """Cập nhật điểm"""
     try:
-        update_data = grade.dict(exclude_unset=True)
+        update_data = score.dict(exclude_unset=True)
         
-        if "grade_data" in update_data:
-            update_data["final_grade"] = calculate_final_grade(update_data["grade_data"])
+        if "score_data" in update_data:
+            update_data["final_score"] = calculate_final_grade(update_data["score_data"])
         
-        response = db.table("grades").update(update_data).eq("id", grade_id).execute()
+        response = db.table("scores").update(update_data).eq("id", score_id).execute()
         
         if response.data:
             return {
@@ -217,7 +217,7 @@ async def update_grade(
         else:
             raise HTTPException(status_code=404, detail="Không tìm thấy điểm")
     except Exception as e:
-        logger.error(f"Error updating grade: {str(e)}")
+        logger.error(f"Error updating score: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 @router.get("/teacher/info")
@@ -535,19 +535,19 @@ async def get_students_by_class_subject(
         
         # Lấy điểm của các học sinh cho môn này
         student_ids = [s["id"] for s in filtered_students]
-        grades = db.table("grades").select("*").in_("student_id", student_ids).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+        scores = db.table("scores").select("*").in_("student_id", student_ids).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
         
         # Tạo dictionary để map điểm với học sinh
-        grades_dict = {g["student_id"]: g for g in grades.data}
+        scores_dict = {s["student_id"]: s for s in scores.data}
         
-        # Combine student info with grades
-        student_grades = []
+        # Combine student info with scores
+        student_scores = []
         for student in filtered_students:
-            student_grade = {
+            student_score = {
                 "student": student,
-                "grade": grades_dict.get(student["id"], None)
+                "score": scores_dict.get(student["id"], None)
             }
-            student_grades.append(student_grade)
+            student_scores.append(student_score)
         
         return {
             "success": True,
@@ -560,7 +560,7 @@ async def get_students_by_class_subject(
                     "class": class_info,
                     "subject": subject_info
                 },
-                "students": student_grades
+                "students": student_scores
             }
         }
         
@@ -572,208 +572,25 @@ async def get_students_by_class_subject(
 
 
 # ===============================================
-# GRADE CONFIG ENDPOINTS
+# SCORE MANAGEMENT ENDPOINTS
 # ===============================================
+# Note: ScoreConfig (score_column_config) đã được quản lý bởi admin module
+# Admin quản lý score_column_config trực tiếp trong subjects table
 
-# @router.post("/config/upsert")
-# async def upsert_grade_config(
-#     config: dict,
-#     current_teacher=Depends(get_current_teacher),
-#     db=Depends(get_db)
-# ):
-#     """Tạo mới hoặc cập nhật cấu hình cột điểm"""
-#     try:
-#         from grades.models import GradeConfigCreate
-        
-#         config_obj = GradeConfigCreate(**config)
-        
-#         # Kiểm tra xem đã có config chưa
-#         existing = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", config_obj.subject_id).eq("academic_year", config_obj.academic_year).eq("semester", config_obj.semester).execute()
-        
-#         if existing.data:
-#             # Update existing config
-#             update_data = {
-#                 "grade_column_config": config_obj.grade_column_config,
-#                 "updated_at": datetime.now().isoformat()
-#             }
-            
-#             response = db.table("grade_configs").update(update_data).eq("id", existing.data[0]["id"]).execute()
-#             message = "Cập nhật cấu hình điểm thành công"
-#         else:
-#             # Create new config
-#             config_data = {
-#                 "teacher_id": current_teacher["id"],
-#                 "subject_id": config_obj.subject_id,
-#                 "academic_year": config_obj.academic_year,
-#                 "semester": config_obj.semester,
-#                 "grade_column_config": config_obj.grade_column_config,
-#                 "created_at": datetime.now().isoformat(),
-#                 "updated_at": datetime.now().isoformat()
-#             }
-            
-#             response = db.table("grade_configs").insert(config_data).execute()
-#             message = "Tạo cấu hình điểm thành công"
-        
-#         return {
-#             "success": True,
-#             "message": message,
-#             "data": response.data[0] if response.data else None
-#         }
-        
-#     except Exception as e:
-#         logger.error(f"Error upserting grade config: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
-
-
-# @router.post("/config")
-# async def create_grade_config(
-#     config: dict,
-#     current_teacher=Depends(get_current_teacher),
-#     db=Depends(get_db)
-# ):
-#     """Tạo cấu hình cột điểm cho môn học"""
-#     try:
-#         from grades.models import GradeConfigCreate
-        
-#         config_obj = GradeConfigCreate(**config)
-        
-#         # Kiểm tra xem đã có config chưa
-#         existing = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", config_obj.subject_id).eq("academic_year", config_obj.academic_year).eq("semester", config_obj.semester).execute()
-        
-#         if existing.data:
-#             raise HTTPException(
-#                 status_code=status.HTTP_400_BAD_REQUEST,
-#                 detail="Cấu hình điểm cho môn này đã tồn tại"
-#             )
-        
-#         config_data = {
-#             "teacher_id": current_teacher["id"],
-#             "subject_id": config_obj.subject_id,
-#             "academic_year": config_obj.academic_year,
-#             "semester": config_obj.semester,
-#             "grade_column_config": config_obj.grade_column_config,
-#             "created_at": datetime.now().isoformat(),
-#             "updated_at": datetime.now().isoformat()
-#         }
-        
-#         response = db.table("grade_configs").insert(config_data).execute()
-        
-#         return {
-#             "success": True,
-#             "message": "Tạo cấu hình điểm thành công",
-#             "data": response.data[0] if response.data else None
-#         }
-        
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f"Error creating grade config: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
-
-
-# @router.get("/config/{subject_id}")
-# async def get_grade_config(
-#     subject_id: int,
-#     academic_year: str,
-#     semester: str,
-#     current_teacher=Depends(get_current_teacher),
-#     db=Depends(get_db)
-# ):
-#     """Lấy cấu hình cột điểm cho môn học"""
-#     try:
-#         config = db.table("grade_configs").select("*").eq("teacher_id", current_teacher["id"]).eq("subject_id", subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
-        
-#         if not config.data:
-#             # Trả về config mặc định
-#             default_config = {
-#                 "teacher_id": current_teacher["id"],
-#                 "subject_id": subject_id,
-#                 "academic_year": academic_year,
-#                 "semester": semester,
-#                 "grade_column_config": {
-#                     "Diem_thuong_xuyen": {"he_so": 1, "label": "Điểm thường xuyên"},
-#                     "Diem_thi_giua_ki": {"he_so": 2, "label": "Điểm thi giữa kì"},
-#                     "Diem_thi_cuoi_ki": {"he_so": 3, "label": "Điểm thi cuối kì"}
-#                 }
-#             }
-            
-#             return {
-#                 "success": True,
-#                 "message": "Sử dụng cấu hình mặc định",
-#                 "data": default_config
-#             }
-        
-#         return {
-#             "success": True,
-#             "message": "Lấy cấu hình điểm thành công",
-#             "data": config.data[0]
-#         }
-        
-#     except Exception as e:
-#         logger.error(f"Error getting grade config: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
-
-
-# @router.put("/config/{config_id}")
-# async def update_grade_config(
-#     config_id: int,
-#     config: dict,
-#     current_teacher=Depends(get_current_teacher),
-#     db=Depends(get_db)
-# ):
-#     """Cập nhật cấu hình cột điểm"""
-#     try:
-#         from grades.models import GradeConfigUpdate
-        
-#         config_obj = GradeConfigUpdate(**config)
-        
-#         # Kiểm tra quyền sở hữu
-#         existing = db.table("grade_configs").select("*").eq("id", config_id).eq("teacher_id", current_teacher["id"]).execute()
-        
-#         if not existing.data:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="Không tìm thấy cấu hình điểm"
-#             )
-        
-#         update_data = {
-#             "grade_column_config": config_obj.grade_column_config,
-#             "updated_at": datetime.now().isoformat()
-#         }
-        
-#         response = db.table("grade_configs").update(update_data).eq("id", config_id).execute()
-        
-#         return {
-#             "success": True,
-#             "message": "Cập nhật cấu hình điểm thành công",
-#             "data": response.data[0] if response.data else None
-#         }
-        
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f"Error updating grade config: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
-
-
-# ===============================================
-# GRADE MANAGEMENT ENDPOINTS
-# ===============================================
-
-@router.post("/grade")
-async def create_or_update_grade(
-    grade: dict,
+@router.post("/score")
+async def create_or_update_score(
+    score: dict,
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
     """Tạo hoặc cập nhật điểm học sinh"""
     try:
-        from grades.models import GradeCreate
+        from scores.models import ScoreCreate
         
-        grade_obj = GradeCreate(**grade)
+        score_obj = ScoreCreate(**score)
         
         # Kiểm tra quyền truy cập class_subject
-        class_subject = db.table("class_subjects").select("*").eq("id", grade_obj.class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
+        class_subject = db.table("class_subjects").select("*").eq("id", score_obj.class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
         
         if not class_subject.data:
             raise HTTPException(
@@ -781,45 +598,45 @@ async def create_or_update_grade(
                 detail="Bạn không có quyền nhập điểm cho lớp này"
             )
         
-        # Lấy grade settings (schema mới) để tính final_grade
+        # Lấy score_column_config từ subjects table để tính final_score
         subject_id = class_subject.data[0]["subject_id"]
-        settings_resp = db.table("grade_settings").select("*").eq("subject_id", subject_id).eq("is_active", True).execute()
+        subject_resp = db.table("subjects").select("score_column_config, is_active").eq("id", subject_id).eq("is_active", True).execute()
         
-        if settings_resp.data:
-            grade_config = settings_resp.data[0]["grade_column_config"]
-            final_grade = calculate_final_grade(grade_obj.grade_data, grade_config)
-            # logger.info(f"Final grade: {final_grade}")  
+        if subject_resp.data and subject_resp.data[0].get("score_column_config"):
+            score_config = subject_resp.data[0]["score_column_config"]
+            final_score = calculate_final_grade(score_obj.score_data, score_config)
+            # logger.info(f"Final score: {final_score}")  
         else:
-            final_grade = 0.0
+            final_score = 0.0
         
         # Kiểm tra xem đã có điểm chưa
-        existing = db.table("grades").select("*").eq("student_id", grade_obj.student_id).eq("class_subject_id", grade_obj.class_subject_id).eq("academic_year", grade_obj.academic_year).eq("semester", grade_obj.semester).execute()
+        existing = db.table("scores").select("*").eq("student_id", score_obj.student_id).eq("class_subject_id", score_obj.class_subject_id).eq("academic_year", score_obj.academic_year).eq("semester", score_obj.semester).execute()
         
         if existing.data:
-            # Update existing grade
+            # Update existing score
             update_data = {
-                "grade_data": grade_obj.grade_data,
-                "final_grade": final_grade,
+                "score_data": score_obj.score_data,
+                "final_score": final_score,
                 "updated_at": datetime.now().isoformat()
             }
             
-            response = db.table("grades").update(update_data).eq("id", existing.data[0]["id"]).execute()
+            response = db.table("scores").update(update_data).eq("id", existing.data[0]["id"]).execute()
             message = "Cập nhật điểm thành công"
         else:
-            # Create new grade
-            grade_data = {
-                "student_id": grade_obj.student_id,
-                "class_subject_id": grade_obj.class_subject_id,
-                "academic_year": grade_obj.academic_year,
-                "semester": grade_obj.semester,
-                "grade_data": grade_obj.grade_data,
-                "final_grade": final_grade,
+            # Create new score
+            score_data = {
+                "student_id": score_obj.student_id,
+                "class_subject_id": score_obj.class_subject_id,
+                "academic_year": score_obj.academic_year,
+                "semester": score_obj.semester,
+                "score_data": score_obj.score_data,
+                "final_score": final_score,
                 "created_by": current_teacher["user_id"],
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
             
-            response = db.table("grades").insert(grade_data).execute()
+            response = db.table("scores").insert(score_data).execute()
             message = "Tạo điểm thành công"
         
         return {
@@ -831,12 +648,12 @@ async def create_or_update_grade(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating/updating grade: {str(e)}")
+        logger.error(f"Error creating/updating score: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-@router.get("/grade/{student_id}/{class_subject_id}")
-async def get_student_grade(
+@router.get("/score/{student_id}/{class_subject_id}")
+async def get_student_score(
     student_id: int,
     class_subject_id: int,
     academic_year: str,
@@ -855,9 +672,9 @@ async def get_student_grade(
                 detail="Bạn không có quyền xem điểm của lớp này"
             )
         
-        grade = db.table("grades").select("*").eq("student_id", student_id).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+        score = db.table("scores").select("*").eq("student_id", student_id).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
         
-        if not grade.data:
+        if not score.data:
             return {
                 "success": True,
                 "message": "Chưa có điểm",
@@ -867,34 +684,34 @@ async def get_student_grade(
         return {
             "success": True,
             "message": "Lấy điểm thành công",
-            "data": grade.data[0]
+            "data": score.data[0]
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting grade: {str(e)}")
+        logger.error(f"Error getting score: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-@router.delete("/grade/{grade_id}")
-async def delete_grade(
-    grade_id: int,
+@router.delete("/score/{score_id}")
+async def delete_score(
+    score_id: int,
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
     """Xóa điểm"""
     try:
         # Kiểm tra quyền sở hữu
-        grade = db.table("grades").select("*, class_subjects!inner(teacher_id)").eq("id", grade_id).execute()
+        score = db.table("scores").select("*, class_subjects!inner(teacher_id)").eq("id", score_id).execute()
         
-        if not grade.data or grade.data[0]["class_subjects"]["teacher_id"] != current_teacher["id"]:
+        if not score.data or score.data[0]["class_subjects"]["teacher_id"] != current_teacher["id"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Bạn không có quyền xóa điểm này"
             )
         
-        response = db.table("grades").delete().eq("id", grade_id).execute()
+        response = db.table("scores").delete().eq("id", score_id).execute()
         
         return {
             "success": True,
@@ -905,7 +722,7 @@ async def delete_grade(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting grade: {str(e)}")
+        logger.error(f"Error deleting score: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
@@ -925,12 +742,12 @@ async def process_ocr_in_background(
         teacher_id: Teacher ID
         db: Database connection
     """
-    # Cleanup old grade sheets before processing (opportunistic cleanup)
+    # Cleanup old score sheets before processing (opportunistic cleanup)
     try:
-        from grades.services import cleanup_old_grade_sheets
-        cleanup_old_grade_sheets(max_age_hours=24)
+        from scores.services import cleanup_old_score_sheets
+        cleanup_old_score_sheets(max_age_hours=24)
     except Exception as e:
-        logger.warning(f"Failed to cleanup old grade sheets: {str(e)}")
+        logger.warning(f"Failed to cleanup old score sheets: {str(e)}")
     
     # Wait for semaphore (queue management)
     async with OCR_SEMAPHORE:
@@ -952,7 +769,7 @@ async def process_ocr_in_background(
             ocr_results[request_id]['progress'] = 30
             ocr_results[request_id]['message'] = 'Đang nhận diện văn bản...'
             
-            parsed_result = ocr_service.parse_grade_sheet(image_path)
+            parsed_result = ocr_service.parse_score_sheet(image_path)
             
             # Update progress: 60%
             ocr_results[request_id]['progress'] = 60
@@ -1045,8 +862,8 @@ async def process_ocr_in_background(
                 pass
 
 
-@router.post("/ocr/parse-grade-sheet")
-async def parse_grade_sheet_from_image(
+@router.post("/ocr/parse-score-sheet")
+async def parse_score_sheet_from_image(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     current_teacher=Depends(get_current_teacher),
@@ -1066,12 +883,12 @@ async def parse_grade_sheet_from_image(
             )
         
         # Tạo thư mục uploads nếu chưa có
-        upload_dir = Path("uploads/grade_sheets")
+        upload_dir = Path("uploads/score_sheets")
         upload_dir.mkdir(parents=True, exist_ok=True)
         
         # Lưu file tạm thời
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_filename = f"grade_sheet_{current_teacher['id']}_{timestamp}_{file.filename}"
+        temp_filename = f"score_sheet_{current_teacher['id']}_{timestamp}_{file.filename}"
         temp_path = upload_dir / temp_filename
         
         # Save uploaded file
@@ -1079,7 +896,7 @@ async def parse_grade_sheet_from_image(
             content = await file.read()
             buffer.write(content)
         
-        logger.info(f"Saved uploaded grade sheet to {temp_path}")
+        logger.info(f"Saved uploaded score sheet to {temp_path}")
         
         # Generate unique request ID
         request_id = str(uuid.uuid4())
@@ -1135,7 +952,7 @@ async def parse_grade_sheet_from_image(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error uploading grade sheet: {str(e)}")
+        logger.error(f"Error uploading score sheet: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
@@ -1233,8 +1050,8 @@ async def get_ocr_status(
 # ANALYTICS & TREND ENDPOINTS
 # ===============================================
 
-# @router.get("/grade-trend/{student_id}/{class_subject_id}")
-# async def get_student_grade_trend(
+# @router.get("/score-trend/{student_id}/{class_subject_id}")
+# async def get_student_score_trend(
 #     student_id: int,
 #     class_subject_id: int,
 #     academic_year: str,
@@ -1244,11 +1061,11 @@ async def get_ocr_status(
 # ):
 #     """Phân tích xu hướng điểm cho một học sinh trong một môn.
 
-#     Dựa trên dữ liệu `grade_data` và `grade_config` của môn để ước lượng
+#     Dựa trên dữ liệu `score_data` và `score_config` của môn để ước lượng
 #     xu hướng tăng/giảm/ổn định, trả về cả mô tả ngắn gọn cho UI.
 #     """
 #     try:
-#         from grades.services import analyze_grade_trend
+#         from scores.services import analyze_grade_trend
         
 #         # Quyền truy cập
 #         class_subject = db.table("class_subjects").select("*").eq("id", class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
@@ -1259,8 +1076,8 @@ async def get_ocr_status(
 #             )
 
 #         # Lấy điểm và cấu hình cột điểm
-#         grade_resp = db.table("grades").select("*").eq("student_id", student_id).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
-#         if not grade_resp.data:
+#         score_resp = db.table("scores").select("*").eq("student_id", student_id).eq("class_subject_id", class_subject_id).eq("academic_year", academic_year).eq("semester", semester).execute()
+#         if not score_resp.data:
 #             return {
 #                 "success": True,
 #                 "message": "Chưa có điểm",
@@ -1274,10 +1091,10 @@ async def get_ocr_status(
 
 #         subject_id = class_subject.data[0]["subject_id"]
 #         settings_resp = db.table("grade_settings").select("*").eq("subject_id", subject_id).eq("is_active", True).execute()
-#         grade_config = settings_resp.data[0]["grade_column_config"] if settings_resp.data else None
+#         score_config = settings_resp.data[0]["score_column_config"] if settings_resp.data else None
 
-#         grade_record = grade_resp.data[0]
-#         trend = analyze_grade_trend(grade_record.get("grade_data", {}), grade_config)
+#         score_record = score_resp.data[0]
+#         trend = analyze_grade_trend(score_record.get("score_data", {}), score_config)
 
 #         # Chuẩn hóa payload cho UI
 #         color = "#16A34A" if trend["direction"] == "up" else ("#DC2626" if trend["direction"] == "down" else "#6B7280")
@@ -1294,14 +1111,14 @@ async def get_ocr_status(
 #                 "confidence": trend["confidence"],
 #                 "reason": trend["reason"],
 #                 "ordered_points": trend["ordered_points"],
-#                 "final_grade": grade_record.get("final_grade")
+#                 "final_score": score_record.get("final_score")
 #             }
 #         }
         
 #     except HTTPException:
 #         raise
 #     except Exception as e:
-#         logger.error(f"Error analyzing grade trend: {str(e)}")
+#         logger.error(f"Error analyzing score trend: {str(e)}")
 #         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
@@ -1423,7 +1240,7 @@ async def get_teacher_dashboard_analytics(
         # Thu thập tất cả điểm số
         class_subject_ids = [cs["id"] for cs in class_subjects.data]
         
-        all_grades = db.table("grades").select("""
+        all_grades = db.table("scores").select("""
             *,
             students:student_id(id, student_id, full_name, class_name, grade),
             class_subjects!inner(
@@ -1433,26 +1250,26 @@ async def get_teacher_dashboard_analytics(
             )
         """).in_("class_subject_id", class_subject_ids).eq("academic_year", academic_year).eq("semester", semester).execute()
         
-        grades_data = all_grades.data if all_grades.data else []
+        scores_data = all_grades.data if all_grades.data else []
         
         # === TỔNG QUAN ===
-        total_students_with_grades = len(grades_data)
+        total_students_with_scores = len(scores_data)
         # Chỉ tính với các điểm số (bỏ qua giá trị chữ như "Đ", "KĐ")
         # Convert string numbers to float if possible
-        numeric_grades = []
-        for g in grades_data:
-            final_grade = g.get("final_grade")
-            if final_grade is None:
+        numeric_scores = []
+        for g in scores_data:
+            final_score = g.get("final_score")
+            if final_score is None:
                 continue
             # Check if numeric (int, float, or string number)
-            if isinstance(final_grade, (int, float)):
-                numeric_grades.append(final_grade)
-            elif isinstance(final_grade, str):
+            if isinstance(final_score, (int, float)):
+                numeric_scores.append(final_score)
+            elif isinstance(final_score, str):
                 try:
-                    numeric_grades.append(float(final_grade))
+                    numeric_scores.append(float(final_score))
                 except (ValueError, TypeError):
                     pass  # Ignore non-numeric strings like "Đ", "KĐ"
-        average_score = sum(numeric_grades) / len(numeric_grades) if len(numeric_grades) > 0 else 0
+        average_score = sum(numeric_scores) / len(numeric_scores) if len(numeric_scores) > 0 else 0
         
         # Lấy tổng số học sinh trong các lớp dạy
         total_students_count = 0
@@ -1468,60 +1285,60 @@ async def get_teacher_dashboard_analytics(
         weak = []       # Yếu: 3.5 - 4.9
         poor = []       # Kém: < 3.5
         
-        for grade in grades_data:
-            final_grade = grade.get("final_grade")
-            if final_grade is None:
+        for score in scores_data:
+            final_score = score.get("final_score")
+            if final_score is None:
                 continue
             
             # Convert to float if string, skip if not convertible
-            if isinstance(final_grade, str):
+            if isinstance(final_score, str):
                 try:
-                    final_grade = float(final_grade)
+                    final_score = float(final_score)
                 except (ValueError, TypeError):
                     continue  # Ignore non-numeric strings like "Đ", "KĐ"
-            elif not isinstance(final_grade, (int, float)):
+            elif not isinstance(final_score, (int, float)):
                 continue  # Skip other non-numeric types
             
             # Now we can safely compare
-            if final_grade >= 8.0:
-                excellent.append(grade)
-            elif final_grade >= 6.5:
-                good.append(grade)
-            elif final_grade >= 5.0:
-                average.append(grade)
-            elif final_grade >= 3.5:
-                weak.append(grade)
+            if final_score >= 8.0:
+                excellent.append(score)
+            elif final_score >= 6.5:
+                good.append(score)
+            elif final_score >= 5.0:
+                average.append(score)
+            elif final_score >= 3.5:
+                weak.append(score)
             else:
-                poor.append(grade)
+                poor.append(score)
         
         performance_groups = {
             "excellent": {
                 "count": len(excellent),
-                "percentage": round(len(excellent) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "percentage": round(len(excellent) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
                 "label": "Giỏi (8.0 - 10)",
                 "color": "#059669"
             },
             "good": {
                 "count": len(good),
-                "percentage": round(len(good) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "percentage": round(len(good) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
                 "label": "Khá (6.5 - 7.9)",
                 "color": "#2563EB"
             },
             "average": {
                 "count": len(average),
-                "percentage": round(len(average) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "percentage": round(len(average) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
                 "label": "Trung bình (5.0 - 6.4)",
                 "color": "#D97706"
             },
             "weak": {
                 "count": len(weak),
-                "percentage": round(len(weak) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "percentage": round(len(weak) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
                 "label": "Yếu (3.5 - 4.9)",
                 "color": "#EA580C"
             },
             "poor": {
                 "count": len(poor),
-                "percentage": round(len(poor) * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0,
+                "percentage": round(len(poor) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
                 "label": "Kém (< 3.5)",
                 "color": "#DC2626"
             }
@@ -1529,52 +1346,52 @@ async def get_teacher_dashboard_analytics(
         
         # === SO SÁNH GIỮA CÁC LỚP ===
         class_comparison = []
-        class_grades_map = {}
+        class_scores_map = {}
         
-        for grade in grades_data:
+        for score in scores_data:
             # Chỉ xử lý điểm số (bỏ qua giá trị chữ như "Đ", "KĐ")
-            final_grade = grade.get("final_grade")
-            if final_grade is None:
+            final_score = score.get("final_score")
+            if final_score is None:
                 continue
             # Convert to float if string
-            if isinstance(final_grade, str):
+            if isinstance(final_score, str):
                 try:
-                    final_grade = float(final_grade)
+                    final_score = float(final_score)
                 except (ValueError, TypeError):
                     continue  # Ignore non-numeric strings like "Đ", "KĐ"
             
-            class_name = grade["class_subjects"]["classes"]["class_name"]
-            if class_name not in class_grades_map:
-                class_grades_map[class_name] = []
-            class_grades_map[class_name].append(final_grade)
+            class_name = score["class_subjects"]["classes"]["class_name"]
+            if class_name not in class_scores_map:
+                class_scores_map[class_name] = []
+            class_scores_map[class_name].append(final_score)
         
-        for class_name, grades_list in class_grades_map.items():
-            # All grades in list are already validated and converted to numeric in the loop above
+        for class_name, scores_list in class_scores_map.items():
+            # All scores in list are already validated and converted to numeric in the loop above
             # Double-check to ensure all are numeric before processing
-            valid_grades = []
-            for g in grades_list:
-                if g is None:
+            valid_scores = []
+            for s in scores_list:
+                if s is None:
                     continue
-                if isinstance(g, str):
+                if isinstance(s, str):
                     try:
-                        valid_grades.append(float(g))
+                        valid_scores.append(float(s))
                     except (ValueError, TypeError):
                         continue
-                elif isinstance(g, (int, float)):
-                    valid_grades.append(g)
+                elif isinstance(s, (int, float)):
+                    valid_scores.append(s)
             
-            if valid_grades:
-                avg = sum(valid_grades) / len(valid_grades)
-                highest = max(valid_grades)
-                lowest = min(valid_grades)
+            if valid_scores:
+                avg = sum(valid_scores) / len(valid_scores)
+                highest = max(valid_scores)
+                lowest = min(valid_scores)
                 
                 class_comparison.append({
                     "class_name": class_name,
-                    "student_count": len(valid_grades),
+                    "student_count": len(valid_scores),
                     "average_score": round(avg, 2),
                     "highest_score": round(highest, 2),
                     "lowest_score": round(lowest, 2),
-                    "pass_rate": round(sum(1 for g in valid_grades if g >= 5.0) * 100 / len(valid_grades), 2)
+                    "pass_rate": round(sum(1 for s in valid_scores if s >= 5.0) * 100 / len(valid_scores), 2)
                 })
         
         # Sắp xếp theo điểm trung bình giảm dần
@@ -1582,18 +1399,18 @@ async def get_teacher_dashboard_analytics(
         
         # === HỌC SINH CẦN QUAN TÂM (điểm yếu và kém) ===
         students_need_attention = []
-        for grade in weak + poor:
-            student_info = grade.get("students", {})
-            class_info = grade.get("class_subjects", {}).get("classes", {})
+        for score in weak + poor:
+            student_info = score.get("students", {})
+            class_info = score.get("class_subjects", {}).get("classes", {})
             
             # Helper để xác định category (Kém hoặc Yếu)
-            final_grade = grade.get("final_grade")
+            final_score = score.get("final_score")
             numeric_grade = None
-            if isinstance(final_grade, (int, float)):
-                numeric_grade = final_grade
-            elif isinstance(final_grade, str):
+            if isinstance(final_score, (int, float)):
+                numeric_grade = final_score
+            elif isinstance(final_score, str):
                 try:
-                    numeric_grade = float(final_grade)
+                    numeric_grade = float(final_score)
                 except (ValueError, TypeError):
                     numeric_grade = None
             
@@ -1605,21 +1422,21 @@ async def get_teacher_dashboard_analytics(
                 "student_id": student_info.get("student_id"),
                 "student_name": student_info.get("full_name"),
                 "class_name": class_info.get("class_name"),
-                "final_grade": grade.get("final_grade"),
+                "final_score": score.get("final_score"),
                 "category": category,
-                "grade_data": grade.get("grade_data", {})
+                "score_data": score.get("score_data", {})
             })
         
         # Sắp xếp theo điểm tăng dần (yếu nhất lên đầu)
         def get_sort_key(item):
-            final_grade = item["final_grade"]
-            if final_grade is None:
+            final_score = item["final_score"]
+            if final_score is None:
                 return 0
-            if isinstance(final_grade, (int, float)):
-                return final_grade
-            if isinstance(final_grade, str):
+            if isinstance(final_score, (int, float)):
+                return final_score
+            if isinstance(final_score, str):
                 try:
-                    return float(final_grade)
+                    return float(final_score)
                 except (ValueError, TypeError):
                     return 0
             return 0
@@ -1629,78 +1446,78 @@ async def get_teacher_dashboard_analytics(
         # === TOP HỌC SINH XUẤT SẮC ===
         # Sort key helper để xử lý TEXT column
         def top_student_sort_key(x):
-            final_grade = x.get("final_grade", 0)
-            if isinstance(final_grade, (int, float)):
-                return final_grade
-            if isinstance(final_grade, str):
+            final_score = x.get("final_score", 0)
+            if isinstance(final_score, (int, float)):
+                return final_score
+            if isinstance(final_score, str):
                 try:
-                    return float(final_grade)
+                    return float(final_score)
                 except (ValueError, TypeError):
                     return 0
             return 0
         
         top_students = []
-        for grade in sorted(excellent, key=top_student_sort_key, reverse=True)[:10]:
-            student_info = grade.get("students", {})
-            class_info = grade.get("class_subjects", {}).get("classes", {})
+        for score in sorted(excellent, key=top_student_sort_key, reverse=True)[:10]:
+            student_info = score.get("students", {})
+            class_info = score.get("class_subjects", {}).get("classes", {})
             
             top_students.append({
                 "student_id": student_info.get("student_id"),
                 "student_name": student_info.get("full_name"),
                 "class_name": class_info.get("class_name"),
-                "final_grade": grade.get("final_grade"),
-                "grade_data": grade.get("grade_data", {})
+                "final_score": score.get("final_score"),
+                "score_data": score.get("score_data", {})
             })
         
         # === PHÂN BỐ ĐIỂM SỐ (Distribution) ===
-        # Helper function to safely convert grade to float (handle TEXT column type)
-        def get_numeric_grade(grade_data):
-            final_grade = grade_data.get("final_grade")
-            if final_grade is None:
+        # Helper function to safely convert score to float (handle TEXT column type)
+        def get_numeric_score(score_data):
+            final_score = score_data.get("final_score")
+            if final_score is None:
                 return None
-            if isinstance(final_grade, (int, float)):
-                return final_grade
-            if isinstance(final_grade, str):
+            if isinstance(final_score, (int, float)):
+                return final_score
+            if isinstance(final_score, str):
                 try:
-                    return float(final_grade)
+                    return float(final_score)
                 except (ValueError, TypeError):
                     return None
             return None
         
-        # Check if all grades are letter grades (Đ/KĐ)
-        letter_grade_count = 0
-        for g in grades_data:
-            final_grade = g.get("final_grade")
-            if isinstance(final_grade, str) and final_grade in ['Đ', 'KĐ']:
-                letter_grade_count += 1
+        # Check if all scores are letter grades (Đ/KĐ)
+        letter_score_count = 0
+        for s in scores_data:
+            final_score = s.get("final_score")
+            if isinstance(final_score, str) and final_score in ['Đ', 'KĐ']:
+                letter_score_count += 1
         
-        is_all_letter_grades = letter_grade_count == total_students_with_grades and total_students_with_grades > 0
+        is_all_letter_grades = letter_score_count == total_students_with_scores and total_students_with_scores > 0
         
         if is_all_letter_grades:
             # Trường hợp môn học với toàn điểm chữ (vd: GDTC)
             score_distribution = {
-                "Đ (Đạt)": letter_grade_count,  # Tất cả đạt
-                "KĐ (Không đạt)": total_students_with_grades - letter_grade_count,  # Không đạt
+                "Đ (Đạt)": letter_score_count,  # Tất cả đạt
+                "KĐ (Không đạt)": total_students_with_scores - letter_score_count,  # Không đạt
             }
             
             # Count Đ and KĐ
-            pass_count = len([g for g in grades_data if g.get("final_grade") == 'Đ'])
-            fail_count = len([g for g in grades_data if g.get("final_grade") == 'KĐ'])
+            pass_count = len([s for s in scores_data if s.get("final_score") == 'Đ'])
+            fail_count = len([s for s in scores_data if s.get("final_score") == 'KĐ'])
         else:
             # Trường hợp môn học với điểm số
             score_distribution = {
-                "9-10": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and gr >= 9]),
-                "8-9": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 8 <= gr < 9]),
-                "7-8": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 7 <= gr < 8]),
-                "6-7": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 6 <= gr < 7]),
-                "5-6": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 5 <= gr < 6]),
-                "4-5": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and 4 <= gr < 5]),
-                "0-4": len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and gr < 4])
+                "9-10": len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and sc >= 9]),
+                "8-9": len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and 8 <= sc < 9]),
+                "7-8": len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and 7 <= sc < 8]),
+                "6-7": len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and 6 <= sc < 7]),
+                "5-6": len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and 5 <= sc < 6]),
+                "4-5": len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and 4 <= sc < 5]),
+                "0-4": len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and sc < 4])
             }
             
             # === THỐNG KÊ ĐẠT/KHÔNG ĐẠT ===
-            pass_count = len([g for g in grades_data if (gr := get_numeric_grade(g)) is not None and gr >= 5.0])
-            fail_count = total_students_with_grades - pass_count
+            pass_count = len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and sc >= 5.0])
+            fail_count = total_students_with_scores - pass_count
         
         analytics_data = {
             "academic_year": academic_year,
@@ -1708,16 +1525,16 @@ async def get_teacher_dashboard_analytics(
             "class_filter": class_id,  # Thêm thông tin về class filter
             "total_classes": len(class_subjects.data),
             "total_students": total_students_count,
-            "students_with_grades": total_students_with_grades,
-            "students_without_grades": total_students_count - total_students_with_grades,
+            "students_with_scores": total_students_with_scores,
+            "students_without_scores": total_students_count - total_students_with_scores,
             "is_letter_grade_subject": is_all_letter_grades,  # Flag để frontend biết loại điểm
             "overview": {
-                "average_score": round(average_score, 2) if numeric_grades else 0,
-                "highest_score": round(max(numeric_grades), 2) if numeric_grades else 0,
-                "lowest_score": round(min([g for g in numeric_grades if g > 0]), 2) if numeric_grades else 0,
+                "average_score": round(average_score, 2) if numeric_scores else 0,
+                "highest_score": round(max(numeric_scores), 2) if numeric_scores else 0,
+                "lowest_score": round(min([s for s in numeric_scores if s > 0]), 2) if numeric_scores else 0,
                 "pass_count": pass_count,
                 "fail_count": fail_count,
-                "pass_rate": round(pass_count * 100 / total_students_with_grades, 2) if total_students_with_grades > 0 else 0
+                "pass_rate": round(pass_count * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0
             },
             "performance_groups": performance_groups,
             "score_distribution": score_distribution,
@@ -1747,7 +1564,7 @@ async def get_teacher_dashboard_analytics(
 
 
 @router.get("/template/download/{class_subject_id}")
-async def download_grade_template(
+async def download_score_template(
     class_subject_id: int,
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
@@ -1775,15 +1592,15 @@ async def download_grade_template(
         class_info = class_subject_info["classes"]
         subject_info = class_subject_info["subjects"]
         
-        # Get grade_settings for this subject
-        grade_settings_response = db.table("grade_settings").select("*").eq(
-            "subject_id", subject_info["id"]
+        # Get score_column_config from subjects table
+        subject_response = db.table("subjects").select("score_column_config, is_active").eq(
+            "id", subject_info["id"]
         ).eq("is_active", True).execute()
         
         # Helper function to flatten nested columns with proper ordering
-        def flatten_grade_columns(grade_column_config):
+        def flatten_score_columns(score_column_config):
             """Extract all column keys (child columns from nested structure) in correct order"""
-            if not grade_column_config:
+            if not score_column_config:
                 return []
             
             # Define priority order for sorting
@@ -1801,7 +1618,7 @@ async def download_grade_template(
             
             # Sort parent columns first
             sorted_columns = sorted(
-                grade_column_config.items(),
+                score_column_config.items(),
                 key=lambda x: priority_order.get(x[0], 999)
             )
             
@@ -1823,12 +1640,12 @@ async def download_grade_template(
             return flat_columns
         
         # Determine column headers
-        if grade_settings_response.data:
-            grade_config = grade_settings_response.data[0].get("grade_column_config", {})
-            grade_columns = flatten_grade_columns(grade_config)
+        if subject_response.data and subject_response.data[0].get("score_column_config"):
+            score_config = subject_response.data[0].get("score_column_config", {})
+            score_columns = flatten_score_columns(score_config)
         else:
-            # Fallback to default columns if no grade_settings
-            grade_columns = ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
+            # Fallback to default columns if no score_column_config
+            score_columns = ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
         
         # Lấy danh sách học sinh (bao gồm subject_selected)
         students = db.table("students").select("*").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).order("student_id").execute()
@@ -1873,8 +1690,8 @@ async def download_grade_template(
             'bg_color': 'white'
         })
         
-        # Header - Dynamic based on grade_settings
-        headers = ['id', 'ho_va_ten'] + grade_columns
+        # Header - Dynamic based on score settings
+        headers = ['id', 'ho_va_ten'] + score_columns
         for col, header in enumerate(headers):
             worksheet.write(0, col, header, header_format)
         
@@ -1882,16 +1699,16 @@ async def download_grade_template(
         for row, student in enumerate(filtered_students, start=1):
             worksheet.write(row, 0, student['student_id'], cell_format)
             worksheet.write(row, 1, student['full_name'], cell_format)
-            # Empty cells for all grade columns
-            for col_idx in range(len(grade_columns)):
+            # Empty cells for all score columns
+            for col_idx in range(len(score_columns)):
                 worksheet.write(row, col_idx + 2, '', cell_format)
         
         # Điều chỉnh độ rộng cột
         worksheet.set_column('A:A', 12)  # id
         worksheet.set_column('B:B', 25)  # họ và tên
-        # Set width for all grade columns dynamically
-        if grade_columns:
-            last_col_letter = chr(ord('C') + len(grade_columns) - 1)
+        # Set width for all score columns dynamically
+        if score_columns:
+            last_col_letter = chr(ord('C') + len(score_columns) - 1)
             worksheet.set_column(f'C:{last_col_letter}', 15)
         
         workbook.close()
@@ -1927,7 +1744,7 @@ async def bulk_import_grades(
     """Nhập điểm hàng loạt từ file Excel/CSV"""
     try:
         class_subject_id = import_data.get("class_subject_id")
-        grades_data = import_data.get("grades", [])
+        scores_data = import_data.get("scores", []) or import_data.get("grades", [])  # Backward compatibility: support both "scores" and "grades"
         
         # Kiểm tra quyền truy cập
         class_subject = db.table("class_subjects").select("*").eq("id", class_subject_id).eq("teacher_id", current_teacher["id"]).execute()
@@ -1940,7 +1757,7 @@ async def bulk_import_grades(
         
         subject_id = class_subject.data[0]["subject_id"]
         
-        # Lấy thông tin subject để thêm Mon_hoc vào grade_data
+        # Lấy thông tin subject để thêm Mon_hoc vào score_data
         subject_info = db.table("subjects").select("subject_name").eq("id", subject_id).execute()
         subject_name = subject_info.data[0]["subject_name"] if subject_info.data else ""
         
@@ -1948,18 +1765,18 @@ async def bulk_import_grades(
         academic_year = import_data.get("academic_year") or get_current_academic_year()
         semester = import_data.get("semester") or get_current_semester()
         
-        # Lấy grade settings (schema mới) để có grade_column_config
-        settings_resp = db.table("grade_settings").select("*").eq("subject_id", subject_id).eq("is_active", True).execute()
+        # Lấy score_column_config từ subjects table
+        subject_resp = db.table("subjects").select("score_column_config, is_active").eq("id", subject_id).eq("is_active", True).execute()
         
-        if not settings_resp.data:
+        if not subject_resp.data or not subject_resp.data[0].get("score_column_config"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Chưa có Grade Settings (cấu hình cột điểm) cho môn này. Vui lòng cấu hình trong grade_settings trước khi import."
+                detail="Chưa có cấu hình cột điểm (score_column_config) cho môn này. Vui lòng cấu hình trong subjects trước khi import."
             )
         
-        grade_column_config = settings_resp.data[0].get("grade_column_config")
+        score_column_config = subject_resp.data[0].get("score_column_config")
         
-        if not grade_column_config:
+        if not score_column_config:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cấu hình cột điểm không hợp lệ"
@@ -1968,10 +1785,10 @@ async def bulk_import_grades(
         imported_count = 0
         errors = []
         
-        # Helper function to normalize grade values (support both numbers and letter grades)
-        def normalize_grade_value(value):
+        # Helper function to normalize score values (support both numbers and letter scores)
+        def normalize_score_value(value):
             """
-            Convert raw value to either float (numeric grade) or string (letter grade: Đ/KĐ)
+            Convert raw value to either float (numeric score) or string (letter score: Đ/KĐ)
             Returns: (normalized_value, is_valid)
             """
             if value is None or value == '':
@@ -1998,13 +1815,13 @@ async def bulk_import_grades(
             except (ValueError, TypeError):
                 return None, False
         
-        # Build column mapping from grade_column_config (dynamic)
-        def get_column_mapping(grade_column_config):
-            """Generate mapping from import column names to grade_column_config structure"""
+        # Build column mapping from score_column_config (dynamic)
+        def get_column_mapping(score_column_config):
+            """Generate mapping from import column names to score_column_config structure"""
             mapping = {}
             
-            # Flatten the grade_column_config to get all column names
-            for column_name, column_config in grade_column_config.items():
+            # Flatten the score_column_config to get all column names
+            for column_name, column_config in score_column_config.items():
                 if isinstance(column_config, dict) and 'data' in column_config:
                     # Parent column with children
                     for child_key in column_config['data'].keys():
@@ -2015,11 +1832,11 @@ async def bulk_import_grades(
             
             return mapping
         
-        column_mapping = get_column_mapping(grade_column_config)
+        column_mapping = get_column_mapping(score_column_config)
         
-        for grade_record in grades_data:
+        for score_record in scores_data:
             try:
-                student_id = grade_record.get("student_id")
+                student_id = score_record.get("student_id")
                 if not student_id:
                     continue
                 
@@ -2033,15 +1850,15 @@ async def bulk_import_grades(
                 student_db_id = student.data[0]['id']
                 
                 # Transform data từ flat structure thành nested structure với He_so
-                grade_data = {}
+                score_data = {}
                 
                 # Process all columns from the import data
-                for import_col_name, import_value in grade_record.items():
+                for import_col_name, import_value in score_record.items():
                     if import_col_name in ['student_id', 'ho_va_ten']:
                         continue  # Skip student info columns
                     
-                    # Normalize the grade value
-                    normalized_value, is_valid = normalize_grade_value(import_value)
+                    # Normalize the score value
+                    normalized_value, is_valid = normalize_score_value(import_value)
                     
                     if not is_valid:
                         errors.append(
@@ -2060,14 +1877,14 @@ async def bulk_import_grades(
                         if parent_col:
                             # This is a child column - save as flat structure with child name as key
                             # Ví dụ: Diem_tx1, Diem_tx2 thay vì Diem_thuong_xuyen->Diem_tx1
-                            grade_data[child_col] = {
-                                'He_so': grade_column_config[parent_col]['data'][child_col].get('he_so', 1),
+                            score_data[child_col] = {
+                                'He_so': score_column_config[parent_col]['data'][child_col].get('he_so', 1),
                                 'Diem': normalized_value
                             }
                         else:
                             # This is a regular column
-                            grade_data[import_col_name] = {
-                                'He_so': grade_column_config[import_col_name].get('he_so', 1),
+                            score_data[import_col_name] = {
+                                'He_so': score_column_config[import_col_name].get('he_so', 1),
                                 'Diem': normalized_value
                             }
                     else:
@@ -2076,40 +1893,40 @@ async def bulk_import_grades(
                         if import_col_name.startswith('Diem_tx'):
                             # Tìm he_so từ Diem_thuong_xuyen config (nếu tồn tại)
                             he_so = 1  # Default
-                            if 'Diem_thuong_xuyen' in grade_column_config:
-                                he_so = grade_column_config['Diem_thuong_xuyen'].get('he_so', 1)
+                            if 'Diem_thuong_xuyen' in score_column_config:
+                                he_so = score_column_config['Diem_thuong_xuyen'].get('he_so', 1)
                             
-                            grade_data[import_col_name] = {
+                            score_data[import_col_name] = {
                                 'He_so': he_so,
                                 'Diem': normalized_value
                             }
                         # Bỏ qua các cột khác không có trong mapping
                 
-                # Thêm Mon_hoc vào grade_data
-                grade_data['Mon_hoc'] = subject_name
+                # Thêm Mon_hoc vào score_data
+                score_data['Mon_hoc'] = subject_name
                 
-                # Tính final grade với transformed data
-                final_grade = calculate_final_grade(grade_data, grade_column_config)
+                # Tính final score với transformed data
+                final_score = calculate_final_grade(score_data, score_column_config)
                 
-                # Upsert grade (sử dụng student_db_id thay vì student_id string)
-                existing = db.table("grades").select("id").eq("student_id", student_db_id).eq("class_subject_id", class_subject_id).execute()
+                # Upsert score (sử dụng student_db_id thay vì student_id string)
+                existing = db.table("scores").select("id").eq("student_id", student_db_id).eq("class_subject_id", class_subject_id).execute()
                 
                 if existing.data:
                     # Update existing
-                    db.table("grades").update({
-                        "grade_data": grade_data,
-                        "final_grade": final_grade,
+                    db.table("scores").update({
+                        "score_data": score_data,
+                        "final_score": final_score,
                         "updated_at": datetime.now().isoformat()
                     }).eq("id", existing.data[0]["id"]).execute()
                 else:
                     # Create new (sử dụng student_db_id)
-                    db.table("grades").insert({
+                    db.table("scores").insert({
                         "student_id": student_db_id,
                         "class_subject_id": class_subject_id,
                         "academic_year": academic_year,
                         "semester": semester,
-                        "grade_data": grade_data,
-                        "final_grade": final_grade,
+                        "score_data": score_data,
+                        "final_score": final_score,
                         "created_at": datetime.now().isoformat(),
                         "updated_at": datetime.now().isoformat()
                     }).execute()
@@ -2117,16 +1934,16 @@ async def bulk_import_grades(
                 imported_count += 1
                 
             except Exception as e:
-                logger.error(f"Error importing grade for student {grade_record.get('student_id', 'N/A')}: {str(e)}")
-                errors.append(f"Lỗi nhập điểm cho học sinh {grade_record.get('student_id', 'N/A')}: {str(e)}")
+                logger.error(f"Error importing score for student {score_record.get('student_id', 'N/A')}: {str(e)}")
+                errors.append(f"Lỗi nhập điểm cho học sinh {score_record.get('student_id', 'N/A')}: {str(e)}")
         
         return {
             "success": True,
-            "message": f"Nhập điểm thành công {imported_count}/{len(grades_data)} học sinh",
+            "message": f"Nhập điểm thành công {imported_count}/{len(scores_data)} học sinh",
             "data": {
                 "success_count": imported_count,
                 "error_count": len(errors),
-                "total_count": len(grades_data),
+                "total_count": len(scores_data),
                 "errors": errors
             }
         }
@@ -2318,8 +2135,8 @@ async def get_teacher_available_periods(
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-@router.get("/teacher/available-periods-grades")
-async def get_teacher_available_periods_grades(
+@router.get("/teacher/available-periods-scores")
+async def get_teacher_available_periods_scores(
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
@@ -2344,7 +2161,7 @@ async def get_teacher_available_periods_grades(
         class_subject_ids = [cs["id"] for cs in cs_response.data]
         
         # Lấy grades theo class_subject_ids
-        grades_response = db.table("grades").select("academic_year, semester").in_("class_subject_id", class_subject_ids).execute()
+        grades_response = db.table("scores").select("academic_year, semester").in_("class_subject_id", class_subject_ids).execute()
         
         if not grades_response.data:
             return {

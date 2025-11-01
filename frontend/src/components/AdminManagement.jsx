@@ -95,8 +95,8 @@ const AdminManagement = () => {
   const [userSubjects, setUserSubjects] = useState({}); // Map user_id -> [subject_ids] cho import
   const [importLoading, setImportLoading] = useState(false);
 
-  // Grade column config state for grade_settings tab
-  const [gradeColumns, setGradeColumns] = useState([]);
+  // Score column config state for score_settings tab
+  const [scoreColumns, setScoreColumns] = useState([]);
   const [editingColumnKey, setEditingColumnKey] = useState(null);
   const [showColumnForm, setShowColumnForm] = useState(false);
   const [columnFormData, setColumnFormData] = useState({
@@ -107,20 +107,20 @@ const AdminManagement = () => {
     subColumns: [],
   });
 
-  // Helper: fetch grade settings by subject and populate editor
-  const fetchSubjectGradeSettings = useCallback(async (subjectId) => {
+  // Helper: fetch score settings by subject and populate editor
+  const fetchSubjectScoreSettings = useCallback(async (subjectId) => {
     try {
-      const res = await api.getGradeConfigBySubject(subjectId);
-      if (res && res.success && res.data && res.data.grade_column_config) {
-        const gc = res.data.grade_column_config;
-        const columnsArray = Object.entries(gc).map(([key, value]) => ({
+      const res = await api.getScoreConfigBySubject(subjectId);
+      if (res && res.success && res.data && res.data.score_column_config) {
+        const sc = res.data.score_column_config;
+        const columnsArray = Object.entries(sc).map(([key, value]) => ({
           key,
           label: value.label,
           he_so: value.he_so,
           data: value.data || null,
         }));
-        setGradeColumns(columnsArray);
-        setFormData((prev) => ({ ...prev, grade_column_config: gc }));
+        setScoreColumns(columnsArray);
+        setFormData((prev) => ({ ...prev, score_column_config: sc }));
       }
     } catch (e) {
       // Silent fallback; will rely on joined data if available
@@ -174,7 +174,7 @@ const AdminManagement = () => {
         "subject_name",
         "description",
         "is_mandatory",
-        "grade_column_config",
+        "score_column_config",
         "is_active",
       ],
       endpoint: "/admin/subjects",
@@ -231,11 +231,11 @@ const AdminManagement = () => {
       ],
       endpoint: "/admin/class-subjects",
     },
-    grade_settings: {
+    score_settings: {
       title: "Cấu hình cột điểm",
-      fields: ["subject_id", "grade_column_config"],
-      displayFields: ["id", "subject_name", "grade_column_config", "is_active"],
-      endpoint: "/grade-settings",
+      fields: ["subject_id", "score_column_config"],
+      displayFields: ["id", "subject_name", "score_column_config", "is_active"],
+      endpoint: "/score-settings",
     },
   };
 
@@ -295,12 +295,12 @@ const AdminManagement = () => {
         if (activeTab === "subjects") {
           items = items.map((s) => ({
             ...s,
-            grade_column_config: s.grade_column_config || null,
+            score_column_config: s.score_column_config || null,
           }));
         }
 
-        // Transform data cho grade_settings để lấy subject_name từ nested object
-        if (activeTab === "grade_settings") {
+        // Transform data cho score_settings để lấy subject_name từ nested object
+        if (activeTab === "score_settings") {
           items = items.map((item) => ({
             ...item,
             subject_name: item.subjects?.subject_name || "-",
@@ -539,15 +539,15 @@ const AdminManagement = () => {
         });
 
         if (response.success) {
-          // Nếu là tạo mới môn học và có cấu hình cột điểm → tạo/ cập nhật grade_settings
-          if (activeTab === "subjects" && data.grade_column_config) {
+          // Nếu là tạo mới môn học và có cấu hình cột điểm → tạo/ cập nhật score_settings
+          if (activeTab === "subjects" && data.score_column_config) {
             try {
               const subjectId = response.data?.id;
               if (subjectId) {
                 // Kiểm tra đã có settings chưa
                 let existing = null;
                 try {
-                  const getRes = await api.getGradeConfigBySubject(subjectId);
+                  const getRes = await api.getScoreConfigBySubject(subjectId);
                   if (getRes.success) existing = getRes.data;
                 } catch (e) {
                   existing = null;
@@ -555,13 +555,13 @@ const AdminManagement = () => {
 
                 if (existing && existing.id) {
                   await api.updateGradeSettings(existing.id, {
-                    grade_column_config: data.grade_column_config,
+                    score_column_config: data.score_column_config,
                     is_active: true,
                   });
                 } else {
                   await api.createGradeSettings({
                     subject_id: subjectId,
-                    grade_column_config: data.grade_column_config,
+                    score_column_config: data.score_column_config,
                     is_active: true,
                   });
                 }
@@ -698,24 +698,24 @@ const AdminManagement = () => {
         });
 
         if (response.success) {
-          if (activeTab === "subjects" && data.grade_column_config) {
+          if (activeTab === "subjects" && data.score_column_config) {
             try {
               let existing = null;
               try {
-                const getRes = await api.getGradeConfigBySubject(id);
+                const getRes = await api.getScoreConfigBySubject(id);
                 if (getRes.success) existing = getRes.data;
               } catch (e) {
                 existing = null;
               }
               if (existing && existing.id) {
-                await api.updateGradeSettings(existing.id, {
-                  grade_column_config: data.grade_column_config,
+                await api.updateScoreSettings(id, {
+                  score_column_config: data.score_column_config,
                   is_active: true,
                 });
               } else {
-                await api.createGradeSettings({
+                await api.createScoreSettings({
                   subject_id: id,
-                  grade_column_config: data.grade_column_config,
+                  score_column_config: data.score_column_config,
                   is_active: true,
                 });
               }
@@ -991,10 +991,10 @@ const AdminManagement = () => {
       >
         {currentConfig?.fields
           ?.filter((field) => {
-            // Skip grade_column_config vì nó có Visual Editor riêng
+            // Skip score_column_config vì nó có Visual Editor riêng
             if (
-              activeTab === "grade_settings" &&
-              field === "grade_column_config"
+              activeTab === "score_settings" &&
+              field === "score_column_config"
             ) {
               return false;
             }
@@ -1112,7 +1112,7 @@ const AdminManagement = () => {
                     onValueChange={(value) =>
                       handleChange(field, value ? parseInt(value) : null)
                     }
-                    disabled={activeTab === "grade_settings" && isEdit}
+                    disabled={activeTab === "score_settings" && isEdit}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Chọn môn học" />
@@ -1128,7 +1128,7 @@ const AdminManagement = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  {activeTab === "grade_settings" && isEdit && (
+                  {activeTab === "score_settings" && isEdit && (
                     <p className="mt-1 text-xs text-amber-600">
                       ⚠️ Môn học không thể thay đổi sau khi tạo
                     </p>
@@ -1348,8 +1348,8 @@ const AdminManagement = () => {
             </div>
           ))}
 
-        {/* Grade Column Config Editor for grade_settings tab */}
-        {(activeTab === "grade_settings" || activeTab === "subjects") && (
+        {/* Score Column Config Editor for score_settings tab */}
+        {(activeTab === "score_settings" || activeTab === "subjects") && (
           <div className="p-6 mt-6 space-y-4 border rounded-lg border-border bg-muted/30">
             <div className="flex items-center justify-between">
               <div>
@@ -1619,17 +1619,17 @@ const AdminManagement = () => {
                       let updatedColumns;
                       if (editingColumnKey) {
                         // Update existing column
-                        updatedColumns = gradeColumns.map((col) =>
+                        updatedColumns = scoreColumns.map((col) =>
                           col.key === editingColumnKey ? newColumn : col
                         );
                       } else {
                         // Add new column
-                        updatedColumns = [...gradeColumns, newColumn];
+                        updatedColumns = [...scoreColumns, newColumn];
                       }
 
-                      setGradeColumns(updatedColumns);
+                      setScoreColumns(updatedColumns);
 
-                      // Convert to grade_column_config format
+                      // Convert to score_column_config format
                       const configObj = {};
                       updatedColumns.forEach((col) => {
                         configObj[col.key] = {
@@ -1643,7 +1643,7 @@ const AdminManagement = () => {
 
                       setFormData({
                         ...formData,
-                        grade_column_config: configObj,
+                        score_column_config: configObj,
                       });
 
                       setShowColumnForm(false);
@@ -1658,13 +1658,13 @@ const AdminManagement = () => {
             )}
 
             {/* Display existing columns */}
-            {gradeColumns.length > 0 && (
+            {scoreColumns.length > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
                   Các cột điểm hiện tại:
                 </label>
                 <div className="space-y-2">
-                  {gradeColumns.map((column, idx) => (
+                  {scoreColumns.map((column, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between p-3 border rounded-lg bg-background"
@@ -1727,10 +1727,10 @@ const AdminManagement = () => {
                           size="sm"
                           variant="destructive"
                           onClick={() => {
-                            const updatedColumns = gradeColumns.filter(
+                            const updatedColumns = scoreColumns.filter(
                               (_, i) => i !== idx
                             );
-                            setGradeColumns(updatedColumns);
+                            setScoreColumns(updatedColumns);
 
                             // Update formData
                             const configObj = {};
@@ -1746,7 +1746,7 @@ const AdminManagement = () => {
 
                             setFormData({
                               ...formData,
-                              grade_column_config: configObj,
+                              score_column_config: configObj,
                             });
                           }}
                         >
@@ -1759,7 +1759,7 @@ const AdminManagement = () => {
               </div>
             )}
 
-            {gradeColumns.length === 0 && !showColumnForm && (
+            {scoreColumns.length === 0 && !showColumnForm && (
               <div className="py-8 text-center text-gray-500 rounded-lg bg-gray-50">
                 <BookOpen className="w-12 h-12 mx-auto mb-2 text-gray-400" />
                 <p>Chưa có cột điểm nào. Nhấn "Thêm cột điểm" để bắt đầu.</p>
@@ -1825,9 +1825,9 @@ const AdminManagement = () => {
               }
               setFormData({});
               setShowPassword(false);
-              // Reset grade columns
-              if (activeTab === "grade_settings") {
-                setGradeColumns([]);
+              // Reset score columns
+              if (activeTab === "score_settings") {
+                setScoreColumns([]);
                 setShowColumnForm(false);
                 setEditingColumnKey(null);
               }
@@ -1926,12 +1926,12 @@ const AdminManagement = () => {
                       // Khởi tạo formData với giá trị mặc định cho teachers
                       if (activeTab === "teachers") {
                         setFormData({ gender: "Nam" });
-                      } else if (activeTab === "grade_settings") {
+                      } else if (activeTab === "score_settings") {
                         setFormData({});
-                        setGradeColumns([]);
+                        setScoreColumns([]);
                       } else if (activeTab === "subjects") {
                         setFormData({});
-                        setGradeColumns([]);
+                        setScoreColumns([]);
                       } else {
                         setFormData({});
                       }
@@ -1963,7 +1963,7 @@ const AdminManagement = () => {
                   activeTab === "classes" ||
                   activeTab === "subject_teachers" ||
                   activeTab === "class_subjects" ||
-                  activeTab === "grade_settings") && (
+                  activeTab === "score_settings") && (
                   <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
                     <input
                       type="checkbox"
@@ -2094,7 +2094,7 @@ const AdminManagement = () => {
                               ? "GIỚI TÍNH"
                               : field === "phone"
                               ? "SDT"
-                              : field === "grade_column_config"
+                              : field === "score_column_config"
                               ? "CẤU HÌNH CỘT ĐIỂM"
                               : field.replace(/_/g, " ").toUpperCase()}
                           </TableHead>
@@ -2230,8 +2230,8 @@ const AdminManagement = () => {
                                   >
                                     {item[field] ?? "-"}
                                   </span>
-                                ) : field === "grade_column_config" ? (
-                                  // Hiển thị grade_column_config với badges
+                                ) : field === "score_column_config" ? (
+                                  // Hiển thị score_column_config với badges
                                   <div className="max-w-md">
                                     {item[field] &&
                                     typeof item[field] === "object" ? (
@@ -2340,40 +2340,40 @@ const AdminManagement = () => {
                                           );
                                           setFormData(initData);
                                         } else if (
-                                          activeTab === "grade_settings"
+                                          activeTab === "score_settings"
                                         ) {
-                                          // Load grade_column_config khi edit grade settings
+                                          // Load score_column_config khi edit score settings
                                           setFormData(item);
-                                          if (item.grade_column_config) {
+                                          if (item.score_column_config) {
                                             const columnsArray = Object.entries(
-                                              item.grade_column_config
+                                              item.score_column_config
                                             ).map(([key, value]) => ({
                                               key,
                                               label: value.label,
                                               he_so: value.he_so,
                                               data: value.data || null,
                                             }));
-                                            setGradeColumns(columnsArray);
+                                            setScoreColumns(columnsArray);
                                           } else {
-                                            setGradeColumns([]);
+                                            setScoreColumns([]);
                                           }
                                         } else if (activeTab === "subjects") {
                                           setFormData(item);
                                           // Luôn fetch từ backend để đảm bảo dữ liệu mới nhất
-                                          fetchSubjectGradeSettings(item.id);
-                                          if (item.grade_column_config) {
-                                            const gc = item.grade_column_config;
+                                          fetchSubjectScoreSettings(item.id);
+                                          if (item.score_column_config) {
+                                            const sc = item.score_column_config;
                                             const columnsArray = Object.entries(
-                                              gc
+                                              sc
                                             ).map(([key, value]) => ({
                                               key,
                                               label: value.label,
                                               he_so: value.he_so,
                                               data: value.data || null,
                                             }));
-                                            setGradeColumns(columnsArray);
+                                            setScoreColumns(columnsArray);
                                           } else {
-                                            setGradeColumns([]);
+                                            setScoreColumns([]);
                                           }
                                         } else {
                                           setFormData(item);

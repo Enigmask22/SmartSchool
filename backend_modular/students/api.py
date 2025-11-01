@@ -11,7 +11,7 @@ import aiofiles
 from students.models import StudentCreate, StudentUpdate, ResponseModel, ListResponse
 from core.database import get_db
 from core.logger import setup_logger
-from auth.api import get_current_user
+from core.dependencies import get_current_user
 
 logger = setup_logger("students_api")
 router = APIRouter()
@@ -261,7 +261,7 @@ async def permanent_delete_student(
         
         # Xóa các bản ghi liên quan
         db.table("attendance").delete().eq("student_id", student_id).execute()
-        db.table("grades").delete().eq("student_id", student_id).execute()
+        db.table("scores").delete().eq("student_id", student_id).execute()
         
         # Xóa vĩnh viễn student record
         response = db.table("students").delete().eq("id", student_id).execute()

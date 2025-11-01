@@ -23,11 +23,11 @@ from admin.api import router as admin_router
 from users.api import router as users_router
 from students.api import router as students_router
 from attendance.api import router as attendance_router
-from grades.api import router as grades_router
+from scores.api import router as scores_router
 from homeroom.api import router as homeroom_router
 from feedback.api import router as feedback_router
 from ai_services.api import router as ai_router
-from grade_settings.api import router as grade_settings_router
+from score_settings.api import router as score_settings_router
 import threading
 import datetime
 import schedule
@@ -140,11 +140,11 @@ def create_app() -> FastAPI:
     app.include_router(users_router, prefix="/api/users", tags=["Users"])
     app.include_router(students_router, prefix="/api/students", tags=["Students"])
     app.include_router(attendance_router, prefix="/api/attendance", tags=["Attendance"])
-    app.include_router(grades_router, prefix="/api/grades", tags=["Grades"])
+    app.include_router(scores_router, prefix="/api/scores", tags=["Scores"])
     app.include_router(homeroom_router, prefix="/api/homeroom", tags=["Homeroom"])
     app.include_router(feedback_router, prefix="/api/feedback", tags=["AI Feedback"])
     app.include_router(ai_router, prefix="/api/ai", tags=["AI Services"])
-    app.include_router(grade_settings_router, prefix="/api/grade-settings", tags=["Grade Settings"])
+    app.include_router(score_settings_router, prefix="/api/score-settings", tags=["Score Settings"])
     
     # Startup event
     @app.on_event("startup")
@@ -159,7 +159,7 @@ def create_app() -> FastAPI:
             
             # Cleanup old files on startup
             from auth.services import OTPService
-            from grades.services import cleanup_old_grade_sheets
+            from scores.services import cleanup_old_score_sheets
             
             # Cleanup expired OTPs
             otp_service = OTPService()
@@ -167,10 +167,10 @@ def create_app() -> FastAPI:
             if otp_deleted > 0:
                 logger.info(f"🧹 Cleaned up {otp_deleted} expired OTPs")
             
-            # Cleanup old grade sheets (older than 24 hours)
-            sheets_deleted = cleanup_old_grade_sheets(max_age_hours=24)
+            # Cleanup old score sheets (older than 24 hours)
+            sheets_deleted = cleanup_old_score_sheets(max_age_hours=24)
             if sheets_deleted > 0:
-                logger.info(f"🧹 Cleaned up {sheets_deleted} old grade sheets")
+                logger.info(f"🧹 Cleaned up {sheets_deleted} old score sheets")
             
         except Exception as e:
             logger.error(f"❌ Failed to initialize database: {str(e)}")
@@ -187,19 +187,19 @@ def create_app() -> FastAPI:
                 m = today.month
                 d = today.day
                 for grade in [10, 11, 12]:
-                    # Check holiday config
+                    # Check dayoff config
                     cfg = (
-                        client.table("config_holidays")
-                        .select("holidays_list")
+                        client.table("dayoff")
+                        .select("dayoffs_list")
                         .eq("year", y)
                         .eq("month", m)
                         .eq("grade", grade)
                         .execute()
                     )
-                    if cfg.data and cfg.data[0].get("holidays_list"):
+                    if cfg.data and cfg.data[0].get("dayoffs_list"):
                         try:
-                            if d in (cfg.data[0]["holidays_list"] or []):
-                                logger.info(f"Skip auto-absence for grade {grade} - holiday {today}")
+                            if d in (cfg.data[0]["dayoffs_list"] or []):
+                                logger.info(f"Skip auto-absence for grade {grade} - dayoff {today}")
                                 continue
                         except Exception:
                             pass

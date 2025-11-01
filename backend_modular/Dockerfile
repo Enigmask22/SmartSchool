@@ -82,9 +82,9 @@ COPY attendance/ ./attendance/
 COPY auth/ ./auth/
 COPY core/ ./core/
 COPY feedback/ ./feedback/
-COPY grades/ ./grades/
+COPY scores/ ./scores/
 COPY homeroom/ ./homeroom/
-COPY school_config/ ./school_config/
+COPY score_settings/ ./score_settings/
 COPY students/ ./students/
 COPY users/ ./users/
 

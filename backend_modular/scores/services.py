@@ -1,5 +1,5 @@
 """
-Grades Services
+Scores Services
 """
 
 from typing import List, Optional, Dict
@@ -7,13 +7,13 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from core.logger import setup_logger
 
-logger = setup_logger("grades_service")
+logger = setup_logger("scores_service")
 
-def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
-    """Tính điểm tổng kết dựa trên grade_data và config"""
+def calculate_final_grade(score_data: dict, score_config: dict = None) -> float:
+    """Tính điểm tổng kết dựa trên score_data và config"""
     try:
-        # Helper function to flatten nested grade_config
-        def flatten_grade_config(config):
+        # Helper function to flatten nested score_config
+        def flatten_score_config(config):
             """Flatten nested config structure to handle child columns"""
             flattened = {}
             for column_name, column_config in config.items():
@@ -26,9 +26,9 @@ def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
                     flattened[column_name] = column_config
             return flattened
         
-        if grade_config:
+        if score_config:
             # Flatten the config first to handle nested structures
-            flat_config = flatten_grade_config(grade_config)
+            flat_config = flatten_score_config(score_config)
             
             # Gom tất cả các cột điểm thường xuyên (Diem_tx*)
             tx_scores = []
@@ -43,9 +43,9 @@ def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
             has_any_grade = False
             
             for column_name, column_config in flat_config.items():
-                if column_name in grade_data and "Diem" in grade_data[column_name]:
+                if column_name in score_data and "Diem" in score_data[column_name]:
                     has_any_grade = True
-                    diem_value = grade_data[column_name]["Diem"]
+                    diem_value = score_data[column_name]["Diem"]
                     is_letter = isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']
                     if not is_letter:
                         is_all_letter_grades = False
@@ -54,8 +54,8 @@ def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
                 return 0.0
             
             for column_name, column_config in flat_config.items():
-                if column_name in grade_data and "Diem" in grade_data[column_name]:
-                    diem_value = grade_data[column_name]["Diem"]
+                if column_name in score_data and "Diem" in score_data[column_name]:
+                    diem_value = score_data[column_name]["Diem"]
                     
                     # Nếu là điểm chữ, convert sang số
                     if is_all_letter_grades and isinstance(diem_value, str) and diem_value in ['Đ', 'KĐ']:
@@ -108,7 +108,7 @@ def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
                 return round(final_numeric_score, 2)
             return 0.0
         else:
-            # Use weights from grade_data
+            # Use weights from score_data
             # Gom tất cả các cột điểm thường xuyên (Diem_tx*)
             tx_scores = []
             # Gom các cột điểm thi
@@ -121,7 +121,7 @@ def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
             is_all_letter_grades = True
             has_any_grade = False
             
-            for column_name, value in grade_data.items():
+            for column_name, value in score_data.items():
                 if isinstance(value, dict) and "Diem" in value:
                     has_any_grade = True
                     diem_value = value.get("Diem", 0)
@@ -132,7 +132,7 @@ def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
             if not has_any_grade:
                 return 0.0
             
-            for column_name, value in grade_data.items():
+            for column_name, value in score_data.items():
                 if isinstance(value, dict) and "Diem" in value:
                     diem_value = value.get("Diem", 0)
                     
@@ -187,7 +187,7 @@ def calculate_final_grade(grade_data: dict, grade_config: dict = None) -> float:
                 return round(final_numeric_score, 2)
             return 0.0
     except Exception as e:
-        logger.error(f"Error calculating grade: {str(e)}")
+        logger.error(f"Error calculating score: {str(e)}")
         return 0.0
 
 
@@ -210,17 +210,17 @@ def _infer_column_stage_priority(column_key: str, column_label: str = "") -> int
     return 1
 
 
-# def _extract_ordered_points(grade_data: dict, grade_config: Optional[dict]) -> List[dict]:
+# def _extract_ordered_points(score_data: dict, score_config: Optional[dict]) -> List[dict]:
 #     """Trả về danh sách điểm đã sắp theo thời gian với trọng số.
 #     Mỗi phần tử: {name, score, weight, stage}
 #     - Hỗ trợ format grade_settings: nhiều cột thường xuyên (Diem_tx1, Diem_tx2, ...)
-#     - Nếu có grade_config: flatten để lấy đúng he_so/label cả cho cột con
+#     - Nếu có score_config: flatten để lấy đúng he_so/label cả cho cột con
 #     - Bỏ qua cột thiếu điểm hoặc không phải số (ví dụ Đ/KĐ)
 #     """
 #     # Flatten config nếu có (để map trực tiếp theo key con như Diem_tx1, ...)
 #     flat_config: Dict[str, Dict] = {}
-#     if grade_config and isinstance(grade_config, dict):
-#         for col_key, col_cfg in grade_config.items():
+#     if score_config and isinstance(score_config, dict):
+#         for col_key, col_cfg in score_config.items():
 #             if isinstance(col_cfg, dict) and "data" in col_cfg:
 #                 for child_key, child_cfg in (col_cfg.get("data") or {}).items():
 #                     flat_config[child_key] = child_cfg or {}
@@ -228,7 +228,7 @@ def _infer_column_stage_priority(column_key: str, column_label: str = "") -> int
 #                 flat_config[col_key] = col_cfg or {}
 
 #     points: List[dict] = []
-#     for column_name, value in (grade_data or {}).items():
+#     for column_name, value in (score_data or {}).items():
 #         try:
 #             if not isinstance(value, dict) or "Diem" not in value:
 #                 continue
@@ -266,7 +266,7 @@ def _infer_column_stage_priority(column_key: str, column_label: str = "") -> int
 #     return points
 
 
-# def analyze_grade_trend(grade_data: dict, grade_config: Optional[dict] = None) -> dict:
+# def analyze_grade_trend(score_data: dict, score_config: Optional[dict] = None) -> dict:
 #     """Phân tích xu hướng điểm trong một môn dựa trên chuỗi cột điểm.
 
 #     Thuật toán: hồi quy tuyến tính có trọng số (x = 1..n, y = điểm, w = hệ số).
@@ -282,7 +282,7 @@ def _infer_column_stage_priority(column_key: str, column_label: str = "") -> int
 #         reason: str
 #     }
 #     """
-#     points = _extract_ordered_points(grade_data, grade_config)
+#     points = _extract_ordered_points(score_data, score_config)
 #     logger.info(f"Points: {points}")
 #     n = len(points)
 #     if n < 2:
@@ -341,9 +341,9 @@ def _infer_column_stage_priority(column_key: str, column_label: str = "") -> int
 #     }
 
 
-def cleanup_old_grade_sheets(max_age_hours: int = 24) -> int:
+def cleanup_old_score_sheets(max_age_hours: int = 24) -> int:
     """
-    Dọn dẹp các ảnh grade sheets đã cũ hơn max_age_hours
+    Dọn dẹp các ảnh score sheets đã cũ hơn max_age_hours
     
     Args:
         max_age_hours: Số giờ tối đa để giữ file (mặc định: 24 giờ)
@@ -353,13 +353,13 @@ def cleanup_old_grade_sheets(max_age_hours: int = 24) -> int:
     """
     deleted_count = 0
     try:
-        upload_dir = Path("uploads/grade_sheets")
+        upload_dir = Path("uploads/score_sheets")
         if not upload_dir.exists():
             return 0
         
         cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
         
-        for file_path in upload_dir.glob("grade_sheet_*"):
+        for file_path in upload_dir.glob("score_sheet_*"):
             try:
                 # Lấy thời gian modified của file
                 file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
@@ -367,15 +367,15 @@ def cleanup_old_grade_sheets(max_age_hours: int = 24) -> int:
                 if file_mtime < cutoff_time:
                     file_path.unlink()
                     deleted_count += 1
-                    logger.debug(f"Đã xóa grade sheet cũ: {file_path.name}")
+                    logger.debug(f"Đã xóa score sheet cũ: {file_path.name}")
                     
             except Exception as e:
                 logger.error(f"Lỗi xóa file {file_path}: {str(e)}")
         
         if deleted_count > 0:
-            logger.info(f"🧹 Đã dọn dẹp {deleted_count} ảnh grade sheets cũ (>{max_age_hours}h)")
+            logger.info(f"🧹 Đã dọn dẹp {deleted_count} ảnh score sheets cũ (>{max_age_hours}h)")
         
     except Exception as e:
-        logger.error(f"❌ Lỗi dọn dẹp grade sheets: {str(e)}")
+        logger.error(f"❌ Lỗi dọn dẹp score sheets: {str(e)}")
     
     return deleted_count
