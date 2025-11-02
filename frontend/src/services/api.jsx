@@ -193,6 +193,31 @@ class ApiService {
     }
   }
 
+  // Generic HTTP methods for convenience
+  async get(endpoint) {
+    return this.request(endpoint, { method: "GET" });
+  }
+
+  async post(endpoint, data = null) {
+    const options = { method: "POST" };
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    return this.request(endpoint, options);
+  }
+
+  async put(endpoint, data = null) {
+    const options = { method: "PUT" };
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    return this.request(endpoint, options);
+  }
+
+  async delete(endpoint) {
+    return this.request(endpoint, { method: "DELETE" });
+  }
+
   // Authentication
   async login(username, password) {
     return this.request("/auth/login", {

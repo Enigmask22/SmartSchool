@@ -19,6 +19,7 @@ import {
   Building,
   FileX,
   Settings,
+  Camera,
 } from "lucide-react";
 import api from "../services/api";
 import logger from "../utils/logger";
@@ -57,6 +58,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import SystemSettings from "./SystemSettings";
+import CameraManagement from "./CameraManagement";
 // import SchoolDaysConfig from "./SchoolDaysConfig";
 
 const AdminManagement = () => {
@@ -247,6 +249,7 @@ const AdminManagement = () => {
     // { id: "subject_teachers", label: "GV-Môn học", icon: UserCheck }, // Đã tích hợp vào tab Giáo viên
     { id: "class_subjects", label: "Phân công giảng dạy", icon: Building },
     // Đã tích hợp Cấu hình cột điểm vào tab Môn học
+    { id: "cameras", label: "Quản lý Camera", icon: Camera },
     { id: "system_settings", label: "Cấu hình thời gian", icon: Settings },
     // { id: "school_config", label: "Cấu hình học tập", icon: School },
   ];
@@ -1889,9 +1892,11 @@ const AdminManagement = () => {
         </Card>
       </div>
 
-      {/* Conditional Content - System Settings hoặc Table-based Content */}
+      {/* Conditional Content - System Settings, Camera Management hoặc Table-based Content */}
       {activeTab === "system_settings" ? (
         <SystemSettings />
+      ) : activeTab === "cameras" ? (
+        <CameraManagement />
       ) : (
         <>
           {/* Enhanced Content */}

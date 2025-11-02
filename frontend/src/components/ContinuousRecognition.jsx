@@ -14,6 +14,7 @@ import {
   WifiOff,
   BarChart3,
   Info,
+  Video,
 } from "lucide-react";
 import {
   Card,
@@ -25,6 +26,15 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import api from "../services/api";
 import logger from "../utils/logger";
 
 // API Configuration
@@ -52,11 +62,86 @@ const ContinuousRecognition = () => {
     uniqueStudents: new Set(),
     runningTime: 0,
   });
+
+  // Multi-camera tracking: stats và recognitions riêng cho từng camera
+  const [cameraStats, setCameraStats] = useState({}); // { cameraId: { total: 0, unique: Set(), lastFrame: null } }
+  const [cameraRecognitions, setCameraRecognitions] = useState({}); // { cameraId: [recognitions] }
+  const [cameraPreviews, setCameraPreviews] = useState({}); // { cameraId: base64Image }
+  const [streamErrors, setStreamErrors] = useState({}); // { cameraId: true/false } - track stream errors để fallback
   const [settings, setSettings] = useState({
     cooldownPeriod: 60,
   });
   const [startTime, setStartTime] = useState(null);
   const [message, setMessage] = useState("");
+
+  // Camera management state
+  const [availableCameras, setAvailableCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState(null);
+  const [cameraSource, setCameraSource] = useState("webcam"); // "webcam" or "managed"
+  const [selectedMultiCameras, setSelectedMultiCameras] = useState([]); // For multi-camera mode
+  const [useMultiCamera, setUseMultiCamera] = useState(false);
+  const cameraFrameIntervals = useRef({}); // Track intervals for each camera
+
+  // Load available cameras from camera manager
+  const loadCameras = useCallback(async () => {
+    try {
+      const response = await api.get("/cameras/");
+      if (response.success && response.data) {
+        // Lấy tất cả cameras enabled (không cần filter active vì có thể start sau)
+        const enabledCameras = response.data.filter((cam) => cam.enabled);
+        setAvailableCameras(enabledCameras);
+        logger.info(`📹 Loaded ${enabledCameras.length} enabled cameras`);
+
+        // Tự động chọn camera đầu tiên nếu chưa chọn
+        if (
+          enabledCameras.length > 0 &&
+          !selectedCameraId &&
+          cameraSource === "managed"
+        ) {
+          setSelectedCameraId(enabledCameras[0].camera_id);
+        }
+      }
+    } catch (error) {
+      logger.error("❌ Error loading cameras:", error);
+    }
+  }, [selectedCameraId, cameraSource]);
+
+  // Start camera khi chọn managed camera
+  const startSelectedCamera = useCallback(async (cameraId) => {
+    if (!cameraId) return;
+
+    try {
+      const response = await api.post(`/cameras/${cameraId}/start`);
+      if (response.success) {
+        logger.info(`✅ Started camera ${cameraId}`);
+      } else {
+        logger.warn(`⚠️ Camera ${cameraId} may not be connected yet`);
+      }
+    } catch (error) {
+      logger.error(`❌ Error starting camera ${cameraId}:`, error);
+    }
+  }, []);
+
+  // Tự động start camera khi chọn (single hoặc multi)
+  useEffect(() => {
+    if (cameraSource === "managed") {
+      if (useMultiCamera && selectedMultiCameras.length > 0) {
+        // Start tất cả cameras đã chọn trong multi-camera mode
+        selectedMultiCameras.forEach((cameraId) => {
+          startSelectedCamera(cameraId);
+        });
+      } else if (selectedCameraId) {
+        // Start single camera
+        startSelectedCamera(selectedCameraId);
+      }
+    }
+  }, [
+    selectedCameraId,
+    selectedMultiCameras,
+    cameraSource,
+    useMultiCamera,
+    startSelectedCamera,
+  ]);
 
   // Load current settings from backend
   const loadSettings = useCallback(async () => {
@@ -120,17 +205,72 @@ const ContinuousRecognition = () => {
         // Log debug info
         logger.debug("🔍 Recognition result:", data.data);
 
-        if (
-          data.data.recognized_students &&
-          data.data.recognized_students.length > 0
-        ) {
-          setRecognizedStudents(data.data.recognized_students);
+        // Lấy camera_id từ response (có thể từ data.camera_id hoặc data.data.camera_id)
+        const cameraId = data.camera_id || data.data?.camera_id || "default";
+        const recognitionData = data.data || data;
 
-          // Add to recent recognitions
-          data.data.recognized_students.forEach((recognition) => {
+        if (
+          recognitionData.recognized_students &&
+          recognitionData.recognized_students.length > 0
+        ) {
+          // Update global recognized students (latest from any camera)
+          setRecognizedStudents(recognitionData.recognized_students);
+
+          // Update camera-specific stats
+          setCameraStats((prev) => {
+            const cameraStat = prev[cameraId] || {
+              total: 0,
+              unique: new Set(),
+              lastFrame: null,
+            };
+            const uniqueSet =
+              cameraStat.unique instanceof Set ? cameraStat.unique : new Set();
+            recognitionData.recognized_students.forEach((recognition) => {
+              cameraStat.total += 1;
+              if (recognition.student?.id) {
+                uniqueSet.add(recognition.student.id);
+              }
+            });
+            // Convert Set to array để lưu vào state (React không serialize Set)
+            return {
+              ...prev,
+              [cameraId]: {
+                total: cameraStat.total,
+                unique: uniqueSet, // Vẫn giữ Set để tính size, nhưng khi render convert sang array
+                uniqueCount: uniqueSet.size,
+                lastFrame: Date.now(),
+              },
+            };
+          });
+
+          // Update camera-specific recognitions
+          setCameraRecognitions((prev) => {
+            const cameraRecs = prev[cameraId] || [];
+            const newRecs = recognitionData.recognized_students.map(
+              (recognition) => ({
+                ...recognition,
+                camera_id: cameraId,
+                timestamp: new Date().toLocaleTimeString("vi-VN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  timeZone: "Asia/Ho_Chi_Minh",
+                }),
+                id: Date.now() + Math.random(),
+              })
+            );
+            return {
+              ...prev,
+              [cameraId]: [...newRecs, ...cameraRecs.slice(0, 9)],
+            };
+          });
+
+          // Add to recent recognitions (global)
+          recognitionData.recognized_students.forEach((recognition) => {
             setRecentRecognitions((prev) => [
               {
                 ...recognition,
+                camera_id: cameraId,
                 timestamp: new Date().toLocaleTimeString("vi-VN", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -139,20 +279,24 @@ const ContinuousRecognition = () => {
                 }),
                 id: Date.now() + Math.random(),
               },
-              ...prev.slice(0, 9), // Keep only last 10
+              ...prev.slice(0, 19), // Keep only last 20 (tăng để multi-camera)
             ]);
           });
 
           setTotalRecognitionsToday(
-            (prev) => prev + data.data.recognized_students.length
+            (prev) => prev + recognitionData.recognized_students.length
           );
         } else {
-          // Clear recognized students if no valid recognition
-          setRecognizedStudents([]);
+          // Clear recognized students if no valid recognition (only for single camera mode)
+          if (!useMultiCamera || cameraId === selectedCameraId) {
+            setRecognizedStudents([]);
+          }
 
           // Log debug message if available
-          if (data.data.message) {
-            logger.debug(`⚠️ Recognition message: ${data.data.message}`);
+          if (recognitionData.message) {
+            logger.debug(
+              `⚠️ Recognition message [${cameraId}]: ${recognitionData.message}`
+            );
           }
         }
         break;
@@ -248,15 +392,137 @@ const ContinuousRecognition = () => {
     }
   };
 
-  // Capture and send frame
+  // Capture frame from managed camera via API - luôn update preview để có hình ảnh
+  const captureFromManagedCamera = useCallback(
+    async (cameraId, updatePreviewOnly = false) => {
+      // Nếu chỉ update preview (không phải recognition), không cần check isRunning
+      if (!updatePreviewOnly && !isRunning) {
+        return;
+      }
+
+      try {
+        const response = await api.get(
+          `/cameras/${cameraId}/frame?format=base64`
+        );
+
+        if (response.success && response.data && response.data.frame) {
+          // LUÔN update preview image (cả khi running và không running) để có hình ảnh
+          setCameraPreviews((prev) => ({
+            ...prev,
+            [cameraId]: `data:image/jpeg;base64,${response.data.frame}`,
+          }));
+
+          // Update preview image trong DOM (fallback)
+          const imgElement = document.getElementById(
+            `camera-preview-${cameraId}`
+          );
+          if (imgElement) {
+            imgElement.src = `data:image/jpeg;base64,${response.data.frame}`;
+            imgElement.style.display = "block";
+          }
+
+          // Chỉ gửi frame qua WebSocket khi đang running và không phải chỉ preview
+          if (
+            !updatePreviewOnly &&
+            isRunning &&
+            wsRef.current &&
+            wsRef.current.readyState === WebSocket.OPEN
+          ) {
+            wsRef.current.send(
+              JSON.stringify({
+                type: "frame",
+                image: response.data.frame,
+                camera_id: cameraId, // Thêm camera_id để backend biết frame từ camera nào
+              })
+            );
+          }
+        }
+      } catch (error) {
+        // Chỉ log error nếu đang running hoặc đang update preview
+        if (isRunning || updatePreviewOnly) {
+          logger.error(`❌ Error capturing from camera ${cameraId}:`, error);
+        }
+      }
+    },
+    [isRunning]
+  );
+
+  // Refresh preview images cho cameras đã chọn (ngay cả khi không running)
+  useEffect(() => {
+    if (cameraSource === "managed") {
+      const camerasToRefresh =
+        useMultiCamera && selectedMultiCameras.length > 0
+          ? selectedMultiCameras
+          : selectedCameraId
+          ? [selectedCameraId]
+          : [];
+
+      if (camerasToRefresh.length > 0) {
+        // Delay một chút để camera đã start xong
+        const loadPreview = () => {
+          camerasToRefresh.forEach((cameraId) => {
+            captureFromManagedCamera(cameraId, true);
+          });
+        };
+
+        // Load preview ngay lập tức
+        loadPreview();
+
+        // Refresh preview mỗi 300ms để mượt hơn (~3.3 FPS preview)
+        const previewInterval = setInterval(() => {
+          loadPreview();
+        }, 300); // Giảm từ 500ms xuống 300ms để preview mượt hơn
+
+        return () => clearInterval(previewInterval);
+      }
+    }
+  }, [
+    cameraSource,
+    selectedCameraId,
+    selectedMultiCameras,
+    useMultiCamera,
+    captureFromManagedCamera,
+  ]);
+
+  // Track setTimeout IDs để có thể clear khi dừng
+  const staggerTimeoutsRef = useRef([]);
+
+  // Capture and send frame với stagger intervals cho multi-camera
   const captureAndSendFrame = useCallback(() => {
-    if (
-      !videoRef.current ||
-      !canvasRef.current ||
-      !wsRef.current ||
-      !isRunning ||
-      !isCameraOn
-    ) {
+    if (!wsRef.current || !isRunning) {
+      return;
+    }
+
+    // Nếu dùng managed cameras
+    if (cameraSource === "managed") {
+      if (useMultiCamera && selectedMultiCameras.length > 0) {
+        // Clear previous timeouts nếu có
+        staggerTimeoutsRef.current.forEach((timeoutId) =>
+          clearTimeout(timeoutId)
+        );
+        staggerTimeoutsRef.current = [];
+
+        // Multi-camera mode: capture từ tất cả cameras với stagger
+        // Stagger: mỗi camera capture cách nhau 0.5s để không quá tải backend
+        selectedMultiCameras.forEach((cameraId, index) => {
+          const timeoutId = setTimeout(() => {
+            // Kiểm tra lại isRunning trước khi capture
+            if (isRunning) {
+              captureFromManagedCamera(cameraId);
+            }
+          }, index * 500); // Stagger 500ms giữa các camera
+
+          staggerTimeoutsRef.current.push(timeoutId);
+        });
+      } else if (selectedCameraId) {
+        // Single managed camera
+        captureFromManagedCamera(selectedCameraId);
+      }
+      return;
+    }
+
+    // Webcam mode (original logic)
+    if (!videoRef.current || !canvasRef.current || !isCameraOn) {
       return;
     }
 
@@ -300,7 +566,15 @@ const ContinuousRecognition = () => {
     } catch (error) {
       logger.error("❌ Frame capture error:", error);
     }
-  }, [isRunning, isCameraOn]);
+  }, [
+    isRunning,
+    isCameraOn,
+    cameraSource,
+    selectedCameraId,
+    selectedMultiCameras,
+    useMultiCamera,
+    captureFromManagedCamera,
+  ]);
 
   // Toggle camera on/off
   const toggleCamera = async () => {
@@ -325,11 +599,24 @@ const ContinuousRecognition = () => {
     }
   };
 
-  // Control recognition (chỉ khi camera đang bật)
+  // Control recognition (chỉ khi camera đang bật hoặc đã chọn managed camera)
   const toggleRecognition = () => {
-    if (!isCameraOn) {
+    // Với managed camera, không cần bật webcam
+    if (cameraSource === "webcam" && !isCameraOn) {
       alert("Vui lòng bật camera trước khi bắt đầu nhận diện!");
       return;
+    }
+
+    // Với managed camera, cần chọn camera
+    if (cameraSource === "managed") {
+      if (useMultiCamera && selectedMultiCameras.length === 0) {
+        alert("Vui lòng chọn ít nhất 1 camera để điểm danh đa luồng!");
+        return;
+      }
+      if (!useMultiCamera && !selectedCameraId) {
+        alert("Vui lòng chọn camera!");
+        return;
+      }
     }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -342,6 +629,14 @@ const ContinuousRecognition = () => {
       );
     }
   };
+
+  // Load cameras on mount
+  useEffect(() => {
+    loadCameras();
+    // Refresh cameras mỗi 10 giây
+    const interval = setInterval(loadCameras, 10000);
+    return () => clearInterval(interval);
+  }, [loadCameras]);
 
   // Initialize on component mount
   useEffect(() => {
@@ -377,22 +672,46 @@ const ContinuousRecognition = () => {
 
   // Start/stop frame capture
   useEffect(() => {
-    if (isRunning && isConnected && isCameraOn) {
-      // Increase interval to 2 seconds to reduce load
+    // Managed camera mode: chỉ cần isRunning và isConnected
+    // Webcam mode: cần thêm isCameraOn
+    const shouldCapture =
+      isRunning && isConnected && (cameraSource === "managed" || isCameraOn);
+
+    if (shouldCapture) {
+      // Với managed camera, capture mỗi 2 giây
+      // Với webcam, capture mỗi 2 giây
       intervalRef.current = setInterval(captureAndSendFrame, 2000); // 0.5 FPS
     } else {
+      // Dừng capture - clear interval và timeouts
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
+      }
+
+      // Clear tất cả stagger timeouts để tránh spam
+      if (staggerTimeoutsRef.current) {
+        staggerTimeoutsRef.current.forEach((timeoutId) =>
+          clearTimeout(timeoutId)
+        );
+        staggerTimeoutsRef.current = [];
       }
     }
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
+      // Cleanup timeouts khi unmount
+      if (staggerTimeoutsRef.current) {
+        staggerTimeoutsRef.current.forEach((timeoutId) =>
+          clearTimeout(timeoutId)
+        );
+        staggerTimeoutsRef.current = [];
       }
     };
-  }, [isRunning, isConnected, isCameraOn, captureAndSendFrame]);
+  }, [isRunning, isConnected, isCameraOn, captureAndSendFrame, cameraSource]);
 
   // Helper function to format duration
   const formatDuration = (seconds) => {
@@ -512,20 +831,48 @@ const ContinuousRecognition = () => {
                   <span>{isRunning ? "Đang chạy" : "Đã dừng"}</span>
                 </Badge>
 
-                {/* Camera Toggle Button */}
-                <Button
-                  onClick={toggleCamera}
-                  variant={isCameraOn ? "destructive" : "default"}
-                  className="flex items-center space-x-2"
-                >
-                  {isCameraOn ? <Square size={18} /> : <Camera size={18} />}
-                  <span>{isCameraOn ? "Tắt Camera" : "Bật Camera"}</span>
-                </Button>
+                {/* Camera Toggle Button - chỉ hiển thị cho webcam mode */}
+                {cameraSource === "webcam" && (
+                  <Button
+                    onClick={toggleCamera}
+                    variant={isCameraOn ? "destructive" : "default"}
+                    className="flex items-center space-x-2"
+                  >
+                    {isCameraOn ? <Square size={18} /> : <Camera size={18} />}
+                    <span>{isCameraOn ? "Tắt Camera" : "Bật Camera"}</span>
+                  </Button>
+                )}
+
+                {/* Camera Info for Managed Camera */}
+                {cameraSource === "managed" && selectedCameraId && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <Video className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900">
+                      {availableCameras.find(
+                        (c) => c.camera_id === selectedCameraId
+                      )?.name || "Camera"}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {useMultiCamera
+                        ? `${selectedMultiCameras.length} cameras`
+                        : "Active"}
+                    </Badge>
+                  </div>
+                )}
 
                 {/* Recognition Control Button */}
                 <Button
                   onClick={isRunning ? handleStop : handleStart}
-                  disabled={!isConnected || !isCameraOn}
+                  disabled={
+                    !isConnected ||
+                    (cameraSource === "webcam" && !isCameraOn) ||
+                    (cameraSource === "managed" &&
+                      !selectedCameraId &&
+                      !useMultiCamera) ||
+                    (cameraSource === "managed" &&
+                      useMultiCamera &&
+                      selectedMultiCameras.length === 0)
+                  }
                   variant={isRunning ? "destructive" : "default"}
                   className="flex items-center space-x-2"
                 >
@@ -667,25 +1014,600 @@ const ContinuousRecognition = () => {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Camera className="w-6 h-6 text-primary" />
-                  <span>Camera Nhận Diện</span>
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Camera className="w-6 h-6 text-primary" />
+                    <span>Camera Nhận Diện</span>
+                  </CardTitle>
+                  <div className="flex items-center gap-4">
+                    {/* Camera Source Selector */}
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">Nguồn:</Label>
+                      <Select
+                        value={cameraSource}
+                        onValueChange={(value) => {
+                          setCameraSource(value);
+                          if (value === "webcam") {
+                            setSelectedCameraId(null);
+                            setUseMultiCamera(false);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="webcam">Webcam</SelectItem>
+                          <SelectItem value="managed">
+                            Camera Quản Lý
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Managed Camera Selector */}
+                    {cameraSource === "managed" && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm">Camera:</Label>
+                          <Select
+                            value={selectedCameraId || ""}
+                            onValueChange={(value) => {
+                              setSelectedCameraId(value);
+                              setUseMultiCamera(false);
+                            }}
+                          >
+                            <SelectTrigger className="w-48">
+                              <SelectValue placeholder="Chọn camera" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableCameras.map((cam) => (
+                                <SelectItem
+                                  key={cam.camera_id}
+                                  value={cam.camera_id}
+                                >
+                                  {cam.name} ({cam.location || "N/A"})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Multi-camera toggle - hiển thị ngay cả khi chỉ có 1 camera để chuẩn bị */}
+                        {availableCameras.length > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
+                            <input
+                              type="checkbox"
+                              id="multiCamera"
+                              checked={useMultiCamera}
+                              onChange={(e) => {
+                                setUseMultiCamera(e.target.checked);
+                                if (!e.target.checked) {
+                                  setSelectedMultiCameras([]);
+                                } else if (selectedCameraId) {
+                                  setSelectedMultiCameras([selectedCameraId]);
+                                }
+                              }}
+                              className="w-4 h-4 cursor-pointer"
+                              disabled={availableCameras.length < 2}
+                            />
+                            <Label
+                              htmlFor="multiCamera"
+                              className={`text-sm font-medium cursor-pointer ${
+                                availableCameras.length < 2
+                                  ? "text-gray-400"
+                                  : "text-blue-900"
+                              }`}
+                            >
+                              Đa luồng
+                              {availableCameras.length < 2 && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  (cần ≥2 camera)
+                                </span>
+                              )}
+                            </Label>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="relative">
-                  <video
-                    ref={videoRef}
-                    className={`w-full h-auto bg-black rounded-lg ${
-                      !isCameraOn ? "hidden" : ""
-                    }`}
-                    autoPlay
-                    muted
-                    playsInline
-                  />
+                {/* Multi-camera mode info banner */}
+                {cameraSource === "managed" && useMultiCamera && (
+                  <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Video className="w-5 h-5 text-blue-600" />
+                      <Label className="text-sm font-semibold text-blue-900">
+                        Chế độ đa luồng đã bật - Chọn cameras để nhận diện đồng
+                        thời:
+                      </Label>
+                    </div>
 
-                  {/* Camera Off Placeholder */}
-                  {!isCameraOn && (
+                    {availableCameras.length > 1 ? (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {availableCameras.map((cam) => (
+                          <label
+                            key={cam.camera_id}
+                            className={`flex items-center gap-2 p-2 border-2 rounded-lg cursor-pointer transition-all ${
+                              selectedMultiCameras.includes(cam.camera_id)
+                                ? "bg-blue-100 border-blue-500 shadow-sm"
+                                : "bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedMultiCameras.includes(
+                                cam.camera_id
+                              )}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedMultiCameras([
+                                    ...selectedMultiCameras,
+                                    cam.camera_id,
+                                  ]);
+                                } else {
+                                  setSelectedMultiCameras(
+                                    selectedMultiCameras.filter(
+                                      (id) => id !== cam.camera_id
+                                    )
+                                  );
+                                }
+                              }}
+                              className="w-4 h-4 cursor-pointer"
+                            />
+                            <span className="text-sm font-medium">
+                              {cam.name}
+                            </span>
+                            {cam.location && (
+                              <span className="text-xs text-gray-500">
+                                ({cam.location})
+                              </span>
+                            )}
+                            <Badge
+                              variant={
+                                cam.status === "active"
+                                  ? "default"
+                                  : "destructive"
+                              }
+                              className="text-xs"
+                            >
+                              {cam.status === "active" ? "✓" : "✗"}
+                            </Badge>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-orange-600 mt-2">
+                        ⚠️ Cần ít nhất 2 camera để sử dụng chế độ đa luồng. Hiện
+                        có {availableCameras.length} camera.
+                      </p>
+                    )}
+
+                    {selectedMultiCameras.length === 0 &&
+                      availableCameras.length > 1 && (
+                        <p className="text-xs text-red-600 mt-2 font-medium">
+                          ⚠️ Vui lòng chọn ít nhất 1 camera để bắt đầu nhận diện
+                        </p>
+                      )}
+
+                    {selectedMultiCameras.length > 0 && (
+                      <p className="text-xs text-green-600 mt-2 font-medium">
+                        ✓ Đã chọn {selectedMultiCameras.length} camera(s) - Sẵn
+                        sàng nhận diện đa luồng
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="relative">
+                  {/* Show video for webcam mode */}
+                  {cameraSource === "webcam" && (
+                    <video
+                      ref={videoRef}
+                      className={`w-full h-auto bg-black rounded-lg ${
+                        !isCameraOn ? "hidden" : ""
+                      }`}
+                      autoPlay
+                      muted
+                      playsInline
+                    />
+                  )}
+
+                  {/* Show preview: single camera hoặc multi-camera grid */}
+                  {cameraSource === "managed" &&
+                    (useMultiCamera && selectedMultiCameras.length > 0 ? (
+                      // Multi-camera grid view
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {selectedMultiCameras.map((cameraId) => {
+                          const camera = availableCameras.find(
+                            (c) => c.camera_id === cameraId
+                          );
+                          const preview = cameraPreviews[cameraId];
+                          const stats = cameraStats[cameraId] || {
+                            total: 0,
+                            uniqueCount: 0,
+                            lastFrame: null,
+                          };
+                          const recs = cameraRecognitions[cameraId] || [];
+
+                          // Build camera stream URL - dùng proxy qua backend để tránh CORS và tối ưu
+                          const getCameraStreamUrl = (camera) => {
+                            if (!camera?.camera_id) return null;
+                            // Dùng proxy endpoint qua backend để stream MJPEG
+                            const API_BASE =
+                              process.env.REACT_APP_API_URL ||
+                              "http://localhost:8000/api";
+                            return `${API_BASE}/cameras/${camera.camera_id}/stream`;
+                          };
+
+                          // Fallback: thử stream trực tiếp nếu proxy không hoạt động
+                          const getDirectStreamUrl = (camera) => {
+                            if (!camera?.source) return null;
+                            let url = camera.source.trim();
+                            if (url.includes("://")) {
+                              const parts = url.split("://");
+                              const urlPart = parts[1];
+                              if (!urlPart.includes("/")) {
+                                url = `${parts[0]}://${urlPart}/video`;
+                              } else if (!urlPart.includes("/video")) {
+                                const hostPort = urlPart.split("/")[0];
+                                url = `${parts[0]}://${hostPort}/video`;
+                              }
+                            } else if (url.includes(":")) {
+                              url = `http://${url}/video`;
+                            }
+                            return url;
+                          };
+
+                          const streamUrl = getCameraStreamUrl(camera);
+                          const directStreamUrl = getDirectStreamUrl(camera);
+
+                          return (
+                            <Card key={cameraId} className="overflow-hidden">
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <CardTitle className="text-sm font-medium">
+                                      {camera?.name || `Camera ${cameraId}`}
+                                    </CardTitle>
+                                    {camera?.location && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        {camera.location}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Badge
+                                    variant={
+                                      camera?.status === "active"
+                                        ? "default"
+                                        : "destructive"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {camera?.status === "active"
+                                      ? "✓ Active"
+                                      : "✗ Inactive"}
+                                  </Badge>
+                                </div>
+
+                                {/* Status badge - di chuyển lên header để không che camera */}
+                                {isRunning && (
+                                  <div className="flex items-center gap-2 px-2 py-1 bg-green-100 rounded text-xs">
+                                    <AlertCircle className="w-3 h-3 text-green-600 animate-pulse" />
+                                    <span className="font-medium text-green-700">
+                                      ĐANG NHẬN DIỆN
+                                    </span>
+                                  </div>
+                                )}
+                              </CardHeader>
+                              <CardContent className="space-y-2">
+                                {/* Video Stream với fallback preview - ưu tiên proxy backend */}
+                                <div className="relative w-full bg-black rounded-lg aspect-video flex items-center justify-center overflow-hidden">
+                                  {/* Ưu tiên: proxy backend stream, fallback: direct stream, fallback: preview image */}
+                                  {!streamErrors[cameraId] &&
+                                  (streamUrl || directStreamUrl) ? (
+                                    <video
+                                      key={`stream-${cameraId}-${
+                                        streamErrors[cameraId] === "direct"
+                                          ? "direct"
+                                          : "proxy"
+                                      }`}
+                                      src={
+                                        streamErrors[cameraId] === "direct"
+                                          ? directStreamUrl
+                                          : streamUrl || directStreamUrl
+                                      }
+                                      autoPlay
+                                      muted
+                                      playsInline
+                                      className="w-full h-full object-contain"
+                                      onError={(e) => {
+                                        logger.warn(
+                                          `Stream error for camera ${cameraId}, trying fallback:`,
+                                          e
+                                        );
+                                        // Thử direct stream nếu proxy lỗi
+                                        if (streamUrl && directStreamUrl) {
+                                          // Có cả 2, thử switch sang direct
+                                          setStreamErrors((prev) => ({
+                                            ...prev,
+                                            [cameraId]: "direct",
+                                          }));
+                                        } else {
+                                          // Không có fallback, dùng preview
+                                          setStreamErrors((prev) => ({
+                                            ...prev,
+                                            [cameraId]: "both_failed",
+                                          }));
+                                        }
+                                      }}
+                                      onLoadedData={() => {
+                                        setStreamErrors((prev) => {
+                                          const newErrors = { ...prev };
+                                          delete newErrors[cameraId];
+                                          return newErrors;
+                                        });
+                                        logger.debug(
+                                          `Stream loaded successfully for camera ${cameraId}`
+                                        );
+                                      }}
+                                    />
+                                  ) : preview ? (
+                                    // Fallback: dùng preview image từ API
+                                    <img
+                                      key={`preview-${cameraId}`}
+                                      src={preview}
+                                      alt={`${camera?.name} preview`}
+                                      className="w-full h-full object-contain"
+                                      onError={() => {
+                                        // Refresh preview nếu image lỗi
+                                        captureFromManagedCamera(
+                                          cameraId,
+                                          true
+                                        );
+                                      }}
+                                    />
+                                  ) : (
+                                    // Loading state
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="text-white text-center">
+                                        <Video className="w-12 h-12 mx-auto mb-2 text-gray-400 animate-pulse" />
+                                        <p className="text-xs">
+                                          Đang kết nối camera...
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Retry button nếu stream lỗi */}
+                                  {streamErrors[cameraId] && (
+                                    <div className="absolute bottom-2 right-2 z-10">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setStreamErrors((prev) => {
+                                            const newErrors = { ...prev };
+                                            delete newErrors[cameraId];
+                                            return newErrors;
+                                          });
+                                          // Force reload video
+                                          const videoEl =
+                                            document.querySelector(
+                                              `video[key="stream-${cameraId}"]`
+                                            );
+                                          if (videoEl) {
+                                            videoEl.load();
+                                          }
+                                        }}
+                                        className="text-xs bg-blue-600 text-white hover:bg-blue-700 border-none"
+                                      >
+                                        Thử lại
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Stats */}
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div>
+                                    <span className="text-muted-foreground">
+                                      Nhận diện:{" "}
+                                    </span>
+                                    <span className="font-semibold text-green-600">
+                                      {stats.total}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">
+                                      Unique:{" "}
+                                    </span>
+                                    <span className="font-semibold text-blue-600">
+                                      {stats.uniqueCount || 0}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Recent recognition cho camera này */}
+                                {recs.length > 0 && (
+                                  <div className="text-xs border-t pt-2">
+                                    <p className="font-medium mb-1">
+                                      Nhận diện gần đây:
+                                    </p>
+                                    {recs.slice(0, 2).map((rec) => (
+                                      <div
+                                        key={rec.id}
+                                        className="flex justify-between items-center mb-1"
+                                      >
+                                        <span className="text-muted-foreground">
+                                          {rec.student?.full_name || "Unknown"}
+                                        </span>
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          {rec.confidence}%
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    ) : selectedCameraId ? (
+                      // Single camera view với MJPEG stream trực tiếp
+                      (() => {
+                        const selectedCamera = availableCameras.find(
+                          (c) => c.camera_id === selectedCameraId
+                        );
+
+                        // Build stream URL - ưu tiên proxy backend
+                        const API_BASE =
+                          process.env.REACT_APP_API_URL ||
+                          "http://localhost:8000/api";
+                        const streamUrl = `${API_BASE}/cameras/${selectedCameraId}/stream`;
+
+                        // Fallback: direct stream URL
+                        const getDirectStreamUrl = (camera) => {
+                          if (!camera?.source) return null;
+                          let url = camera.source.trim();
+                          if (url.includes("://")) {
+                            const parts = url.split("://");
+                            const urlPart = parts[1];
+                            if (!urlPart.includes("/")) {
+                              url = `${parts[0]}://${urlPart}/video`;
+                            } else if (!urlPart.includes("/video")) {
+                              const hostPort = urlPart.split("/")[0];
+                              url = `${parts[0]}://${hostPort}/video`;
+                            }
+                          } else if (url.includes(":")) {
+                            url = `http://${url}/video`;
+                          }
+                          return url;
+                        };
+
+                        const directStreamUrl =
+                          getDirectStreamUrl(selectedCamera);
+
+                        return (
+                          <div className="w-full bg-black rounded-lg min-h-96 flex items-center justify-center relative overflow-hidden">
+                            {/* Video stream với fallback - ưu tiên proxy backend */}
+                            {!streamErrors[selectedCameraId] &&
+                            (streamUrl || directStreamUrl) ? (
+                              <video
+                                key={`stream-${selectedCameraId}-${
+                                  streamErrors[selectedCameraId] === "direct"
+                                    ? "direct"
+                                    : "proxy"
+                                }`}
+                                src={
+                                  streamErrors[selectedCameraId] === "direct"
+                                    ? directStreamUrl
+                                    : streamUrl || directStreamUrl
+                                }
+                                autoPlay
+                                muted
+                                playsInline
+                                className="w-full h-full object-contain"
+                                style={{ maxHeight: "100%" }}
+                                onError={(e) => {
+                                  logger.warn(
+                                    `Stream error for camera ${selectedCameraId}, trying fallback:`,
+                                    e
+                                  );
+                                  // Thử direct stream nếu proxy lỗi
+                                  if (streamUrl && directStreamUrl) {
+                                    // Có cả 2, thử switch sang direct
+                                    setStreamErrors((prev) => ({
+                                      ...prev,
+                                      [selectedCameraId]: "direct",
+                                    }));
+                                  } else {
+                                    // Không có fallback
+                                    setStreamErrors((prev) => ({
+                                      ...prev,
+                                      [selectedCameraId]: "both_failed",
+                                    }));
+                                  }
+                                }}
+                                onLoadedData={() => {
+                                  setStreamErrors((prev) => {
+                                    const newErrors = { ...prev };
+                                    delete newErrors[selectedCameraId];
+                                    return newErrors;
+                                  });
+                                  logger.debug(
+                                    `Stream loaded successfully for camera ${selectedCameraId}`
+                                  );
+                                }}
+                              />
+                            ) : cameraPreviews[selectedCameraId] ? (
+                              <img
+                                key={`preview-${selectedCameraId}`}
+                                src={cameraPreviews[selectedCameraId]}
+                                alt="Camera preview"
+                                className="max-w-full max-h-96 object-contain"
+                                onError={() => {
+                                  captureFromManagedCamera(
+                                    selectedCameraId,
+                                    true
+                                  );
+                                }}
+                              />
+                            ) : (
+                              <div className="text-white text-center">
+                                <Video className="w-16 h-16 mx-auto mb-2 text-gray-400 animate-pulse" />
+                                <p className="text-sm">
+                                  Đang kết nối camera...
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Status badge - di chuyển lên trên, không che camera */}
+                            {isRunning && (
+                              <div className="absolute top-3 right-3 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 shadow-lg z-10">
+                                <AlertCircle className="w-3.5 h-3.5 animate-pulse" />
+                                <span>ĐANG NHẬN DIỆN</span>
+                              </div>
+                            )}
+
+                            {/* Retry button nếu stream lỗi */}
+                            {streamErrors[selectedCameraId] && (
+                              <div className="absolute bottom-3 right-3 z-10">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setStreamErrors((prev) => {
+                                      const newErrors = { ...prev };
+                                      delete newErrors[selectedCameraId];
+                                      return newErrors;
+                                    });
+                                    const videoEl = document.querySelector(
+                                      `video[key="stream-${selectedCameraId}"]`
+                                    );
+                                    if (videoEl) {
+                                      videoEl.load();
+                                    }
+                                  }}
+                                  className="text-xs bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  Thử lại stream
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : null)}
+
+                  {/* Camera Off Placeholder - chỉ hiển thị với webcam mode */}
+                  {cameraSource === "webcam" && !isCameraOn && (
                     <div className="flex items-center justify-center w-full bg-gray-800 rounded-lg h-96">
                       <div className="text-center text-white">
                         <Camera
@@ -705,34 +1627,38 @@ const ContinuousRecognition = () => {
                   <canvas ref={canvasRef} className="hidden" />
 
                   {/* Status Overlay */}
-                  <div className="absolute top-4 left-4">
-                    <div
-                      className={`px-3 py-2 rounded-lg text-white font-medium flex items-center space-x-2 ${
-                        !isCameraOn
-                          ? "bg-gray-600"
-                          : isRunning
-                          ? "bg-green-600"
-                          : "bg-red-600"
-                      }`}
-                    >
-                      {!isCameraOn ? (
-                        <>
-                          <CameraOff size={18} />
-                          <span>CAMERA TẮT</span>
-                        </>
-                      ) : isRunning ? (
-                        <>
-                          <AlertCircle size={18} className="animate-pulse" />
-                          <span>ĐANG NHẬN DIỆN</span>
-                        </>
-                      ) : (
-                        <>
-                          <Pause size={18} />
-                          <span>TẠM DỪNG</span>
-                        </>
-                      )}
+                  {cameraSource === "webcam" && (
+                    <div className="absolute top-4 left-4">
+                      <div
+                        className={`px-3 py-2 rounded-lg text-white font-medium flex items-center space-x-2 ${
+                          !isCameraOn
+                            ? "bg-gray-600"
+                            : isRunning
+                            ? "bg-green-600"
+                            : "bg-red-600"
+                        }`}
+                      >
+                        {!isCameraOn ? (
+                          <>
+                            <CameraOff size={18} />
+                            <span>CAMERA TẮT</span>
+                          </>
+                        ) : isRunning ? (
+                          <>
+                            <AlertCircle size={18} className="animate-pulse" />
+                            <span>ĐANG NHẬN DIỆN</span>
+                          </>
+                        ) : (
+                          <>
+                            <Pause size={18} />
+                            <span>TẠM DỪNG</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Status Overlay for Managed Camera - đã di chuyển vào trong camera cards */}
 
                   {/* Recognition Results Overlay */}
                   {recognizedStudents.length > 0 && (
