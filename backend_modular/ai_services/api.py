@@ -178,17 +178,22 @@ async def continuous_recognition_stream(websocket: WebSocket):
                 
                 if frame_data.get("type") == "frame":
                     image_base64 = frame_data.get("image")
+                    camera_id = frame_data.get("camera_id")  # Lấy camera_id từ frontend
                     
                     if continuous_recognition_state["is_running"] and image_base64:
                         # Process recognition với active service
                         result = await process_continuous_recognition(image_base64, websocket)
+                        
+                        # Thêm camera_id vào result
+                        result["camera_id"] = camera_id
                         
                         # Send result back
                         await websocket.send_text(json.dumps({
                             "type": "recognition_result",
                             "data": result,
                             "service": ai_service.service_name,
-                            "accuracy": ai_service.accuracy
+                            "accuracy": ai_service.accuracy,
+                            "camera_id": camera_id  # Trả về camera_id để frontend biết
                         }))
                 
                 elif frame_data.get("type") == "control":

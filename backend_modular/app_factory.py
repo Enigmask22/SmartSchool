@@ -28,6 +28,7 @@ from homeroom.api import router as homeroom_router
 from feedback.api import router as feedback_router
 from ai_services.api import router as ai_router
 from score_settings.api import router as score_settings_router
+from camera_manager.api import router as camera_router
 import threading
 import datetime
 import schedule
@@ -145,6 +146,7 @@ def create_app() -> FastAPI:
     app.include_router(feedback_router, prefix="/api/feedback", tags=["AI Feedback"])
     app.include_router(ai_router, prefix="/api/ai", tags=["AI Services"])
     app.include_router(score_settings_router, prefix="/api/score-settings", tags=["Score Settings"])
+    app.include_router(camera_router, prefix="/api/cameras", tags=["Camera Management"])
     
     # Startup event
     @app.on_event("startup")
@@ -171,6 +173,31 @@ def create_app() -> FastAPI:
             sheets_deleted = cleanup_old_score_sheets(max_age_hours=24)
             if sheets_deleted > 0:
                 logger.info(f"🧹 Cleaned up {sheets_deleted} old score sheets")
+            
+            # Load cameras from database (if any)
+            try:
+                from camera_manager.services import camera_manager
+                from camera_manager.db_service import CameraDBService
+                from core.database import db as core_db
+                
+                # Load cameras từ database (cần dùng .client để lấy Supabase Client)
+                db_cameras = await CameraDBService.get_all_cameras(core_db.client, enabled_only=False)
+                if db_cameras:
+                    loaded_count = 0
+                    for db_camera in db_cameras:
+                        try:
+                            config = CameraDBService.dict_to_config(db_camera)
+                            # Chỉ load nếu enabled
+                            if config.enabled:
+                                camera_manager.add_camera(config, frame_callback=None)
+                                loaded_count += 1
+                        except Exception as e:
+                            logger.warning(f"⚠️ Không thể load camera {db_camera.get('camera_id')}: {e}")
+                    
+                    if loaded_count > 0:
+                        logger.info(f"📹 Đã load {loaded_count}/{len(db_cameras)} cameras từ database")
+            except Exception as e:
+                logger.warning(f"⚠️ Không thể load cameras từ database (có thể bảng chưa tồn tại): {e}")
             
         except Exception as e:
             logger.error(f"❌ Failed to initialize database: {str(e)}")
@@ -259,8 +286,20 @@ def create_app() -> FastAPI:
     # Shutdown event
     @app.on_event("shutdown")
     async def shutdown_event():
-        """Cleanup khi tắt server"""
+        """Cleanup khi tắt server - non-blocking để tránh đơ khi reload"""
+        import asyncio
         logger.info("Shutting down Smart School System API - Modular Edition...")
+        
+        # Cleanup cameras trong background để không block shutdown
+        try:
+            from camera_manager.services import camera_manager
+            
+            # Chạy cleanup trong executor để không block event loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, camera_manager.cleanup)
+            logger.info("✅ All cameras cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up cameras: {e}")
     
     # Health check endpoint
     @app.get("/health")
