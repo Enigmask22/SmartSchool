@@ -1092,7 +1092,7 @@ async def get_subject_teachers(
         if not show_deleted:
             query = query.eq("is_active", True)
         
-        response = query.order("academic_year", desc=True).execute()
+        response = query.order("id", desc=True).execute()
         
         # Flatten data for easier frontend consumption
         flattened_data = []
@@ -1101,7 +1101,6 @@ async def get_subject_teachers(
                 "id": item["id"],
                 "teacher_id": item["teacher_id"],
                 "subject_id": item["subject_id"],
-                "academic_year": item.get("academic_year"),
                 "is_active": item.get("is_active"),
                 "teacher_name": item["teachers"]["full_name"] if item.get("teachers") else None,
                 "teacher_code": item["teachers"]["teacher_code"] if item.get("teachers") else None,
@@ -1127,7 +1126,6 @@ async def create_subject_teacher(
         data = {
             "teacher_id": assignment.teacher_id,
             "subject_id": assignment.subject_id,
-            "academic_year": assignment.academic_year,
             "is_active": assignment.is_active,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
@@ -1160,8 +1158,6 @@ async def update_subject_teacher(
             update_data["teacher_id"] = assignment.teacher_id
         if assignment.subject_id:
             update_data["subject_id"] = assignment.subject_id
-        if assignment.academic_year:
-            update_data["academic_year"] = assignment.academic_year
         if assignment.is_active is not None:
             update_data["is_active"] = assignment.is_active
         
@@ -1574,12 +1570,10 @@ async def create_student_admin(
             data["email"] = student_data.email
         if student_data.phone:
             data["phone"] = student_data.phone
-        if student_data.parent_name:
-            data["parent_name"] = student_data.parent_name
-        if student_data.parent_phone:
-            data["parent_phone"] = student_data.parent_phone
         if student_data.address:
             data["address"] = student_data.address
+        if student_data.parent_contacts is not None:
+            data["parent_contacts"] = student_data.parent_contacts
         
         # Sanitize: đảm bảo không có class_id trong payload insert
         if "class_id" in data:
@@ -1632,12 +1626,10 @@ async def update_student_admin(
             update_data["email"] = student_data.email
         if student_data.phone:
             update_data["phone"] = student_data.phone
-        if student_data.parent_name:
-            update_data["parent_name"] = student_data.parent_name
-        if student_data.parent_phone:
-            update_data["parent_phone"] = student_data.parent_phone
         if student_data.address:
             update_data["address"] = student_data.address
+        if student_data.parent_contacts is not None:
+            update_data["parent_contacts"] = student_data.parent_contacts
         if student_data.is_active is not None:
             update_data["is_active"] = student_data.is_active
         
@@ -1829,7 +1821,7 @@ async def bulk_import_students(
                     "updated_at": datetime.now().isoformat()
                 }
                 
-                # Chỉ thêm các optional fields nếu có giá trị (giống create_student_admin)
+                # Optional fields
                 if student_record.email:
                     student_data["email"] = student_record.email
                 if student_record.so_dien_thoai:
@@ -1838,16 +1830,58 @@ async def bulk_import_students(
                     student_data["date_of_birth"] = student_record.ngay_sinh
                 if student_record.dia_chi:
                     student_data["address"] = student_record.dia_chi
-                if student_record.ten_phu_huynh:
-                    student_data["parent_name"] = student_record.ten_phu_huynh
-                if student_record.sdt_phu_huynh:
-                    student_data["parent_phone"] = student_record.sdt_phu_huynh
-                
-                # Insert student (whitelist field để tuyệt đối không lọt class_id)
+
+                # Build parent_contacts
+                contacts: list = []
+                # JSON list provided
+                if isinstance(student_record.parent_contacts, list):
+                    for c in student_record.parent_contacts:
+                        if isinstance(c, dict):
+                            name = (c.get("name") or "").strip()
+                            phone = (c.get("phone") or "").strip()
+                            relation = (c.get("relation") or "parent").strip() or "parent"
+                            if name or phone:
+                                contacts.append({"relation": relation, "name": name or None, "phone": phone or None})
+                # Legacy single columns
+                if student_record.ten_phu_huynh or student_record.sdt_phu_huynh:
+                    contacts.append({
+                        "relation": "parent",
+                        "name": (student_record.ten_phu_huynh or '').strip() or None,
+                        "phone": (student_record.sdt_phu_huynh or '').strip() or None,
+                    })
+                # Father/Mother columns
+                if student_record.ten_bo or student_record.sdt_bo:
+                    contacts.append({
+                        "relation": "father",
+                        "name": (student_record.ten_bo or '').strip() or None,
+                        "phone": (student_record.sdt_bo or '').strip() or None,
+                    })
+                if student_record.ten_me or student_record.sdt_me:
+                    contacts.append({
+                        "relation": "mother",
+                        "name": (student_record.ten_me or '').strip() or None,
+                        "phone": (student_record.sdt_me or '').strip() or None,
+                    })
+
+                # Deduplicate by (relation,name,phone) and remove empty
+                norm = []
+                for c in contacts:
+                    if not (c.get("name") or c.get("phone")):
+                        continue
+                    key = (c.get("relation"), c.get("name"), c.get("phone"))
+                    if key not in norm:
+                        norm.append(key)
+                parent_contacts_clean = [
+                    {"relation": r, "name": n, "phone": p} for (r, n, p) in norm
+                ]
+                if parent_contacts_clean:
+                    student_data["parent_contacts"] = parent_contacts_clean
+
+                # Insert student (whitelist)
                 allowed_fields = [
                     "student_id", "full_name", "class_name", "grade", "gender",
-                    "email", "phone", "date_of_birth", "address", "parent_name",
-                    "parent_phone", "is_active", "created_at", "updated_at"
+                    "email", "phone", "date_of_birth", "address", "parent_contacts",
+                    "is_active", "created_at", "updated_at"
                 ]
                 student_row = {k: student_data.get(k) for k in allowed_fields if student_data.get(k) is not None}
                 logger.debug(f"📝 Bulk import inserting student with keys: {list(student_row.keys())}")

@@ -31,7 +31,8 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
         student_data = student.dict()
         
         if student_data.get("date_of_birth"):
-            student_data["date_of_birth"] = student_data["date_of_birth"].isoformat()
+            dob_val = student_data["date_of_birth"]
+            student_data["date_of_birth"] = dob_val.isoformat() if hasattr(dob_val, "isoformat") else dob_val
         
         student_data["created_at"] = datetime.now().isoformat()
         student_data["updated_at"] = datetime.now().isoformat()
@@ -151,7 +152,7 @@ async def update_student(
         for field, value in student.dict(exclude_unset=True).items():
             if value is not None:
                 if field == "date_of_birth" and value:
-                    update_data[field] = value.isoformat()
+                    update_data[field] = value.isoformat() if hasattr(value, "isoformat") else value
                 else:
                     update_data[field] = value
         

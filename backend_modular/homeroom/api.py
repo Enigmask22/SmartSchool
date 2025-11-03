@@ -80,7 +80,7 @@ async def homeroom_bootstrap(
                 sresp = (
                     db.table("students")
                     .select(
-                        "id, student_id, full_name, email, phone, date_of_birth, parent_name, parent_phone, address, profile_image, class_name, grade, gender, subject_selected, is_active"
+                        "id, student_id, full_name, email, phone, date_of_birth, parent_contacts, address, profile_image, class_name, grade, gender, subject_selected, is_active"
                     )
                     .in_("id", sids)
                     .execute()
@@ -474,8 +474,8 @@ async def get_homeroom_students(
             email,
             phone,
             date_of_birth,
-            parent_name,
-            parent_phone,
+            parent_contacts,
+            address,
             profile_image,
             is_active,
             class_name,
@@ -503,8 +503,8 @@ async def get_homeroom_students(
                     "email": student["email"],
                     "phone": student["phone"],
                     "date_of_birth": student["date_of_birth"],
-                    "parent_name": student["parent_name"],
-                    "parent_phone": student["parent_phone"],
+                    "parent_contacts": student["parent_contacts"],
+                    "address": student["address"],
                     "profile_image": student["profile_image"],
                     "is_active": student["is_active"],
                     "class_name": student["class_name"],

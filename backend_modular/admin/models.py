@@ -72,13 +72,11 @@ class ClassUpdate(BaseModel):
 class SubjectTeacherCreate(BaseModel):
     teacher_id: int
     subject_id: int
-    academic_year: Optional[str] = "2025-2026"  # Năm học mặc định
     is_active: Optional[bool] = True
 
 class SubjectTeacherUpdate(BaseModel):
     teacher_id: Optional[int] = None
     subject_id: Optional[int] = None
-    academic_year: Optional[str] = None
     is_active: Optional[bool] = None
 
 class ClassSubjectCreate(BaseModel):
@@ -107,8 +105,7 @@ class StudentCreate(BaseModel):
     class_id: Optional[int] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    parent_name: Optional[str] = None
-    parent_phone: Optional[str] = None
+    parent_contacts: Optional[list] = None
     address: Optional[str] = None
     is_active: Optional[bool] = True
 
@@ -121,8 +118,7 @@ class StudentUpdate(BaseModel):
     grade: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    parent_name: Optional[str] = None
-    parent_phone: Optional[str] = None
+    parent_contacts: Optional[list] = None
     address: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -135,6 +131,11 @@ class StudentImportRecord(BaseModel):
     ngay_sinh: Optional[str] = None
     ten_phu_huynh: Optional[str] = None
     sdt_phu_huynh: Optional[str] = None
+    ten_bo: Optional[str] = None
+    sdt_bo: Optional[str] = None
+    ten_me: Optional[str] = None
+    sdt_me: Optional[str] = None
+    parent_contacts: Optional[list] = None
     dia_chi: Optional[str] = None
     gioi_tinh: str = "Nam"
 
