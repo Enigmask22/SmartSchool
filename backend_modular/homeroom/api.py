@@ -80,12 +80,27 @@ async def homeroom_bootstrap(
                 sresp = (
                     db.table("students")
                     .select(
-                        "id, student_id, full_name, email, phone, date_of_birth, parent_contacts, address, profile_image, class_name, grade, gender, subject_selected, is_active"
+                        "id, student_id, full_name, email, phone, date_of_birth, address, profile_image, class_name, grade, gender, subject_selected, is_active"
                     )
                     .in_("id", sids)
                     .execute()
                 )
                 students = sresp.data or []
+                
+                # Fetch ALL parent_info in ONE query (performance optimization)
+                if students:
+                    student_ids = [s["id"] for s in students]
+                    parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
+                    parent_info_map = {}
+                    for pi in (parent_info_resp.data or []):
+                        sid = pi["student_id"]
+                        if sid not in parent_info_map:
+                            parent_info_map[sid] = []
+                        parent_info_map[sid].append(pi)
+                    
+                    # Assign parent_contacts to each student
+                    for student in students:
+                        student["parent_contacts"] = parent_info_map.get(student["id"], [])
 
         return {
             "success": True,
@@ -474,7 +489,6 @@ async def get_homeroom_students(
             email,
             phone,
             date_of_birth,
-            parent_contacts,
             address,
             profile_image,
             is_active,
@@ -495,7 +509,19 @@ async def get_homeroom_students(
         # Xử lý dữ liệu trả về
         students = []
         if response.data:
+            # Fetch ALL parent_info in ONE query (performance optimization)
+            student_ids = [s["id"] for s in response.data]
+            parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
+            parent_info_map = {}
+            for pi in (parent_info_resp.data or []):
+                sid = pi["student_id"]
+                if sid not in parent_info_map:
+                    parent_info_map[sid] = []
+                parent_info_map[sid].append(pi)
+            
             for student in response.data:
+                parent_contacts = parent_info_map.get(student["id"], [])
+                
                 students.append({
                     "id": student["id"],
                     "student_id": student["student_id"],
@@ -503,7 +529,7 @@ async def get_homeroom_students(
                     "email": student["email"],
                     "phone": student["phone"],
                     "date_of_birth": student["date_of_birth"],
-                    "parent_contacts": student["parent_contacts"],
+                    "parent_contacts": parent_contacts,
                     "address": student["address"],
                     "profile_image": student["profile_image"],
                     "is_active": student["is_active"],

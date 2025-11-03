@@ -260,6 +260,11 @@ async def recognize_face_upload(
                     
                     if student_response.data:
                         student_data = student_response.data[0]
+                        
+                        # Fetch parent_info
+                        parent_info = db.table("parent_info").select("*").eq("student_id", student_id_int).execute()
+                        student_data["parent_contacts"] = parent_info.data if parent_info.data else []
+                        
                         return FaceRecognitionResponse(
                             recognized=True,
                             student=student_data,
@@ -307,6 +312,11 @@ async def recognize_face_base64(
                     
                     if student_response.data:
                         student_data = student_response.data[0]
+                        
+                        # Fetch parent_info
+                        parent_info = db.table("parent_info").select("*").eq("student_id", student_id_int).execute()
+                        student_data["parent_contacts"] = parent_info.data if parent_info.data else []
+                        
                         return FaceRecognitionResponse(
                             recognized=True,
                             student=student_data,
@@ -677,6 +687,10 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
                             student_response = db.table("students").select("*").eq("id", int(student_id)).execute()
                             if student_response.data:
                                 student_data = student_response.data[0]
+                                
+                                # Fetch parent_info from separate table
+                                parent_info_response = db.table("parent_info").select("*").eq("student_id", int(student_id)).execute()
+                                student_data["parent_contacts"] = parent_info_response.data if parent_info_response.data else []
                                 
                                 # Auto-create attendance record
                                 attendance_result = await create_auto_attendance(student_data, db, confidence)
