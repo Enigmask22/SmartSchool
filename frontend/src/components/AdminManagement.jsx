@@ -109,6 +109,13 @@ const AdminManagement = () => {
     subColumns: [],
   });
 
+  // Filters for class_subjects tab
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [filteredClasses, setFilteredClasses] = useState([]);
+
   // Helper: fetch score settings by subject and populate editor
   const fetchSubjectScoreSettings = useCallback(async (subjectId) => {
     try {
@@ -204,12 +211,7 @@ const AdminManagement = () => {
     subject_teachers: {
       title: "Quản lý giáo viên - môn học",
       fields: ["teacher_id", "subject_id"], // Giữ nguyên: giáo viên trước, môn học sau
-      displayFields: [
-        "id",
-        "teacher_name",
-        "subject_name",
-        "is_active",
-      ],
+      displayFields: ["id", "teacher_name", "subject_name", "is_active"],
       endpoint: "/admin/subject-teachers",
     },
     class_subjects: {
@@ -437,6 +439,148 @@ const AdminManagement = () => {
       setSelectedSubjects([]);
     }
   }, [activeTab, editingItem, showAddForm, teacherSubjects]);
+
+  // Load academic years when entering class_subjects tab
+  useEffect(() => {
+    if (activeTab === "class_subjects") {
+      (async () => {
+        try {
+          const [yearsRes, defaultYearRes] = await Promise.all([
+            api.request("/admin/classes/academic-years"),
+            api.request("/admin/classes/default-academic-year"),
+          ]);
+
+          if (yearsRes.success) {
+            const years = yearsRes.data || [];
+            setAcademicYears(years);
+
+            // Set default academic year
+            let toSelect = "";
+            if (defaultYearRes.success && years.includes(defaultYearRes.data)) {
+              toSelect = defaultYearRes.data;
+            } else if (years.length > 0) {
+              toSelect = years[years.length - 1]; // Chọn năm cuối cùng (năm mới nhất)
+            }
+            setSelectedAcademicYear(toSelect);
+          }
+        } catch (e) {
+          logger.error("Error loading academic years:", e);
+        }
+      })();
+    } else {
+      // Reset filters when leaving class_subjects tab
+      setSelectedAcademicYear("");
+      setSelectedGrade("");
+      setSelectedClassId("");
+      setFilteredClasses([]);
+    }
+  }, [activeTab]);
+
+  // Filter classes when academic year or grade changes
+  useEffect(() => {
+    if (activeTab === "class_subjects") {
+      let filtered = [...classes];
+
+      // Filter by academic year
+      if (selectedAcademicYear) {
+        filtered = filtered.filter(
+          (cls) => cls.academic_year === selectedAcademicYear
+        );
+      }
+
+      // Filter by grade
+      if (selectedGrade) {
+        filtered = filtered.filter(
+          (cls) => cls.grade.toString() === selectedGrade
+        );
+      }
+
+      setFilteredClasses(filtered);
+    }
+  }, [activeTab, classes, selectedAcademicYear, selectedGrade]);
+
+  // Handle initialize all subjects for a class
+  const handleInitializeClassSubjects = async () => {
+    if (!selectedClassId || !selectedAcademicYear) {
+      alert("Vui lòng chọn lớp và năm học!");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn khởi tạo tất cả môn học cho lớp này?\n\nHệ thống sẽ tạo phân công giảng dạy cho tất cả ${subjects.length} môn học hiện có.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Get current semester (default to HK1)
+      const currentSemester = "HK1";
+
+      // Prepare bulk insert data
+      const classSubjectsToCreate = subjects
+        .filter((subject) => subject.is_active !== false) // Only active subjects
+        .map((subject) => ({
+          class_id: parseInt(selectedClassId),
+          subject_id: subject.id,
+          teacher_id: null, // Admin will assign later
+          academic_year: selectedAcademicYear,
+          semester: currentSemester,
+        }));
+
+      if (classSubjectsToCreate.length === 0) {
+        alert("Không có môn học nào để khởi tạo!");
+        return;
+      }
+
+      // Send requests sequentially to avoid overwhelming the server
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      for (const classSubject of classSubjectsToCreate) {
+        try {
+          const response = await api.request("/admin/class-subjects", {
+            method: "POST",
+            body: JSON.stringify(classSubject),
+          });
+
+          if (response.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            errors.push(`${classSubject.subject_id}: ${response.message}`);
+          }
+        } catch (err) {
+          errorCount++;
+          errors.push(`${classSubject.subject_id}: ${err.message}`);
+        }
+      }
+
+      // Show result
+      let message = `✅ Khởi tạo thành công ${successCount}/${classSubjectsToCreate.length} môn học!`;
+
+      if (errorCount > 0) {
+        message += `\n\n⚠️ Có ${errorCount} môn học bị lỗi hoặc đã tồn tại.`;
+        if (errors.length > 0 && errors.length <= 5) {
+          message += `\n\nChi tiết lỗi:\n${errors.join("\n")}`;
+        }
+      }
+
+      alert(message);
+
+      // Reload data
+      await loadData();
+    } catch (error) {
+      logger.error("Error initializing class subjects:", error);
+      alert("❌ Lỗi khi khởi tạo môn học: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreate = async (data) => {
     if (!currentConfig?.endpoint) return;
@@ -961,9 +1105,36 @@ const AdminManagement = () => {
 
   const filteredData = data.filter((item) => {
     const searchLower = searchTerm.toLowerCase();
-    return Object.values(item).some((value) =>
+    const matchesSearch = Object.values(item).some((value) =>
       String(value).toLowerCase().includes(searchLower)
     );
+
+    // Apply filters for class_subjects tab
+    if (activeTab === "class_subjects") {
+      let matchesFilters = true;
+
+      // Filter by academic year
+      if (selectedAcademicYear && item.academic_year !== selectedAcademicYear) {
+        matchesFilters = false;
+      }
+
+      // Filter by grade (check class's grade)
+      if (selectedGrade) {
+        const classData = classes.find((c) => c.id === item.class_id);
+        if (!classData || classData.grade.toString() !== selectedGrade) {
+          matchesFilters = false;
+        }
+      }
+
+      // Filter by class
+      if (selectedClassId && item.class_id.toString() !== selectedClassId) {
+        matchesFilters = false;
+      }
+
+      return matchesSearch && matchesFilters;
+    }
+
+    return matchesSearch;
   });
 
   const renderForm = (isEdit = false, item = null) => {
@@ -1135,7 +1306,10 @@ const AdminManagement = () => {
                     <SelectValue placeholder="Chọn lớp" />
                   </SelectTrigger>
                   <SelectContent>
-                    {classes.map((cls) => (
+                    {(activeTab === "class_subjects"
+                      ? filteredClasses
+                      : classes
+                    ).map((cls) => (
                       <SelectItem key={cls.id} value={cls.id.toString()}>
                         {cls.class_name} - {cls.grade}
                       </SelectItem>
@@ -1912,6 +2086,15 @@ const AdminManagement = () => {
                       Import từ Users
                     </Button>
                   )}
+                  {activeTab === "class_subjects" && selectedClassId && (
+                    <Button
+                      onClick={handleInitializeClassSubjects}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Shuffle className="w-5 h-5 mr-2" />
+                      Khởi tạo môn học
+                    </Button>
+                  )}
                   <Button
                     onClick={() => {
                       setShowAddForm(true);
@@ -1947,6 +2130,70 @@ const AdminManagement = () => {
                     className="pl-12"
                   />
                 </div>
+
+                {/* Filters for class_subjects tab */}
+                {activeTab === "class_subjects" && (
+                  <div className="flex items-center gap-3">
+                    {/* Academic Year Filter */}
+                    <Select
+                      value={selectedAcademicYear || "none"}
+                      onValueChange={(value) =>
+                        setSelectedAcademicYear(value === "none" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Năm học" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Năm học</SelectItem>
+                        {academicYears.map((y) => (
+                          <SelectItem key={y} value={y}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Grade Filter */}
+                    <Select
+                      value={selectedGrade || "none"}
+                      onValueChange={(value) =>
+                        setSelectedGrade(value === "none" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Khối" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Khối</SelectItem>
+                        <SelectItem value="10">Khối 10</SelectItem>
+                        <SelectItem value="11">Khối 11</SelectItem>
+                        <SelectItem value="12">Khối 12</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {/* Class Filter */}
+                    <Select
+                      value={selectedClassId || "none"}
+                      onValueChange={(value) =>
+                        setSelectedClassId(value === "none" ? "" : value)
+                      }
+                      disabled={!selectedAcademicYear && !selectedGrade}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Lớp học" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Lớp học</SelectItem>
+                        {filteredClasses.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id.toString()}>
+                            {cls.class_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Checkbox hiển thị đã xóa - chỉ hiện cho Users, Teachers, Subjects, và Grade Settings */}
                 {(activeTab === "users" ||
@@ -2166,14 +2413,14 @@ const AdminManagement = () => {
                                   item[field] ? (
                                     <Badge
                                       variant="outline"
-                                      className="px-3 py-1 text-xs inline-flex items-center justify-center whitespace-nowrap text-purple-800 bg-purple-100 border-purple-200"
+                                      className="inline-flex items-center justify-center px-3 py-1 text-xs text-purple-800 bg-purple-100 border-purple-200 whitespace-nowrap"
                                     >
                                       Môn chính
                                     </Badge>
                                   ) : (
                                     <Badge
                                       variant="outline"
-                                      className="px-3 py-1 text-xs inline-flex items-center justify-center whitespace-nowrap text-gray-800 bg-gray-100 border-gray-200"
+                                      className="inline-flex items-center justify-center px-3 py-1 text-xs text-gray-800 bg-gray-100 border-gray-200 whitespace-nowrap"
                                     >
                                       Môn tự chọn
                                     </Badge>
