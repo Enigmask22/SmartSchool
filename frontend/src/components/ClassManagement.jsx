@@ -12,6 +12,7 @@ import {
   Edit,
   RefreshCw,
   Search,
+  X,
 } from "lucide-react";
 import {
   Card,
@@ -80,8 +81,7 @@ const ClassManagement = () => {
     class_id: null,
     date_of_birth: "",
     address: "",
-    parent_name: "",
-    parent_phone: "",
+    parent_contacts: [{ relation: "parent", name: "", phone: "" }],
     gender: "Nam",
   });
   const [studentFormErrors, setStudentFormErrors] = useState({});
@@ -254,6 +254,62 @@ const ClassManagement = () => {
     }
   };
 
+  // Parent contacts handlers for Add Student
+  const addParentContactRow = () => {
+    setStudentFormData((prev) => ({
+      ...prev,
+      parent_contacts: [
+        ...(prev.parent_contacts || []),
+        { relation: "parent", name: "", phone: "" },
+      ],
+    }));
+  };
+
+  const removeParentContactRow = (index) => {
+    setStudentFormData((prev) => ({
+      ...prev,
+      parent_contacts: (prev.parent_contacts || []).filter(
+        (_, i) => i !== index
+      ),
+    }));
+  };
+
+  const updateParentContactField = (index, field, value) => {
+    setStudentFormData((prev) => {
+      const list = [...(prev.parent_contacts || [])];
+      list[index] = { ...list[index], [field]: value };
+      return { ...prev, parent_contacts: list };
+    });
+  };
+
+  // Parent contacts handlers for Edit Student
+  const addParentContactRowEdit = () => {
+    setEditForm((prev) => ({
+      ...prev,
+      parent_contacts: [
+        ...(prev.parent_contacts || []),
+        { relation: "parent", name: "", phone: "" },
+      ],
+    }));
+  };
+
+  const removeParentContactRowEdit = (index) => {
+    setEditForm((prev) => ({
+      ...prev,
+      parent_contacts: (prev.parent_contacts || []).filter(
+        (_, i) => i !== index
+      ),
+    }));
+  };
+
+  const updateParentContactFieldEdit = (index, field, value) => {
+    setEditForm((prev) => {
+      const list = [...(prev.parent_contacts || [])];
+      list[index] = { ...list[index], [field]: value };
+      return { ...prev, parent_contacts: list };
+    });
+  };
+
   // Hàm validate form học sinh
   const validateStudentForm = () => {
     const newErrors = {};
@@ -306,6 +362,19 @@ const ClassManagement = () => {
         }
       });
 
+      // Process parent_contacts
+      cleanData.parent_contacts = (studentFormData.parent_contacts || [])
+        .map((c) => ({
+          relation: c.relation || "parent",
+          name: (c.name && c.name.trim()) || null,
+          phone: (c.phone && c.phone.trim()) || null,
+        }))
+        .filter((c) => c.name || c.phone);
+
+      if (cleanData.parent_contacts.length === 0) {
+        delete cleanData.parent_contacts;
+      }
+
       // Bổ sung class_id từ filter nếu chưa có
       if (!cleanData.class_id && selectedClassForManagement) {
         cleanData.class_id = parseInt(selectedClassForManagement);
@@ -326,8 +395,7 @@ const ClassManagement = () => {
           grade: "",
           date_of_birth: "",
           address: "",
-          parent_name: "",
-          parent_phone: "",
+          parent_contacts: [{ relation: "parent", name: "", phone: "" }],
           gender: "Nam",
         });
         setStudentFormErrors({});
@@ -359,8 +427,7 @@ const ClassManagement = () => {
       class_id: null,
       date_of_birth: "",
       address: "",
-      parent_name: "",
-      parent_phone: "",
+      parent_contacts: [{ relation: "parent", name: "", phone: "" }],
       gender: "Nam",
     });
     setStudentFormErrors({});
@@ -369,7 +436,7 @@ const ClassManagement = () => {
 
   // Hàm download template cho import học sinh
   const downloadStudentTemplate = () => {
-    // Tạo dữ liệu mẫu
+    // Tạo dữ liệu mẫu với nhiều phụ huynh
     const templateData = [
       {
         ho_va_ten: "Nguyễn Văn A",
@@ -379,19 +446,125 @@ const ClassManagement = () => {
         khoi: "10",
         ngay_sinh: "2006-01-01",
         gioi_tinh: "Nam",
-        ten_phu_huynh: "Nguyễn Văn B",
-        sdt_phu_huynh: "0987654321",
-        dia_chi: "TP.HCM",
+        dia_chi: "123 Đường ABC, Quận 1, TP.HCM",
+        // Phụ huynh 1
+        phu_huynh_1_quan_he: "Bố",
+        phu_huynh_1_ho_ten: "Nguyễn Văn Bố",
+        phu_huynh_1_sdt: "0987654321",
+        // Phụ huynh 2
+        phu_huynh_2_quan_he: "Mẹ",
+        phu_huynh_2_ho_ten: "Trần Thị Mẹ",
+        phu_huynh_2_sdt: "0976543210",
+        // Phụ huynh 3 (optional)
+        phu_huynh_3_quan_he: "",
+        phu_huynh_3_ho_ten: "",
+        phu_huynh_3_sdt: "",
+      },
+      {
+        ho_va_ten: "Trần Thị B",
+        email: "tranthib@example.com",
+        so_dien_thoai: "0123456788",
+        lop_hoc: "10A1",
+        khoi: "10",
+        ngay_sinh: "2006-05-15",
+        gioi_tinh: "Nữ",
+        dia_chi: "456 Đường XYZ, Quận 3, TP.HCM",
+        // Phụ huynh 1
+        phu_huynh_1_quan_he: "Mẹ",
+        phu_huynh_1_ho_ten: "Nguyễn Thị Lan",
+        phu_huynh_1_sdt: "0965432109",
+        // Phụ huynh 2
+        phu_huynh_2_quan_he: "Người giám hộ",
+        phu_huynh_2_ho_ten: "Trần Văn Cường",
+        phu_huynh_2_sdt: "0954321098",
+        // Phụ huynh 3
+        phu_huynh_3_quan_he: "",
+        phu_huynh_3_ho_ten: "",
+        phu_huynh_3_sdt: "",
       },
     ];
 
     // Tạo workbook
     const ws = XLSX.utils.json_to_sheet(templateData);
+
+    // Định dạng header
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "4472C4" } },
+      alignment: { horizontal: "center", vertical: "center" },
+    };
+
+    // Set column widths
+    ws["!cols"] = [
+      { wch: 20 }, // ho_va_ten
+      { wch: 25 }, // email
+      { wch: 15 }, // so_dien_thoai
+      { wch: 10 }, // lop_hoc
+      { wch: 8 }, // khoi
+      { wch: 12 }, // ngay_sinh
+      { wch: 10 }, // gioi_tinh
+      { wch: 35 }, // dia_chi
+      { wch: 18 }, // phu_huynh_1_quan_he
+      { wch: 20 }, // phu_huynh_1_ho_ten
+      { wch: 15 }, // phu_huynh_1_sdt
+      { wch: 18 }, // phu_huynh_2_quan_he
+      { wch: 20 }, // phu_huynh_2_ho_ten
+      { wch: 15 }, // phu_huynh_2_sdt
+      { wch: 18 }, // phu_huynh_3_quan_he
+      { wch: 20 }, // phu_huynh_3_ho_ten
+      { wch: 15 }, // phu_huynh_3_sdt
+    ];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Danh sách học sinh");
 
+    // Thêm sheet hướng dẫn
+    const instructions = [
+      { "": "HƯỚNG DẪN SỬ DỤNG TEMPLATE IMPORT HỌC SINH" },
+      { "": "" },
+      { "": "1. CÁC TRƯỜNG BẮT BUỘC:" },
+      { "": "   - ho_va_ten: Họ và tên học sinh (bắt buộc)" },
+      { "": "   - lop_hoc: Tên lớp (VD: 10A1, 11B2)" },
+      { "": "   - khoi: Khối học (10, 11, hoặc 12)" },
+      { "": "" },
+      { "": "2. CÁC TRƯỜNG TÙY CHỌN:" },
+      { "": "   - email: Email học sinh" },
+      { "": "   - so_dien_thoai: Số điện thoại học sinh" },
+      { "": "   - ngay_sinh: Định dạng YYYY-MM-DD (VD: 2006-01-15)" },
+      { "": "   - gioi_tinh: Nam, Nữ, hoặc Khác" },
+      { "": "   - dia_chi: Địa chỉ chi tiết" },
+      { "": "" },
+      { "": "3. THÔNG TIN PHỤ HUYNH:" },
+      { "": "   - Có thể thêm tối đa 3 phụ huynh cho mỗi học sinh" },
+      { "": "   - Mỗi phụ huynh có 3 trường:" },
+      {
+        "": "     + phu_huynh_X_quan_he: Bố, Mẹ, Phụ huynh, hoặc Người giám hộ",
+      },
+      { "": "     + phu_huynh_X_ho_ten: Họ tên phụ huynh" },
+      { "": "     + phu_huynh_X_sdt: Số điện thoại" },
+      { "": "   - Nếu muốn thêm phụ huynh thứ 4, 5... thêm cột theo mẫu" },
+      { "": "" },
+      { "": "4. LƯU Ý:" },
+      { "": "   - KHÔNG XÓA dòng header (dòng đầu tiên)" },
+      { "": "   - KHÔNG thay đổi tên các cột" },
+      { "": "   - Mã học sinh sẽ tự động được tạo dựa trên khối" },
+      { "": "   - Dữ liệu mẫu có thể xóa và thay bằng dữ liệu thực" },
+      { "": "" },
+      { "": "5. VÍ DỤ QUAN HỆ PHỤ HUYNH:" },
+      { "": "   - Bố" },
+      { "": "   - Mẹ" },
+      { "": "   - Phụ huynh" },
+      { "": "   - Người giám hộ" },
+    ];
+
+    const wsInstructions = XLSX.utils.json_to_sheet(instructions, {
+      skipHeader: true,
+    });
+    wsInstructions["!cols"] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, wsInstructions, "Hướng dẫn");
+
     // Download file
-    XLSX.writeFile(wb, "template_hoc_sinh.xlsx");
+    XLSX.writeFile(wb, "template_danh_sach_hoc_sinh.xlsx");
   };
 
   // Hàm xử lý upload file
@@ -471,6 +644,62 @@ const ClassManagement = () => {
             }
           }
 
+          // Parse thông tin phụ huynh (hỗ trợ nhiều phụ huynh)
+          const parent_contacts = [];
+
+          // Duyệt qua các cột để tìm thông tin phụ huynh (phu_huynh_1, phu_huynh_2, ...)
+          let parentIndex = 1;
+          while (true) {
+            const relationKey = `phu_huynh_${parentIndex}_quan_he`;
+            const nameKey = `phu_huynh_${parentIndex}_ho_ten`;
+            const phoneKey = `phu_huynh_${parentIndex}_sdt`;
+
+            // Kiểm tra xem có cột phụ huynh này không
+            if (
+              !(relationKey in row) &&
+              !(nameKey in row) &&
+              !(phoneKey in row)
+            ) {
+              break; // Không còn phụ huynh nào nữa
+            }
+
+            const relation = row[relationKey]
+              ? row[relationKey].toString().trim()
+              : "";
+            const name = row[nameKey] ? row[nameKey].toString().trim() : "";
+            const phone = row[phoneKey] ? row[phoneKey].toString().trim() : "";
+
+            // Chỉ thêm nếu có ít nhất tên hoặc số điện thoại
+            if (name || phone) {
+              // Validate quan hệ
+              const validRelations = ["Bố", "Mẹ", "Phụ huynh", "Người giám hộ"];
+              let normalizedRelation = relation;
+
+              if (relation && !validRelations.includes(relation)) {
+                rowErrors.push(
+                  `Phụ huynh ${parentIndex}: Quan hệ không hợp lệ (phải là: Bố, Mẹ, Phụ huynh, Người giám hộ)`
+                );
+              }
+
+              // Map sang giá trị API
+              const relationMap = {
+                Bố: "father",
+                Mẹ: "mother",
+                "Phụ huynh": "parent",
+                "Người giám hộ": "guardian",
+              };
+              normalizedRelation = relationMap[relation] || "parent";
+
+              parent_contacts.push({
+                relation: normalizedRelation,
+                name: name,
+                phone: phone,
+              });
+            }
+
+            parentIndex++;
+          }
+
           if (rowErrors.length > 0) {
             errors.push({
               row: index + 2, // +2 vì Excel bắt đầu từ 1 và có header
@@ -487,16 +716,12 @@ const ClassManagement = () => {
               lop_hoc: row.lop_hoc.toString().trim(),
               khoi: row.khoi.toString().trim(),
               ngay_sinh: row.ngay_sinh ? row.ngay_sinh.toString().trim() : null,
-              ten_phu_huynh: row.ten_phu_huynh
-                ? row.ten_phu_huynh.toString().trim()
-                : null,
-              sdt_phu_huynh: row.sdt_phu_huynh
-                ? row.sdt_phu_huynh.toString().trim()
-                : null,
               dia_chi: row.dia_chi ? row.dia_chi.toString().trim() : null,
               gioi_tinh: row.gioi_tinh
                 ? row.gioi_tinh.toString().trim()
                 : "Nam",
+              parent_contacts:
+                parent_contacts.length > 0 ? parent_contacts : null,
             });
           }
         });
@@ -696,8 +921,14 @@ const ClassManagement = () => {
       grade: student.grade || "",
       date_of_birth: student.date_of_birth || "",
       address: student.address || "",
-      parent_name: student.parent_name || "",
-      parent_phone: student.parent_phone || "",
+      parent_name:
+        (student.parent_contacts && student.parent_contacts[0]?.name) || "",
+      parent_phone:
+        (student.parent_contacts && student.parent_contacts[0]?.phone) || "",
+      parent_contacts:
+        student.parent_contacts && student.parent_contacts.length > 0
+          ? student.parent_contacts
+          : [{ relation: "parent", name: "", phone: "" }],
       gender: student.gender || "Nam",
     });
     setShowEditModal(true);
@@ -750,10 +981,28 @@ const ClassManagement = () => {
 
     setEditLoading(true);
     try {
-      logger.debug("Updating student:", selectedStudentForEdit.id, editForm);
+      // Prepare payload with parent_contacts
+      const payload = { ...editForm };
+
+      // Process parent_contacts
+      if (Array.isArray(payload.parent_contacts)) {
+        payload.parent_contacts = payload.parent_contacts
+          .map((c) => ({
+            relation: c.relation || "parent",
+            name: (c.name && c.name.trim()) || null,
+            phone: (c.phone && c.phone.trim()) || null,
+          }))
+          .filter((c) => c.name || c.phone);
+
+        if (payload.parent_contacts.length === 0) {
+          delete payload.parent_contacts;
+        }
+      }
+
+      logger.debug("Updating student:", selectedStudentForEdit.id, payload);
       const response = await api.updateStudent(
         selectedStudentForEdit.id,
-        editForm
+        payload
       );
       logger.debug("Update response:", response);
 
@@ -1441,33 +1690,158 @@ const ClassManagement = () => {
                   className="w-full"
                 />
               </div>
+            </div>
 
-              {/* Tên phụ huynh */}
-              <div className="space-y-2">
-                <Label htmlFor="parent_name">Tên phụ huynh</Label>
-                <Input
-                  id="parent_name"
-                  type="text"
-                  value={studentFormData.parent_name}
-                  onChange={(e) =>
-                    handleStudentFormChange("parent_name", e.target.value)
-                  }
-                  placeholder="VD: Nguyễn Văn Bình"
-                />
+            {/* Liên hệ phụ huynh - Redesigned */}
+            <div className="p-4 space-y-4 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-base font-semibold text-gray-800">
+                  <svg
+                    className="w-5 h-5 text-blue-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                  Thông tin liên hệ phụ huynh
+                </label>
+                <Button
+                  type="button"
+                  onClick={addParentContactRow}
+                  size="sm"
+                  className="text-white bg-blue-600 shadow-md hover:bg-blue-700"
+                >
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                  Thêm người liên hệ
+                </Button>
               </div>
 
-              {/* SĐT phụ huynh */}
-              <div className="space-y-2">
-                <Label htmlFor="parent_phone">SĐT phụ huynh</Label>
-                <Input
-                  id="parent_phone"
-                  type="tel"
-                  value={studentFormData.parent_phone}
-                  onChange={(e) =>
-                    handleStudentFormChange("parent_phone", e.target.value)
-                  }
-                  placeholder="VD: 0987654321"
-                />
+              <div className="pr-2 space-y-3 overflow-y-auto max-h-96">
+                {(studentFormData.parent_contacts || []).map((c, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 transition-shadow bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Người liên hệ #{idx + 1}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeParentContactRow(idx)}
+                        className="w-8 h-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div>
+                        <Label className="mb-1 text-xs font-medium text-gray-600">
+                          Mối quan hệ
+                        </Label>
+                        <Select
+                          value={c.relation || "parent"}
+                          onValueChange={(value) =>
+                            updateParentContactField(idx, "relation", value)
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="parent">Phụ huynh</SelectItem>
+                            <SelectItem value="father">Bố</SelectItem>
+                            <SelectItem value="mother">Mẹ</SelectItem>
+                            <SelectItem value="guardian">
+                              Người giám hộ
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="mb-1 text-xs font-medium text-gray-600">
+                          Họ và tên
+                        </Label>
+                        <Input
+                          type="text"
+                          value={c.name || ""}
+                          onChange={(e) =>
+                            updateParentContactField(
+                              idx,
+                              "name",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Nhập họ tên"
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="mb-1 text-xs font-medium text-gray-600">
+                          Số điện thoại
+                        </Label>
+                        <Input
+                          type="tel"
+                          value={c.phone || ""}
+                          onChange={(e) =>
+                            updateParentContactField(
+                              idx,
+                              "phone",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Nhập số điện thoại"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {(studentFormData.parent_contacts || []).length === 0 && (
+                  <div className="py-8 text-center text-gray-500">
+                    <svg
+                      className="w-12 h-12 mx-auto mb-2 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                    <p className="text-sm">Chưa có thông tin liên hệ</p>
+                    <p className="mt-1 text-xs">
+                      Nhấn nút "Thêm người liên hệ" để bắt đầu
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1599,14 +1973,39 @@ const ClassManagement = () => {
                     <TableCell>{student.gioi_tinh || "Nam"}</TableCell>
                     <TableCell>{student.ngay_sinh || "-"}</TableCell>
                     <TableCell>
-                      <div>
-                        <div>{student.ten_phu_huynh || "-"}</div>
-                        {student.sdt_phu_huynh && (
-                          <div className="text-xs text-muted-foreground">
-                            {student.sdt_phu_huynh}
-                          </div>
-                        )}
-                      </div>
+                      {student.parent_contacts &&
+                      student.parent_contacts.length > 0 ? (
+                        <div className="space-y-1">
+                          {student.parent_contacts.map((contact, idx) => {
+                            // Map relation sang tiếng Việt
+                            const relationDisplay =
+                              {
+                                father: "Bố",
+                                mother: "Mẹ",
+                                parent: "Phụ huynh",
+                                guardian: "Người giám hộ",
+                              }[contact.relation] || "Phụ huynh";
+
+                            return (
+                              <div key={idx} className="text-sm">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mr-1">
+                                  {relationDisplay}
+                                </span>
+                                <span className="font-medium">
+                                  {contact.name || "-"}
+                                </span>
+                                {contact.phone && (
+                                  <span className="ml-1 text-xs text-muted-foreground">
+                                    ({contact.phone})
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1813,6 +2212,159 @@ const ClassManagement = () => {
                   }
                   placeholder="VD: 0987654321"
                 />
+              </div>
+            </div>
+
+            {/* Liên hệ phụ huynh - Redesigned */}
+            <div className="p-4 space-y-4 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-base font-semibold text-gray-800">
+                  <svg
+                    className="w-5 h-5 text-blue-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                  Thông tin liên hệ phụ huynh
+                </label>
+                <Button
+                  type="button"
+                  onClick={addParentContactRowEdit}
+                  size="sm"
+                  className="text-white bg-blue-600 shadow-md hover:bg-blue-700"
+                >
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                  Thêm người liên hệ
+                </Button>
+              </div>
+
+              <div className="pr-2 space-y-3 overflow-y-auto max-h-96">
+                {(editForm.parent_contacts || []).map((c, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 transition-shadow bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Người liên hệ #{idx + 1}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeParentContactRowEdit(idx)}
+                        className="w-8 h-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div>
+                        <Label className="mb-1 text-xs font-medium text-gray-600">
+                          Mối quan hệ
+                        </Label>
+                        <Select
+                          value={c.relation || "parent"}
+                          onValueChange={(value) =>
+                            updateParentContactFieldEdit(idx, "relation", value)
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="parent">Phụ huynh</SelectItem>
+                            <SelectItem value="father">Bố</SelectItem>
+                            <SelectItem value="mother">Mẹ</SelectItem>
+                            <SelectItem value="guardian">
+                              Người giám hộ
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="mb-1 text-xs font-medium text-gray-600">
+                          Họ và tên
+                        </Label>
+                        <Input
+                          type="text"
+                          value={c.name || ""}
+                          onChange={(e) =>
+                            updateParentContactFieldEdit(
+                              idx,
+                              "name",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Nhập họ tên"
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="mb-1 text-xs font-medium text-gray-600">
+                          Số điện thoại
+                        </Label>
+                        <Input
+                          type="tel"
+                          value={c.phone || ""}
+                          onChange={(e) =>
+                            updateParentContactFieldEdit(
+                              idx,
+                              "phone",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Nhập số điện thoại"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {(editForm.parent_contacts || []).length === 0 && (
+                  <div className="py-8 text-center text-gray-500">
+                    <svg
+                      className="w-12 h-12 mx-auto mb-2 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                    <p className="text-sm">Chưa có thông tin liên hệ</p>
+                    <p className="mt-1 text-xs">
+                      Nhấn nút "Thêm người liên hệ" để bắt đầu
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

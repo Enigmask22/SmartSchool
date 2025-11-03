@@ -15,24 +15,34 @@ class StudentBase(BaseModel):
     grade: str = Field(..., description="Khối")
     date_of_birth: Optional[date] = None
     address: Optional[str] = None
-    parent_name: Optional[str] = None
-    parent_phone: Optional[str] = None
+    parent_contacts: Optional[list] = None
     gender: str = Field(default="Nam", description="Giới tính: Nam, Nữ, hoặc Khác")
 
-class StudentCreate(StudentBase):
-    pass
-
-class StudentUpdate(BaseModel):
-    full_name: Optional[str] = None
+class StudentCreate(BaseModel):
+    student_id: str
+    full_name: str
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    class_name: str
+    grade: str
+    class_id: Optional[int] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    parent_contacts: Optional[list] = None
+    address: Optional[str] = None
+    is_active: Optional[bool] = True
+
+class StudentUpdate(BaseModel):
+    student_id: Optional[str] = None
+    full_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
     class_name: Optional[str] = None
     grade: Optional[str] = None
-    date_of_birth: Optional[date] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    parent_contacts: Optional[list] = None
     address: Optional[str] = None
-    parent_name: Optional[str] = None
-    parent_phone: Optional[str] = None
-    gender: Optional[str] = None
     is_active: Optional[bool] = None
     subject_selected: Optional[dict] = None
 

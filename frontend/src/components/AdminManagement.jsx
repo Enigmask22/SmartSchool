@@ -203,12 +203,11 @@ const AdminManagement = () => {
     },
     subject_teachers: {
       title: "Quản lý giáo viên - môn học",
-      fields: ["teacher_id", "subject_id", "academic_year"], // Giữ nguyên: giáo viên trước, môn học sau
+      fields: ["teacher_id", "subject_id"], // Giữ nguyên: giáo viên trước, môn học sau
       displayFields: [
         "id",
         "teacher_name",
         "subject_name",
-        "academic_year",
         "is_active",
       ],
       endpoint: "/admin/subject-teachers",
@@ -493,16 +492,12 @@ const AdminManagement = () => {
 
         // 2. Tạo các subject_teachers nếu có môn học được chọn
         if (selectedSubjects.length > 0) {
-          const currentYear = new Date().getFullYear();
-          const academicYear = `${currentYear}-${currentYear + 1}`;
-
           const subjectTeacherPromises = selectedSubjects.map((subjectId) =>
             api.request("/admin/subject-teachers", {
               method: "POST",
               body: JSON.stringify({
                 teacher_id: newTeacherId,
                 subject_id: subjectId,
-                academic_year: academicYear,
                 is_active: true,
               }),
             })
@@ -639,9 +634,6 @@ const AdminManagement = () => {
           (sid) => !selectedSubjects.includes(sid)
         );
 
-        const currentYear = new Date().getFullYear();
-        const academicYear = `${currentYear}-${currentYear + 1}`;
-
         // Thêm môn học mới
         if (subjectsToAdd.length > 0) {
           const addPromises = subjectsToAdd.map((subjectId) =>
@@ -650,7 +642,6 @@ const AdminManagement = () => {
               body: JSON.stringify({
                 teacher_id: id,
                 subject_id: subjectId,
-                academic_year: academicYear,
                 is_active: true,
               }),
             })
@@ -887,9 +878,6 @@ const AdminManagement = () => {
         const createdTeachers = response.data;
 
         // 2. Tạo subject_teachers cho những giáo viên có môn học được chọn
-        const currentYear = new Date().getFullYear();
-        const academicYear = `${currentYear}-${currentYear + 1}`;
-
         const subjectTeacherPromises = [];
 
         createdTeachers.forEach((teacher) => {
@@ -902,7 +890,6 @@ const AdminManagement = () => {
                 body: JSON.stringify({
                   teacher_id: teacher.id,
                   subject_id: subjectId,
-                  academic_year: academicYear,
                   is_active: true,
                 }),
               })

@@ -8,7 +8,7 @@ import { SystemSettingsProvider } from "./contexts/SystemSettingsContext";
 
 // Components
 import Sidebar from "./components/Sidebar";
-import Dashboard from "./components/Dashboard";
+// import Dashboard from "./components/Dashboard";
 import StudentList from "./components/StudentList";
 import AttendanceView from "./components/AttendanceView";
 import FaceManagement from "./components/FaceManagement";
@@ -79,8 +79,8 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="w-12 h-12 rounded-full border-b-2 border-indigo-600 animate-spin"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="w-12 h-12 border-b-2 border-indigo-600 rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -121,8 +121,8 @@ function AppContent() {
           return <AdminManagement />;
         case "ui-demo":
           return <UIDemo />;
-        default:
-          return <Dashboard setCurrentView={setCurrentView} />;
+        // default:
+        //   return <Dashboard setCurrentView={setCurrentView} />;
       }
     }
 
