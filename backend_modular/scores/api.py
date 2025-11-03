@@ -108,8 +108,8 @@ async def get_student_all_scores(
         if semester is None:
             semester = get_current_semester()
         
-        # Lấy thông tin học sinh
-        student = db.table("students").select("*").eq("id", student_id).execute()
+        # Lấy thông tin học sinh (chỉ các field cần thiết)
+        student = db.table("students").select("id, student_id, full_name, email, class_name, grade").eq("id", student_id).execute()
         
         if not student.data:
             raise HTTPException(
@@ -512,7 +512,7 @@ async def get_students_by_class_subject(
         subject_info = subject_data.data[0] if subject_data.data else None
         
         # Lấy danh sách học sinh trong lớp theo class_name và grade (bao gồm subject_selected)
-        students = db.table("students").select("*").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).execute()
+        students = db.table("students").select("id, student_id, full_name, class_name, grade, subject_selected, is_active").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).execute()
         
         # Filter học sinh theo subject_selected (core_subjects hoặc elective_subjects)
         filtered_students = []
@@ -1648,7 +1648,7 @@ async def download_score_template(
             score_columns = ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
         
         # Lấy danh sách học sinh (bao gồm subject_selected)
-        students = db.table("students").select("*").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).order("student_id").execute()
+        students = db.table("students").select("id, student_id, full_name, class_name, grade, subject_selected, is_active").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).order("student_id").execute()
         
         # Filter học sinh theo subject_selected
         filtered_students = []

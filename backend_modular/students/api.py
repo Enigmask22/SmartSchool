@@ -118,11 +118,20 @@ async def get_students(
         offset = (page - 1) * page_size
         response = query.range(offset, offset + page_size - 1).execute()
         
-        # Fetch parent_info cho mỗi student
+        # Fetch ALL parent_info in ONE query (performance optimization)
         students_data = response.data or []
-        for student in students_data:
-            parent_info = db.table("parent_info").select("*").eq("student_id", student["id"]).execute()
-            student["parent_contacts"] = parent_info.data if parent_info.data else []
+        if students_data:
+            student_ids = [s["id"] for s in students_data]
+            parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
+            parent_info_map = {}
+            for pi in (parent_info_resp.data or []):
+                sid = pi["student_id"]
+                if sid not in parent_info_map:
+                    parent_info_map[sid] = []
+                parent_info_map[sid].append(pi)
+            
+            for student in students_data:
+                student["parent_contacts"] = parent_info_map.get(student["id"], [])
         
         return ListResponse(
             success=True,

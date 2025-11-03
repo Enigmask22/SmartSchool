@@ -903,10 +903,19 @@ async def get_class_students(
         students_resp = db.table("students").select("*").in_("id", student_ids).execute()
         students_data = students_resp.data or []
         
-        # Fetch parent_info cho mỗi student
-        for student in students_data:
-            parent_info = db.table("parent_info").select("*").eq("student_id", student["id"]).execute()
-            student["parent_contacts"] = parent_info.data if parent_info.data else []
+        # Fetch ALL parent_info in ONE query (performance optimization)
+        if students_data:
+            all_student_ids = [s["id"] for s in students_data]
+            parent_info_resp = db.table("parent_info").select("*").in_("student_id", all_student_ids).execute()
+            parent_info_map = {}
+            for pi in (parent_info_resp.data or []):
+                sid = pi["student_id"]
+                if sid not in parent_info_map:
+                    parent_info_map[sid] = []
+                parent_info_map[sid].append(pi)
+            
+            for student in students_data:
+                student["parent_contacts"] = parent_info_map.get(student["id"], [])
         
         return {"success": True, "data": students_data}
     except HTTPException:
@@ -1517,10 +1526,19 @@ async def get_all_students_admin(
         response = db.table("students").select("*").order("created_at", desc=True).execute()
         students_data = response.data or []
         
-        # Fetch parent_info cho mỗi student
-        for student in students_data:
-            parent_info = db.table("parent_info").select("*").eq("student_id", student["id"]).execute()
-            student["parent_contacts"] = parent_info.data if parent_info.data else []
+        # Fetch ALL parent_info in ONE query (performance optimization)
+        if students_data:
+            student_ids = [s["id"] for s in students_data]
+            parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
+            parent_info_map = {}
+            for pi in (parent_info_resp.data or []):
+                sid = pi["student_id"]
+                if sid not in parent_info_map:
+                    parent_info_map[sid] = []
+                parent_info_map[sid].append(pi)
+            
+            for student in students_data:
+                student["parent_contacts"] = parent_info_map.get(student["id"], [])
         
         return {"success": True, "data": students_data}
     except Exception as e:
@@ -1544,15 +1562,23 @@ async def get_students_by_grade(
             response = db.table("students").select("*").in_("class_name", class_names).order("full_name").execute()
             students_data = response.data or []
             
-            # Fetch parent_info cho mỗi student
-            for student in students_data:
-                parent_info = db.table("parent_info").select("*").eq("student_id", student["id"]).execute()
-                student["parent_contacts"] = parent_info.data if parent_info.data else []
+            # Fetch ALL parent_info in ONE query (performance optimization)
+            if students_data:
+                student_ids = [s["id"] for s in students_data]
+                parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
+                parent_info_map = {}
+                for pi in (parent_info_resp.data or []):
+                    sid = pi["student_id"]
+                    if sid not in parent_info_map:
+                        parent_info_map[sid] = []
+                    parent_info_map[sid].append(pi)
+                
+                for student in students_data:
+                    student["parent_contacts"] = parent_info_map.get(student["id"], [])
         else:
             students_data = []
             
-        return {"success": True, "data": students_data}        
-        return {"success": True, "data": response.data}
+        return {"success": True, "data": students_data}
     except Exception as e:
         logger.error(f"Error getting students by grade: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách học sinh theo khối: {str(e)}")
