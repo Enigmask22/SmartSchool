@@ -103,6 +103,8 @@ const ClassManagement = () => {
   // Academic year filter
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  // Grade filter
+  const [selectedGrade, setSelectedGrade] = useState("");
 
   // Move class modal states
   const [showMoveModal, setShowMoveModal] = useState(false);
@@ -122,12 +124,21 @@ const ClassManagement = () => {
         : "/admin/classes";
       const response = await api.request(endpoint);
       if (response.success) {
-        setClasses(response.data || []);
+        let filteredClasses = response.data || [];
+
+        // Lọc thêm theo khối nếu đã chọn
+        if (selectedGrade) {
+          filteredClasses = filteredClasses.filter(
+            (cls) => cls.grade.toString() === selectedGrade
+          );
+        }
+
+        setClasses(filteredClasses);
       }
     } catch (err) {
       logger.error("Error loading classes:", err);
     }
-  }, [selectedAcademicYear]);
+  }, [selectedAcademicYear, selectedGrade]);
 
   // Load học sinh của lớp được chọn
   const loadClassStudents = useCallback(async () => {
@@ -832,14 +843,14 @@ const ClassManagement = () => {
     })();
   }, []);
 
-  // Load classes when academic year changes
+  // Load classes when academic year or grade changes
   useEffect(() => {
     loadClassManagementData();
-    // Reset lớp khi đổi năm học
+    // Reset lớp khi đổi năm học hoặc khối
     setSelectedClassForManagement("");
     setHomeroomTeacher(null);
     setClassStudents([]);
-  }, [selectedAcademicYear, loadClassManagementData]);
+  }, [selectedAcademicYear, selectedGrade, loadClassManagementData]);
 
   // Load học sinh khi chọn lớp
   useEffect(() => {
@@ -1096,6 +1107,29 @@ const ClassManagement = () => {
                       {y}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Grade Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="grade-select" className="text-sm font-medium">
+                Chọn khối
+              </Label>
+              <Select
+                value={selectedGrade || "none"}
+                onValueChange={(value) =>
+                  setSelectedGrade(value === "none" ? "" : value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="Chọn khối" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Chọn khối</SelectItem>
+                  <SelectItem value="10">Khối 10</SelectItem>
+                  <SelectItem value="11">Khối 11</SelectItem>
+                  <SelectItem value="12">Khối 12</SelectItem>
                 </SelectContent>
               </Select>
             </div>

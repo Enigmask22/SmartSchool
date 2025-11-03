@@ -82,7 +82,7 @@ class SubjectTeacherUpdate(BaseModel):
 class ClassSubjectCreate(BaseModel):
     class_id: int
     subject_id: int
-    teacher_id: int
+    teacher_id: Optional[int] = None
     academic_year: str
     semester: str
     is_active: Optional[bool] = True
