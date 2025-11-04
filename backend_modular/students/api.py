@@ -452,9 +452,10 @@ async def get_student_stats(db=Depends(get_db)):
         active_response = db.table("students").select("count", count="exact").eq("is_active", True).execute()
         active_students = active_response.count if active_response.count else 0
         
-        # Students with InsightFace encoding
-        encoded_response = db.table("students").select("count", count="exact").not_.is_("insightface_encoding", "null").execute()
-        encoded_students = encoded_response.count if encoded_response.count else 0
+        # Students with InsightFace encoding (check từ face_embeddings table)
+        embeddings_response = db.table("face_embeddings").select("student_id").execute()
+        unique_students_with_embeddings = set(emb['student_id'] for emb in embeddings_response.data) if embeddings_response.data else set()
+        encoded_students = len(unique_students_with_embeddings)
         
         stats = {
             "total_students": total_students,

@@ -634,13 +634,13 @@ const FaceManagement = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-gray-900">
-                        {student.insightface_encoding ? (
+                        {student.face_samples_count && student.face_samples_count > 0 ? (
                           <Badge
                             variant="default"
                             className="text-green-800 bg-green-100"
                           >
                             <UserCheck className="w-3 h-3 mr-1" />
-                            Đã đăng ký (InsightFace)
+                            Đã đăng ký ({student.face_samples_count} mẫu)
                           </Badge>
                         ) : (
                           <Badge
@@ -653,7 +653,7 @@ const FaceManagement = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-sm font-medium text-center">
-                        {student.insightface_encoding ? (
+                        {student.face_samples_count && student.face_samples_count > 0 ? (
                           <Button
                             onClick={() =>
                               deleteFaceEncoding(student.id, student.full_name)

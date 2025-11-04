@@ -307,7 +307,7 @@ async def homeroom_face_bootstrap(
             if sids:
                 sresp = (
                     db.table("students")
-                    .select("id, student_id, full_name, email, phone, class_name, grade, is_active, insightface_encoding, face_samples_count, recognition_enabled, encoding_version")
+                    .select("id, student_id, full_name, email, phone, class_name, grade, is_active, face_samples_count, recognition_enabled")
                     .in_("id", sids)
                     .execute()
                 )
@@ -495,9 +495,7 @@ async def get_homeroom_students(
             class_name,
             grade,
             gender,
-            insightface_encoding,
             face_samples_count,
-            encoding_version,
             recognition_enabled,
             subject_selected
             """
@@ -536,9 +534,7 @@ async def get_homeroom_students(
                     "class_name": student["class_name"],
                     "grade": student["grade"],
                     "gender": student["gender"],
-                    "insightface_encoding": student["insightface_encoding"],
                     "face_samples_count": student["face_samples_count"],
-                    "encoding_version": student["encoding_version"],
                     "recognition_enabled": student["recognition_enabled"],
                     "subject_selected": student["subject_selected"]
                 })
@@ -600,14 +596,12 @@ async def update_student_face_encoding(
         if student_id not in student_ids:
             raise HTTPException(status_code=403, detail="Học sinh không thuộc lớp chủ nhiệm của bạn")
 
-        # Cập nhật encoding
+        # Cập nhật encoding - chỉ update face_samples_count (embeddings được quản lý qua face_embeddings table)
         update_data = {
             "updated_at": datetime.now().isoformat(),
             "updated_by": current_user["id"]
         }
         
-        if "insightface_encoding" in encoding_data:
-            update_data["insightface_encoding"] = encoding_data["insightface_encoding"]
         if "face_samples_count" in encoding_data:
             update_data["face_samples_count"] = encoding_data["face_samples_count"]
 

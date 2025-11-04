@@ -1356,7 +1356,7 @@ const ClassManagement = () => {
                         </TableCell>
                         <TableCell>{student.class_name}</TableCell>
                         <TableCell>
-                          {student.insightface_encoding ? (
+                          {student.face_samples_count && student.face_samples_count > 0 ? (
                             <Badge
                               variant="default"
                               className="text-green-800 bg-green-100"
