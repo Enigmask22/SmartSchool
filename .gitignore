@@ -490,3 +490,10 @@ instruction_md/
 llm_gen/
 build_wheel/
 latex/
+# Train/Test module (không commit vào repo)
+backend_modular/ai_services/train_test/
+backend_modular/ai_services/train_test/**/*
+
+# InsightFace cache (không commit vào repo)
+backend_modular/ai_services/insightface_cache/
+backend_modular/ai_services/insightface_cache/**/*
