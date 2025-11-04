@@ -21,6 +21,7 @@ pandas>=2.1.0
 # - Để dùng GPU trên Windows: Cài qua Conda (xem FAISS_WINDOWS_SETUP.md)
 faiss-cpu>=1.7.4
 # faiss-gpu>=1.7.4  # Chỉ dùng được trên Linux/macOS hoặc qua Conda trên Windows
+optuna>=3.0.0
 
 # Cryptography packages
 python-jose[cryptography]>=3.3.0

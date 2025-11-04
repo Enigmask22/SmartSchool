@@ -18,7 +18,9 @@ from pathlib import Path
 import time
 
 # Cache path for InsightFace (monkey patch đã được apply trong main.py)
-CACHE_PATH = os.getenv("INSIGHTFACE_CACHE_PATH", "./insightface_cache")
+# Đảm bảo path là relative đến file services.py (ai_services/insightface_cache)
+_default_cache_path = os.path.join(os.path.dirname(__file__), "insightface_cache")
+CACHE_PATH = os.getenv("INSIGHTFACE_CACHE_PATH", _default_cache_path)
 
 # InsightFace imports (SAU KHI đã set environment)
 try:
@@ -226,12 +228,20 @@ class FaissIndexManager:
             
             # Save metadata với format đẹp hơn
             # Convert id_to_index và index_to_id sang string keys để JSON format đẹp
+            # QUAN TRỌNG: Kiểm tra xem có data không trước khi save
+            if not self.id_to_index or not self.index_to_id or self.total_vectors == 0:
+                logger.warning(f"⚠️ Cannot save metadata: empty data!")
+                logger.warning(f"   id_to_index={len(self.id_to_index)}, index_to_id={len(self.index_to_id)}, total_vectors={self.total_vectors}")
+                return False
+            
             metadata = {
                 "id_to_index": {str(k): v for k, v in self.id_to_index.items()},
                 "index_to_id": {str(k): str(v) for k, v in self.index_to_id.items()},
                 "total_vectors": self.total_vectors,
                 "dimension": self.dimension
             }
+            
+            logger.debug(f"📊 Metadata to save: {len(self.id_to_index)} students, {self.total_vectors} vectors")
             
             # Custom JSON formatter để format đẹp: mỗi student_id một dòng, array nằm ngang
             def format_json_pretty(obj, indent=0):
@@ -261,11 +271,55 @@ class FaissIndexManager:
             
             # Format và save
             formatted_json = format_json_pretty(metadata)
-            with open(self.metadata_path, 'w', encoding='utf-8') as f:
-                f.write(formatted_json)
             
-            logger.info(f"💾 Saved Faiss index to {self.index_path}")
-            return True
+            # Kiểm tra formatted_json không empty
+            if not formatted_json or len(formatted_json.strip()) == 0:
+                logger.error(f"❌ Formatted JSON is empty! Metadata: {metadata}")
+                return False
+            try:
+                # Resolve absolute path để đảm bảo ghi đúng file
+                metadata_path_abs = Path(self.metadata_path).resolve()
+                metadata_path_abs.parent.mkdir(parents=True, exist_ok=True)
+                
+                logger.debug(f"📝 Writing metadata to: {metadata_path_abs}")
+                logger.debug(f"📝 Metadata content length: {len(formatted_json)} chars")
+                logger.debug(f"📝 First 100 chars: {formatted_json[:100]}")
+                
+                # Write với explicit flush để đảm bảo data được ghi
+                with open(metadata_path_abs, 'w', encoding='utf-8') as f:
+                    f.write(formatted_json)
+                    f.flush()  # Force flush to disk
+                    os.fsync(f.fileno())  # Ensure OS-level write
+                
+                # Verify file was written với delay nhỏ để đảm bảo OS đã flush
+                import time
+                time.sleep(0.1)  # Small delay for OS to flush
+                
+                if metadata_path_abs.exists():
+                    file_size = metadata_path_abs.stat().st_size
+                    if file_size > 0:
+                        logger.info(f"💾 Saved Faiss index to {self.index_path}")
+                        logger.info(f"💾 Saved Faiss metadata to {metadata_path_abs} (size: {file_size} bytes)")
+                        # Verify content
+                        with open(metadata_path_abs, 'r', encoding='utf-8') as verify_f:
+                            verify_content = verify_f.read()
+                            if len(verify_content) > 0:
+                                logger.debug(f"✅ Verified: metadata file has {len(verify_content)} chars")
+                            else:
+                                logger.error(f"❌ Metadata file is empty after write! Expected {len(formatted_json)} chars")
+                                return False
+                        return True
+                    else:
+                        logger.error(f"❌ Metadata file exists but is empty (0 bytes)")
+                        return False
+                else:
+                    logger.error(f"❌ Metadata file was not created: {metadata_path_abs}")
+                    return False
+            except Exception as file_error:
+                logger.error(f"❌ Error writing metadata file {self.metadata_path}: {file_error}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return False
             
         except Exception as e:
             logger.error(f"❌ Error saving Faiss index: {str(e)}")
@@ -357,7 +411,6 @@ class InsightFaceRecognitionService:
         
         # Parameters optimized for ULTRA-HIGH ACCURACY (95%+)
         self.similarity_threshold = 0.20  # Giảm từ 0.25 xuống 0.20 cho flexible hơn
-        self.detection_confidence = 0.6   # Giảm từ 0.7 xuống 0.6 cho detection dễ hơn
         self.det_size = (1280, 1280)      # Tăng từ 1024x1024 lên 1280x1280 cho ultra quality
         
         # Database lưu face embeddings (512-dimensional ArcFace features)
@@ -374,6 +427,24 @@ class InsightFaceRecognitionService:
         self.quality_threshold = 0.6      # Giảm từ 0.8 xuống 0.6 cho detection dễ hơn
         self.diversity_threshold = 0.10   # Giảm từ 0.15 xuống 0.10 cho accept ảnh dễ hơn
         self.ensemble_size = 5            # Sử dụng top 5 matches cho ensemble voting
+        # Angle-Robust Weighted Ensemble parameters (có thể tinh chỉnh bởi train/test)
+        self.ensemble_weights = [0.4, 0.3, 0.2, 0.1, 0.05]
+        self.angle_good_threshold = 0.25
+        self.angle_bonus_cap = 0.10
+        self.angle_bonus_per_match = 0.02
+        self.peak_bonus_high_threshold = 0.5
+        self.peak_bonus_high = 0.05
+        self.peak_bonus_mid_threshold = 0.35
+        self.peak_bonus_mid = 0.02
+        self.consistency_bonus_cap = 0.03
+        self.consistency_variance_coef = 0.15
+        self.sample_bonus_per = 0.003
+        self.sample_bonus_cap = 0.02
+        self.final_weight_weighted = 0.6
+        self.final_weight_angle = 0.15
+        self.final_weight_peak = 0.1
+        self.final_weight_consistency = 0.1
+        self.final_weight_sample = 0.05
         
         # Known faces arrays
         self.known_student_ids = []
@@ -590,27 +661,34 @@ class InsightFaceRecognitionService:
             
             # Step 1: Sử dụng Faiss để tìm top-K candidates (nhanh hơn brute force)
             top_candidates = []
-            if self.faiss_manager and self.faiss_manager.index is not None:
+            if self.faiss_manager and self.faiss_manager.index is not None and self.faiss_manager.total_vectors > 0:
                 # Faiss search: top 50 candidates (đủ cho 1000-2000 students)
                 faiss_results = self.faiss_manager.search(target_embedding, top_k=50)
                 
-                # Group by student_id và aggregate similarities
-                student_similarities = {}
-                for student_id, similarity in faiss_results:
-                    if student_id not in student_similarities:
-                        student_similarities[student_id] = []
-                    student_similarities[student_id].append(similarity)
-                
-                # Chỉ xử lý các students có similarity > threshold cơ bản
-                for student_id, similarities in student_similarities.items():
-                    if max(similarities) >= self.similarity_threshold:
-                        top_candidates.append(student_id)
-                
-                logger.debug(f"🔍 Faiss found {len(top_candidates)} candidates from {len(faiss_results)} results")
+                if faiss_results:
+                    # Group by student_id và aggregate similarities
+                    student_similarities = {}
+                    for student_id, similarity in faiss_results:
+                        if student_id not in student_similarities:
+                            student_similarities[student_id] = []
+                        student_similarities[student_id].append(similarity)
+                    
+                    # Chỉ xử lý các students có similarity > threshold cơ bản
+                    for student_id, similarities in student_similarities.items():
+                        if max(similarities) >= self.similarity_threshold:
+                            top_candidates.append(student_id)
+                    
+                    logger.debug(f"🔍 Faiss found {len(top_candidates)} candidates from {len(faiss_results)} results (total vectors: {self.faiss_manager.total_vectors})")
+                else:
+                    logger.warning("⚠️ Faiss search returned no results, falling back to brute force")
+                    top_candidates = list(self.face_database.keys())
             else:
-                # Fallback: Nếu không có Faiss, dùng tất cả students
+                # Fallback: Nếu không có Faiss hoặc index empty, dùng tất cả students
+                faiss_status = "not initialized" if not self.faiss_manager else \
+                              "index is None" if self.faiss_manager.index is None else \
+                              f"empty (0 vectors)" if self.faiss_manager.total_vectors == 0 else "unknown"
+                logger.warning(f"⚠️ Faiss {faiss_status}, using brute force on all {len(self.face_database)} students")
                 top_candidates = list(self.face_database.keys())
-                logger.debug(f"⚠️ Faiss not available, using all {len(top_candidates)} students")
             
             if not top_candidates:
                 return None, 0.0
@@ -638,35 +716,41 @@ class InsightFaceRecognitionService:
                     top_similarities = sorted_similarities[:min(self.ensemble_size, len(sorted_similarities))]
                     
                     # Weighted ensemble: Ưu tiên scores cao hơn
-                    weights = [0.4, 0.3, 0.2, 0.1, 0.05][:len(top_similarities)]
+                    weights = self.ensemble_weights[:len(top_similarities)]
                     weights = weights[:len(top_similarities)]
                     weight_sum = sum(weights)
                     weighted_score = sum(sim * weight for sim, weight in zip(top_similarities, weights)) / weight_sum
                     
                     # 2. Angle Robustness: Bonus nếu có nhiều angles match tốt
-                    good_matches = [s for s in similarities if s > 0.25]  # Lowered threshold
-                    angle_bonus = min(0.10, len(good_matches) * 0.02)  # Increased bonus
+                    good_matches = [s for s in similarities if s > self.angle_good_threshold]
+                    angle_bonus = min(self.angle_bonus_cap, len(good_matches) * self.angle_bonus_per_match)
                     
                     # 3. Peak Performance: Bonus cho similarity cao nhất
                     max_similarity = max(similarities)
-                    peak_bonus = 0.05 if max_similarity > 0.5 else 0.02 if max_similarity > 0.35 else 0.0
+                    peak_bonus = (
+                        self.peak_bonus_high if max_similarity > self.peak_bonus_high_threshold
+                        else self.peak_bonus_mid if max_similarity > self.peak_bonus_mid_threshold
+                        else 0.0
+                    )
                     
                     # 4. Consistency Bonus: Ít variance = stable recognition
                     if len(similarities) > 2:
                         variance = np.var(similarities)
-                        consistency_bonus = max(0, 0.03 - variance * 0.15)
+                        consistency_bonus = max(0, self.consistency_bonus_cap - variance * self.consistency_variance_coef)
                     else:
                         consistency_bonus = 0.0
                     
                     # 5. Sample Size Bonus: Nhiều samples = robust hơn
-                    sample_bonus = min(0.02, len(similarities) * 0.003)
+                    sample_bonus = min(self.sample_bonus_cap, len(similarities) * self.sample_bonus_per)
                     
                     # Final composite score với angle-robust weighting
-                    final_score = (weighted_score * 0.6 + 
-                                 angle_bonus * 0.15 + 
-                                 peak_bonus * 0.1 + 
-                                 consistency_bonus * 0.1 + 
-                                 sample_bonus * 0.05)
+                    final_score = (
+                        weighted_score * self.final_weight_weighted +
+                        angle_bonus * self.final_weight_angle +
+                        peak_bonus * self.final_weight_peak +
+                        consistency_bonus * self.final_weight_consistency +
+                        sample_bonus * self.final_weight_sample
+                    )
                     
                     candidates.append({
                         'student_id': student_id,
@@ -704,12 +788,13 @@ class InsightFaceRecognitionService:
                 best_student_id = best_candidate['student_id']
                 best_similarity = best_candidate['final_score']
                 
-                logger.info(f"🎯 Angle-Robust Ultra-High Accuracy Match:")
-                logger.info(f"   Student: {best_student_id}")
-                logger.info(f"   Final Score: {best_similarity:.3f}")
-                logger.info(f"   Max Similarity: {best_candidate['max_similarity']:.3f}")
-                logger.info(f"   Good Matches: {best_candidate['good_matches']}/{best_candidate['sample_count']}")
-                logger.info(f"   Angle Bonus: {best_candidate['angle_bonus']:.3f}")
+                # Verbose logging chỉ khi cần debug (disabled trong train/test để tăng tốc)
+                logger.debug(f"🎯 Angle-Robust Ultra-High Accuracy Match:")
+                logger.debug(f"   Student: {best_student_id}")
+                logger.debug(f"   Final Score: {best_similarity:.3f}")
+                logger.debug(f"   Max Similarity: {best_candidate['max_similarity']:.3f}")
+                logger.debug(f"   Good Matches: {best_candidate['good_matches']}/{best_candidate['sample_count']}")
+                logger.debug(f"   Angle Bonus: {best_candidate['angle_bonus']:.3f}")
             
             return best_student_id, best_similarity
             
@@ -736,13 +821,16 @@ class InsightFaceRecognitionService:
 
     async def load_known_faces(self, db=None):
         """Load face embeddings từ database"""
-        # Reset database state
-        self.face_database = {}
-        self.face_metadata = {}
-        self.known_student_ids = []
-        self.known_names = []
-        
-        logger.info("🔄 InsightFace database reset.")
+        # Chỉ reset nếu có db (trong production)
+        # Trong train/test mode (db=None), giữ nguyên face_database
+        if db is not None:
+            # Reset database state
+            self.face_database = {}
+            self.face_metadata = {}
+            self.known_student_ids = []
+            self.known_names = []
+            
+            logger.info("🔄 InsightFace database reset.")
 
         if db:
             logger.info("🗄️ Loading face data from Supabase for InsightFace...")
@@ -806,18 +894,23 @@ class InsightFaceRecognitionService:
             total_embeddings = sum(len(embs) for embs in student_embeddings.values())
             logger.info(f"✅ Loaded {loaded_count} students with {total_embeddings} total embeddings")
             
-            # Build Faiss index sau khi load data (chỉ khi khởi động, không rebuild khi update)
-            # Rebuild sẽ được gọi riêng sau khi reload
+            # Build/Load Faiss index sau khi load data
+            # QUAN TRỌNG: Thử load index từ disk trước, nếu không có hoặc không consistent thì build mới
             if self.faiss_manager and loaded_count > 0:
-                # Try load từ disk trước (chỉ khi khởi động)
-                # Khi update, skip load và rebuild sau
-                if not self.faiss_manager.index:
-                    if not self.faiss_manager.load_index(self.face_database):
-                        # Nếu không load được, build mới
-                        logger.info("🔨 Building new Faiss index...")
-                        self.faiss_manager.build_index(self.face_database)
+                # Thử load index từ disk (nhanh hơn build mới)
+                index_loaded = self.faiss_manager.load_index(self.face_database)
+                if not index_loaded:
+                    # Nếu không load được, build index mới
+                    logger.info("🔨 Building new Faiss index from loaded data...")
+                    build_success = self.faiss_manager.build_index(self.face_database)
+                    if build_success:
                         # Save index để dùng lần sau
                         self.faiss_manager.save_index()
+                        logger.info(f"✅ Faiss index built and saved: {self.faiss_manager.total_vectors} vectors")
+                    else:
+                        logger.warning("⚠️ Failed to build Faiss index")
+                else:
+                    logger.info(f"✅ Faiss index loaded from disk: {self.faiss_manager.total_vectors} vectors")
             
             return loaded_count
             
@@ -936,32 +1029,60 @@ class InsightFaceRecognitionService:
             self.known_names = [f"Student_{sid}" for sid in self.known_student_ids]
             
             # Update Faiss index
-            # QUAN TRỌNG: Reload toàn bộ face_database từ database trước khi rebuild index
-            # để đảm bảo không mất các students đã register trước đó
+            # QUAN TRỌNG: Không reload từ database vì sync_face_encoding_to_db() được gọi SAU register_student_face()
+            # Nếu reload ngay bây giờ, embedding mới chưa có trong database → sẽ mất
+            # Thay vào đó, dùng face_database hiện tại trong memory (đã có embedding mới) và merge với database
             if self.faiss_manager and db:
                 logger.info("🔄 Updating Faiss index after registration...")
                 try:
-                    # Reload toàn bộ face_database từ database (không rebuild index trong _load_from_database)
-                    # Tạm thời disable faiss_manager để skip rebuild trong _load_from_database
+                    # Strategy: Merge face_database hiện tại (có embedding mới) với database (có students khác)
+                    # Tạm thời disable faiss_manager để reload từ database mà không rebuild index
                     temp_faiss = self.faiss_manager
                     self.faiss_manager = None
+                    
+                    # Backup embedding mới vừa thêm
+                    current_student_embeddings = self.face_database.get(student_id_str, []).copy()
+                    
+                    # Reload từ database để lấy tất cả students khác
                     await self._load_from_database(db)
+                    
+                    # Restore embedding mới vào face_database (overwrite nếu có trong DB)
+                    # Đảm bảo embedding mới không bị mất
+                    if current_student_embeddings:
+                        self.face_database[student_id_str] = current_student_embeddings
+                        logger.debug(f"✅ Restored {len(current_student_embeddings)} new embeddings for student {student_id_str}")
+                    
                     # Restore faiss_manager và rebuild index với face_database đầy đủ
                     self.faiss_manager = temp_faiss
                     if self.faiss_manager and self.face_database:
-                        logger.info(f"📊 Rebuilding Faiss index with {sum(len(embs) for embs in self.face_database.values())} total embeddings from {len(self.face_database)} students")
-                        self.faiss_manager.build_index(self.face_database)
-                        self.faiss_manager.save_index()
-                        logger.info("✅ Faiss index updated successfully with all students")
+                        total_embeddings = sum(len(embs) for embs in self.face_database.values())
+                        total_students = len(self.face_database)
+                        logger.info(f"📊 Rebuilding Faiss index with {total_embeddings} total embeddings from {total_students} students")
+                        build_success = self.faiss_manager.build_index(self.face_database)
+                        if build_success:
+                            save_success = self.faiss_manager.save_index()
+                            if save_success:
+                                logger.info(f"✅ Faiss index updated and saved successfully: {total_students} students, {total_embeddings} embeddings")
+                                logger.info(f"💾 Saved to: {self.faiss_manager.index_path} and {self.faiss_manager.metadata_path}")
+                            else:
+                                logger.error("❌ Failed to save Faiss index (save_index returned False)")
+                        else:
+                            logger.error("❌ Failed to build Faiss index (build_index returned False)")
+                    else:
+                        logger.warning(f"⚠️ Cannot update Faiss index: faiss_manager={self.faiss_manager is not None}, face_database_empty={not self.face_database}")
                 except Exception as e:
                     logger.error(f"❌ Error updating Faiss index: {str(e)}")
                     import traceback
                     logger.error(traceback.format_exc())
-                    # Fallback: rebuild từ face_database hiện tại (có thể thiếu students cũ)
+                    # Fallback: rebuild từ face_database hiện tại trong memory (đã có embedding mới)
                     if self.faiss_manager:
-                        logger.warning("⚠️ Fallback: rebuilding from current face_database (may miss old students)")
-                        self.faiss_manager.update_index(student_id_str, self.face_database.get(student_id_str, []), self.face_database)
-                        self.faiss_manager.save_index()
+                        logger.warning("⚠️ Fallback: rebuilding from current in-memory face_database")
+                        self.faiss_manager.build_index(self.face_database)
+                        save_success = self.faiss_manager.save_index()
+                        if save_success:
+                            logger.info("✅ Fallback: Faiss index saved successfully")
+                        else:
+                            logger.error("❌ Fallback save_index also failed!")
             
             return {
                 "success": True,
@@ -981,9 +1102,14 @@ class InsightFaceRecognitionService:
         try:
             start_time = time.time()
             
-            # Load latest data từ DB
-            logger.info("🔄 Reloading InsightFace database...")
-            await self.load_known_faces(db)
+            # Load latest data từ DB (chỉ khi có db - production mode)
+            # Trong train/test mode (db=None), giữ nguyên face_database từ memory
+            if db is not None:
+                logger.info("🔄 Reloading InsightFace database...")
+                await self.load_known_faces(db)
+            else:
+                # Train/test mode: không reload, sử dụng face_database hiện tại
+                logger.debug("📝 Train/test mode: Using face_database from memory (not reloading)")
 
             if not self.face_database:
                 return {
@@ -995,7 +1121,7 @@ class InsightFaceRecognitionService:
             if confidence_threshold is None:
                 confidence_threshold = self.similarity_threshold
             
-            logger.info(f"🔍 InsightFace recognition với threshold: {confidence_threshold}")
+            logger.debug(f"🔍 InsightFace recognition với threshold: {confidence_threshold}")
             
             # Convert base64 to image
             image = self.base64_to_image(image_base64)
@@ -1027,9 +1153,9 @@ class InsightFaceRecognitionService:
                     
                     # Update stats
                     self.recognition_stats["successful_recognitions"] += 1
-                    logger.info(f"✅ InsightFace recognition: student_id={student_id}, confidence={confidence:.3f}")
+                    logger.debug(f"✅ InsightFace recognition: student_id={student_id}, confidence={confidence:.3f}")
                 else:
-                    logger.warning(f"⚠️ Confidence {best_similarity:.3f} < threshold {confidence_threshold}")
+                    logger.debug(f"⚠️ Confidence {best_similarity:.3f} < threshold {confidence_threshold}")
                 
                 self.recognition_stats["total_recognitions"] += 1
                 
