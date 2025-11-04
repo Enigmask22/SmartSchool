@@ -15,6 +15,12 @@ onnx>=1.16.0
 scikit-learn>=1.4.0
 numpy>=1.26.0
 pandas>=2.1.0
+# Faiss for fast similarity search
+# Note: faiss-gpu không có trên PyPI cho Windows
+# - Trên Windows: Dùng faiss-cpu (vẫn rất nhanh: 50-200ms cho 1000-2000 students)
+# - Để dùng GPU trên Windows: Cài qua Conda (xem FAISS_WINDOWS_SETUP.md)
+faiss-cpu>=1.7.4
+# faiss-gpu>=1.7.4  # Chỉ dùng được trên Linux/macOS hoặc qua Conda trên Windows
 
 # Cryptography packages
 python-jose[cryptography]>=3.3.0

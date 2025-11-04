@@ -7,6 +7,7 @@ from typing import List
 import base64
 import json
 import time
+import numpy as np
 from ai_services.models import (
     FaceRecognitionRequest,
     FaceRecognitionResponse,
@@ -127,9 +128,10 @@ async def control_recognition(control: dict):
 async def get_ai_status(db=Depends(get_db)):
     """Lấy trạng thái AI service"""
     try:
-        # Thống kê database - Only check InsightFace encoding
-        db_response = db.table("students").select("id, full_name, insightface_encoding").not_.is_("insightface_encoding", "null").execute()
-        database_count = len(db_response.data) if db_response.data else 0
+        # Thống kê database - Check từ face_embeddings table
+        embeddings_response = db.table("face_embeddings").select("student_id").execute()
+        unique_students = set(emb['student_id'] for emb in embeddings_response.data) if embeddings_response.data else set()
+        database_count = len(unique_students)
         local_count = len(ai_service.face_database) if ai_service.is_available else 0
         
         # Kiểm tra sync status
@@ -355,10 +357,10 @@ async def register_student_face_upload(
         contents = await file.read()
         image_base64 = base64.b64encode(contents).decode('utf-8')
         
-        result = await ai_service.register_student_face(student_id, image_base64)
+        result = await ai_service.register_student_face(student_id, image_base64, db)
         
-        # Đồng bộ lên database
-        if result.get('success'):
+        # Đồng bộ lên database (sync_face_encoding_to_db đã được gọi trong register_student_face nếu có db)
+        if result.get('success') and db:
             await sync_face_encoding_to_db(student_id, result, db)
         
         return FaceEncodingResponse(**result)
@@ -383,7 +385,7 @@ async def register_student_face_base64(
         if not student_response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
-        result = await ai_service.register_student_face(student_id, request.image_base64)
+        result = await ai_service.register_student_face(student_id, request.image_base64, db)
         
         # Đồng bộ lên database
         if result.get('success'):
@@ -455,23 +457,26 @@ async def delete_student_encoding(
 ):
     """Xóa face encoding của học sinh"""
     try:
+        # Pass db to delete_student_face để reload từ database
         # Kiểm tra student tồn tại
         student_response = db.table("students").select("*").eq("id", student_id).execute()
         
         if not student_response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
-        # Xóa từ AI service
-        ai_result = await ai_service.delete_student_face(student_id)
+        # Xóa từ face_embeddings table trước (để khi reload, student đã bị xóa)
+        delete_response = db.table("face_embeddings").delete().eq("student_id", student_id).execute()
         
-        # Xóa từ database
-        db_response = db.table("students").update({
-            "insightface_encoding": None,
+        # Xóa từ AI service (pass db để reload từ database sau khi xóa)
+        ai_result = await ai_service.delete_student_face(student_id, db=db)
+        
+        # Update face_samples_count (trigger sẽ tự động update, nhưng để chắc chắn)
+        update_response = db.table("students").update({
             "face_samples_count": 0,
             "updated_at": "now()"
         }).eq("id", student_id).execute()
         
-        if db_response.data:
+        if update_response.data:
             logger.info(f"Face encoding deleted for student {student_id}")
             
             return {
@@ -513,7 +518,7 @@ async def register_multiple_student_faces(
                 contents = await file.read()
                 image_base64 = base64.b64encode(contents).decode('utf-8')
                 
-                result = await ai_service.register_student_face(student_id, image_base64)
+                result = await ai_service.register_student_face(student_id, image_base64, db)
                 
                 if result.get('success'):
                     successful_registrations += 1
@@ -584,48 +589,55 @@ async def get_debug_info():
         return {"success": False, "message": str(e)}
 
 async def sync_face_encoding_to_db(student_id: int, result: dict, db):
-    """Helper function để đồng bộ face encoding lên database"""
+    """Helper function để đồng bộ face encoding lên bảng face_embeddings"""
     if not result.get('success') or not ACTIVE_SERVICE:
         return
         
-    logger.info(f"Syncing face encoding for student {student_id}")
+    logger.info(f"Syncing face encoding to face_embeddings table for student {student_id}")
     try:
         student_id_str = str(student_id)
         face_features = ACTIVE_SERVICE.face_database.get(student_id_str)
         
-        face_data = {}
-        if face_features and isinstance(face_features, list):
-            # InsightFace embeddings are numpy arrays
-            embeddings = [emb.tolist() for emb in face_features]
-            face_data = {
-                "student_id": student_id,
-                "service": "InsightFace",
-                "embeddings": embeddings,
-                "embedding_size": 512,
-                "sample_count": len(face_features),
-                "registered_at": "now()"
-            }
-            
-            logger.info(f"Prepared insightface_encoding with {len(face_features)} samples")
-        else:
+        if not face_features or not isinstance(face_features, list):
             logger.warning(f"No face features found for student {student_id}")
-            face_data = {"student_id": student_id, "service": "InsightFace", "registered_at": "now()"}
+            return
 
-        # Update database
-        import json
-        db_response = db.table("students").update({
-            "insightface_encoding": json.dumps(face_data),
-            "face_samples_count": len(face_features) if face_features else 0,
-            "updated_at": "now()"
-        }).eq("id", student_id).execute()
+        # Get current embeddings from database để determine embedding_index
+        existing_response = db.table("face_embeddings").select("embedding_index").eq("student_id", student_id).order("embedding_index", desc=True).limit(1).execute()
+        next_index = 0
+        if existing_response.data and len(existing_response.data) > 0:
+            next_index = existing_response.data[0].get('embedding_index', -1) + 1
         
-        if db_response.data:
-            logger.info(f"Successfully synced face encoding for student {student_id}")
+        # Sync tất cả embeddings vào face_embeddings table
+        # Lưu ý: Chỉ sync embeddings mới (chưa có trong DB)
+        # Hoặc replace toàn bộ nếu cần (safer approach: sync all)
+        
+        # Delete existing embeddings cho student này (clean slate)
+        db.table("face_embeddings").delete().eq("student_id", student_id).execute()
+        
+        # Insert tất cả embeddings hiện tại
+        embeddings_to_insert = []
+        for idx, embedding in enumerate(face_features):
+            embedding_array = embedding.tolist() if isinstance(embedding, np.ndarray) else embedding
+            
+            embeddings_to_insert.append({
+                "student_id": student_id,
+                "embedding_vector": embedding_array,
+                "embedding_index": idx,
+                "quality_score": result.get('detection_score', 0.0),
+                "detection_score": result.get('detection_score', 0.0),
+                "registered_at": "now()"
+            })
+        
+        # Batch insert
+        if embeddings_to_insert:
+            db.table("face_embeddings").insert(embeddings_to_insert).execute()
+            logger.info(f"✅ Successfully synced {len(embeddings_to_insert)} embeddings to face_embeddings for student {student_id}")
         else:
-            logger.warning(f"DB update returned no data for student {student_id}")
+            logger.warning(f"No embeddings to sync for student {student_id}")
             
     except Exception as sync_error:
-        logger.error(f"Error syncing face encoding: {sync_error}")
+        logger.error(f"Error syncing face encoding to face_embeddings: {sync_error}")
         import traceback
         logger.error(traceback.format_exc())
 

@@ -36,9 +36,302 @@ from sklearn.metrics.pairwise import cosine_similarity
 import warnings
 warnings.filterwarnings("ignore")
 
-# Setup logging
+# Setup logging first
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Faiss imports for fast similarity search
+try:
+    import faiss
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
+    faiss = None
+    logger.warning("⚠️ Faiss not available. Install with: pip install faiss-cpu (or faiss-gpu)")
+
+class FaissIndexManager:
+    """
+    Manager cho Faiss index để tối ưu similarity search
+    Hỗ trợ 1000-2000 học sinh với hiệu năng cao
+    """
+    
+    def __init__(self, dimension=512, use_gpu=False):
+        self.dimension = dimension
+        self.index = None
+        self.id_to_index = {}  # Map student_id -> list of index positions trong Faiss
+        self.index_to_id = {}  # Reverse map: index position -> student_id
+        self.total_vectors = 0
+        self.use_gpu = use_gpu and FAISS_AVAILABLE
+        self.index_path = Path(CACHE_PATH) / "faiss_index.bin"
+        self.metadata_path = Path(CACHE_PATH) / "faiss_metadata.json"
+        
+        # Tạo cache directory nếu chưa có
+        Path(CACHE_PATH).mkdir(parents=True, exist_ok=True)
+    
+    def build_index(self, face_database: Dict[str, List[np.ndarray]]) -> bool:
+        """
+        Build Faiss index từ face_database
+        face_database: {student_id: [embedding1, embedding2, ...]}
+        """
+        try:
+            if not FAISS_AVAILABLE:
+                logger.warning("⚠️ Faiss not available, skipping index build")
+                return False
+            
+            # Flatten tất cả embeddings thành 1D array
+            all_embeddings = []
+            self.id_to_index = {}
+            self.index_to_id = {}
+            current_index = 0
+            
+            for student_id, embeddings_list in face_database.items():
+                if not embeddings_list:
+                    continue
+                
+                # Track index positions cho student này
+                student_indices = []
+                
+                for embedding in embeddings_list:
+                    # Normalize embedding (L2 normalization cho cosine similarity)
+                    embedding_norm = embedding / np.linalg.norm(embedding)
+                    
+                    # Flatten thành 1D array
+                    all_embeddings.append(embedding_norm.astype('float32'))
+                    
+                    # Map index position -> student_id
+                    self.index_to_id[current_index] = student_id
+                    student_indices.append(current_index)
+                    current_index += 1
+                
+                # Map student_id -> list of indices
+                self.id_to_index[student_id] = student_indices
+            
+            if not all_embeddings:
+                logger.warning("⚠️ No embeddings to index")
+                return False
+            
+            # Convert to numpy array
+            embeddings_array = np.vstack(all_embeddings).astype('float32')
+            self.total_vectors = embeddings_array.shape[0]
+            
+            logger.info(f"📊 Building Faiss index: {self.total_vectors} vectors, {len(face_database)} students")
+            
+            # Create Faiss index
+            # Sử dụng IndexFlatIP (Inner Product) cho cosine similarity (vì đã normalize)
+            # Với cosine similarity, dùng IndexFlatIP (Inner Product = dot product khi normalized)
+            
+            # Try GPU nếu có GPU support và được enable
+            if self.use_gpu:
+                # Check if faiss-gpu is installed (has GPU functions)
+                has_gpu_functions = hasattr(faiss, 'get_num_gpus') and hasattr(faiss, 'StandardGpuResources')
+                
+                if not has_gpu_functions:
+                    logger.warning("⚠️ FAISS_USE_GPU=true nhưng faiss-cpu đang được dùng!")
+                    logger.warning("   → Cần cài faiss-gpu: pip uninstall faiss-cpu && pip install faiss-gpu")
+                    logger.warning("   → Hoặc set FAISS_USE_GPU=false trong .env")
+                    self.index = faiss.IndexFlatIP(self.dimension)
+                    self.use_gpu = False
+                    logger.info("✅ Using Faiss CPU index (faiss-gpu not installed)")
+                elif faiss.get_num_gpus() == 0:
+                    logger.warning("⚠️ FAISS_USE_GPU=true nhưng không có GPU available!")
+                    logger.warning("   → Kiểm tra CUDA và GPU drivers")
+                    self.index = faiss.IndexFlatIP(self.dimension)
+                    self.use_gpu = False
+                    logger.info("✅ Using Faiss CPU index (no GPU available)")
+                else:
+                    try:
+                        # GPU version
+                        res = faiss.StandardGpuResources()
+                        cpu_index = faiss.IndexFlatIP(self.dimension)  # Inner Product cho cosine similarity
+                        self.index = faiss.index_cpu_to_gpu(res, 0, cpu_index)
+                        logger.info(f"✅ Using Faiss GPU index (GPU count: {faiss.get_num_gpus()})")
+                    except (AttributeError, RuntimeError) as e:
+                        # Fallback to CPU nếu GPU không available
+                        logger.warning(f"⚠️ GPU error: {e}, falling back to CPU")
+                        self.index = faiss.IndexFlatIP(self.dimension)
+                        self.use_gpu = False
+                        logger.info("✅ Using Faiss CPU index (fallback)")
+            else:
+                # CPU version
+                self.index = faiss.IndexFlatIP(self.dimension)  # Inner Product cho cosine similarity
+                logger.info("✅ Using Faiss CPU index (FAISS_USE_GPU=false or not set)")
+            
+            # Add vectors to index
+            self.index.add(embeddings_array)
+            
+            logger.info(f"✅ Faiss index built successfully: {self.total_vectors} vectors indexed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error building Faiss index: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+    
+    def search(self, query_embedding: np.ndarray, top_k: int = 50) -> List[Tuple[str, float]]:
+        """
+        Search top-k similar embeddings
+        Returns: List of (student_id, similarity_score)
+        """
+        try:
+            if self.index is None or self.total_vectors == 0:
+                return []
+            
+            # Normalize query embedding
+            query_norm = query_embedding / np.linalg.norm(query_embedding)
+            query_vector = query_norm.astype('float32').reshape(1, -1)
+            
+            # Search top-k
+            k = min(top_k, self.total_vectors)
+            distances, indices = self.index.search(query_vector, k)
+            
+            # Convert to results
+            results = []
+            for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
+                if idx == -1:  # Invalid index
+                    continue
+                
+                student_id = self.index_to_id.get(idx)
+                if student_id:
+                    # Distance là inner product (cosine similarity khi normalized)
+                    # Convert to similarity score (0-1 range, higher = more similar)
+                    similarity = float(distance)  # Already cosine similarity
+                    results.append((student_id, similarity))
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ Error in Faiss search: {str(e)}")
+            return []
+    
+    def save_index(self) -> bool:
+        """Save Faiss index và metadata to disk"""
+        try:
+            if self.index is None:
+                return False
+            
+            # Save index (convert to CPU nếu là GPU index)
+            # Check GPU index bằng cách check type name thay vì isinstance (vì faiss-cpu không có GpuIndex)
+            if self.use_gpu and hasattr(faiss, 'index_gpu_to_cpu'):
+                try:
+                    # Thử convert GPU index sang CPU để save
+                    cpu_index = faiss.index_gpu_to_cpu(self.index)
+                    faiss.write_index(cpu_index, str(self.index_path))
+                except (AttributeError, RuntimeError):
+                    # Nếu không phải GPU index hoặc không có GPU, save trực tiếp
+                    faiss.write_index(self.index, str(self.index_path))
+            else:
+                # CPU index - save trực tiếp
+                faiss.write_index(self.index, str(self.index_path))
+            
+            # Save metadata với format đẹp hơn
+            # Convert id_to_index và index_to_id sang string keys để JSON format đẹp
+            metadata = {
+                "id_to_index": {str(k): v for k, v in self.id_to_index.items()},
+                "index_to_id": {str(k): str(v) for k, v in self.index_to_id.items()},
+                "total_vectors": self.total_vectors,
+                "dimension": self.dimension
+            }
+            
+            # Custom JSON formatter để format đẹp: mỗi student_id một dòng, array nằm ngang
+            def format_json_pretty(obj, indent=0):
+                """Format JSON với style đẹp: arrays nằm ngang, objects mỗi key một dòng"""
+                if isinstance(obj, dict):
+                    if not obj:
+                        return "{}"
+                    items = []
+                    for key, value in obj.items():
+                        formatted_value = format_json_pretty(value, indent + 2)
+                        items.append(f"{' ' * (indent + 2)}\"{key}\": {formatted_value}")
+                    return "{\n" + ",\n".join(items) + f"\n{' ' * indent}}}"
+                elif isinstance(obj, list):
+                    if not obj:
+                        return "[]"
+                    # Arrays nằm ngang nếu ngắn, xuống dòng nếu dài
+                    if len(obj) <= 10:
+                        items = ", ".join(str(item) for item in obj)
+                        return f"[{items}]"
+                    else:
+                        items = []
+                        for item in obj:
+                            items.append(f"{' ' * (indent + 2)}{item}")
+                        return "[\n" + ",\n".join(items) + f"\n{' ' * indent}]"
+                else:
+                    return json.dumps(obj, ensure_ascii=False)
+            
+            # Format và save
+            formatted_json = format_json_pretty(metadata)
+            with open(self.metadata_path, 'w', encoding='utf-8') as f:
+                f.write(formatted_json)
+            
+            logger.info(f"💾 Saved Faiss index to {self.index_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving Faiss index: {str(e)}")
+            return False
+    
+    def load_index(self, face_database: Dict[str, List[np.ndarray]]) -> bool:
+        """Load Faiss index từ disk (nếu có) và verify consistency"""
+        try:
+            if not self.index_path.exists() or not self.metadata_path.exists():
+                logger.info("📭 No saved Faiss index found, will build new one")
+                return False
+            
+            # Load index
+            self.index = faiss.read_index(str(self.index_path))
+            
+            # Load metadata
+            with open(self.metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            self.id_to_index = {k: v for k, v in metadata["id_to_index"].items()}
+            self.index_to_id = {int(k): v for k, v in metadata["index_to_id"].items()}
+            self.total_vectors = metadata["total_vectors"]
+            
+            # Verify consistency với face_database hiện tại
+            expected_total = sum(len(embs) for embs in face_database.values())
+            if self.total_vectors != expected_total:
+                logger.warning(f"⚠️ Index inconsistency: {self.total_vectors} vectors in index vs {expected_total} in database. Rebuilding...")
+                return False
+            
+            # Convert to GPU nếu cần (chỉ khi có GPU support)
+            if self.use_gpu:
+                has_gpu_functions = hasattr(faiss, 'get_num_gpus') and hasattr(faiss, 'StandardGpuResources')
+                
+                if not has_gpu_functions:
+                    logger.warning("⚠️ FAISS_USE_GPU=true nhưng faiss-cpu đang được dùng!")
+                    logger.warning("   → Cần cài faiss-gpu: pip uninstall faiss-cpu && pip install faiss-gpu")
+                    self.use_gpu = False
+                elif faiss.get_num_gpus() > 0:
+                    try:
+                        res = faiss.StandardGpuResources()
+                        self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
+                        logger.info(f"✅ Converted to Faiss GPU index (GPU count: {faiss.get_num_gpus()})")
+                    except (AttributeError, RuntimeError) as e:
+                        logger.warning(f"⚠️ Cannot convert to GPU index: {e}, using CPU")
+                        self.use_gpu = False
+                else:
+                    logger.warning("⚠️ FAISS_USE_GPU=true nhưng không có GPU available!")
+                    self.use_gpu = False
+            
+            logger.info(f"✅ Loaded Faiss index: {self.total_vectors} vectors")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error loading Faiss index: {str(e)}, will build new one")
+            return False
+    
+    def update_index(self, student_id: str, embeddings: List[np.ndarray], face_database: Dict[str, List[np.ndarray]]) -> bool:
+        """
+        Update index khi thêm/sửa embeddings của một student
+        Approach: Rebuild index (nhanh với Faiss)
+        """
+        return self.build_index(face_database)
+    
+    def remove_from_index(self, student_id: str, face_database: Dict[str, List[np.ndarray]]) -> bool:
+        """Remove student từ index"""
+        return self.build_index(face_database)
 
 class InsightFaceRecognitionService:
     """
@@ -70,6 +363,10 @@ class InsightFaceRecognitionService:
         # Database lưu face embeddings (512-dimensional ArcFace features)
         self.face_database = {}  # {student_id: [embedding1, embedding2, ...]}
         self.face_metadata = {}  # {student_id: {"name": "", "registered_count": int}}
+        
+        # Faiss index manager cho fast similarity search
+        use_gpu = os.getenv("FAISS_USE_GPU", "false").lower() == "true"
+        self.faiss_manager = FaissIndexManager(dimension=512, use_gpu=use_gpu) if FAISS_AVAILABLE else None
         
         self.max_samples_per_person = 15  # Tăng từ 10 lên 15 samples cho ultra robustness
         
@@ -282,18 +579,53 @@ class InsightFaceRecognitionService:
             return 0.0
 
     def find_best_match(self, target_embedding: np.ndarray) -> Tuple[Optional[str], float]:
-        """Ultra-High Accuracy Matching Algorithm - Angle-Robust 95%+ target accuracy"""
+        """
+        Ultra-High Accuracy Matching Algorithm với Faiss optimization
+        - Sử dụng Faiss để tìm top-K candidates nhanh (thay vì brute force)
+        - Sau đó áp dụng Angle-Robust Weighted Ensemble trên top candidates
+        """
         try:
             if not self.face_database:
                 return None, 0.0
             
+            # Step 1: Sử dụng Faiss để tìm top-K candidates (nhanh hơn brute force)
+            top_candidates = []
+            if self.faiss_manager and self.faiss_manager.index is not None:
+                # Faiss search: top 50 candidates (đủ cho 1000-2000 students)
+                faiss_results = self.faiss_manager.search(target_embedding, top_k=50)
+                
+                # Group by student_id và aggregate similarities
+                student_similarities = {}
+                for student_id, similarity in faiss_results:
+                    if student_id not in student_similarities:
+                        student_similarities[student_id] = []
+                    student_similarities[student_id].append(similarity)
+                
+                # Chỉ xử lý các students có similarity > threshold cơ bản
+                for student_id, similarities in student_similarities.items():
+                    if max(similarities) >= self.similarity_threshold:
+                        top_candidates.append(student_id)
+                
+                logger.debug(f"🔍 Faiss found {len(top_candidates)} candidates from {len(faiss_results)} results")
+            else:
+                # Fallback: Nếu không có Faiss, dùng tất cả students
+                top_candidates = list(self.face_database.keys())
+                logger.debug(f"⚠️ Faiss not available, using all {len(top_candidates)} students")
+            
+            if not top_candidates:
+                return None, 0.0
+            
+            # Step 2: Áp dụng Angle-Robust Weighted Ensemble trên top candidates
             best_student_id = None
             best_similarity = 0.0
             
             # Candidate scoring với multiple metrics - Angle-Robust
             candidates = []
             
-            for student_id, embeddings_list in self.face_database.items():
+            for student_id in top_candidates:
+                embeddings_list = self.face_database.get(student_id, [])
+                if not embeddings_list:
+                    continue
                 # Calculate similarities với tất cả embeddings của student này
                 similarities = []
                 for stored_embedding in embeddings_list:
@@ -430,44 +762,72 @@ class InsightFaceRecognitionService:
             logger.warning("📭 No database connection provided.")
 
     async def _load_from_database(self, db) -> int:
-        """Load InsightFace embeddings từ database"""
-        response = db.table("students").select("id, full_name, insightface_encoding").not_.is_("insightface_encoding", "null").execute()
-        
-        if not response.data:
-            logger.info("📭 No students with InsightFace encoding found.")
-            return 0
+        """Load InsightFace embeddings từ bảng face_embeddings"""
+        try:
+            # Load embeddings từ face_embeddings table
+            embeddings_response = db.table("face_embeddings").select("student_id, embedding_vector, embedding_index, quality_score, detection_score").order("student_id, embedding_index").execute()
+            
+            if not embeddings_response.data:
+                logger.info("📭 No face embeddings found in database.")
+                return 0
 
-        logger.info(f"📊 Found {len(response.data)} students with InsightFace encoding.")
-        
-        loaded_count = 0
-        for student in response.data:
-            student_id = str(student['id'])
-            encoding = student.get('insightface_encoding')
-
-            try:
-                # Parse JSON string nếu cần
-                if isinstance(encoding, str):
-                    encoding = json.loads(encoding)
-
-                embeddings_data = encoding.get('embeddings')
-                if embeddings_data and isinstance(embeddings_data, list):
-                    # Convert list back to numpy arrays
-                    embeddings = [np.array(emb) for emb in embeddings_data]
-                    
+            logger.info(f"📊 Found {len(embeddings_response.data)} embeddings in face_embeddings table.")
+            
+            # Group embeddings by student_id
+            student_embeddings = {}
+            for emb_record in embeddings_response.data:
+                student_id = str(emb_record['student_id'])
+                if student_id not in student_embeddings:
+                    student_embeddings[student_id] = []
+                
+                # Convert PostgreSQL array to numpy array
+                embedding_vector = np.array(emb_record['embedding_vector'], dtype=np.float32)
+                student_embeddings[student_id].append(embedding_vector)
+            
+            # Load student names
+            student_ids = list(student_embeddings.keys())
+            if student_ids:
+                students_response = db.table("students").select("id, full_name").in_("id", [int(sid) for sid in student_ids]).execute()
+                student_names = {str(s['id']): s.get('full_name', f"Student_{s['id']}") for s in students_response.data}
+            else:
+                student_names = {}
+            
+            # Populate face_database và face_metadata
+            loaded_count = 0
+            for student_id, embeddings in student_embeddings.items():
+                if embeddings:
                     self.face_database[student_id] = embeddings
                     self.face_metadata[student_id] = {
-                        "name": student.get('full_name', f"Student_{student_id}"),
+                        "name": student_names.get(student_id, f"Student_{student_id}"),
                         "registered_count": len(embeddings)
                     }
                     loaded_count += 1
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ Error loading InsightFace data for student {student_id}: {e}")
-                continue
+            
+            total_embeddings = sum(len(embs) for embs in student_embeddings.values())
+            logger.info(f"✅ Loaded {loaded_count} students with {total_embeddings} total embeddings")
+            
+            # Build Faiss index sau khi load data (chỉ khi khởi động, không rebuild khi update)
+            # Rebuild sẽ được gọi riêng sau khi reload
+            if self.faiss_manager and loaded_count > 0:
+                # Try load từ disk trước (chỉ khi khởi động)
+                # Khi update, skip load và rebuild sau
+                if not self.faiss_manager.index:
+                    if not self.faiss_manager.load_index(self.face_database):
+                        # Nếu không load được, build mới
+                        logger.info("🔨 Building new Faiss index...")
+                        self.faiss_manager.build_index(self.face_database)
+                        # Save index để dùng lần sau
+                        self.faiss_manager.save_index()
+            
+            return loaded_count
+            
+        except Exception as e:
+            logger.error(f"❌ Error loading face embeddings from database: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return 0
 
-        return loaded_count
-
-    async def register_student_face(self, student_id: int, image_base64: str) -> Dict:
+    async def register_student_face(self, student_id: int, image_base64: str, db=None) -> Dict:
         """Đăng ký khuôn mặt học sinh với Ultra-High Quality InsightFace embeddings"""
         try:
             logger.info(f"📝 Registering ULTRA-HIGH QUALITY face for student {student_id}...")
@@ -574,6 +934,34 @@ class InsightFaceRecognitionService:
             # Update known arrays
             self.known_student_ids = list(self.face_database.keys())
             self.known_names = [f"Student_{sid}" for sid in self.known_student_ids]
+            
+            # Update Faiss index
+            # QUAN TRỌNG: Reload toàn bộ face_database từ database trước khi rebuild index
+            # để đảm bảo không mất các students đã register trước đó
+            if self.faiss_manager and db:
+                logger.info("🔄 Updating Faiss index after registration...")
+                try:
+                    # Reload toàn bộ face_database từ database (không rebuild index trong _load_from_database)
+                    # Tạm thời disable faiss_manager để skip rebuild trong _load_from_database
+                    temp_faiss = self.faiss_manager
+                    self.faiss_manager = None
+                    await self._load_from_database(db)
+                    # Restore faiss_manager và rebuild index với face_database đầy đủ
+                    self.faiss_manager = temp_faiss
+                    if self.faiss_manager and self.face_database:
+                        logger.info(f"📊 Rebuilding Faiss index with {sum(len(embs) for embs in self.face_database.values())} total embeddings from {len(self.face_database)} students")
+                        self.faiss_manager.build_index(self.face_database)
+                        self.faiss_manager.save_index()
+                        logger.info("✅ Faiss index updated successfully with all students")
+                except Exception as e:
+                    logger.error(f"❌ Error updating Faiss index: {str(e)}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # Fallback: rebuild từ face_database hiện tại (có thể thiếu students cũ)
+                    if self.faiss_manager:
+                        logger.warning("⚠️ Fallback: rebuilding from current face_database (may miss old students)")
+                        self.faiss_manager.update_index(student_id_str, self.face_database.get(student_id_str, []), self.face_database)
+                        self.faiss_manager.save_index()
             
             return {
                 "success": True,
@@ -687,25 +1075,54 @@ class InsightFaceRecognitionService:
             logger.error(f"❌ Error counting faces: {str(e)}")
             return 0
 
-    async def delete_student_face(self, student_id: int) -> Dict:
+    async def delete_student_face(self, student_id: int, db=None) -> Dict:
         """Xóa InsightFace embeddings của học sinh"""
         try:
             student_id_str = str(student_id)
             
+            # Xóa từ face_database
             if student_id_str in self.face_database:
                 del self.face_database[student_id_str]
-                if student_id_str in self.face_metadata:
-                    del self.face_metadata[student_id_str]
-                
-                # self.save_face_database()
-                
-                # Update known arrays
-                self.known_student_ids = list(self.face_database.keys())
-                self.known_names = [f"Student_{sid}" for sid in self.known_student_ids]
-                
-                return {"success": True, "message": "Xóa InsightFace embeddings thành công"}
-            else:
-                return {"success": False, "message": "Không tìm thấy InsightFace data"}
+            if student_id_str in self.face_metadata:
+                del self.face_metadata[student_id_str]
+            
+            # Update Faiss index
+            # QUAN TRỌNG: Reload toàn bộ face_database từ database trước khi rebuild index
+            # để đảm bảo consistency với database
+            if self.faiss_manager and db:
+                logger.info("🔄 Updating Faiss index after deletion...")
+                try:
+                    # Reload toàn bộ face_database từ database (không rebuild index trong _load_from_database)
+                    temp_faiss = self.faiss_manager
+                    self.faiss_manager = None
+                    await self._load_from_database(db)
+                    # Restore faiss_manager và rebuild index với face_database đầy đủ
+                    self.faiss_manager = temp_faiss
+                    if self.faiss_manager and self.face_database:
+                        logger.info(f"📊 Rebuilding Faiss index with {sum(len(embs) for embs in self.face_database.values())} total embeddings from {len(self.face_database)} students")
+                        self.faiss_manager.build_index(self.face_database)
+                        self.faiss_manager.save_index()
+                        logger.info("✅ Faiss index updated successfully after deletion")
+                except Exception as e:
+                    logger.error(f"❌ Error updating Faiss index: {str(e)}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # Fallback: rebuild từ face_database hiện tại
+                    if self.faiss_manager:
+                        logger.warning("⚠️ Fallback: rebuilding from current face_database")
+                        self.faiss_manager.remove_from_index(student_id_str, self.face_database)
+                        self.faiss_manager.save_index()
+            elif self.faiss_manager:
+                # Nếu không có db, rebuild từ face_database hiện tại
+                logger.info("🔄 Updating Faiss index after deletion (no DB connection)...")
+                self.faiss_manager.remove_from_index(student_id_str, self.face_database)
+                self.faiss_manager.save_index()
+            
+            # Update known arrays
+            self.known_student_ids = list(self.face_database.keys())
+            self.known_names = [f"Student_{sid}" for sid in self.known_student_ids]
+            
+            return {"success": True, "message": "Xóa InsightFace embeddings thành công"}
                 
         except Exception as e:
             logger.error(f"❌ Error deleting InsightFace data: {str(e)}")
@@ -713,6 +1130,12 @@ class InsightFaceRecognitionService:
 
     def get_service_info(self) -> Dict:
         """Thông tin về InsightFace service"""
+        faiss_info = {
+            "enabled": self.faiss_manager is not None and self.faiss_manager.index is not None,
+            "total_vectors": self.faiss_manager.total_vectors if self.faiss_manager else 0,
+            "use_gpu": self.faiss_manager.use_gpu if self.faiss_manager else False
+        } if self.faiss_manager else {"enabled": False}
+        
         return {
             "service_name": "InsightFace (ArcFace)",
             "accuracy": "95-99%",
@@ -723,7 +1146,8 @@ class InsightFaceRecognitionService:
             "recognition_stats": self.recognition_stats,
             "similarity_threshold": self.similarity_threshold,
             "detection_size": self.det_size,
-            "available": self.app is not None
+            "available": self.app is not None,
+            "faiss_optimization": faiss_info
         }
 
 # Create service instance (will be None if InsightFace not installed)
@@ -765,7 +1189,7 @@ class AIServiceWrapper:
         
         return await self.service.recognize_face(image_base64, db, confidence_threshold)
     
-    async def register_student_face(self, student_id: int, image_base64: str):
+    async def register_student_face(self, student_id: int, image_base64: str, db=None):
         """Register student face"""
         if not self.service:
             return {
@@ -773,7 +1197,7 @@ class AIServiceWrapper:
                 "message": "AI Service not available"
             }
         
-        return await self.service.register_student_face(student_id, image_base64)
+        return await self.service.register_student_face(student_id, image_base64, db=db)
     
     async def get_face_count(self, image_base64: str):
         """Count faces in image"""
@@ -793,7 +1217,7 @@ class AIServiceWrapper:
         if hasattr(self.service, 'face_database'):
             self.face_database = self.service.face_database
     
-    async def delete_student_face(self, student_id: int):
+    async def delete_student_face(self, student_id: int, db=None):
         """Delete student face encoding"""
         if not self.service:
             return {
@@ -801,7 +1225,7 @@ class AIServiceWrapper:
                 "message": "AI Service not available"
             }
         
-        return await self.service.delete_student_face(student_id)
+        return await self.service.delete_student_face(student_id, db=db)
 
 # Create AI service wrapper instance
 ai_service = AIServiceWrapper() 
