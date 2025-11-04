@@ -45,3 +45,21 @@ class ResponseModel(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
+
+class CommentCreateRequest(BaseModel):
+    student_id: int = Field(..., description="ID học sinh")
+    description: str = Field(..., description="Nội dung nhận xét")
+
+class CommentResponse(BaseModel):
+    id: int
+    student_id: int
+    class_id: Optional[int]
+    description: str
+    created_by: Optional[int]
+    created_at: str
+    updated_at: str
+
+class CommentResponseModel(BaseModel):
+    success: bool
+    message: str
+    data: Optional[CommentResponse] = None

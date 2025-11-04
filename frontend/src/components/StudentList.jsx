@@ -1193,6 +1193,32 @@ const StudentList = () => {
       setHasScoreData(false);
     }
 
+    // Load existing comment if available
+    try {
+      const token = localStorage.getItem("access_token");
+      const commentResponse = await fetch(
+        `${API_BASE_URL}/feedback/comments/${student.id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (commentResponse.ok) {
+        const commentResult = await commentResponse.json();
+        if (commentResult.success && commentResult.data) {
+          setGeneratedFeedback(commentResult.data.description);
+          logger.debug("✅ Loaded existing comment:", commentResult.data);
+        }
+      }
+    } catch (error) {
+      logger.error("Error loading comment:", error);
+      // Không hiển thị lỗi nếu không có comment, chỉ log
+    }
+
     // Set form with calculated score and subject lists
     logger.debug("📝 Setting feedback form:", initialForm);
     setFeedbackForm(initialForm);
@@ -1298,9 +1324,9 @@ const StudentList = () => {
     }
   };
 
-  const sendSMS = async () => {
+  const saveComment = async () => {
     if (!generatedFeedback || !selectedStudentForFeedback) {
-      setFeedbackError("Không có nhận xét để gửi");
+      setFeedbackError("Không có nhận xét để lưu");
       return;
     }
 
@@ -1308,25 +1334,327 @@ const StudentList = () => {
     setFeedbackError("");
 
     try {
-      const response = await ApiService.sendSMSFeedback({
-        student_id: selectedStudentForFeedback.id,
-        feedback: generatedFeedback,
-        parent_phone:
-          (selectedStudentForFeedback.parent_contacts &&
-            selectedStudentForFeedback.parent_contacts[0]?.phone) ||
-          selectedStudentForFeedback.phone,
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(`${API_BASE_URL}/feedback/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          student_id: selectedStudentForFeedback.id,
+          description: generatedFeedback,
+        }),
       });
 
-      if (response.success) {
-        alert("Gửi SMS thành công!");
+      const result = await response.json();
+
+      if (result.success) {
+        setFeedbackSuccess(true);
+        setFeedbackError("");
+        logger.info("✅ Đã lưu nhận xét thành công");
       } else {
-        setFeedbackError(response.error || "Không thể gửi SMS");
+        setFeedbackError(result.message || "Không thể lưu nhận xét");
       }
     } catch (error) {
-      logger.error("Error sending SMS:", error);
-      setFeedbackError("Lỗi kết nối server khi gửi SMS");
+      logger.error("Error saving comment:", error);
+      setFeedbackError("Lỗi kết nối server khi lưu nhận xét");
     } finally {
       setSmsLoading(false);
+    }
+  };
+
+  // Function to export all comments for the class
+  const exportAllComments = async () => {
+    if (!selectedClass || selectedClass === "all") {
+      alert("Vui lòng chọn lớp để tải nhận xét");
+      return;
+    }
+
+    try {
+      // Lấy class_id từ homeroomClasses
+      const found = homeroomClasses.find((c) => c.class_name === selectedClass);
+      const classId = found?.id;
+
+      if (!classId) {
+        alert("Không tìm thấy thông tin lớp");
+        return;
+      }
+
+      // Lấy tất cả comments của lớp
+      const token = localStorage.getItem("access_token");
+      logger.info(
+        `🔍 Đang lấy comments cho class_id: ${classId}, class_name: ${selectedClass}`
+      );
+
+      const response = await fetch(
+        `${API_BASE_URL}/feedback/comments/class/${classId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        logger.error(`❌ API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        logger.error(`Error response: ${errorText}`);
+        alert("Lỗi khi lấy nhận xét từ server");
+        return;
+      }
+
+      const result = await response.json();
+      logger.info(`📦 API response:`, result);
+
+      if (!result.success) {
+        logger.warn(`⚠️ API returned success=false: ${result.message}`);
+        alert(result.message || "Lỗi khi lấy nhận xét");
+        return;
+      }
+
+      if (!result.data || result.data.length === 0) {
+        logger.warn(`⚠️ Không có dữ liệu: result.data =`, result.data);
+        alert("Lớp này chưa có nhận xét nào");
+        return;
+      }
+
+      const comments = result.data;
+      logger.info(`📥 Đang tải ${comments.length} nhận xét...`);
+      logger.info(`📋 Danh sách comments:`, comments);
+
+      // Tải từng file cho mỗi học sinh
+      let downloadedCount = 0;
+      for (let i = 0; i < comments.length; i++) {
+        const comment = comments[i];
+        logger.info(
+          `📄 Đang xử lý comment ${i + 1}/${comments.length}:`,
+          comment
+        );
+
+        const student = {
+          id: comment.student_id,
+          student_id: comment.student_code || String(comment.student_id),
+          full_name: comment.student_name || "Học sinh",
+          class_name: selectedClass,
+        };
+
+        logger.info(`👤 Thông tin học sinh:`, student);
+
+        // Tạo workbook và worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Phiếu điểm");
+
+        // Page setup for A4
+        worksheet.pageSetup = {
+          paperSize: 9, // A4
+          orientation: "portrait",
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          margins: {
+            left: 0.3,
+            right: 0.3,
+            top: 0.5,
+            bottom: 0.5,
+            header: 0.2,
+            footer: 0.2,
+          },
+          horizontalCentered: true,
+        };
+
+        worksheet.columns = [
+          { width: 15 }, // A - Môn học
+          { width: 18 }, // B - Điểm thường xuyên
+          { width: 8 }, // C - GK
+          { width: 8 }, // D - CK
+          { width: 10 }, // E - TBM HK
+        ];
+
+        let currentRow = 1;
+
+        // Title
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        const titleCell = worksheet.getCell(`A${currentRow}`);
+        titleCell.value = "PHIẾU ĐIỂM HỌC SINH";
+        titleCell.font = { bold: true, size: 14 };
+        titleCell.alignment = { horizontal: "center", vertical: "middle" };
+        currentRow += 2;
+
+        // Teacher name
+        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = `Giáo viên chủ nhiệm: ${
+          user?.full_name || ""
+        }`;
+        currentRow++;
+
+        // Class
+        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = `Lớp: ${selectedClass}`;
+        currentRow++;
+
+        // Academic year and semester
+        worksheet.getCell(`A${currentRow}`).value = `Năm học: ${academicYear}`;
+        const semesterCell = worksheet.getCell(`E${currentRow}`);
+        semesterCell.value = `Học kỳ: ${semester}`;
+        semesterCell.alignment = { horizontal: "right", vertical: "middle" };
+        currentRow += 2;
+
+        // Student info
+        worksheet.getCell(
+          `A${currentRow}`
+        ).value = `Học sinh: ${student.full_name}`;
+        const studentIdCell = worksheet.getCell(`E${currentRow}`);
+        studentIdCell.value = `Mã số: ${student.student_id}`;
+        studentIdCell.alignment = { horizontal: "right", vertical: "middle" };
+        currentRow += 2;
+
+        // Comments section
+        currentRow += 2;
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        const commentTitleCell = worksheet.getCell(`A${currentRow}`);
+        commentTitleCell.value = "NHẬN XÉT CỦA GIÁO VIÊN";
+        commentTitleCell.font = { bold: true, size: 11 };
+        commentTitleCell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+        };
+        const remarksTitleRow = currentRow;
+        currentRow += 2;
+
+        // Feedback text with wrapping
+        const feedbackText = comment.description || "Chưa có nhận xét";
+        const wrapText = (text, maxLength = 70) => {
+          const words = text.split(" ");
+          const lines = [];
+          let currentLine = "";
+
+          words.forEach((word) => {
+            if ((currentLine + word).length <= maxLength) {
+              currentLine += (currentLine ? " " : "") + word;
+            } else {
+              if (currentLine) lines.push(currentLine);
+              currentLine = word;
+            }
+          });
+          if (currentLine) lines.push(currentLine);
+
+          return lines;
+        };
+
+        const feedbackLines = wrapText(feedbackText);
+        feedbackLines.forEach((line) => {
+          worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+          const feedbackCell = worksheet.getCell(`A${currentRow}`);
+          feedbackCell.value = line;
+          feedbackCell.alignment = {
+            horizontal: "center",
+            vertical: "top",
+            wrapText: true,
+          };
+          worksheet.getRow(currentRow).height = 18;
+          currentRow++;
+        });
+        const remarksEndRow = currentRow - 1;
+
+        // Apply border around the whole remarks block
+        for (let r = remarksTitleRow; r <= remarksEndRow; r++) {
+          for (let c = 1; c <= 5; c++) {
+            const cell = worksheet.getCell(r, c);
+            const border = {};
+            if (r === remarksTitleRow) border.top = { style: "thin" };
+            if (r === remarksEndRow) border.bottom = { style: "thin" };
+            if (c === 1) border.left = { style: "thin" };
+            if (c === 5) border.right = { style: "thin" };
+            cell.border = { ...cell.border, ...border };
+          }
+        }
+
+        // Signature section
+        currentRow += 3;
+        worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+        worksheet.mergeCells(`D${currentRow}:E${currentRow}`);
+        const sigLeftTitle = worksheet.getCell(`A${currentRow}`);
+        sigLeftTitle.value = "Giáo viên chủ nhiệm";
+        sigLeftTitle.font = { bold: true };
+        sigLeftTitle.alignment = { horizontal: "left", vertical: "middle" };
+        const sigRightTitle = worksheet.getCell(`D${currentRow}`);
+        sigRightTitle.value = "Phụ huynh";
+        sigRightTitle.font = { bold: true };
+        sigRightTitle.alignment = { horizontal: "right", vertical: "middle" };
+        currentRow++;
+
+        worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+        worksheet.mergeCells(`D${currentRow}:E${currentRow}`);
+        const sigLeftNote = worksheet.getCell(`A${currentRow}`);
+        sigLeftNote.value = "(Ký và ghi rõ họ tên)";
+        sigLeftNote.alignment = { horizontal: "left", vertical: "middle" };
+        const sigRightNote = worksheet.getCell(`D${currentRow}`);
+        sigRightNote.value = "(Ký và ghi rõ họ tên)";
+        sigRightNote.alignment = { horizontal: "right", vertical: "middle" };
+
+        // Generate buffer and download
+        try {
+          const buffer = await workbook.xlsx.writeBuffer();
+          const blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          // Sanitize filename: remove special characters
+          const sanitizeFileName = (name) => {
+            return String(name)
+              .replace(/[<>:"/\\|?*]/g, "_")
+              .trim();
+          };
+          const fileName = `PhieuDiem_${sanitizeFileName(
+            student.student_id
+          )}_${sanitizeFileName(
+            student.full_name
+          )}_${academicYear}_${semester}.xlsx`;
+          link.download = fileName;
+
+          // Append to body temporarily để đảm bảo link hoạt động
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          // Cleanup URL sau một chút delay
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+          }, 100);
+
+          downloadedCount++;
+          logger.info(
+            `✅ Đã tải file ${downloadedCount}/${comments.length}: ${fileName}`
+          );
+
+          // Delay lớn hơn giữa các lần download để tránh browser block multiple downloads
+          if (i < comments.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+          }
+        } catch (fileError) {
+          logger.error(
+            `❌ Lỗi khi tạo file cho học sinh ${student.full_name}:`,
+            fileError
+          );
+          // Tiếp tục với học sinh tiếp theo thay vì dừng
+        }
+      }
+
+      if (downloadedCount === comments.length) {
+        alert(`✅ Đã tải ${downloadedCount} phiếu điểm thành công!`);
+      } else {
+        alert(
+          `⚠️ Đã tải ${downloadedCount}/${comments.length} phiếu điểm. Có thể một số file bị browser chặn.`
+        );
+      }
+    } catch (error) {
+      logger.error("Error exporting all comments:", error);
+      alert("❌ Lỗi khi tải nhận xét: " + (error.message || "Unknown error"));
     }
   };
 
@@ -2010,6 +2338,19 @@ const StudentList = () => {
                   <RefreshCw className="w-4 h-4" />
                   <span>Làm mới</span>
                 </Button>
+                {isHomeroomTeacher() &&
+                  selectedClass &&
+                  selectedClass !== "all" && (
+                    <Button
+                      onClick={exportAllComments}
+                      variant="default"
+                      size="sm"
+                      className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Tải phiếu liên lạc toàn lớp</span>
+                    </Button>
+                  )}
               </div>
             </div>
           </div>
@@ -3622,11 +3963,11 @@ const StudentList = () => {
                           </div>
                         </div>
 
-                        {/* SMS Button */}
+                        {/* Save Comment Button */}
                         <button
-                          onClick={sendSMS}
+                          onClick={saveComment}
                           disabled={smsLoading}
-                          className="flex items-center justify-center w-full px-4 py-2 font-medium text-white transition-colors bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                          className="flex items-center justify-center w-full px-4 py-2 font-medium text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
                         >
                           {smsLoading ? (
                             <>
@@ -3650,10 +3991,10 @@ const StudentList = () => {
                                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                 ></path>
                               </svg>
-                              Đang gửi...
+                              Đang lưu...
                             </>
                           ) : (
-                            <>Gửi SMS cho phụ huynh</>
+                            <>Lưu nhận xét</>
                           )}
                         </button>
                       </div>
