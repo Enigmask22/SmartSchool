@@ -19,7 +19,6 @@ from feedback.models import (
 from feedback.services import feedback_service
 from core.logger import setup_logger
 from core.database import get_db
-from core.dependencies import get_current_user
 
 logger = setup_logger("feedback_api")
 router = APIRouter()
@@ -192,8 +191,7 @@ async def send_sms_feedback(request: SMSFeedbackRequest):
 @router.post("/comments")
 async def save_comment(
     request: CommentCreateRequest,
-    db=Depends(get_db),
-    current_user=Depends(get_current_user)
+    db=Depends(get_db)
 ):
     """Lưu hoặc cập nhật nhận xét học sinh vào database (upsert)"""
     try:
@@ -227,11 +225,6 @@ async def save_comment(
             existing_comment = existing_comment_response.data[0]
             comment_id = existing_comment["id"]
             
-            # Giữ created_by và created_at từ comment cũ
-            comment_data["created_by"] = existing_comment.get("created_by")
-            if not comment_data["created_by"] and current_user and isinstance(current_user, dict):
-                comment_data["created_by"] = current_user.get("id")
-            
             response = db.table("comments").update(comment_data).eq("id", comment_id).execute()
             
             if response.data and len(response.data) > 0:
@@ -245,7 +238,6 @@ async def save_comment(
                         student_id=comment["student_id"],
                         class_id=comment.get("class_id"),
                         description=comment["description"],
-                        created_by=comment.get("created_by"),
                         created_at=comment["created_at"],
                         updated_at=comment["updated_at"]
                     )
@@ -254,7 +246,6 @@ async def save_comment(
                 raise HTTPException(status_code=500, detail="Không thể cập nhật nhận xét")
         else:
             # Insert comment mới
-            comment_data["created_by"] = current_user.get("id") if current_user and isinstance(current_user, dict) else None
             comment_data["created_at"] = datetime.now().isoformat()
             
             response = db.table("comments").insert(comment_data).execute()
@@ -270,7 +261,6 @@ async def save_comment(
                         student_id=comment["student_id"],
                         class_id=comment.get("class_id"),
                         description=comment["description"],
-                        created_by=comment.get("created_by"),
                         created_at=comment["created_at"],
                         updated_at=comment["updated_at"]
                     )
@@ -301,15 +291,14 @@ async def get_comment(
             return CommentResponseModel(
                 success=True,
                 message="Lấy nhận xét thành công",
-                data=CommentResponse(
-                    id=comment["id"],
-                    student_id=comment["student_id"],
-                    class_id=comment.get("class_id"),
-                    description=comment["description"],
-                    created_by=comment.get("created_by"),
-                    created_at=comment["created_at"],
-                    updated_at=comment["updated_at"]
-                )
+                    data=CommentResponse(
+                        id=comment["id"],
+                        student_id=comment["student_id"],
+                        class_id=comment.get("class_id"),
+                        description=comment["description"],
+                        created_at=comment["created_at"],
+                        updated_at=comment["updated_at"]
+                    )
             )
         else:
             return CommentResponseModel(
@@ -403,7 +392,6 @@ async def get_class_comments(
                     "student_name": student_info.get("full_name"),
                     "class_id": comment.get("class_id") or class_id,  # Nếu NULL thì dùng class_id từ param
                     "description": comment["description"],
-                    "created_by": comment.get("created_by"),
                     "created_at": comment["created_at"],
                     "updated_at": comment["updated_at"]
                 })
