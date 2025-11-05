@@ -55,7 +55,6 @@ class CommentResponse(BaseModel):
     student_id: int
     class_id: Optional[int]
     description: str
-    created_by: Optional[int]
     created_at: str
     updated_at: str
 
