@@ -8,6 +8,8 @@ import base64
 import json
 import time
 import numpy as np
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from ai_services.models import (
     FaceRecognitionRequest,
     FaceRecognitionResponse,
@@ -21,14 +23,26 @@ from core.logger import setup_logger
 logger = setup_logger("ai_api")
 router = APIRouter()
 
+# Thread pool cho AI recognition (GIL-free: InsightFace + FAISS chạy C++/CUDA)
+# 10 workers = hỗ trợ 10 cameras xử lý song song
+AI_RECOGNITION_POOL = ThreadPoolExecutor(
+    max_workers=10,
+    thread_name_prefix="ai_recognition_worker"
+)
+
 # Global state cho continuous recognition
 continuous_recognition_state = {
     "is_running": False,
     "last_recognition": {},
     "cooldown_period": 30,
     "active_connections": set(),
+    "camera_connections": {},  # {camera_id: {"websocket": ws, "last_frame_time": timestamp}}
     "service_name": "Not Available",
-    "accuracy": "0%"
+    "accuracy": "0%",
+    # Metrics
+    "total_frames_processed": 0,
+    "total_recognition_time": 0.0,
+    "active_workers": 0,
 }
 
 def update_continuous_state():
@@ -58,19 +72,29 @@ async def get_recognition_status():
         # Xác định service status - luôn trả về "active" như backend cũ
         service_status = "active"
         
+        # Tính average latency
+        avg_latency = 0.0
+        if continuous_recognition_state["total_frames_processed"] > 0:
+            avg_latency = continuous_recognition_state["total_recognition_time"] / continuous_recognition_state["total_frames_processed"]
+        
         return {
             "success": True,
             "message": "Recognition status retrieved",
             "data": {
                 "is_running": continuous_recognition_state["is_running"],
                 "active_connections": len(continuous_recognition_state["active_connections"]),
+                "active_cameras": len(continuous_recognition_state["camera_connections"]),
                 "cooldown_period": continuous_recognition_state["cooldown_period"],
                 "active_cooldowns": active_cooldowns,
                 "total_recognized_today": len(continuous_recognition_state["last_recognition"]),
                 "service_name": continuous_recognition_state["service_name"],
                 "accuracy": continuous_recognition_state["accuracy"],
                 "service_status": service_status,  # Thêm field này cho frontend
-                "is_available": ai_service.is_available
+                "is_available": ai_service.is_available,
+                # Performance metrics
+                "total_frames_processed": continuous_recognition_state["total_frames_processed"],
+                "average_latency_ms": round(avg_latency * 1000, 1),
+                "active_workers": continuous_recognition_state["active_workers"],
             }
         }
         
@@ -165,9 +189,11 @@ async def get_ai_status(db=Depends(get_db)):
 
 @router.websocket("/recognition/stream")
 async def continuous_recognition_stream(websocket: WebSocket):
-    """WebSocket endpoint cho continuous face recognition"""
+    """WebSocket endpoint cho continuous face recognition với multi-camera support"""
     await websocket.accept()
     continuous_recognition_state["active_connections"].add(websocket)
+    
+    camera_id = None
     
     try:
         logger.info(f"Client connected to {ai_service.service_name} recognition stream")
@@ -180,11 +206,32 @@ async def continuous_recognition_stream(websocket: WebSocket):
                 
                 if frame_data.get("type") == "frame":
                     image_base64 = frame_data.get("image")
-                    camera_id = frame_data.get("camera_id")  # Lấy camera_id từ frontend
+                    camera_id = frame_data.get("camera_id", "unknown")  # Lấy camera_id từ frontend
+                    
+                    # Rate limiting: Check last frame time cho camera này
+                    current_time = time.time()
+                    if camera_id in continuous_recognition_state["camera_connections"]:
+                        last_frame_time = continuous_recognition_state["camera_connections"][camera_id].get("last_frame_time", 0)
+                        time_since_last = current_time - last_frame_time
+                        # Min 100ms giữa các frame (max 10 FPS per camera)
+                        if time_since_last < 0.1:
+                            # Skip frame nếu quá nhanh
+                            await websocket.send_text(json.dumps({
+                                "type": "rate_limit",
+                                "message": "Frame rate too high, skipping",
+                                "camera_id": camera_id
+                            }))
+                            continue
+                    
+                    # Update camera tracking
+                    continuous_recognition_state["camera_connections"][camera_id] = {
+                        "websocket": websocket,
+                        "last_frame_time": current_time
+                    }
                     
                     if continuous_recognition_state["is_running"] and image_base64:
-                        # Process recognition với active service
-                        result = await process_continuous_recognition(image_base64, websocket)
+                        # Process recognition với active service (chạy trong thread pool)
+                        result = await process_continuous_recognition(image_base64, websocket, camera_id)
                         
                         # Thêm camera_id vào result
                         result["camera_id"] = camera_id
@@ -232,6 +279,10 @@ async def continuous_recognition_stream(websocket: WebSocket):
         logger.error(f"WebSocket connection error: {e}")
     finally:
         continuous_recognition_state["active_connections"].discard(websocket)
+        # Cleanup camera tracking khi disconnect
+        if camera_id and camera_id in continuous_recognition_state["camera_connections"]:
+            del continuous_recognition_state["camera_connections"][camera_id]
+            logger.info(f"Camera {camera_id} disconnected")
 
 @router.post("/recognize")
 async def recognize_face_upload(
@@ -641,14 +692,40 @@ async def sync_face_encoding_to_db(student_id: int, result: dict, db):
         import traceback
         logger.error(traceback.format_exc())
 
-async def process_continuous_recognition(image_base64: str, websocket: WebSocket):
-    """Xử lý continuous recognition với Ultra-High Accuracy InsightFace"""
+def sync_recognize_face_worker(image_base64: str, threshold: float = 0.20):
+    """
+    Sync worker function cho AI recognition (chạy trong thread pool)
+    GIL-free vì InsightFace + FAISS chạy C++/CUDA
+    """
     try:
         if not ai_service.service:
-            return {"success": False, "message": "No AI service available"}
+            return {"success": False, "message": "No AI service available", "faces": []}
         
         from core.database import get_db
         db = get_db()
+        
+        # Gọi sync method (không dùng await)
+        # recognize_face là async nhưng internal calls đều sync
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(ai_service.recognize_face(image_base64, db, threshold))
+        loop.close()
+        
+        return result
+    except Exception as e:
+        logger.error(f"❌ Error in sync recognition worker: {e}")
+        return {"success": False, "message": str(e), "faces": []}
+
+
+async def process_continuous_recognition(image_base64: str, websocket: WebSocket, camera_id: str = None):
+    """Xử lý continuous recognition với Ultra-High Accuracy InsightFace (async wrapper)"""
+    # Khởi tạo recognized_students ngay từ đầu để tránh UnboundLocalError
+    recognized_students = []
+    
+    try:
+        if not ai_service.service:
+            return {"success": False, "message": "No AI service available"}
         
         # Ultra-High Accuracy thresholds cho InsightFace
         if ai_service.service_name == "InsightFace (ArcFace)":
@@ -658,11 +735,30 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
             threshold = 0.65  # MediaPipe fallback
             min_confidence = 0.75
         
-        result = await ai_service.recognize_face(image_base64, db, threshold)
+        # Chạy recognition trong thread pool (non-blocking)
+        continuous_recognition_state["active_workers"] += 1
+        start_time = time.time()
+        
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                AI_RECOGNITION_POOL,
+                sync_recognize_face_worker,
+                image_base64,
+                threshold
+            )
+        finally:
+            continuous_recognition_state["active_workers"] -= 1
+            recognition_time = time.time() - start_time
+            continuous_recognition_state["total_frames_processed"] += 1
+            continuous_recognition_state["total_recognition_time"] += recognition_time
+            
+            # Log performance per camera
+            if camera_id:
+                logger.debug(f"Camera {camera_id}: recognition took {recognition_time*1000:.1f}ms")
         
         if result.get("success") and result.get("faces"):
             current_time = time.time()
-            recognized_students = []
+            # recognized_students đã được khởi tạo ở đầu function
             
             logger.info(f"🔍 {ai_service.service_name} Ultra-High Accuracy result: {len(result['faces'])} faces detected")
             
@@ -695,6 +791,9 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
                         continuous_recognition_state["last_recognition"][student_id] = current_time
                         
                         # Get student info from database
+                        from core.database import get_db
+                        db = get_db()
+                        
                         try:
                             student_response = db.table("students").select("*").eq("id", int(student_id)).execute()
                             if student_response.data:
