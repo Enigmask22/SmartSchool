@@ -129,6 +129,11 @@ const StudentList = () => {
   // View mode state
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "list"
 
+  // Subject import states
+  const [showSubjectImportModal, setShowSubjectImportModal] = useState(false);
+  const [subjectImportFile, setSubjectImportFile] = useState(null);
+  const [subjectImportLoading, setSubjectImportLoading] = useState(false);
+
   // View scores states
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [selectedStudentForScores, setSelectedStudentForScores] =
@@ -1674,6 +1679,113 @@ const StudentList = () => {
     }
   };
 
+  // Function to download subject selection template
+  const downloadSubjectTemplate = async () => {
+    if (!selectedClass || selectedClass === "all") {
+      alert("Vui lòng chọn lớp để tải mẫu nhập môn học");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(
+        `${API_BASE_URL}/homeroom/export-subject-template/${selectedClass}?academic_year=${selectedAcademicYear}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Lỗi khi tải file mẫu");
+      }
+
+      // Tạo blob từ response
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Mau_nhap_mon_hoc_${selectedClass}_${selectedAcademicYear}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert("✅ Đã tải file mẫu thành công!");
+    } catch (error) {
+      logger.error("Error downloading subject template:", error);
+      alert("❌ Lỗi khi tải file mẫu: " + (error.message || "Unknown error"));
+    }
+  };
+
+  // Function to handle subject import
+  const handleSubjectImport = async () => {
+    if (!subjectImportFile) {
+      alert("Vui lòng chọn file để import");
+      return;
+    }
+
+    if (!selectedClass || selectedClass === "all") {
+      alert("Vui lòng chọn lớp để import môn học");
+      return;
+    }
+
+    setSubjectImportLoading(true);
+
+    try {
+      const token = localStorage.getItem("access_token");
+      const formData = new FormData();
+      formData.append("file", subjectImportFile);
+
+      const response = await fetch(
+        `${API_BASE_URL}/homeroom/import-subjects/${selectedClass}?academic_year=${selectedAcademicYear}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Lỗi khi import file");
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(
+          `✅ ${result.message}\n\n` +
+            `• Số học sinh đã cập nhật: ${result.total_updated}\n` +
+            (result.total_errors > 0
+              ? `• Số lỗi: ${result.total_errors}\n${
+                  result.errors?.join("\n") || ""
+                }`
+              : "")
+        );
+
+        // Reset và đóng modal
+        setSubjectImportFile(null);
+        setShowSubjectImportModal(false);
+
+        // Refresh danh sách học sinh
+        fetchStudents();
+      } else {
+        throw new Error(result.message || "Import thất bại");
+      }
+    } catch (error) {
+      logger.error("Error importing subjects:", error);
+      alert("❌ Lỗi khi import file: " + (error.message || "Unknown error"));
+    } finally {
+      setSubjectImportLoading(false);
+    }
+  };
+
   // Function to export student report card to Excel using ExcelJS
   const exportStudentReportCard = async () => {
     if (!selectedStudentForFeedback) {
@@ -2403,15 +2515,37 @@ const StudentList = () => {
                 {isHomeroomTeacher() &&
                   selectedClass &&
                   selectedClass !== "all" && (
-                    <Button
-                      onClick={exportAllComments}
-                      variant="default"
-                      size="sm"
-                      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Tải phiếu liên lạc toàn lớp</span>
-                    </Button>
+                    <>
+                      <Button
+                        onClick={downloadSubjectTemplate}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2 border-green-600 text-green-600 hover:bg-green-50"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Tải mẫu nhập môn học</span>
+                      </Button>
+
+                      <Button
+                        onClick={() => setShowSubjectImportModal(true)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>Import môn học</span>
+                      </Button>
+
+                      <Button
+                        onClick={exportAllComments}
+                        variant="default"
+                        size="sm"
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Tải phiếu liên lạc toàn lớp</span>
+                      </Button>
+                    </>
                   )}
               </div>
             </div>
@@ -4514,6 +4648,85 @@ const StudentList = () => {
                   chính và 4 môn tự chọn
                 </p>
               ) : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Subject Import Modal */}
+      {showSubjectImportModal && (
+        <Dialog
+          open={showSubjectImportModal}
+          onOpenChange={setShowSubjectImportModal}
+        >
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Import môn học cho lớp {selectedClass}</DialogTitle>
+              <DialogDescription>
+                Tải file Excel đã điền thông tin môn học của học sinh
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-6 space-y-4">
+              {/* Hướng dẫn */}
+              <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  📋 Hướng dẫn:
+                </h4>
+                <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                  <li>Tải file mẫu bằng nút "Tải mẫu nhập môn học"</li>
+                  <li>Điền chữ "x" vào ô nếu học sinh chọn môn đó</li>
+                  <li>Các môn bắt buộc đã được đánh dấu sẵn</li>
+                  <li>Upload file đã hoàn thành vào đây</li>
+                </ol>
+              </div>
+
+              {/* File Input */}
+              <div className="space-y-2">
+                <Label htmlFor="subject-file">Chọn file Excel</Label>
+                <Input
+                  id="subject-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setSubjectImportFile(e.target.files[0])}
+                  className="cursor-pointer"
+                />
+                {subjectImportFile && (
+                  <p className="text-sm text-green-600">
+                    ✓ Đã chọn: {subjectImportFile.name}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSubjectImportModal(false);
+                  setSubjectImportFile(null);
+                }}
+                disabled={subjectImportLoading}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSubjectImport}
+                disabled={!subjectImportFile || subjectImportLoading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {subjectImportLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Đang import...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import
+                  </>
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
