@@ -49,12 +49,14 @@ class ResponseModel(BaseModel):
 class CommentCreateRequest(BaseModel):
     student_id: int = Field(..., description="ID học sinh")
     description: str = Field(..., description="Nội dung nhận xét")
+    semester: str = Field(default="HK1", description="Học kỳ: HK1, HK2, CN")
 
 class CommentResponse(BaseModel):
     id: int
     student_id: int
     class_id: Optional[int]
     description: str
+    semester: str
     created_at: str
     updated_at: str
 

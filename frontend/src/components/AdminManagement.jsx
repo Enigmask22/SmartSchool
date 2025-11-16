@@ -717,11 +717,15 @@ const AdminManagement = () => {
           loadData();
           alert("Tạo thành công!");
         } else {
-          setError(response.message || "Không thể tạo bản ghi");
+          const errorMsg = response.message || "Không thể tạo bản ghi";
+          setError(errorMsg);
+          alert("❌ " + errorMsg);
         }
       }
     } catch (err) {
-      setError("Lỗi khi tạo: " + err.message);
+      const errorMsg = "Lỗi khi tạo: " + err.message;
+      setError(errorMsg);
+      alert("❌ " + errorMsg);
     }
   };
 
@@ -866,11 +870,15 @@ const AdminManagement = () => {
           loadData();
           alert("Cập nhật thành công!");
         } else {
-          setError(response.message || "Không thể cập nhật");
+          const errorMsg = response.message || "Không thể cập nhật";
+          setError(errorMsg);
+          alert("❌ " + errorMsg);
         }
       }
     } catch (err) {
-      setError("Lỗi khi cập nhật: " + err.message);
+      const errorMsg = "Lỗi khi cập nhật: " + err.message;
+      setError(errorMsg);
+      alert("❌ " + errorMsg);
     }
   };
 

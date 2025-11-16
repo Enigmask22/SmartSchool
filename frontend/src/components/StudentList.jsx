@@ -86,6 +86,8 @@ const StudentList = () => {
   const [homeroomClasses, setHomeroomClasses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("HK1"); // Học kỳ mặc định
+  const [availableSemesters] = useState(["HK1", "HK2", "CN"]); // Danh sách học kỳ
   const classesReqIdRef = useRef(0);
 
   // Face registration states
@@ -1040,7 +1042,11 @@ const StudentList = () => {
 
     try {
       // Get all scores for this student across all subjects
-      const response = await ApiService.getStudentScores(student.id);
+      const response = await ApiService.getStudentScores(
+        student.id,
+        selectedAcademicYear,
+        selectedSemester
+      );
 
       if (response.success) {
         setStudentScores(response.data?.scores || []);
@@ -1118,7 +1124,11 @@ const StudentList = () => {
         "🎯 Fetching scores for feedback form for student:",
         student
       );
-      const scoresResponse = await ApiService.getStudentScores(student.id);
+      const scoresResponse = await ApiService.getStudentScores(
+        student.id,
+        selectedAcademicYear,
+        selectedSemester
+      );
       logger.debug("📊 Scores response for feedback:", scoresResponse);
 
       if (scoresResponse.success && scoresResponse.data) {
@@ -1197,7 +1207,7 @@ const StudentList = () => {
     try {
       const token = localStorage.getItem("access_token");
       const commentResponse = await fetch(
-        `${API_BASE_URL}/feedback/comments/${student.id}`,
+        `${API_BASE_URL}/feedback/comments/${student.id}?semester=${selectedSemester}`,
         {
           method: "GET",
           headers: {
@@ -1344,6 +1354,7 @@ const StudentList = () => {
         body: JSON.stringify({
           student_id: selectedStudentForFeedback.id,
           description: generatedFeedback,
+          semester: selectedSemester,
         }),
       });
 
@@ -1388,7 +1399,7 @@ const StudentList = () => {
       );
 
       const response = await fetch(
-        `${API_BASE_URL}/feedback/comments/class/${classId}`,
+        `${API_BASE_URL}/feedback/comments/class/${classId}?semester=${selectedSemester}`,
         {
           method: "GET",
           headers: {
@@ -1614,7 +1625,7 @@ const StudentList = () => {
             student.student_id
           )}_${sanitizeFileName(
             student.full_name
-          )}_${academicYear}_${semester}.xlsx`;
+          )}_${selectedAcademicYear}_${selectedSemester}.xlsx`;
           link.download = fileName;
 
           // Append to body temporarily để đảm bảo link hoạt động
@@ -1671,7 +1682,11 @@ const StudentList = () => {
       // Fetch scores if not already loaded
       let scores = studentScores;
       if (!scores || scores.length === 0) {
-        const response = await ApiService.getStudentScores(student.id);
+        const response = await ApiService.getStudentScores(
+          student.id,
+          selectedAcademicYear,
+          selectedSemester
+        );
         if (response.success && response.data?.scores) {
           scores = response.data.scores;
         } else {
@@ -2010,7 +2025,7 @@ const StudentList = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `PhieuDiem_${student.student_id}_${student.full_name}_${academicYear}_${semester}.xlsx`;
+      link.download = `PhieuDiem_${student.student_id}_${student.full_name}_${selectedAcademicYear}_${selectedSemester}.xlsx`;
       link.click();
       window.URL.revokeObjectURL(url);
 
@@ -2233,111 +2248,144 @@ const StudentList = () => {
           <CardTitle>Tìm kiếm và lọc</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="search">Tìm kiếm</Label>
-              <div className="relative">
-                <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
-                <Input
-                  id="search"
-                  type="text"
-                  placeholder="Tên hoặc mã học sinh..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            {isHomeroomTeacher() && (
+          <div className="space-y-4">
+            {/* Row 1: Main Filters */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label>Năm học</Label>
-                <Select
-                  value={selectedAcademicYear || ""}
-                  onValueChange={(v) => {
-                    setSelectedAcademicYear(v);
-                    fetchAvailableClasses(v);
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn năm học" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicYears.map((y) => (
-                      <SelectItem key={y} value={y}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="class-select">Lớp</Label>
-              <Select
-                value={selectedClass}
-                onValueChange={(value) => setSelectedClass(value)}
-                disabled={classesLoading}
-              >
-                <SelectTrigger className="flex items-center justify-between w-full">
-                  <SelectValue
-                    placeholder={
-                      classesLoading
-                        ? "Đang tải lớp…"
-                        : isHomeroomTeacher()
-                        ? "Chọn lớp chủ nhiệm"
-                        : "Tất cả lớp"
-                    }
+                <Label htmlFor="search">Tìm kiếm</Label>
+                <div className="relative">
+                  <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
+                  <Input
+                    id="search"
+                    type="text"
+                    placeholder="Tên hoặc mã học sinh..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
                   />
-                  {classesLoading && (
-                    <span className="inline-block w-3 h-3 ml-2 border-2 border-transparent rounded-full border-b-muted-foreground animate-spin" />
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedClass &&
-                    selectedClass !== "all" &&
-                    !availableClasses.includes(selectedClass) && (
-                      <SelectItem value={selectedClass}>
-                        {selectedClass}
-                      </SelectItem>
-                    )}
-                  <SelectItem value="all">
-                    {isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"}
-                  </SelectItem>
-                  {availableClasses.map((className) => (
-                    <SelectItem key={className} value={className}>
-                      {className}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </div>
+
+              {isHomeroomTeacher() ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Năm học</Label>
+                    <Select
+                      value={selectedAcademicYear || ""}
+                      onValueChange={(v) => {
+                        setSelectedAcademicYear(v);
+                        fetchAvailableClasses(v);
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn năm học" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {academicYears.map((y) => (
+                          <SelectItem key={y} value={y}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Học kỳ</Label>
+                    <Select
+                      value={selectedSemester}
+                      onValueChange={setSelectedSemester}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn học kỳ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSemesters.map((sem) => (
+                          <SelectItem key={sem} value={sem}>
+                            {sem === "HK1" ? "Học kỳ 1" : sem === "HK2" ? "Học kỳ 2" : "Cả năm"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="class-select">Lớp</Label>
+                  <Select
+                    value={selectedClass}
+                    onValueChange={(value) => setSelectedClass(value)}
+                    disabled={classesLoading}
+                  >
+                    <SelectTrigger className="flex items-center justify-between w-full">
+                      <SelectValue
+                        placeholder={
+                          classesLoading
+                            ? "Đang tải lớp…"
+                            : "Tất cả lớp"
+                        }
+                      />
+                      {classesLoading && (
+                        <span className="inline-block w-3 h-3 ml-2 border-2 border-transparent rounded-full border-b-muted-foreground animate-spin" />
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedClass &&
+                        selectedClass !== "all" &&
+                        !availableClasses.includes(selectedClass) && (
+                          <SelectItem value={selectedClass}>
+                            {selectedClass}
+                          </SelectItem>
+                        )}
+                      <SelectItem value="all">Tất cả lớp</SelectItem>
+                      {availableClasses.map((className) => (
+                        <SelectItem key={className} value={className}>
+                          {className}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Hiển thị</Label>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
+            {/* Row 2: Class Info & Actions */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-2 border-t">
+              {/* Left: Class Info */}
+              <div className="flex items-center gap-3">
+                {isHomeroomTeacher() && homeroomClasses.length > 0 && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-sm text-blue-700">Lớp chủ nhiệm:</span>
+                    <span className="text-sm font-bold text-blue-900">{homeroomClasses[0].class_name}</span>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="show-inactive"
                     checked={showInactive}
                     onChange={(e) => setShowInactive(e.target.checked)}
-                    className="w-4 h-4 rounded text-primary bg-background border-input focus:ring-2 focus:ring-ring"
+                    className="w-4 h-4 rounded text-primary bg-background border-input focus:ring-2 focus:ring-ring cursor-pointer"
                   />
-                  <Label htmlFor="show-inactive" className="cursor-pointer">
-                    Đã xóa
+                  <Label htmlFor="show-inactive" className="text-sm cursor-pointer text-muted-foreground">
+                    Hiển thị đã xóa
                   </Label>
                 </div>
+              </div>
+
+              {/* Right: Action Buttons */}
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={fetchStudents}
                   variant="outline"
                   size="sm"
-                  className="flex items-center space-x-2"
+                  className="flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Làm mới</span>
                 </Button>
+                
                 {isHomeroomTeacher() &&
                   selectedClass &&
                   selectedClass !== "all" && (
@@ -2345,7 +2393,7 @@ const StudentList = () => {
                       onClick={exportAllComments}
                       variant="default"
                       size="sm"
-                      className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
                       <Download className="w-4 h-4" />
                       <span>Tải phiếu liên lạc toàn lớp</span>
