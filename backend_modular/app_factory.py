@@ -25,6 +25,7 @@ from students.api import router as students_router
 from attendance.api import router as attendance_router
 from scores.api import router as scores_router
 from homeroom.api import router as homeroom_router
+from homeroom.subject_import import router as homeroom_subject_router
 from feedback.api import router as feedback_router
 from ai_services.api import router as ai_router
 from score_settings.api import router as score_settings_router
@@ -143,6 +144,7 @@ def create_app() -> FastAPI:
     app.include_router(attendance_router, prefix="/api/attendance", tags=["Attendance"])
     app.include_router(scores_router, prefix="/api/scores", tags=["Scores"])
     app.include_router(homeroom_router, prefix="/api/homeroom", tags=["Homeroom"])
+    app.include_router(homeroom_subject_router, prefix="/api", tags=["Homeroom Subject Import"])
     app.include_router(feedback_router, prefix="/api/feedback", tags=["AI Feedback"])
     app.include_router(ai_router, prefix="/api/ai", tags=["AI Services"])
     app.include_router(score_settings_router, prefix="/api/score-settings", tags=["Score Settings"])
