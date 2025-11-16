@@ -25,6 +25,8 @@ import {
   ClipboardList,
   TrendingUp,
   CheckCircle2,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import {
   Card,
@@ -123,6 +125,9 @@ const StudentList = () => {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12); // 12 students per page (3x4 grid)
+
+  // View mode state
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "list"
 
   // View scores states
   const [showScoresModal, setShowScoresModal] = useState(false);
@@ -2289,7 +2294,7 @@ const StudentList = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Học kỳ</Label>
                     <Select
@@ -2302,7 +2307,11 @@ const StudentList = () => {
                       <SelectContent>
                         {availableSemesters.map((sem) => (
                           <SelectItem key={sem} value={sem}>
-                            {sem === "HK1" ? "Học kỳ 1" : sem === "HK2" ? "Học kỳ 2" : "Cả năm"}
+                            {sem === "HK1"
+                              ? "Học kỳ 1"
+                              : sem === "HK2"
+                              ? "Học kỳ 2"
+                              : "Cả năm"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -2320,9 +2329,7 @@ const StudentList = () => {
                     <SelectTrigger className="flex items-center justify-between w-full">
                       <SelectValue
                         placeholder={
-                          classesLoading
-                            ? "Đang tải lớp…"
-                            : "Tất cả lớp"
+                          classesLoading ? "Đang tải lớp…" : "Tất cả lớp"
                         }
                       />
                       {classesLoading && (
@@ -2355,11 +2362,15 @@ const StudentList = () => {
               <div className="flex items-center gap-3">
                 {isHomeroomTeacher() && homeroomClasses.length > 0 && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                    <span className="text-sm text-blue-700">Lớp chủ nhiệm:</span>
-                    <span className="text-sm font-bold text-blue-900">{homeroomClasses[0].class_name}</span>
+                    <span className="text-sm text-blue-700">
+                      Lớp chủ nhiệm:
+                    </span>
+                    <span className="text-sm font-bold text-blue-900">
+                      {homeroomClasses[0].class_name}
+                    </span>
                   </div>
                 )}
-                
+
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -2368,7 +2379,10 @@ const StudentList = () => {
                     onChange={(e) => setShowInactive(e.target.checked)}
                     className="w-4 h-4 rounded text-primary bg-background border-input focus:ring-2 focus:ring-ring cursor-pointer"
                   />
-                  <Label htmlFor="show-inactive" className="text-sm cursor-pointer text-muted-foreground">
+                  <Label
+                    htmlFor="show-inactive"
+                    className="text-sm cursor-pointer text-muted-foreground"
+                  >
                     Hiển thị đã xóa
                   </Label>
                 </div>
@@ -2385,7 +2399,7 @@ const StudentList = () => {
                   <RefreshCw className="w-4 h-4" />
                   <span>Làm mới</span>
                 </Button>
-                
+
                 {isHomeroomTeacher() &&
                   selectedClass &&
                   selectedClass !== "all" && (
@@ -2419,254 +2433,488 @@ const StudentList = () => {
                 trong tổng số{" "}
                 <span className="font-semibold">{totalStudents}</span> học sinh
               </div>
-              <div className="flex items-center space-x-2">
-                <Label className="text-sm">Số lượng/trang:</Label>
-                <Select
-                  value={pageSize.toString()}
-                  onValueChange={(value) => {
-                    setPageSize(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-[80px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="6">6</SelectItem>
-                    <SelectItem value="12">12</SelectItem>
-                    <SelectItem value="24">24</SelectItem>
-                    <SelectItem value="48">48</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-3">
+                {/* View Mode Toggle */}
+                <div className="flex items-center border rounded-lg border-input">
+                  <Button
+                    onClick={() => setViewMode("grid")}
+                    variant={viewMode === "grid" ? "default" : "ghost"}
+                    size="sm"
+                    className="rounded-r-none"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode("list")}
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="sm"
+                    className="rounded-l-none"
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Page Size Selector */}
+                <div className="flex items-center space-x-2">
+                  <Label className="text-sm">Số lượng/trang:</Label>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[80px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="6">6</SelectItem>
+                      <SelectItem value="12">12</SelectItem>
+                      <SelectItem value="24">24</SelectItem>
+                      <SelectItem value="48">48</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Students Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredStudents.length === 0 ? (
-          <Card className="col-span-full">
-            <CardContent className="py-12 text-center">
-              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
-                <Users className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="mb-2 text-lg font-medium text-foreground">
-                {searchTerm || selectedClass
-                  ? "Không tìm thấy học sinh nào"
-                  : "Chưa có học sinh nào"}
-              </h3>
-              <p className="text-muted-foreground">
-                {searchTerm || selectedClass
-                  ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
-                  : "Hãy thêm học sinh mới để bắt đầu"}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          paginatedStudents.map((student) => (
-            <Card
-              key={student.id}
-              className={`group transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-                student.is_active === false
-                  ? "border-destructive/50 bg-destructive/5 opacity-75"
-                  : "hover:border-primary/50"
-              }`}
-            >
-              {/* Header with avatar and basic info */}
-              <CardHeader
-                className={`${
+      {/* Students Display */}
+      {viewMode === "grid" ? (
+        /* Grid View */
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredStudents.length === 0 ? (
+            <Card className="col-span-full">
+              <CardContent className="py-12 text-center">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
+                  <Users className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="mb-2 text-lg font-medium text-foreground">
+                  {searchTerm || selectedClass
+                    ? "Không tìm thấy học sinh nào"
+                    : "Chưa có học sinh nào"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || selectedClass
+                    ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
+                    : "Hãy thêm học sinh mới để bắt đầu"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            paginatedStudents.map((student) => (
+              <Card
+                key={student.id}
+                className={`group transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
                   student.is_active === false
-                    ? "bg-destructive text-destructive-foreground"
-                    : "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground"
+                    ? "border-destructive/50 bg-destructive/5 opacity-75"
+                    : "hover:border-primary/50"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <div className="flex items-center justify-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
-                        {student.full_name?.charAt(0)?.toUpperCase() || "?"}
-                      </div>
-                      {student.is_active === false && (
-                        <div className="absolute flex items-center justify-center w-6 h-6 rounded-full -top-1 -right-1 bg-destructive">
-                          <X className="w-3 h-3 text-destructive-foreground" />
+                {/* Header with avatar and basic info */}
+                <CardHeader
+                  className={`${
+                    student.is_active === false
+                      ? "bg-destructive text-destructive-foreground"
+                      : "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        <div className="flex items-center justify-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
+                          {student.full_name?.charAt(0)?.toUpperCase() || "?"}
                         </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold truncate">
-                        {student.full_name}
-                      </h3>
-                      <p className="font-mono text-sm text-primary-foreground/80">
-                        {student.student_id}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge
-                          variant="secondary"
-                          className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
-                        >
-                          <GraduationCap className="w-3 h-3 mr-1" />
-                          {student.class_name}
-                        </Badge>
-                        {student.gender && (
+                        {student.is_active === false && (
+                          <div className="absolute flex items-center justify-center w-6 h-6 rounded-full -top-1 -right-1 bg-destructive">
+                            <X className="w-3 h-3 text-destructive-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold truncate">
+                          {student.full_name}
+                        </h3>
+                        <p className="font-mono text-sm text-primary-foreground/80">
+                          {student.student_id}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-2">
                           <Badge
                             variant="secondary"
                             className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
                           >
-                            <Users className="w-3 h-3 mr-1" />
-                            {student.gender}
+                            <GraduationCap className="w-3 h-3 mr-1" />
+                            {student.class_name}
                           </Badge>
-                        )}
+                          {student.gender && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
+                            >
+                              <Users className="w-3 h-3 mr-1" />
+                              {student.gender}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Edit button in top right corner */}
-                  {student.is_active !== false && (
-                    <Button
-                      onClick={() => handleEdit(student)}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center space-x-1 text-xs text-white bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
-                    >
-                      <Edit className="w-3 h-3" />
-                      <span>Sửa</span>
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-
-              {/* Student info */}
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                      <Mail className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="text-sm font-medium truncate">
-                        {student.email || "Chưa có email"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                      <Phone className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">
-                        Số điện thoại
-                      </p>
-                      <p className="text-sm font-medium">
-                        {student.phone || "Chưa có SĐT"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                      <BookOpen className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Khối</p>
-                      <p className="text-sm font-medium">
-                        Khối {student.grade || "N/A"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="pt-4 border-t border-border/50">
-                  {student.is_active === false ? (
-                    // Actions for deleted students (limited)
-                    <div className="space-y-3 text-center">
+                    {/* Edit button in top right corner */}
+                    {student.is_active !== false && (
                       <Button
-                        onClick={() => handleRestore(student)}
-                        disabled={restoreLoading}
+                        onClick={() => handleEdit(student)}
+                        variant="outline"
                         size="sm"
-                        className="w-full"
+                        className="flex items-center space-x-1 text-xs text-white bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
                       >
-                        {restoreLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            <span>Đang khôi phục...</span>
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            <span>Khôi phục học sinh</span>
-                          </>
-                        )}
+                        <Edit className="w-3 h-3" />
+                        <span>Sửa</span>
                       </Button>
-                      <p className="text-xs text-muted-foreground">
-                        Học sinh đã bị xóa
-                      </p>
-                    </div>
-                  ) : (
-                    // Actions for active students (full)
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          onClick={() => handleFeedbackClick(student)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          <span>Nhận xét</span>
-                        </Button>
+                    )}
+                  </div>
+                </CardHeader>
 
-                        <Button
-                          onClick={() => {
-                            setSelectedStudentForMultiple(student);
-                            setShowMultipleModal(true);
-                          }}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <Images className="w-4 h-4" />
-                          <span>Nhiều ảnh</span>
-                        </Button>
+                {/* Student info */}
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                        <Mail className="w-4 h-4 text-primary" />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          onClick={() => handleViewScores(student)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                          <span>Điểm số</span>
-                        </Button>
-
-                        <Button
-                          onClick={() => handleSubjectSelection(student)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <GraduationCap className="w-4 h-4" />
-                          <span>Môn học</span>
-                        </Button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* Edit button moved to header */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="text-sm font-medium truncate">
+                          {student.email || "Chưa có email"}
+                        </p>
                       </div>
                     </div>
-                  )}
+
+                    <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                        <Phone className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">
+                          Số điện thoại
+                        </p>
+                        <p className="text-sm font-medium">
+                          {student.phone || "Chưa có SĐT"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                        <BookOpen className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Khối</p>
+                        <p className="text-sm font-medium">
+                          Khối {student.grade || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="pt-4 border-t border-border/50">
+                    {student.is_active === false ? (
+                      // Actions for deleted students (limited)
+                      <div className="space-y-3 text-center">
+                        <Button
+                          onClick={() => handleRestore(student)}
+                          disabled={restoreLoading}
+                          size="sm"
+                          className="w-full"
+                        >
+                          {restoreLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              <span>Đang khôi phục...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              <span>Khôi phục học sinh</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Học sinh đã bị xóa
+                        </p>
+                      </div>
+                    ) : (
+                      // Actions for active students (full)
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            onClick={() => handleFeedbackClick(student)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Nhận xét</span>
+                          </Button>
+
+                          <Button
+                            onClick={() => {
+                              setSelectedStudentForMultiple(student);
+                              setShowMultipleModal(true);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <Images className="w-4 h-4" />
+                            <span>Upload nhiều ảnh</span>
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            onClick={() => handleViewScores(student)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <BarChart3 className="w-4 h-4" />
+                            <span>Điểm số</span>
+                          </Button>
+
+                          <Button
+                            onClick={() => handleSubjectSelection(student)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <GraduationCap className="w-4 h-4" />
+                            <span>Môn học</span>
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Edit button moved to header */}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      ) : (
+        /* List View */
+        <Card>
+          <CardContent className="p-0">
+            {filteredStudents.length === 0 ? (
+              <div className="py-12 text-center">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
+                  <Users className="w-8 h-8 text-muted-foreground" />
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                <h3 className="mb-2 text-lg font-medium text-foreground">
+                  {searchTerm || selectedClass
+                    ? "Không tìm thấy học sinh nào"
+                    : "Chưa có học sinh nào"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || selectedClass
+                    ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
+                    : "Hãy thêm học sinh mới để bắt đầu"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[60px] text-center">
+                        STT
+                      </TableHead>
+                      <TableHead>Học sinh</TableHead>
+                      <TableHead className="text-center">Lớp</TableHead>
+                      <TableHead className="text-center">Email</TableHead>
+                      <TableHead className="text-center">
+                        Số điện thoại
+                      </TableHead>
+                      <TableHead className="text-center">Khối</TableHead>
+                      <TableHead className="text-center">Trạng thái</TableHead>
+                      <TableHead className="text-center">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedStudents.map((student, index) => (
+                      <TableRow
+                        key={student.id}
+                        className={`${
+                          student.is_active === false
+                            ? "bg-destructive/5 opacity-75"
+                            : "hover:bg-muted/50"
+                        }`}
+                      >
+                        {/* STT */}
+                        <TableCell className="font-medium text-center">
+                          {startIndex + index + 1}
+                        </TableCell>
+
+                        {/* Student Info */}
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${
+                                student.is_active === false
+                                  ? "bg-destructive text-destructive-foreground"
+                                  : "bg-primary text-primary-foreground"
+                              }`}
+                            >
+                              {student.full_name?.charAt(0)?.toUpperCase() ||
+                                "?"}
+                            </div>
+                            <div>
+                              <div className="font-medium">
+                                {student.full_name}
+                              </div>
+                              <div className="text-sm text-muted-foreground font-mono">
+                                {student.student_id}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Class */}
+                        <TableCell className="text-center">
+                          <Badge
+                            variant="outline"
+                            className="flex items-center gap-1 w-fit mx-auto"
+                          >
+                            <GraduationCap className="w-3 h-3" />
+                            {student.class_name || "N/A"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Email */}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2 text-sm">
+                            <Mail className="w-4 h-4 text-muted-foreground" />
+                            <span className="truncate max-w-[200px]">
+                              {student.email || "Chưa có"}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        {/* Phone */}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2 text-sm">
+                            <Phone className="w-4 h-4 text-muted-foreground" />
+                            {student.phone || "Chưa có"}
+                          </div>
+                        </TableCell>
+
+                        {/* Grade */}
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="mx-auto">
+                            Khối {student.grade || "N/A"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Status */}
+                        <TableCell className="text-center">
+                          {student.is_active === false ? (
+                            <Badge
+                              variant="destructive"
+                              className="flex items-center gap-1 w-fit mx-auto"
+                            >
+                              <X className="w-3 h-3" />
+                              Đã xóa
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="success"
+                              className="flex items-center gap-1 w-fit mx-auto bg-green-500 text-white hover:bg-green-600"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              Đang học
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {student.is_active === false ? (
+                              <Button
+                                onClick={() => handleRestore(student)}
+                                disabled={restoreLoading}
+                                size="sm"
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Khôi phục
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  onClick={() => handleEdit(student)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleViewScores(student)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <BarChart3 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleFeedbackClick(student)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MessageCircle className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() =>
+                                    handleSubjectSelection(student)
+                                  }
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <GraduationCap className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => {
+                                    setSelectedStudentForMultiple(student);
+                                    setShowMultipleModal(true);
+                                  }}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Images className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
@@ -2772,7 +3020,7 @@ const StudentList = () => {
                 onClick={() => setRegistrationMode("multiple")}
                 className="flex-1"
               >
-                📸 Nhiều ảnh
+                Upload nhiều ảnh
               </Button>
             </div>
 
@@ -2937,7 +3185,7 @@ const StudentList = () => {
               <div className="space-y-4">
                 <div className="p-4 rounded-lg bg-blue-50">
                   <h4 className="mb-2 font-semibold text-blue-800">
-                    📸 Đăng ký nhiều ảnh (Độ chính xác cao)
+                    Đăng ký nhiều ảnh (Độ chính xác cao)
                   </h4>
                   <p className="text-sm text-blue-700">
                     Chụp 5-10 ảnh với góc độ khác nhau để đạt độ chính xác 90%+:
@@ -2965,7 +3213,7 @@ const StudentList = () => {
                         onClick={() => multipleFileInputRef.current?.click()}
                         className="px-6 py-3 text-white bg-green-600 rounded-md hover:bg-green-700"
                       >
-                        📸 Chọn nhiều ảnh (tối đa 10)
+                        Chọn nhiều ảnh (tối đa 10)
                       </button>
                       <p className="mt-2 text-sm text-gray-600">
                         Chọn 5-10 ảnh khuôn mặt với góc độ khác nhau
