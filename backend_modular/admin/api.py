@@ -933,6 +933,25 @@ async def create_class(
 ):
     """Tạo lớp học mới"""
     try:
+        # Kiểm tra giáo viên chủ nhiệm nếu có
+        if class_data.homeroom_teacher_id:
+            # Tìm lớp mà giáo viên đang chủ nhiệm trong cùng năm học
+            existing_class = db.table("classes").select(
+                "id, class_name, academic_year, teachers:homeroom_teacher_id(teacher_code, full_name)"
+            ).eq("homeroom_teacher_id", class_data.homeroom_teacher_id).eq(
+                "academic_year", class_data.academic_year
+            ).eq("is_active", True).execute()
+            
+            if existing_class.data:
+                teacher_info = existing_class.data[0].get("teachers", {})
+                teacher_code = teacher_info.get("teacher_code", "")
+                teacher_name = teacher_info.get("full_name", "")
+                existing_class_name = existing_class.data[0].get("class_name", "")
+                year = existing_class.data[0].get("academic_year", "")
+                
+                error_msg = f"Giáo viên {teacher_code} {teacher_name} đang chủ nhiệm lớp {existing_class_name} ({year}). Mỗi giáo viên chỉ được chủ nhiệm 1 lớp trong 1 năm học."
+                raise HTTPException(status_code=400, detail=error_msg)
+        
         data = {
             "class_name": class_data.class_name,
             "grade": class_data.grade,
@@ -954,6 +973,8 @@ async def create_class(
         else:
             raise HTTPException(status_code=500, detail="Không thể tạo lớp học")
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating class: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo lớp học: {str(e)}")
@@ -968,13 +989,46 @@ async def update_class(
 ):
     """Cập nhật thông tin lớp học"""
     try:
+        # Lấy thông tin lớp hiện tại
+        current_class = db.table("classes").select("*").eq("id", class_id).execute()
+        if not current_class.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+        
+        current_class_data = current_class.data[0]
+        
+        # Xác định năm học sẽ dùng để kiểm tra (nếu có cập nhật năm học thì dùng năm mới, không thì dùng năm cũ)
+        academic_year_to_check = class_data.academic_year if class_data.academic_year else current_class_data.get("academic_year")
+        
+        # Kiểm tra giáo viên chủ nhiệm nếu có thay đổi
+        if class_data.homeroom_teacher_id is not None:
+            # Chỉ kiểm tra nếu giáo viên mới khác với giáo viên hiện tại
+            current_teacher_id = current_class_data.get("homeroom_teacher_id")
+            
+            if class_data.homeroom_teacher_id != current_teacher_id:
+                # Tìm lớp mà giáo viên đang chủ nhiệm trong cùng năm học
+                existing_class = db.table("classes").select(
+                    "id, class_name, academic_year, teachers:homeroom_teacher_id(teacher_code, full_name)"
+                ).eq("homeroom_teacher_id", class_data.homeroom_teacher_id).eq(
+                    "academic_year", academic_year_to_check
+                ).eq("is_active", True).neq("id", class_id).execute()
+                
+                if existing_class.data:
+                    teacher_info = existing_class.data[0].get("teachers", {})
+                    teacher_code = teacher_info.get("teacher_code", "")
+                    teacher_name = teacher_info.get("full_name", "")
+                    existing_class_name = existing_class.data[0].get("class_name", "")
+                    year = existing_class.data[0].get("academic_year", "")
+                    
+                    error_msg = f"Giáo viên {teacher_code} {teacher_name} đang chủ nhiệm lớp {existing_class_name} ({year}). Mỗi giáo viên chỉ được chủ nhiệm 1 lớp trong 1 năm học."
+                    raise HTTPException(status_code=400, detail=error_msg)
+        
         update_data = {"updated_at": datetime.now().isoformat()}
         
         if class_data.class_name:
             update_data["class_name"] = class_data.class_name
         if class_data.grade:
             update_data["grade"] = class_data.grade
-        if class_data.homeroom_teacher_id:
+        if class_data.homeroom_teacher_id is not None:
             update_data["homeroom_teacher_id"] = class_data.homeroom_teacher_id
         if class_data.room_number:
             update_data["room_number"] = class_data.room_number
