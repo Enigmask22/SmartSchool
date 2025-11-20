@@ -5,9 +5,10 @@ import {
   Clock,
   BookOpen,
   Save,
-  RefreshCw,
+  Download,
   AlertCircle,
   CheckCircle,
+  RefreshCw
 } from "lucide-react";
 import {
   Card,
@@ -28,7 +29,7 @@ import {
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription } from "./ui/alert";
-import api from "../services/api";
+import api from "@/services/api";
 
 const SystemSettings = () => {
   const [settings, setSettings] = useState({});
@@ -330,9 +331,9 @@ const SystemSettings = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-between gap-2">
             <Button variant="outline" onClick={() => loadDayoffConfig(g)}>
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-2" />
               Tải cấu hình
             </Button>
             <Button onClick={() => saveDayoffConfig(g)} disabled={saving}>

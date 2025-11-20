@@ -1,14 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GraduationCap, Users, Loader2, ArrowRight } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import api from '../services/api';
-import logger from "../utils/logger";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { AuthContext } from '@/contexts/AuthContext';
+import api from '@/services/api';
+import logger from "@/utils/logger";
 
-const DashboardSelector = ({ onSelectDashboard }) => {
+const DashboardSelector = () => {
+  const { isAuthenticated } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [hasHomeroomRole, setHasHomeroomRole] = useState(false);
   const [hasSubjectRole, setHasSubjectRole] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Protect this page
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/login', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     checkUserRoles();
@@ -46,7 +57,8 @@ const DashboardSelector = ({ onSelectDashboard }) => {
   };
 
   const handleSelectDashboard = (type) => {
-    onSelectDashboard(type);
+    // Navigate to the selected dashboard
+    navigate(`/${type}/dashboard`, { replace: true });
   };
 
   if (loading) {
@@ -64,12 +76,12 @@ const DashboardSelector = ({ onSelectDashboard }) => {
 
   // Nếu chỉ có 1 role, tự động chuyển
   if (hasHomeroomRole && !hasSubjectRole) {
-    onSelectDashboard('homeroom');
+    navigate('/homeroom/dashboard', { replace: true });
     return null;
   }
 
   if (hasSubjectRole && !hasHomeroomRole) {
-    onSelectDashboard('subject');
+    navigate('/subject/dashboard', { replace: true });
     return null;
   }
 

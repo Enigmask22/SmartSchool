@@ -1,9 +1,9 @@
 import React, { useState, useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
-import ForgotPassword from './ForgotPassword';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '@/contexts/AuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { School, AlertCircle, Loader2 } from 'lucide-react';
 
 const Login = () => {
@@ -13,9 +13,9 @@ const Login = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   
   const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -32,7 +32,15 @@ const Login = () => {
     setError('');
 
     try {
-      await login(formData.username, formData.password);
+      const user = await login(formData.username, formData.password);
+      
+      // Redirect based on role
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        // Teachers go to dashboard selector
+        navigate('/select-dashboard');
+      }
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại');
     } finally {
@@ -40,14 +48,9 @@ const Login = () => {
     }
   };
 
-  // Nếu đang hiển thị forgot password
-  if (showForgotPassword) {
-    return <ForgotPassword onBackToLogin={() => setShowForgotPassword(false)} />;
-  }
-
   return (
     <div 
-      className="flex justify-center items-center p-4 min-h-screen bg-cover bg-center bg-no-repeat"
+      className="relative flex justify-center items-center p-4 min-h-screen bg-cover bg-center bg-no-repeat"
       style={{
         backgroundImage: 'url(/background_login.png)',
       }}
@@ -137,7 +140,7 @@ const Login = () => {
                 <Button
                   type="button"
                   variant="link"
-                  onClick={() => setShowForgotPassword(true)}
+                  onClick={() => navigate('/forgot-password')}
                   className="text-sm text-blue-600 hover:text-blue-500"
                 >
                   Quên mật khẩu?

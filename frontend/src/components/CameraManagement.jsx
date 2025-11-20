@@ -15,8 +15,8 @@ import {
   XCircle,
   Loader,
 } from "lucide-react";
-import api from "../services/api";
-import logger from "../utils/logger";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 import {
   Card,
   CardContent,

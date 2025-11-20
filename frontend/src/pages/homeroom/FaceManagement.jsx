@@ -19,18 +19,18 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
-import { Label } from "./ui/label";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -38,14 +38,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
-import ApiService from "../services/api";
-import { AuthContext } from "../contexts/AuthContext";
-import logger from "../utils/logger";
+} from "@/components/ui/table";
+import ApiService from "@/services/api";
+import { AuthContext } from "@/contexts/AuthContext";
+import logger from "@/utils/logger";
 
 // API Configuration
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
 const FaceManagement = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);

@@ -22,25 +22,25 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
-import { Label } from "./ui/label";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import api from "../services/api";
-import logger from "../utils/logger";
+} from "@/components/ui/select";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
 // API Configuration
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
-const WS_BASE_URL = process.env.REACT_APP_WS_URL || "ws://localhost:8000/api";
+  import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
+const WS_BASE_URL = import.meta.env.VITE_APP_WS_URL || "ws://localhost:8000/api";
 
 const ContinuousRecognition = () => {
   const videoRef = useRef(null);
@@ -1237,7 +1237,7 @@ const ContinuousRecognition = () => {
                             if (!camera?.camera_id) return null;
                             // Dùng proxy endpoint qua backend để stream MJPEG
                             const API_BASE =
-                              process.env.REACT_APP_API_URL ||
+                              import.meta.env.VITE_APP_API_URL ||
                               "http://localhost:8000/api";
                             return `${API_BASE}/cameras/${camera.camera_id}/stream`;
                           };
@@ -1468,7 +1468,7 @@ const ContinuousRecognition = () => {
 
                         // Build stream URL - ưu tiên proxy backend
                         const API_BASE =
-                          process.env.REACT_APP_API_URL ||
+                          import.meta.env.VITE_APP_API_URL ||
                           "http://localhost:8000/api";
                         const streamUrl = `${API_BASE}/cameras/${selectedCameraId}/stream`;
 

@@ -20,17 +20,17 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -38,7 +38,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -46,12 +46,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import { Label } from "./ui/label";
-import { SimpleDatePicker } from "./ui/simple-date-picker";
-import api from "../services/api";
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { SimpleDatePicker } from "@/components/ui/simple-date-picker";
+import api from "@/services/api";
 import * as XLSX from "xlsx";
-import logger from "../utils/logger";
+import logger from "@/utils/logger";
 
 const ClassManagement = () => {
   // States cho Class Management
