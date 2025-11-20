@@ -1,24 +1,24 @@
 import React, { useState, useEffect, useContext } from "react";
-import ApiService from "../services/api";
-import { AuthContext } from "../contexts/AuthContext";
+import ApiService from "@/services/api";
+import { AuthContext } from "@/contexts/AuthContext";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
-import { SimpleDatePicker } from "./ui/simple-date-picker";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { SimpleDatePicker } from "@/components/ui/simple-date-picker";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -26,9 +26,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import { Users, CheckCircle, XCircle, Clock } from "lucide-react";
-import logger from "../utils/logger";
+import logger from "@/utils/logger";
 
 const AttendanceView = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);

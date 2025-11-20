@@ -1,31 +1,31 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
-import { AuthContext } from "../contexts/AuthContext";
-import api from "../services/api";
+import { AuthContext } from "@/contexts/AuthContext";
+import api from "@/services/api";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { SimpleDatePicker } from "./ui/simple-date-picker";
-import logger from "../utils/logger";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { SimpleDatePicker } from "@/components/ui/simple-date-picker";
+import logger from "@/utils/logger";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
+} from "@/components/ui/dialog";
 import {
   Users,
   CheckCircle,

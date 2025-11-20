@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import ApiService from '../services/api';
-import logger from "../utils/logger";
+import ApiService from '@/services/api';
+import logger from "@/utils/logger";
 
 const ReportView = ({ isOpen, onClose }) => {
   const [stats, setStats] = useState({

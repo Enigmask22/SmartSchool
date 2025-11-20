@@ -38,8 +38,8 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import api from "../services/api";
-import logger from "../utils/logger";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
 const OCRGradeSheet = ({
   selectedClassSubject,

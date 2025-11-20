@@ -1,7 +1,16 @@
-import React, { useContext, useState, useEffect, useCallback } from "react";
-import { AuthContext } from "../contexts/AuthContext";
-import { Button } from "./ui/button";
-import { Card } from "./ui/card";
+import { useContext, useState, useEffect, useCallback } from "react";
+import { AuthContext } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Home,
   Users,
@@ -19,22 +28,24 @@ import {
   ChevronRight,
   School,
   UserCircle,
+  LayoutDashboard,
 } from "lucide-react";
-import api from "../services/api";
-import logger from "../utils/logger";
+import api from "@/services/api";
+import logger from "@/utils/logger";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const Sidebar = ({
-  currentView,
-  setCurrentView,
   user,
   isOpen,
   setIsOpen,
   selectedDashboardType,
   onDashboardSwitch,
 }) => {
-  const { logout, isHomeroomTeacher, isSubjectTeacher, isAdmin } =
-    useContext(AuthContext);
+  const { logout, isAdmin } = useContext(AuthContext);
   const [hasBothRoles, setHasBothRoles] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const checkBothRoles = useCallback(async () => {
     if (!user) return;
@@ -81,7 +92,7 @@ const Sidebar = ({
   // Icon mapping
   const getIcon = (iconName) => {
     const iconMap = {
-      dashboard: Home,
+      dashboard: LayoutDashboard,
       "personal-info": UserCircle,
       students: Users,
       attendance: ClipboardList,
@@ -92,272 +103,248 @@ const Sidebar = ({
       "school-config": Settings,
       "class-management": School,
       "admin-management": Cog,
+      "ui-demo": Cog,
       logout: LogOut,
       switch: RefreshCw,
     };
     const IconComponent = iconMap[iconName] || Home;
-    return <IconComponent className="w-5 h-5" />;
+    return <IconComponent className="w-5 h-5 transition-colors" />;
   };
 
-  // Menu items based on selected dashboard type (ưu tiên selectedDashboardType hơn role functions)
+  // Menu items with proper routing paths
   const getMenuItems = () => {
-    const baseItems = [
-      { id: "dashboard", label: "Trang chủ", icon: "dashboard" },
-      {
-        id: "personal-info",
-        label: "Thông tin cá nhân",
-        icon: "personal-info",
-      },
-    ];
+    const profileItem = { 
+      id: "personal-info", 
+      label: "Thông tin cá nhân", 
+      icon: "personal-info", 
+      path: "/profile" 
+    };
 
     if (isAdmin()) {
-      // Admin chỉ có các menu cấu hình và quản trị
       return [
-        { id: "dashboard", label: "Dashboard Thống Kê", icon: "dashboard" },
-        {
-          id: "personal-info",
-          label: "Thông tin cá nhân",
-          icon: "personal-info",
-        },
-        { id: "continuous", label: "Điểm danh tự động", icon: "continuous" },
-        {
-          id: "class-management",
-          label: "Quản lý học sinh",
-          icon: "class-management",
-        },
-        {
-          id: "admin-management",
-          label: "Quản lý hệ thống",
-          icon: "admin-management",
-        },
-        { id: "ui-demo", label: "UI Demo", icon: "dashboard" },
+        { id: "dashboard", label: "Tổng quan", icon: "dashboard", path: "/admin/dashboard" },
+        profileItem,
+        { id: "admin-management", label: "Quản lý hệ thống", icon: "admin-management", path: "/admin/management" },
+        { id: "class-management", label: "Quản lý lớp học", icon: "class-management", path: "/admin/classes" },
+        { id: "continuous", label: "Điểm danh AI", icon: "continuous", path: "/admin/continuous" },
+        { id: "ui-demo", label: "UI Demo", icon: "ui-demo", path: "/admin/ui-demo" },
       ];
-    } else if (selectedDashboardType === "homeroom") {
-      // Dashboard chủ nhiệm - chỉ hiển thị menu chủ nhiệm (không có quản lý điểm)
+    } 
+    
+    if (selectedDashboardType === "homeroom") {
       return [
-        ...baseItems,
-        { id: "students", label: "Học sinh lớp chủ nhiệm", icon: "students" },
-        { id: "attendance", label: "Điểm danh lớp", icon: "attendance" },
-        { id: "faces", label: "Quản lý khuôn mặt", icon: "faces" },
+        { id: "dashboard", label: "Trang chủ", icon: "dashboard", path: "/homeroom/dashboard" },
+        profileItem,
+        { id: "students", label: "Học sinh lớp chủ nhiệm", icon: "students", path: "/homeroom/students" },
+        { id: "attendance", label: "Điểm danh lớp", icon: "attendance", path: "/homeroom/attendance" },
+        { id: "faces", label: "Quản lý khuôn mặt", icon: "faces", path: "/homeroom/faces" },
+        // { id: "continuous", label: "Camera AI", icon: "continuous", path: "/homeroom/continuous" },
+        // { id: "grades", label: "Kết quả học tập", icon: "grades", path: "/homeroom/grades" },
       ];
-    } else if (selectedDashboardType === "subject") {
-      // Dashboard bộ môn - chỉ hiển thị menu bộ môn
+    } 
+    
+    if (selectedDashboardType === "subject") {
       return [
-        { id: "dashboard", label: "Dashboard Phân Tích", icon: "dashboard" },
-        {
-          id: "personal-info",
-          label: "Thông tin cá nhân",
-          icon: "personal-info",
-        },
-        { id: "grades", label: "Quản lý điểm", icon: "grades" },
+        { id: "dashboard", label: "Tổng quan", icon: "dashboard", path: "/subject/dashboard" },
+        profileItem,
+        { id: "grades", label: "Quản lý điểm", icon: "grades", path: "/subject/grades" },
       ];
-    } else {
-      // Fallback: sử dụng role functions nếu chưa có selectedDashboardType
-      if (isHomeroomTeacher()) {
-        return [
-          ...baseItems,
-          { id: "students", label: "Học sinh lớp chủ nhiệm", icon: "students" },
-          { id: "attendance", label: "Điểm danh lớp", icon: "attendance" },
-          { id: "continuous", label: "Điểm danh tự động", icon: "continuous" },
-          { id: "faces", label: "Quản lý khuôn mặt", icon: "faces" },
-        ];
-      } else if (isSubjectTeacher()) {
-        return [
-          { id: "dashboard", label: "Dashboard Phân Tích", icon: "dashboard" },
-          {
-            id: "personal-info",
-            label: "Thông tin cá nhân",
-            icon: "personal-info",
-          },
-          { id: "grades", label: "Quản lý điểm", icon: "grades" },
-        ];
-      } else {
-        return baseItems;
-      }
     }
+
+    return [profileItem];
   };
 
   const menuItems = getMenuItems();
 
+  // Helper to check active state
+  const isActive = (path) => {
+    if (path === '/' && location.pathname !== '/') return false;
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+
   const handleLogout = () => {
-    if (window.confirm("Bạn có chắc muốn đăng xuất?")) {
-      logout();
-    }
+    setShowLogoutDialog(true);
   };
 
-  const handleMenuClick = (viewId) => {
-    setCurrentView(viewId);
-    // Close sidebar on mobile after clicking menu item
-    if (window.innerWidth < 1024) {
-      setIsOpen(false);
-    }
+  const confirmLogout = () => {
+    logout();
+    setShowLogoutDialog(false);
   };
 
-  const toggleSidebar = () => {
-    setIsOpen(!isOpen);
-  };
-
-  const closeSidebar = () => {
-    setIsOpen(false);
+  const handleSwitchDashboard = () => {
+    onDashboardSwitch();
+    const newType = selectedDashboardType === 'homeroom' ? 'subject' : 'homeroom';
+    navigate(`/${newType}/dashboard`);
+    if (window.innerWidth < 1024) setIsOpen(false);
   };
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
-          onClick={closeSidebar}
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setIsOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <Card
+      {/* Sidebar Container */}
+      <aside
         className={`
-        fixed top-0 left-0 h-full bg-white shadow-xl z-50 transition-all duration-300 ease-in-out border-0 rounded-none
-        ${isOpen ? "w-64" : "w-16"}
-        ${!isOpen ? "-translate-x-full lg:translate-x-0" : "translate-x-0"}
-      `}
+          fixed top-0 left-0 h-full bg-white z-50 
+          transition-all duration-300 ease-in-out 
+          border-r border-gray-200 flex flex-col
+          ${isOpen ? "w-64" : "w-20"}
+          ${!isOpen ? "-translate-x-full lg:translate-x-0" : "translate-x-0"}
+        `}
       >
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 text-white bg-blue-600">
-          {isOpen && (
-            <div className="flex items-center space-x-2">
-              <School className="w-6 h-6" />
-              <h1 className="text-lg font-bold">SynapseS</h1>
+        {/* Header / Logo */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-100 bg-blue-600 text-white">
+          {isOpen ? (
+            <div className="flex items-center gap-2 overflow-hidden">
+              <School className="w-6 h-6 shrink-0" />
+              <span className="font-bold text-lg tracking-tight whitespace-nowrap">SynapseS</span>
+            </div>
+          ) : (
+            <div className="w-full flex justify-center">
+              <School className="w-8 h-8" />
             </div>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="text-white hover:bg-blue-700"
+          
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="hidden lg:flex p-1.5 rounded-md hover:bg-blue-700 transition-colors"
           >
-            {isOpen ? (
-              <ChevronLeft className="w-5 h-5" />
-            ) : (
-              <ChevronRight className="w-5 h-5" />
-            )}
-          </Button>
+            {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
         </div>
 
-        {/* User Info */}
-        {user && (
-          <div
-            className={`p-4 border-b border-gray-200 bg-blue-50 ${
-              !isOpen && "px-2"
-            }`}
-          >
-            {isOpen ? (
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-900 truncate">
-                  {user.full_name}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {user.role === "admin"
-                    ? "Quản trị viên"
-                    : selectedDashboardType === "homeroom"
-                    ? "Giáo viên chủ nhiệm"
-                    : selectedDashboardType === "subject"
-                    ? "Giáo viên bộ môn"
-                    : user.role === "homeroom_teacher"
-                    ? "Giáo viên chủ nhiệm"
-                    : user.role === "teacher"
-                    ? "Giáo viên bộ môn"
-                    : "Nhân viên"}
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-center">
-                <div className="flex justify-center items-center w-8 h-8 text-sm font-bold text-white bg-blue-600 rounded-full">
-                  {user.full_name.charAt(0).toUpperCase()}
-                </div>
+        {/* User Profile Summary */}
+        <div className="p-4 border-b border-gray-100 bg-slate-50/50">
+          <div className={`flex items-center gap-3 ${!isOpen && "justify-center"}`}>
+            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0 border-2 border-white shadow-sm">
+              {user?.full_name?.charAt(0).toUpperCase() || "U"}
+            </div>
+            
+            {isOpen && (
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {user?.full_name}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.role === "admin" ? "Quản trị viên" : 
+                   selectedDashboardType === "homeroom" ? "Giáo viên chủ nhiệm" : 
+                   selectedDashboardType === "subject" ? "Giáo viên bộ môn" : "Người dùng"}
+                </p>
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Navigation */}
-        <nav className="overflow-y-auto flex-1 px-2 py-4 space-y-1">
-          {menuItems.map((item) => (
-            <Button
-              key={item.id}
-              variant={currentView === item.id ? "secondary" : "ghost"}
-              onClick={() => handleMenuClick(item.id)}
-              className={`
-                w-full justify-start h-10 px-3 text-sm font-medium
-                ${
-                  currentView === item.id
-                    ? "bg-blue-100 text-blue-900 border-r-2 border-blue-600"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }
-                ${!isOpen && "justify-center px-2"}
-              `}
-              title={!isOpen ? item.label : ""}
-            >
-              {getIcon(item.icon)}
-              {isOpen && <span className="ml-3 truncate">{item.label}</span>}
-            </Button>
-          ))}
-
-          {/* Dashboard Switch Button - Only show if user has both roles AND not admin */}
-          {hasBothRoles && onDashboardSwitch && !isAdmin() && (
-            <div className="pt-4 mt-4 border-t border-gray-200">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  onDashboardSwitch();
-                  if (window.innerWidth < 1024) {
-                    setIsOpen(false);
-                  }
-                }}
+        {/* Navigation Menu */}
+        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
+          {menuItems.map((item) => {
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.id}
+                to={item.path}
+                onClick={() => window.innerWidth < 1024 && setIsOpen(false)}
                 className={`
-                  w-full justify-start h-10 px-3 text-sm font-medium
-                  bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-800
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative
+                  ${active 
+                    ? "bg-blue-200 text-sky-700 shadow-sm border-r-2 border-sky-700" 
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }
                   ${!isOpen && "justify-center px-2"}
                 `}
-                title={!isOpen ? "Đổi Dashboard" : ""}
+                title={!isOpen ? item.label : ""}
               >
-                {getIcon("switch")}
+                <div className={`${active ? "text-blue-600" : "text-slate-500"}`}>
+                  {getIcon(item.icon)}
+                </div>
+
                 {isOpen && (
-                  <span className="ml-3 truncate">
-                    {selectedDashboardType === "homeroom"
-                      ? "Chuyển sang Bộ môn"
-                      : "Chuyển sang Chủ nhiệm"}
+                  <span className="text-sm font-semibold truncate">
+                    {item.label}
                   </span>
                 )}
-              </Button>
+
+                {!isOpen && active && (
+                  <div className="absolute right-1 top-1 w-2 h-2 bg-blue-600 rounded-full border border-white"></div>
+                )}
+              </Link>
+            );
+          })}
+
+          {/* Dashboard Switcher */}
+          {hasBothRoles && onDashboardSwitch && !isAdmin() && (
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <button
+                onClick={handleSwitchDashboard}
+                className={`
+                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
+                  bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100
+                  ${!isOpen && "justify-center px-2"}
+                `}
+                title={!isOpen ? "Chuyển chế độ" : ""}
+              >
+                <RefreshCw className="w-5 h-5" />
+                {isOpen && (
+                  <span className="text-sm font-medium truncate">
+                    {selectedDashboardType === "homeroom" ? "Chuyển sang Bộ môn" : "Chuyển sang Chủ nhiệm"}
+                  </span>
+                )}
+              </button>
             </div>
           )}
-        </nav>
+        </div>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-gray-200">
-          <Button
-            variant="ghost"
+        {/* Footer / Logout */}
+        <div className="p-3 border-t border-gray-100 bg-white">
+          <button
             onClick={handleLogout}
             className={`
-              w-full justify-start h-10 px-3 text-sm font-medium text-red-600 hover:bg-red-50
+              w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors
+              text-red-600 hover:bg-red-50 hover:text-red-700
               ${!isOpen && "justify-center px-2"}
             `}
             title={!isOpen ? "Đăng xuất" : ""}
           >
-            {getIcon("logout")}
-            {isOpen && <span className="ml-3">Đăng xuất</span>}
-          </Button>
+            <LogOut className="w-5 h-5" />
+            {isOpen && <span className="text-sm font-medium">Đăng xuất</span>}
+          </button>
         </div>
-      </Card>
+      </aside>
 
-      {/* Mobile toggle button */}
+      {/* Mobile Toggle Button */}
       {!isOpen && (
         <Button
           size="icon"
           onClick={() => setIsOpen(true)}
-          className="fixed top-4 left-4 z-30 text-white bg-blue-600 shadow-lg hover:bg-blue-700 lg:hidden"
+          className="fixed top-4 left-4 z-40 bg-blue-600 text-white shadow-lg hover:bg-blue-700 lg:hidden rounded-full w-10 h-10"
         >
           <Menu className="w-5 h-5" />
         </Button>
       )}
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận đăng xuất</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLogout} className="bg-red-600 hover:bg-red-700">
+              Đăng xuất
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

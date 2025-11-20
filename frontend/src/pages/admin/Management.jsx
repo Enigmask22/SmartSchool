@@ -21,26 +21,26 @@ import {
   Settings,
   Camera,
 } from "lucide-react";
-import api from "../services/api";
-import logger from "../utils/logger";
-import { SimpleDatePicker } from "./ui/simple-date-picker";
+import api from "@/services/api";
+import logger from "@/utils/logger";
+import { SimpleDatePicker } from "@/components/ui/simple-date-picker";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -48,7 +48,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -56,9 +56,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import SystemSettings from "./SystemSettings";
-import CameraManagement from "./CameraManagement";
+} from "@/components/ui/dialog";
+import SystemSettings from "@/components/SystemSettings";
+import CameraManagement from "@/components/CameraManagement";
 // import SchoolDaysConfig from "./SchoolDaysConfig";
 
 const AdminManagement = () => {
@@ -2026,31 +2026,34 @@ const AdminManagement = () => {
       </div>
 
       {/* Enhanced Tabs */}
-      <div className="mb-8">
-        <Card>
-          <CardContent className="p-0">
-            <nav className="flex space-x-0 overflow-x-auto">
-              {tabs.map((tab) => (
-                <Button
+      <div className="mb-6">
+        <div className="relative bg-white rounded-lg shadow-sm border border-gray-200 p-2">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
                   key={tab.id}
-                  variant={activeTab === tab.id ? "default" : "ghost"}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-4 font-medium text-sm transition-all duration-200 ${
-                    activeTab === tab.id
-                      ? "bg-primary text-primary-foreground shadow-lg"
-                      : "text-muted-foreground hover:text-primary hover:bg-muted"
-                  }`}
+                  className={`
+                    flex items-center gap-2 px-4 py-2.5 rounded-md font-medium text-sm 
+                    transition-all duration-200 whitespace-nowrap flex-shrink-0
+                    ${isActive 
+                      ? "bg-blue-600 text-white shadow-sm" 
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }
+                  `}
                 >
-                  <tab.icon className="w-5 h-5 mr-3" />
-                  {tab.label}
-                  {activeTab === tab.id && (
-                    <div className="w-2 h-2 ml-2 rounded-full animate-pulse bg-primary-foreground"></div>
+                  <tab.icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                  {isActive && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
                   )}
-                </Button>
-              ))}
-            </nav>
-          </CardContent>
-        </Card>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Conditional Content - System Settings, Camera Management hoặc Table-based Content */}
