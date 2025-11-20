@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
-import api from "../services/api";
-import logger from "../utils/logger";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
 export const AuthContext = createContext();
 

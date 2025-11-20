@@ -29,17 +29,17 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -47,7 +47,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -55,15 +55,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import { Label } from "./ui/label";
-import { AuthContext } from "../contexts/AuthContext";
-import { useSystemSettings } from "../contexts/SystemSettingsContext";
-import api from "../services/api";
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { AuthContext } from "@/contexts/AuthContext";
+import { useSystemSettings } from "@/contexts/SystemSettingsContext";
+import api from "@/services/api";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
-import OCRGradeSheet from "./OCRGradeSheet";
-import logger from "../utils/logger";
+import OCRGradeSheet from "@/components/OCRGradeSheet";
+import logger from "@/utils/logger";
 
 // Tạo danh sách năm học từ 2024-2025 đến 2035-2036
 const generateAcademicYears = () => {

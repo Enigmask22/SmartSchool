@@ -22,6 +22,7 @@ const Login = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -38,7 +39,15 @@ const Login = () => {
     setError("");
 
     try {
-      await login(formData.username, formData.password);
+      const user = await login(formData.username, formData.password);
+      
+      // Redirect based on role
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        // Teachers go to dashboard selector
+        navigate('/select-dashboard');
+      }
     } catch (err) {
       setError(err.message || "Đăng nhập thất bại");
     } finally {
@@ -145,7 +154,7 @@ const Login = () => {
                 <Button
                   type="button"
                   variant="link"
-                  onClick={() => setShowForgotPassword(true)}
+                  onClick={() => navigate('/forgot-password')}
                   className="text-sm text-blue-600 hover:text-blue-500"
                 >
                   Quên mật khẩu?
