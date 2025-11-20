@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import logger from "../utils/logger";
+import logger from "@/utils/logger";
 
 // API Configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8000/api';
 
 const MultipleFaceRegistration = ({ student, onClose, onSuccess }) => {
   const [files, setFiles] = useState([]);
@@ -114,7 +114,7 @@ const MultipleFaceRegistration = ({ student, onClose, onSuccess }) => {
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Camera className="w-6 h-6 text-primary" />
-            <span>Đăng ký nhiều ảnh cho {student.full_name}</span>
+            <span>Đăng ký hình ảnh cho {student.full_name}</span>
           </DialogTitle>
           <DialogDescription>
             Tải lên nhiều ảnh khuôn mặt để cải thiện độ chính xác nhận diện
