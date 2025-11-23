@@ -25,6 +25,8 @@ import {
   ClipboardList,
   TrendingUp,
   CheckCircle2,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import {
   Card,
@@ -86,6 +88,8 @@ const StudentList = () => {
   const [homeroomClasses, setHomeroomClasses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("HK1"); // Học kỳ mặc định
+  const [availableSemesters] = useState(["HK1", "HK2", "CN"]); // Danh sách học kỳ
   const classesReqIdRef = useRef(0);
 
   // Face registration states
@@ -121,6 +125,14 @@ const StudentList = () => {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12); // 12 students per page (3x4 grid)
+
+  // View mode state
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "list"
+
+  // Subject import states
+  const [showSubjectImportModal, setShowSubjectImportModal] = useState(false);
+  const [subjectImportFile, setSubjectImportFile] = useState(null);
+  const [subjectImportLoading, setSubjectImportLoading] = useState(false);
 
   // View scores states
   const [showScoresModal, setShowScoresModal] = useState(false);
@@ -1040,7 +1052,11 @@ const StudentList = () => {
 
     try {
       // Get all scores for this student across all subjects
-      const response = await ApiService.getStudentScores(student.id);
+      const response = await ApiService.getStudentScores(
+        student.id,
+        selectedAcademicYear,
+        selectedSemester
+      );
 
       if (response.success) {
         setStudentScores(response.data?.scores || []);
@@ -1118,7 +1134,11 @@ const StudentList = () => {
         "🎯 Fetching scores for feedback form for student:",
         student
       );
-      const scoresResponse = await ApiService.getStudentScores(student.id);
+      const scoresResponse = await ApiService.getStudentScores(
+        student.id,
+        selectedAcademicYear,
+        selectedSemester
+      );
       logger.debug("📊 Scores response for feedback:", scoresResponse);
 
       if (scoresResponse.success && scoresResponse.data) {
@@ -1197,7 +1217,7 @@ const StudentList = () => {
     try {
       const token = localStorage.getItem("access_token");
       const commentResponse = await fetch(
-        `${API_BASE_URL}/feedback/comments/${student.id}`,
+        `${API_BASE_URL}/feedback/comments/${student.id}?semester=${selectedSemester}`,
         {
           method: "GET",
           headers: {
@@ -1344,6 +1364,7 @@ const StudentList = () => {
         body: JSON.stringify({
           student_id: selectedStudentForFeedback.id,
           description: generatedFeedback,
+          semester: selectedSemester,
         }),
       });
 
@@ -1388,7 +1409,7 @@ const StudentList = () => {
       );
 
       const response = await fetch(
-        `${API_BASE_URL}/feedback/comments/class/${classId}`,
+        `${API_BASE_URL}/feedback/comments/class/${classId}?semester=${selectedSemester}`,
         {
           method: "GET",
           headers: {
@@ -1614,7 +1635,7 @@ const StudentList = () => {
             student.student_id
           )}_${sanitizeFileName(
             student.full_name
-          )}_${academicYear}_${semester}.xlsx`;
+          )}_${selectedAcademicYear}_${selectedSemester}.xlsx`;
           link.download = fileName;
 
           // Append to body temporarily để đảm bảo link hoạt động
@@ -1658,6 +1679,113 @@ const StudentList = () => {
     }
   };
 
+  // Function to download subject selection template
+  const downloadSubjectTemplate = async () => {
+    if (!selectedClass || selectedClass === "all") {
+      alert("Vui lòng chọn lớp để tải mẫu nhập môn học");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(
+        `${API_BASE_URL}/homeroom/export-subject-template/${selectedClass}?academic_year=${selectedAcademicYear}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Lỗi khi tải file mẫu");
+      }
+
+      // Tạo blob từ response
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Mau_nhap_mon_hoc_${selectedClass}_${selectedAcademicYear}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert("✅ Đã tải file mẫu thành công!");
+    } catch (error) {
+      logger.error("Error downloading subject template:", error);
+      alert("❌ Lỗi khi tải file mẫu: " + (error.message || "Unknown error"));
+    }
+  };
+
+  // Function to handle subject import
+  const handleSubjectImport = async () => {
+    if (!subjectImportFile) {
+      alert("Vui lòng chọn file để import");
+      return;
+    }
+
+    if (!selectedClass || selectedClass === "all") {
+      alert("Vui lòng chọn lớp để import môn học");
+      return;
+    }
+
+    setSubjectImportLoading(true);
+
+    try {
+      const token = localStorage.getItem("access_token");
+      const formData = new FormData();
+      formData.append("file", subjectImportFile);
+
+      const response = await fetch(
+        `${API_BASE_URL}/homeroom/import-subjects/${selectedClass}?academic_year=${selectedAcademicYear}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Lỗi khi import file");
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(
+          `✅ ${result.message}\n\n` +
+            `• Số học sinh đã cập nhật: ${result.total_updated}\n` +
+            (result.total_errors > 0
+              ? `• Số lỗi: ${result.total_errors}\n${
+                  result.errors?.join("\n") || ""
+                }`
+              : "")
+        );
+
+        // Reset và đóng modal
+        setSubjectImportFile(null);
+        setShowSubjectImportModal(false);
+
+        // Refresh danh sách học sinh
+        fetchStudents();
+      } else {
+        throw new Error(result.message || "Import thất bại");
+      }
+    } catch (error) {
+      logger.error("Error importing subjects:", error);
+      alert("❌ Lỗi khi import file: " + (error.message || "Unknown error"));
+    } finally {
+      setSubjectImportLoading(false);
+    }
+  };
+
   // Function to export student report card to Excel using ExcelJS
   const exportStudentReportCard = async () => {
     if (!selectedStudentForFeedback) {
@@ -1671,7 +1799,11 @@ const StudentList = () => {
       // Fetch scores if not already loaded
       let scores = studentScores;
       if (!scores || scores.length === 0) {
-        const response = await ApiService.getStudentScores(student.id);
+        const response = await ApiService.getStudentScores(
+          student.id,
+          selectedAcademicYear,
+          selectedSemester
+        );
         if (response.success && response.data?.scores) {
           scores = response.data.scores;
         } else {
@@ -2010,7 +2142,7 @@ const StudentList = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `PhieuDiem_${student.student_id}_${student.full_name}_${academicYear}_${semester}.xlsx`;
+      link.download = `PhieuDiem_${student.student_id}_${student.full_name}_${selectedAcademicYear}_${selectedSemester}.xlsx`;
       link.click();
       window.URL.revokeObjectURL(url);
 
@@ -2233,123 +2365,187 @@ const StudentList = () => {
           <CardTitle>Tìm kiếm và lọc</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="search">Tìm kiếm</Label>
-              <div className="relative">
-                <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
-                <Input
-                  id="search"
-                  type="text"
-                  placeholder="Tên hoặc mã học sinh..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            {isHomeroomTeacher() && (
+          <div className="space-y-4">
+            {/* Row 1: Main Filters */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label>Năm học</Label>
-                <Select
-                  value={selectedAcademicYear || ""}
-                  onValueChange={(v) => {
-                    setSelectedAcademicYear(v);
-                    fetchAvailableClasses(v);
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn năm học" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicYears.map((y) => (
-                      <SelectItem key={y} value={y}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="class-select">Lớp</Label>
-              <Select
-                value={selectedClass}
-                onValueChange={(value) => setSelectedClass(value)}
-                disabled={classesLoading}
-              >
-                <SelectTrigger className="flex items-center justify-between w-full">
-                  <SelectValue
-                    placeholder={
-                      classesLoading
-                        ? "Đang tải lớp…"
-                        : isHomeroomTeacher()
-                        ? "Chọn lớp chủ nhiệm"
-                        : "Tất cả lớp"
-                    }
+                <Label htmlFor="search">Tìm kiếm</Label>
+                <div className="relative">
+                  <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
+                  <Input
+                    id="search"
+                    type="text"
+                    placeholder="Tên hoặc mã học sinh..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
                   />
-                  {classesLoading && (
-                    <span className="inline-block w-3 h-3 ml-2 border-2 border-transparent rounded-full border-b-muted-foreground animate-spin" />
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedClass &&
-                    selectedClass !== "all" &&
-                    !availableClasses.includes(selectedClass) && (
-                      <SelectItem value={selectedClass}>
-                        {selectedClass}
-                      </SelectItem>
-                    )}
-                  <SelectItem value="all">
-                    {isHomeroomTeacher() ? "Chọn lớp chủ nhiệm" : "Tất cả lớp"}
-                  </SelectItem>
-                  {availableClasses.map((className) => (
-                    <SelectItem key={className} value={className}>
-                      {className}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </div>
+
+              {isHomeroomTeacher() ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Năm học</Label>
+                    <Select
+                      value={selectedAcademicYear || ""}
+                      onValueChange={(v) => {
+                        setSelectedAcademicYear(v);
+                        fetchAvailableClasses(v);
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn năm học" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {academicYears.map((y) => (
+                          <SelectItem key={y} value={y}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Học kỳ</Label>
+                    <Select
+                      value={selectedSemester}
+                      onValueChange={setSelectedSemester}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn học kỳ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSemesters.map((sem) => (
+                          <SelectItem key={sem} value={sem}>
+                            {sem === "HK1"
+                              ? "Học kỳ 1"
+                              : sem === "HK2"
+                              ? "Học kỳ 2"
+                              : "Cả năm"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="class-select">Lớp</Label>
+                  <Select
+                    value={selectedClass}
+                    onValueChange={(value) => setSelectedClass(value)}
+                    disabled={classesLoading}
+                  >
+                    <SelectTrigger className="flex items-center justify-between w-full">
+                      <SelectValue
+                        placeholder={
+                          classesLoading ? "Đang tải lớp…" : "Tất cả lớp"
+                        }
+                      />
+                      {classesLoading && (
+                        <span className="inline-block w-3 h-3 ml-2 border-2 border-transparent rounded-full border-b-muted-foreground animate-spin" />
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedClass &&
+                        selectedClass !== "all" &&
+                        !availableClasses.includes(selectedClass) && (
+                          <SelectItem value={selectedClass}>
+                            {selectedClass}
+                          </SelectItem>
+                        )}
+                      <SelectItem value="all">Tất cả lớp</SelectItem>
+                      {availableClasses.map((className) => (
+                        <SelectItem key={className} value={className}>
+                          {className}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Hiển thị</Label>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
+            {/* Row 2: Class Info & Actions */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-2 border-t">
+              {/* Left: Class Info */}
+              <div className="flex items-center gap-3">
+                {isHomeroomTeacher() && homeroomClasses.length > 0 && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-sm text-blue-700">
+                      Lớp chủ nhiệm:
+                    </span>
+                    <span className="text-sm font-bold text-blue-900">
+                      {homeroomClasses[0].class_name}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="show-inactive"
                     checked={showInactive}
                     onChange={(e) => setShowInactive(e.target.checked)}
-                    className="h-4 w-4 rounded text-primary bg-background border-input focus:ring-2 focus:ring-ring flex-shrink-0"
+                    className="w-4 h-4 rounded text-primary bg-background border-input focus:ring-2 focus:ring-ring cursor-pointer"
                   />
-                  <Label htmlFor="show-inactive" className="cursor-pointer whitespace-nowrap">
-                    Đã xóa
+                  <Label
+                    htmlFor="show-inactive"
+                    className="text-sm cursor-pointer text-muted-foreground"
+                  >
+                    Hiển thị đã xóa
                   </Label>
                 </div>
+              </div>
+
+              {/* Right: Action Buttons */}
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={fetchStudents}
                   variant="outline"
                   size="sm"
-                  className="flex items-center space-x-2"
+                  className="flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Làm mới</span>
                 </Button>
+
                 {isHomeroomTeacher() &&
                   selectedClass &&
                   selectedClass !== "all" && (
-                    <Button
-                      onClick={exportAllComments}
-                      variant="default"
-                      size="sm"
-                      className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Tải phiếu liên lạc toàn lớp</span>
-                    </Button>
+                    <>
+                      <Button
+                        onClick={downloadSubjectTemplate}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2 border-green-600 text-green-600 hover:bg-green-50"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Tải mẫu nhập môn học</span>
+                      </Button>
+
+                      <Button
+                        onClick={() => setShowSubjectImportModal(true)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>Import môn học</span>
+                      </Button>
+
+                      <Button
+                        onClick={exportAllComments}
+                        variant="default"
+                        size="sm"
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Tải phiếu liên lạc toàn lớp</span>
+                      </Button>
+                    </>
                   )}
               </div>
             </div>
@@ -2371,254 +2567,488 @@ const StudentList = () => {
                 trong tổng số{" "}
                 <span className="font-semibold">{totalStudents}</span> học sinh
               </div>
-              <div className="flex items-center space-x-2">
-                <Label className="text-sm">Số lượng/trang:</Label>
-                <Select
-                  value={pageSize.toString()}
-                  onValueChange={(value) => {
-                    setPageSize(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-[80px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="6">6</SelectItem>
-                    <SelectItem value="12">12</SelectItem>
-                    <SelectItem value="24">24</SelectItem>
-                    <SelectItem value="48">48</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-3">
+                {/* View Mode Toggle */}
+                <div className="flex items-center border rounded-lg border-input">
+                  <Button
+                    onClick={() => setViewMode("grid")}
+                    variant={viewMode === "grid" ? "default" : "ghost"}
+                    size="sm"
+                    className="rounded-r-none"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode("list")}
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="sm"
+                    className="rounded-l-none"
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Page Size Selector */}
+                <div className="flex items-center space-x-2">
+                  <Label className="text-sm">Số lượng/trang:</Label>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[80px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="6">6</SelectItem>
+                      <SelectItem value="12">12</SelectItem>
+                      <SelectItem value="24">24</SelectItem>
+                      <SelectItem value="48">48</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Students Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredStudents.length === 0 ? (
-          <Card className="col-span-full">
-            <CardContent className="py-12 text-center">
-              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
-                <Users className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="mb-2 text-lg font-medium text-foreground">
-                {searchTerm || selectedClass
-                  ? "Không tìm thấy học sinh nào"
-                  : "Chưa có học sinh nào"}
-              </h3>
-              <p className="text-muted-foreground">
-                {searchTerm || selectedClass
-                  ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
-                  : "Hãy thêm học sinh mới để bắt đầu"}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          paginatedStudents.map((student) => (
-            <Card
-              key={student.id}
-              className={`group transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-                student.is_active === false
-                  ? "border-destructive/50 bg-destructive/5 opacity-75"
-                  : "hover:border-primary/50"
-              }`}
-            >
-              {/* Header with avatar and basic info */}
-              <CardHeader
-                className={`${
+      {/* Students Display */}
+      {viewMode === "grid" ? (
+        /* Grid View */
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredStudents.length === 0 ? (
+            <Card className="col-span-full">
+              <CardContent className="py-12 text-center">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
+                  <Users className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="mb-2 text-lg font-medium text-foreground">
+                  {searchTerm || selectedClass
+                    ? "Không tìm thấy học sinh nào"
+                    : "Chưa có học sinh nào"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || selectedClass
+                    ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
+                    : "Hãy thêm học sinh mới để bắt đầu"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            paginatedStudents.map((student) => (
+              <Card
+                key={student.id}
+                className={`group transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
                   student.is_active === false
-                    ? "bg-destructive text-destructive-foreground"
-                    : "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground"
+                    ? "border-destructive/50 bg-destructive/5 opacity-75"
+                    : "hover:border-primary/50"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <div className="flex items-center justify-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
-                        {student.full_name?.charAt(0)?.toUpperCase() || "?"}
-                      </div>
-                      {student.is_active === false && (
-                        <div className="absolute flex items-center justify-center w-6 h-6 rounded-full -top-1 -right-1 bg-destructive">
-                          <X className="w-3 h-3 text-destructive-foreground" />
+                {/* Header with avatar and basic info */}
+                <CardHeader
+                  className={`${
+                    student.is_active === false
+                      ? "bg-destructive text-destructive-foreground"
+                      : "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        <div className="flex items-center justify-center w-16 h-16 text-2xl font-bold rounded-full backdrop-blur-sm bg-white/20">
+                          {student.full_name?.charAt(0)?.toUpperCase() || "?"}
                         </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold truncate">
-                        {student.full_name}
-                      </h3>
-                      <p className="font-mono text-sm text-primary-foreground/80">
-                        {student.student_id}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge
-                          variant="secondary"
-                          className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
-                        >
-                          <GraduationCap className="w-3 h-3 mr-1" />
-                          {student.class_name}
-                        </Badge>
-                        {student.gender && (
+                        {student.is_active === false && (
+                          <div className="absolute flex items-center justify-center w-6 h-6 rounded-full -top-1 -right-1 bg-destructive">
+                            <X className="w-3 h-3 text-destructive-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold truncate">
+                          {student.full_name}
+                        </h3>
+                        <p className="font-mono text-sm text-primary-foreground/80">
+                          {student.student_id}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-2">
                           <Badge
                             variant="secondary"
                             className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
                           >
-                            <Users className="w-3 h-3 mr-1" />
-                            {student.gender}
+                            <GraduationCap className="w-3 h-3 mr-1" />
+                            {student.class_name}
                           </Badge>
-                        )}
+                          {student.gender && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs text-white transition-colors bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
+                            >
+                              <Users className="w-3 h-3 mr-1" />
+                              {student.gender}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Edit button in top right corner */}
-                  {student.is_active !== false && (
-                    <Button
-                      onClick={() => handleEdit(student)}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center space-x-1 text-xs text-white bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
-                    >
-                      <Edit className="w-3 h-3" />
-                      <span>Sửa</span>
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-
-              {/* Student info */}
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                      <Mail className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="text-sm font-medium truncate">
-                        {student.email || "Chưa có email"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                      <Phone className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">
-                        Số điện thoại
-                      </p>
-                      <p className="text-sm font-medium">
-                        {student.phone || "Chưa có SĐT"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                      <BookOpen className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Khối</p>
-                      <p className="text-sm font-medium">
-                        Khối {student.grade || "N/A"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="pt-4 border-t border-border/50">
-                  {student.is_active === false ? (
-                    // Actions for deleted students (limited)
-                    <div className="space-y-3 text-center">
+                    {/* Edit button in top right corner */}
+                    {student.is_active !== false && (
                       <Button
-                        onClick={() => handleRestore(student)}
-                        disabled={restoreLoading}
+                        onClick={() => handleEdit(student)}
+                        variant="outline"
                         size="sm"
-                        className="w-full"
+                        className="flex items-center space-x-1 text-xs text-white bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
                       >
-                        {restoreLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            <span>Đang khôi phục...</span>
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            <span>Khôi phục học sinh</span>
-                          </>
-                        )}
+                        <Edit className="w-3 h-3" />
+                        <span>Sửa</span>
                       </Button>
-                      <p className="text-xs text-muted-foreground">
-                        Học sinh đã bị xóa
-                      </p>
-                    </div>
-                  ) : (
-                    // Actions for active students (full)
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          onClick={() => handleFeedbackClick(student)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          <span>Nhận xét</span>
-                        </Button>
+                    )}
+                  </div>
+                </CardHeader>
 
-                        <Button
-                          onClick={() => {
-                            setSelectedStudentForMultiple(student);
-                            setShowMultipleModal(true);
-                          }}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <Images className="w-4 h-4" />
-                          <span>Hình ảnh</span>
-                        </Button>
+                {/* Student info */}
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                        <Mail className="w-4 h-4 text-primary" />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          onClick={() => handleViewScores(student)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                          <span>Điểm số</span>
-                        </Button>
-
-                        <Button
-                          onClick={() => handleSubjectSelection(student)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                        >
-                          <GraduationCap className="w-4 h-4" />
-                          <span>Môn học</span>
-                        </Button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* Edit button moved to header */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="text-sm font-medium truncate">
+                          {student.email || "Chưa có email"}
+                        </p>
                       </div>
                     </div>
-                  )}
+
+                    <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                        <Phone className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">
+                          Số điện thoại
+                        </p>
+                        <p className="text-sm font-medium">
+                          {student.phone || "Chưa có SĐT"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center p-2 space-x-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                        <BookOpen className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Khối</p>
+                        <p className="text-sm font-medium">
+                          Khối {student.grade || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="pt-4 border-t border-border/50">
+                    {student.is_active === false ? (
+                      // Actions for deleted students (limited)
+                      <div className="space-y-3 text-center">
+                        <Button
+                          onClick={() => handleRestore(student)}
+                          disabled={restoreLoading}
+                          size="sm"
+                          className="w-full"
+                        >
+                          {restoreLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              <span>Đang khôi phục...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              <span>Khôi phục học sinh</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Học sinh đã bị xóa
+                        </p>
+                      </div>
+                    ) : (
+                      // Actions for active students (full)
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            onClick={() => handleFeedbackClick(student)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Nhận xét</span>
+                          </Button>
+
+                          <Button
+                            onClick={() => {
+                              setSelectedStudentForMultiple(student);
+                              setShowMultipleModal(true);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <Images className="w-4 h-4" />
+                            <span>Upload nhiều ảnh</span>
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            onClick={() => handleViewScores(student)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <BarChart3 className="w-4 h-4" />
+                            <span>Điểm số</span>
+                          </Button>
+
+                          <Button
+                            onClick={() => handleSubjectSelection(student)}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                          >
+                            <GraduationCap className="w-4 h-4" />
+                            <span>Môn học</span>
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Edit button moved to header */}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      ) : (
+        /* List View */
+        <Card>
+          <CardContent className="p-0">
+            {filteredStudents.length === 0 ? (
+              <div className="py-12 text-center">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
+                  <Users className="w-8 h-8 text-muted-foreground" />
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                <h3 className="mb-2 text-lg font-medium text-foreground">
+                  {searchTerm || selectedClass
+                    ? "Không tìm thấy học sinh nào"
+                    : "Chưa có học sinh nào"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || selectedClass
+                    ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
+                    : "Hãy thêm học sinh mới để bắt đầu"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[60px] text-center">
+                        STT
+                      </TableHead>
+                      <TableHead>Học sinh</TableHead>
+                      <TableHead className="text-center">Lớp</TableHead>
+                      <TableHead className="text-center">Email</TableHead>
+                      <TableHead className="text-center">
+                        Số điện thoại
+                      </TableHead>
+                      <TableHead className="text-center">Khối</TableHead>
+                      <TableHead className="text-center">Trạng thái</TableHead>
+                      <TableHead className="text-center">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedStudents.map((student, index) => (
+                      <TableRow
+                        key={student.id}
+                        className={`${
+                          student.is_active === false
+                            ? "bg-destructive/5 opacity-75"
+                            : "hover:bg-muted/50"
+                        }`}
+                      >
+                        {/* STT */}
+                        <TableCell className="font-medium text-center">
+                          {startIndex + index + 1}
+                        </TableCell>
+
+                        {/* Student Info */}
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${
+                                student.is_active === false
+                                  ? "bg-destructive text-destructive-foreground"
+                                  : "bg-primary text-primary-foreground"
+                              }`}
+                            >
+                              {student.full_name?.charAt(0)?.toUpperCase() ||
+                                "?"}
+                            </div>
+                            <div>
+                              <div className="font-medium">
+                                {student.full_name}
+                              </div>
+                              <div className="text-sm text-muted-foreground font-mono">
+                                {student.student_id}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Class */}
+                        <TableCell className="text-center">
+                          <Badge
+                            variant="outline"
+                            className="flex items-center gap-1 w-fit mx-auto"
+                          >
+                            <GraduationCap className="w-3 h-3" />
+                            {student.class_name || "N/A"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Email */}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2 text-sm">
+                            <Mail className="w-4 h-4 text-muted-foreground" />
+                            <span className="truncate max-w-[200px]">
+                              {student.email || "Chưa có"}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        {/* Phone */}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2 text-sm">
+                            <Phone className="w-4 h-4 text-muted-foreground" />
+                            {student.phone || "Chưa có"}
+                          </div>
+                        </TableCell>
+
+                        {/* Grade */}
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="mx-auto">
+                            Khối {student.grade || "N/A"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Status */}
+                        <TableCell className="text-center">
+                          {student.is_active === false ? (
+                            <Badge
+                              variant="destructive"
+                              className="flex items-center gap-1 w-fit mx-auto"
+                            >
+                              <X className="w-3 h-3" />
+                              Đã xóa
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="success"
+                              className="flex items-center gap-1 w-fit mx-auto bg-green-500 text-white hover:bg-green-600"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              Đang học
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {student.is_active === false ? (
+                              <Button
+                                onClick={() => handleRestore(student)}
+                                disabled={restoreLoading}
+                                size="sm"
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Khôi phục
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  onClick={() => handleEdit(student)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleViewScores(student)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <BarChart3 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleFeedbackClick(student)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MessageCircle className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() =>
+                                    handleSubjectSelection(student)
+                                  }
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <GraduationCap className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => {
+                                    setSelectedStudentForMultiple(student);
+                                    setShowMultipleModal(true);
+                                  }}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Images className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
@@ -2724,7 +3154,7 @@ const StudentList = () => {
                 onClick={() => setRegistrationMode("multiple")}
                 className="flex-1"
               >
-                📸 Nhiều ảnh
+                Upload nhiều ảnh
               </Button>
             </div>
 
@@ -2889,7 +3319,7 @@ const StudentList = () => {
               <div className="space-y-4">
                 <div className="p-4 rounded-lg bg-blue-50">
                   <h4 className="mb-2 font-semibold text-blue-800">
-                    📸 Đăng ký nhiều ảnh (Độ chính xác cao)
+                    Đăng ký nhiều ảnh (Độ chính xác cao)
                   </h4>
                   <p className="text-sm text-blue-700">
                     Chụp 5-10 ảnh với góc độ khác nhau để đạt độ chính xác 90%+:
@@ -2917,7 +3347,7 @@ const StudentList = () => {
                         onClick={() => multipleFileInputRef.current?.click()}
                         className="px-6 py-3 text-white bg-green-600 rounded-md hover:bg-green-700"
                       >
-                        📸 Chọn nhiều ảnh (tối đa 10)
+                        Chọn nhiều ảnh (tối đa 10)
                       </button>
                       <p className="mt-2 text-sm text-gray-600">
                         Chọn 5-10 ảnh khuôn mặt với góc độ khác nhau
@@ -4218,6 +4648,85 @@ const StudentList = () => {
                   chính và 4 môn tự chọn
                 </p>
               ) : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Subject Import Modal */}
+      {showSubjectImportModal && (
+        <Dialog
+          open={showSubjectImportModal}
+          onOpenChange={setShowSubjectImportModal}
+        >
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Import môn học cho lớp {selectedClass}</DialogTitle>
+              <DialogDescription>
+                Tải file Excel đã điền thông tin môn học của học sinh
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-6 space-y-4">
+              {/* Hướng dẫn */}
+              <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  📋 Hướng dẫn:
+                </h4>
+                <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                  <li>Tải file mẫu bằng nút "Tải mẫu nhập môn học"</li>
+                  <li>Điền chữ "x" vào ô nếu học sinh chọn môn đó</li>
+                  <li>Các môn bắt buộc đã được đánh dấu sẵn</li>
+                  <li>Upload file đã hoàn thành vào đây</li>
+                </ol>
+              </div>
+
+              {/* File Input */}
+              <div className="space-y-2">
+                <Label htmlFor="subject-file">Chọn file Excel</Label>
+                <Input
+                  id="subject-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setSubjectImportFile(e.target.files[0])}
+                  className="cursor-pointer"
+                />
+                {subjectImportFile && (
+                  <p className="text-sm text-green-600">
+                    ✓ Đã chọn: {subjectImportFile.name}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSubjectImportModal(false);
+                  setSubjectImportFile(null);
+                }}
+                disabled={subjectImportLoading}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSubjectImport}
+                disabled={!subjectImportFile || subjectImportLoading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {subjectImportLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Đang import...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import
+                  </>
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

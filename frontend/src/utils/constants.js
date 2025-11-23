@@ -6,6 +6,7 @@
 // ==================== AUTH ROUTES ====================
 export const AUTH_ROUTES = {
   LOGIN: '/login',
+  FORGOT_PASSWORD: '/forgot-password',
   SELECT_DASHBOARD: '/select-dashboard',
 };
 

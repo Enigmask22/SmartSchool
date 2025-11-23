@@ -2,7 +2,7 @@
 API Router cho AI Feedback
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime
 from typing import Optional
 from feedback.models import (
@@ -193,7 +193,7 @@ async def save_comment(
     request: CommentCreateRequest,
     db=Depends(get_db)
 ):
-    """Lưu hoặc cập nhật nhận xét học sinh vào database (upsert)"""
+    """Lưu hoặc cập nhật nhận xét học sinh vào database (upsert theo semester)"""
     try:
         # Lấy thông tin học sinh để lấy class_id
         student_response = db.table("students").select("id, class_name, grade").eq("id", request.student_id).execute()
@@ -210,25 +210,26 @@ async def save_comment(
             if class_response.data and len(class_response.data) > 0:
                 class_id = class_response.data[0]["id"]
         
-        # Kiểm tra xem đã có comment chưa (lấy comment mới nhất)
-        existing_comment_response = db.table("comments").select("*").eq("student_id", request.student_id).order("created_at", desc=True).limit(1).execute()
+        # Kiểm tra xem đã có comment cho semester này chưa
+        existing_comment_response = db.table("comments").select("*").eq("student_id", request.student_id).eq("class_id", class_id).eq("semester", request.semester).execute()
         
         comment_data = {
             "student_id": request.student_id,
             "class_id": class_id,
             "description": request.description,
+            "semester": request.semester,
             "updated_at": datetime.now().isoformat()
         }
         
         if existing_comment_response.data and len(existing_comment_response.data) > 0:
-            # Update comment hiện có
+            # Update comment hiện có cho semester này
             existing_comment = existing_comment_response.data[0]
             comment_id = existing_comment["id"]
             
             response = db.table("comments").update(comment_data).eq("id", comment_id).execute()
             
             if response.data and len(response.data) > 0:
-                logger.info(f"✅ Đã cập nhật nhận xét cho học sinh ID: {request.student_id}")
+                logger.info(f"✅ Đã cập nhật nhận xét cho học sinh ID: {request.student_id}, Semester: {request.semester}")
                 comment = response.data[0]
                 return CommentResponseModel(
                     success=True,
@@ -238,6 +239,7 @@ async def save_comment(
                         student_id=comment["student_id"],
                         class_id=comment.get("class_id"),
                         description=comment["description"],
+                        semester=comment["semester"],
                         created_at=comment["created_at"],
                         updated_at=comment["updated_at"]
                     )
@@ -245,13 +247,13 @@ async def save_comment(
             else:
                 raise HTTPException(status_code=500, detail="Không thể cập nhật nhận xét")
         else:
-            # Insert comment mới
+            # Insert comment mới cho semester này
             comment_data["created_at"] = datetime.now().isoformat()
             
             response = db.table("comments").insert(comment_data).execute()
             
             if response.data and len(response.data) > 0:
-                logger.info(f"✅ Đã tạo nhận xét mới cho học sinh ID: {request.student_id}")
+                logger.info(f"✅ Đã tạo nhận xét mới cho học sinh ID: {request.student_id}, Semester: {request.semester}")
                 comment = response.data[0]
                 return CommentResponseModel(
                     success=True,
@@ -261,6 +263,7 @@ async def save_comment(
                         student_id=comment["student_id"],
                         class_id=comment.get("class_id"),
                         description=comment["description"],
+                        semester=comment["semester"],
                         created_at=comment["created_at"],
                         updated_at=comment["updated_at"]
                     )
@@ -280,25 +283,32 @@ async def save_comment(
 @router.get("/comments/{student_id}")
 async def get_comment(
     student_id: int,
+    semester: Optional[str] = Query(default=None, description="Học kỳ: HK1, HK2, CN"),
     db=Depends(get_db)
 ):
-    """Lấy nhận xét của học sinh (nhận xét mới nhất)"""
+    """Lấy nhận xét của học sinh theo semester"""
     try:
-        response = db.table("comments").select("*").eq("student_id", student_id).order("created_at", desc=True).limit(1).execute()
+        query = db.table("comments").select("*").eq("student_id", student_id)
+        
+        if semester:
+            query = query.eq("semester", semester)
+        
+        response = query.order("created_at", desc=True).limit(1).execute()
         
         if response.data and len(response.data) > 0:
             comment = response.data[0]
             return CommentResponseModel(
                 success=True,
                 message="Lấy nhận xét thành công",
-                    data=CommentResponse(
-                        id=comment["id"],
-                        student_id=comment["student_id"],
-                        class_id=comment.get("class_id"),
-                        description=comment["description"],
-                        created_at=comment["created_at"],
-                        updated_at=comment["updated_at"]
-                    )
+                data=CommentResponse(
+                    id=comment["id"],
+                    student_id=comment["student_id"],
+                    class_id=comment.get("class_id"),
+                    description=comment["description"],
+                    semester=comment["semester"],
+                    created_at=comment["created_at"],
+                    updated_at=comment["updated_at"]
+                )
             )
         else:
             return CommentResponseModel(
@@ -317,9 +327,10 @@ async def get_comment(
 @router.get("/comments/class/{class_id}")
 async def get_class_comments(
     class_id: int,
+    semester: Optional[str] = Query(default=None, description="Học kỳ: HK1, HK2, CN"),
     db=Depends(get_db)
 ):
-    """Lấy tất cả nhận xét của lớp (lấy comment mới nhất cho mỗi học sinh)"""
+    """Lấy tất cả nhận xét của lớp theo semester (lấy comment mới nhất cho mỗi học sinh)"""
     try:
         # Lấy thông tin lớp để có class_name và grade
         class_response = db.table("classes").select("id, class_name, grade").eq("id", class_id).execute()
@@ -336,11 +347,13 @@ async def get_class_comments(
         class_name = class_info.get("class_name")
         grade = class_info.get("grade")
         
-        logger.info(f"🔍 Tìm nhận xét cho lớp: {class_name} (ID: {class_id})")
+        logger.info(f"🔍 Tìm nhận xét cho lớp: {class_name} (ID: {class_id}), Semester: {semester}")
         
-        # Lấy tất cả comments của class (bao gồm cả NULL class_id)
-        # Vì có thể class_id chưa được set khi lưu comment
-        response = db.table("comments").select("*").eq("class_id", class_id).order("created_at", desc=True).execute()
+        # Lấy tất cả comments của class với filter semester
+        query = db.table("comments").select("*").eq("class_id", class_id)
+        if semester:
+            query = query.eq("semester", semester)
+        response = query.order("created_at", desc=True).execute()
         
         logger.info(f"📊 Tìm thấy {len(response.data) if response.data else 0} comments với class_id = {class_id}")
         
@@ -353,8 +366,11 @@ async def get_class_comments(
                 student_ids = [s["id"] for s in students_response.data]
                 logger.info(f"🔄 Fallback: Tìm comments theo {len(student_ids)} học sinh của lớp {class_name}")
                 
-                # Lấy comments của các học sinh này (có thể class_id NULL)
-                response = db.table("comments").select("*").in_("student_id", student_ids).order("created_at", desc=True).execute()
+                # Lấy comments của các học sinh này với filter semester
+                fallback_query = db.table("comments").select("*").in_("student_id", student_ids)
+                if semester:
+                    fallback_query = fallback_query.eq("semester", semester)
+                response = fallback_query.order("created_at", desc=True).execute()
                 logger.info(f"📊 Tìm thấy {len(response.data) if response.data else 0} comments theo student_id")
         
         if not response.data:
@@ -392,6 +408,7 @@ async def get_class_comments(
                     "student_name": student_info.get("full_name"),
                     "class_id": comment.get("class_id") or class_id,  # Nếu NULL thì dùng class_id từ param
                     "description": comment["description"],
+                    "semester": comment.get("semester", "HK1"),
                     "created_at": comment["created_at"],
                     "updated_at": comment["updated_at"]
                 })

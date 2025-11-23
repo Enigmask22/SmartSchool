@@ -33,6 +33,7 @@ import {
 import api from "@/services/api";
 import logger from "@/utils/logger";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ROUTES } from "@/utils/constants";
 
 const Sidebar = ({
   user,
@@ -117,37 +118,37 @@ const Sidebar = ({
       id: "personal-info", 
       label: "Thông tin cá nhân", 
       icon: "personal-info", 
-      path: "/profile" 
+      path: ROUTES.PROFILE
     };
 
     if (isAdmin()) {
       return [
-        { id: "dashboard", label: "Tổng quan", icon: "dashboard", path: "/admin/dashboard" },
+        { id: "dashboard", label: "Tổng quan", icon: "dashboard", path: ROUTES.ADMIN.DASHBOARD },
         profileItem,
-        { id: "admin-management", label: "Quản lý hệ thống", icon: "admin-management", path: "/admin/management" },
-        { id: "class-management", label: "Quản lý lớp học", icon: "class-management", path: "/admin/classes" },
-        { id: "continuous", label: "Điểm danh AI", icon: "continuous", path: "/admin/continuous" },
-        { id: "ui-demo", label: "UI Demo", icon: "ui-demo", path: "/admin/ui-demo" },
+        { id: "admin-management", label: "Quản lý hệ thống", icon: "admin-management", path: ROUTES.ADMIN.MANAGEMENT },
+        { id: "class-management", label: "Quản lý lớp học", icon: "class-management", path: ROUTES.ADMIN.CLASSES },
+        { id: "continuous", label: "Điểm danh AI", icon: "continuous", path: ROUTES.ADMIN.CONTINUOUS },
+        { id: "ui-demo", label: "UI Demo", icon: "ui-demo", path: ROUTES.ADMIN.UI_DEMO },
       ];
     } 
     
     if (selectedDashboardType === "homeroom") {
       return [
-        { id: "dashboard", label: "Trang chủ", icon: "dashboard", path: "/homeroom/dashboard" },
+        { id: "dashboard", label: "Trang chủ", icon: "dashboard", path: ROUTES.HOMEROOM.DASHBOARD },
         profileItem,
-        { id: "students", label: "Học sinh lớp chủ nhiệm", icon: "students", path: "/homeroom/students" },
-        { id: "attendance", label: "Điểm danh lớp", icon: "attendance", path: "/homeroom/attendance" },
-        { id: "faces", label: "Quản lý khuôn mặt", icon: "faces", path: "/homeroom/faces" },
-        // { id: "continuous", label: "Camera AI", icon: "continuous", path: "/homeroom/continuous" },
-        // { id: "grades", label: "Kết quả học tập", icon: "grades", path: "/homeroom/grades" },
+        { id: "students", label: "Học sinh lớp chủ nhiệm", icon: "students", path: ROUTES.HOMEROOM.STUDENTS },
+        { id: "attendance", label: "Điểm danh lớp", icon: "attendance", path: ROUTES.HOMEROOM.ATTENDANCE },
+        { id: "faces", label: "Quản lý khuôn mặt", icon: "faces", path: ROUTES.HOMEROOM.FACES },
+        // { id: "continuous", label: "Camera AI", icon: "continuous", path: ROUTES.HOMEROOM.CONTINUOUS },
+        // { id: "grades", label: "Kết quả học tập", icon: "grades", path: ROUTES.HOMEROOM.GRADES },
       ];
     } 
     
     if (selectedDashboardType === "subject") {
       return [
-        { id: "dashboard", label: "Tổng quan", icon: "dashboard", path: "/subject/dashboard" },
+        { id: "dashboard", label: "Tổng quan", icon: "dashboard", path: ROUTES.SUBJECT.DASHBOARD },
         profileItem,
-        { id: "grades", label: "Quản lý điểm", icon: "grades", path: "/subject/grades" },
+        { id: "grades", label: "Quản lý điểm", icon: "grades", path: ROUTES.SUBJECT.GRADES },
       ];
     }
 
@@ -158,7 +159,7 @@ const Sidebar = ({
 
   // Helper to check active state
   const isActive = (path) => {
-    if (path === '/' && location.pathname !== '/') return false;
+    if (path === ROUTES.ROOT && location.pathname !== ROUTES.ROOT) return false;
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 

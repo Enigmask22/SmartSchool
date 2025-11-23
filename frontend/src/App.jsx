@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
+import { ROUTES } from "@/utils/constants";
 
 // Context
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -45,46 +46,46 @@ function App() {
         <SystemSettingsProvider>
           <Routes>
             {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path={ROUTES.LOGIN} element={<Login />} />
+            <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
             
             {/* Dashboard Selector - Protected but outside MainLayout */}
-            <Route path="/select-dashboard" element={<DashboardSelector />} />
+            <Route path={ROUTES.SELECT_DASHBOARD} element={<DashboardSelector />} />
 
             {/* Protected Routes wrapped in MainLayout */}
-            <Route path="/" element={<MainLayout />}>
+            <Route path={ROUTES.ROOT} element={<MainLayout />}>
               
               {/* Common Routes */}
-              <Route path="profile" element={<PersonalInfo />} />
+              <Route path={ROUTES.PROFILE.substring(1)} element={<PersonalInfo />} />
               
               {/* Admin Routes */}
               <Route element={<ProtectedRoute roles={['admin']} />}>
                 <Route index element={<AdminDashboard />} /> {/* Default for Admin */}
-                <Route path="admin/dashboard" element={<AdminDashboard />} />
-                <Route path="admin/management" element={<AdminManagement />} />
-                <Route path="admin/classes" element={<ClassManagement />} />
-                <Route path="admin/continuous" element={<ContinuousRecognition isAdmin={true} />} />
-                <Route path="admin/ui-demo" element={<UIDemo />} />
+                <Route path={ROUTES.ADMIN.DASHBOARD.substring(1)} element={<AdminDashboard />} />
+                <Route path={ROUTES.ADMIN.MANAGEMENT.substring(1)} element={<AdminManagement />} />
+                <Route path={ROUTES.ADMIN.CLASSES.substring(1)} element={<ClassManagement />} />
+                <Route path={ROUTES.ADMIN.CONTINUOUS.substring(1)} element={<ContinuousRecognition isAdmin={true} />} />
+                <Route path={ROUTES.ADMIN.UI_DEMO.substring(1)} element={<UIDemo />} />
               </Route>
 
               {/* Homeroom Teacher Routes */}
               <Route element={<ProtectedRoute roles={['teacher', 'homeroom_teacher']} />}>
-                <Route path="homeroom/dashboard" element={<HomeroomDashboard />} />
-                <Route path="homeroom/students" element={<StudentList isHomeroom={true} />} />
-                <Route path="homeroom/attendance" element={<AttendanceView isHomeroom={true} />} />
-                <Route path="homeroom/faces" element={<FaceManagement isHomeroom={true} />} />
-                <Route path="homeroom/continuous" element={<ContinuousRecognition isHomeroom={true} />} />
-                <Route path="homeroom/grades" element={<HomeroomGradeManagement isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.DASHBOARD.substring(1)} element={<HomeroomDashboard />} />
+                <Route path={ROUTES.HOMEROOM.STUDENTS.substring(1)} element={<StudentList isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.ATTENDANCE.substring(1)} element={<AttendanceView isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.FACES.substring(1)} element={<FaceManagement isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.CONTINUOUS.substring(1)} element={<ContinuousRecognition isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.GRADES.substring(1)} element={<HomeroomGradeManagement isHomeroom={true} />} />
               </Route>
 
               {/* Subject Teacher Routes */}
               <Route element={<ProtectedRoute roles={['teacher', 'subject_teacher']} />}>
-                <Route path="subject/dashboard" element={<SubjectDashboard />} />
-                <Route path="subject/grades" element={<SubjectGradeManagement />} />
+                <Route path={ROUTES.SUBJECT.DASHBOARD.substring(1)} element={<SubjectDashboard />} />
+                <Route path={ROUTES.SUBJECT.GRADES.substring(1)} element={<SubjectGradeManagement />} />
               </Route>
 
               {/* Fallback route */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to={ROUTES.ROOT} replace />} />
             </Route>
           </Routes>
         </SystemSettingsProvider>
