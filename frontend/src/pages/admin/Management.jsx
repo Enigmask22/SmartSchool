@@ -2034,34 +2034,31 @@ const AdminManagement = () => {
       </div>
 
       {/* Enhanced Tabs */}
-      <div className="mb-6">
-        <div className="relative bg-white rounded-lg shadow-sm border border-gray-200 p-2">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
+      <div className="mb-8">
+        <Card>
+          <CardContent className="p-0">
+            <nav className="flex space-x-0 overflow-x-auto">
+              {tabs.map((tab) => (
+                <Button
                   key={tab.id}
+                  variant={activeTab === tab.id ? "default" : "ghost"}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex items-center gap-2 px-4 py-2.5 rounded-md font-medium text-sm 
-                    transition-all duration-200 whitespace-nowrap flex-shrink-0
-                    ${isActive 
-                      ? "bg-blue-600 text-white shadow-sm" 
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                    }
-                  `}
+                  className={`flex items-center px-6 py-4 font-medium text-sm transition-all duration-200 ${
+                    activeTab === tab.id
+                      ? "bg-primary text-primary-foreground shadow-lg"
+                      : "text-muted-foreground hover:text-primary hover:bg-muted"
+                  }`}
                 >
-                  <tab.icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                  {isActive && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                  <tab.icon className="w-5 h-5 mr-3" />
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <div className="w-2 h-2 ml-2 rounded-full animate-pulse bg-primary-foreground"></div>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                </Button>
+              ))}
+            </nav>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Conditional Content - System Settings, Camera Management hoặc Table-based Content */}

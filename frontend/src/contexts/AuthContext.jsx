@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from "react";
 import api from "@/services/api";
 import logger from "@/utils/logger";
+import { USER_ROLES } from "@/utils/constants";
 
 export const AuthContext = createContext();
 
@@ -128,19 +129,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isTeacher = () => {
-    return user && (user.role === "teacher" || user.role === "admin");
+    return user && (user.role === USER_ROLES.SUBJECT_TEACHER || user.role === USER_ROLES.ADMIN);
   };
 
   const isHomeroomTeacher = () => {
-    return user && user.role === "homeroom_teacher";
+    return user && user.role === USER_ROLES.HOMEROOM_TEACHER;
   };
 
   const isSubjectTeacher = () => {
-    return user && user.role === "teacher";
+    return user && user.role === USER_ROLES.SUBJECT_TEACHER;
   };
 
   const isAdmin = () => {
-    return user && user.role === "admin";
+    return user && user.role === USER_ROLES.ADMIN;
   };
 
   const hasRole = (roles) => {
