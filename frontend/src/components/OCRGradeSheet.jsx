@@ -203,7 +203,7 @@ const OCRGradeSheet = ({
       const formData = new FormData();
       formData.append("file", selectedImage);
 
-      const response = await api.parseGradeSheetOCR(formData);
+      const response = await api.parseScoreSheetOCR(formData);
 
       if (response.success) {
         // Get request_id and start polling
