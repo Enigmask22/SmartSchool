@@ -1,0 +1,52 @@
+/**
+ * Test Data and Constants
+ * Centralized test data for E2E tests
+ */
+
+export const TEST_USER = {
+  admin: {
+    username: process.env.TEST_ADMIN_USER || 'admin',
+    password: process.env.TEST_ADMIN_PASS || 'password',
+    role: 'admin',
+  },
+  homeroom: {
+    username: process.env.TEST_HOMEROOM_USER || 'homeroom1',
+    password: process.env.TEST_HOMEROOM_PASS || 'password',
+    role: 'homeroom',
+  },
+  subject: {
+    username: process.env.TEST_SUBJECT_USER || 'subject1',
+    password: process.env.TEST_SUBJECT_PASS || 'password',
+    role: 'subject',
+  },
+};
+
+export const TEST_TIMEOUTS = {
+  SHORT: 5000,
+  NORMAL: 10000,
+  LONG: 30000,
+};
+
+export const ROUTES = {
+  LOGIN: '/',
+  DASHBOARD_SELECTOR: '/dashboard-selector',
+  ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_MANAGEMENT: '/admin/management',
+  HOMEROOM_DASHBOARD: '/homeroom/dashboard',
+  HOMEROOM_STUDENTS: '/homeroom/students',
+  HOMEROOM_GRADES: '/homeroom/grades',
+};
+
+export const SELECTORS = {
+  // Login page - VERIFIED from actual HTML
+  USERNAME_INPUT: 'input[name="username"]',
+  PASSWORD_INPUT: 'input[name="password"]',
+  LOGIN_BUTTON: 'button[type="submit"]:has-text("Đăng nhập")',
+  FORGOT_PASSWORD_BUTTON: 'button:has-text("Quên mật khẩu")',
+
+  // Dashboard common
+  SIDEBAR: '[data-testid="sidebar"], aside, nav',
+  MAIN_CONTENT: 'main, [role="main"]',
+  LOADING_SPINNER: '[role="status"], .spinner, .loading',
+  ERROR_MESSAGE: '[role="alert"], .error, .alert-danger',
+};
