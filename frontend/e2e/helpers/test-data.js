@@ -5,17 +5,17 @@
 
 export const TEST_USER = {
   admin: {
-    username: process.env.TEST_ADMIN_USER || 'admin',
+    username: process.env.TEST_ADMIN_USER || 'admin.chuyen_le_quy_don.tphcm',
     password: process.env.TEST_ADMIN_PASS || 'password',
     role: 'admin',
   },
   homeroom: {
-    username: process.env.TEST_HOMEROOM_USER || 'homeroom1',
+    username: process.env.TEST_HOMEROOM_USER || 'nguyen_thi_lan.chuyen_le_quy_don.tphcm',
     password: process.env.TEST_HOMEROOM_PASS || 'password',
     role: 'homeroom',
   },
   subject: {
-    username: process.env.TEST_SUBJECT_USER || 'subject1',
+    username: process.env.TEST_SUBJECT_USER || 'nguyen_thi_lan.chuyen_le_quy_don.tphcm',
     password: process.env.TEST_SUBJECT_PASS || 'password',
     role: 'subject',
   },
@@ -35,6 +35,7 @@ export const ROUTES = {
   HOMEROOM_DASHBOARD: '/homeroom/dashboard',
   HOMEROOM_STUDENTS: '/homeroom/students',
   HOMEROOM_GRADES: '/homeroom/grades',
+  SUBJECT_DASHBOARD: '/subject/dashboard',
 };
 
 export const SELECTORS = {
@@ -44,9 +45,11 @@ export const SELECTORS = {
   LOGIN_BUTTON: 'button[type="submit"]:has-text("Đăng nhập")',
   FORGOT_PASSWORD_BUTTON: 'button:has-text("Quên mật khẩu")',
 
-  // Dashboard common
-  SIDEBAR: '[data-testid="sidebar"], aside, nav',
-  MAIN_CONTENT: 'main, [role="main"]',
+  // Dashboard common - ACTUAL STRUCTURE from MainLayout
+  // The actual layout is: div.flex > Sidebar + main > div.p-4 > Outlet(dashboard)
+  // So we can look for main tag which always exists in MainLayout
+  SIDEBAR: 'aside, nav, [role="navigation"]',
+  MAIN_CONTENT: 'main',
   LOADING_SPINNER: '[role="status"], .spinner, .loading',
   ERROR_MESSAGE: '[role="alert"], .error, .alert-danger',
 };
