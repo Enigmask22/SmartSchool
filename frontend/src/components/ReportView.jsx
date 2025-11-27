@@ -121,7 +121,7 @@ const ReportView = ({ isOpen, onClose }) => {
           new Date(record.date) >= weekAgo
         );
         break;
-      case 'month':
+      default:
         const monthAgo = new Date();
         monthAgo.setMonth(monthAgo.getMonth() - 1);
         filtered = filtered.filter(record => 

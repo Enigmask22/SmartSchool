@@ -6,7 +6,6 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Eye,
   Download,
   BarChart3,
   FileText,
@@ -19,7 +18,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "./ui/card";
@@ -29,7 +27,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -775,7 +772,7 @@ const OCRGradeSheet = ({
                 {/* Pagination Summary */}
                 {(() => {
                   const totalRows = parsedData.parsed_rows.length;
-                  const totalPages = Math.ceil(totalRows / pageSize);
+                  // const totalPages = Math.ceil(totalRows / pageSize);
                   const startIndex = (currentPage - 1) * pageSize;
                   const endIndex = startIndex + pageSize;
 
@@ -870,7 +867,7 @@ const OCRGradeSheet = ({
                         </TableHeader>
                         <TableBody>
                           {(() => {
-                            const totalRows = parsedData.parsed_rows.length;
+                            // const totalRows = parsedData.parsed_rows.length;
                             const startIndex = (currentPage - 1) * pageSize;
                             const endIndex = startIndex + pageSize;
                             // Sắp xếp theo student_id tăng dần trước khi phân trang
@@ -1101,8 +1098,8 @@ const OCRGradeSheet = ({
                 {(() => {
                   const totalRows = parsedData.parsed_rows.length;
                   const totalPages = Math.ceil(totalRows / pageSize);
-                  const startIndex = (currentPage - 1) * pageSize;
-                  const endIndex = startIndex + pageSize;
+                  // const startIndex = (currentPage - 1) * pageSize;
+                  // const endIndex = startIndex + pageSize;
 
                   if (totalPages <= 1) return null;
 
