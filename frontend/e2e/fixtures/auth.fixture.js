@@ -12,7 +12,7 @@ export const test = base.extend({
    * IMPORTANT: Update test credentials below or use environment variables:
    * TEST_USERNAME=admin TEST_PASSWORD=password npm run test:e2e
    */
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }, use, testInfo) => {
     // Navigate to login page
     await page.goto(ROUTES.LOGIN);
     
@@ -23,9 +23,21 @@ export const test = base.extend({
       throw new Error('Could not find login form. Make sure dev server is running on http://localhost:3000');
     });
 
-    // Get test credentials from TEST_USER constant (properly formatted usernames)
-    const username = TEST_USER.admin.username;
-    const password = TEST_USER.admin.password;
+    // Determine which user to login as based on test name/title
+    // Default to admin, but switch based on test type
+    let testUser = TEST_USER.admin;
+    
+    const testTitle = testInfo.title.toLowerCase();
+    
+    if (testTitle.includes('homeroom') || testTitle.includes('face management')) {
+      testUser = TEST_USER.homeroom;
+    } else if (testTitle.includes('subject')) {
+      testUser = TEST_USER.subject;
+    }
+    // else default to admin for Admin Dashboard tests
+
+    const username = testUser.username;
+    const password = testUser.password;
 
     // Fill and submit login form using SELECTORS from test-data
     const usernameInput = page.locator(SELECTORS.USERNAME_INPUT);
