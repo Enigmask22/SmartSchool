@@ -42,7 +42,7 @@ export const SELECTORS = {
   // Login page - VERIFIED from actual HTML
   USERNAME_INPUT: 'input[name="username"]',
   PASSWORD_INPUT: 'input[name="password"]',
-  LOGIN_BUTTON: 'button[type="submit"]:has-text("Đăng nhập")',
+  LOGIN_BUTTON: 'button[type="submit"]',
   FORGOT_PASSWORD_BUTTON: 'button:has-text("Quên mật khẩu")',
 
   // Dashboard common - ACTUAL STRUCTURE from MainLayout

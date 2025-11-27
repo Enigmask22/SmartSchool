@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import api from "@/services/api";
 import logger from "@/utils/logger";
+import { AuthContext } from "@/contexts/AuthContext";
+import { USER_ROLES } from "@/utils/constants";
 
 const SystemSettingsContext = createContext();
 
@@ -15,6 +17,10 @@ export const useSystemSettings = () => {
 };
 
 export const SystemSettingsProvider = ({ children }) => {
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user;
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
+
   const [settings, setSettings] = useState({
     academic_year: "2024-2025",
     semester: "HK1",
@@ -26,6 +32,12 @@ export const SystemSettingsProvider = ({ children }) => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
+      // Only fetch admin settings if user is admin
+      if (!isAdmin) {
+        setLoading(false);
+        return;
+      }
+
       const response = await api.request("/admin/system-settings", {
         method: "GET",
       });
