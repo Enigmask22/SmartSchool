@@ -2036,27 +2036,26 @@ const AdminManagement = () => {
       {/* Enhanced Tabs */}
       <div className="mb-8">
         <Card>
-          <CardContent className="p-0">
-            <nav className="flex space-x-0 overflow-x-auto">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-2 justify-start">
               {tabs.map((tab) => (
-                <Button
+                <button
                   key={tab.id}
-                  variant={activeTab === tab.id ? "default" : "ghost"}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-4 font-medium text-sm transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
                     activeTab === tab.id
-                      ? "bg-primary text-primary-foreground shadow-lg"
+                      ? "bg-primary text-primary-foreground shadow-md"
                       : "text-muted-foreground hover:text-primary hover:bg-muted"
                   }`}
                 >
-                  <tab.icon className="w-5 h-5 mr-3" />
-                  {tab.label}
+                  <tab.icon className="w-5 h-5" />
+                  <span>{tab.label}</span>
                   {activeTab === tab.id && (
-                    <div className="w-2 h-2 ml-2 rounded-full animate-pulse bg-primary-foreground"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground"></div>
                   )}
-                </Button>
+                </button>
               ))}
-            </nav>
+            </div>
           </CardContent>
         </Card>
       </div>
