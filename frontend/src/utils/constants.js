@@ -31,8 +31,6 @@ export const HOMEROOM_ROUTES = {
   STUDENTS: '/homeroom/students',
   ATTENDANCE: '/homeroom/attendance',
   FACES: '/homeroom/faces',
-  CONTINUOUS: '/homeroom/continuous',
-  GRADES: '/homeroom/grades',
 };
 
 // ==================== SUBJECT TEACHER ROUTES ====================
