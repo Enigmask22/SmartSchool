@@ -2071,9 +2071,9 @@ const AdminManagement = () => {
           <Card>
             {/* Enhanced Header */}
             <CardHeader className="bg-muted/50">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-2">
                 <div>
-                  <CardTitle className="text-2xl font-bold">
+                  <CardTitle className="text-2xl font-bold mb-1">
                     {currentConfig?.title || "Quản lý"}
                   </CardTitle>
                   <CardDescription>
