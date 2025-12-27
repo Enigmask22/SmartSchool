@@ -104,6 +104,10 @@ const GradeManagement = () => {
   const [importedData, setImportedData] = useState([]);
   const [importErrors, setImportErrors] = useState([]);
 
+  // State for editing cells in import preview
+  const [editingImportCell, setEditingImportCell] = useState(null); // {rowIndex, columnKey}
+  const [editingImportValue, setEditingImportValue] = useState("");
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20); // 20 students per page
@@ -893,6 +897,86 @@ const GradeManagement = () => {
     reader.readAsArrayBuffer(file);
     // Reset input để có thể upload lại cùng file
     event.target.value = "";
+  };
+
+  // Handler để bắt đầu edit một cell trong import preview
+  const handleStartEditImportCell = (rowIndex, columnKey, currentValue) => {
+    setEditingImportCell({ rowIndex, columnKey });
+    setEditingImportValue(
+      currentValue !== null && currentValue !== undefined
+        ? String(currentValue)
+        : ""
+    );
+  };
+
+  // Handler để lưu giá trị đã edit trong import preview
+  const handleSaveImportCell = () => {
+    if (!editingImportCell) return;
+
+    const { rowIndex, columnKey } = editingImportCell;
+
+    // Parse giá trị - xử lý cả điểm số và điểm chữ (Đ, KĐ)
+    let newValue = editingImportValue.trim();
+
+    if (newValue === "" || newValue === "-") {
+      newValue = null;
+    } else if (
+      newValue.toUpperCase() === "Đ" ||
+      newValue.toUpperCase() === "D"
+    ) {
+      newValue = "Đ";
+    } else if (
+      newValue.toUpperCase() === "KĐ" ||
+      newValue.toUpperCase() === "KD"
+    ) {
+      newValue = "KĐ";
+    } else {
+      // Thử parse thành số
+      const numValue = parseFloat(newValue.replace(",", "."));
+      if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
+        // Làm tròn đến 0.25
+        newValue = Math.round(numValue * 4) / 4;
+      } else if (!isNaN(numValue)) {
+        // Số không hợp lệ (ngoài 0-10)
+        alert("Điểm phải nằm trong khoảng 0-10!");
+        return;
+      }
+      // Nếu không parse được, giữ nguyên giá trị text
+    }
+
+    // Cập nhật importedData
+    setImportedData((prevData) => {
+      const newData = [...prevData];
+      newData[rowIndex] = {
+        ...newData[rowIndex],
+        [columnKey]: newValue,
+      };
+      return newData;
+    });
+
+    // Reset editing state
+    setEditingImportCell(null);
+    setEditingImportValue("");
+  };
+
+  // Handler để hủy edit
+  const handleCancelEditImportCell = () => {
+    setEditingImportCell(null);
+    setEditingImportValue("");
+  };
+
+  // Handler cho phím Enter và Escape khi đang edit
+  const handleImportCellKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSaveImportCell();
+    } else if (e.key === "Escape") {
+      handleCancelEditImportCell();
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      handleSaveImportCell();
+      // Có thể thêm logic để move sang cell tiếp theo nếu cần
+    }
   };
 
   const handleConfirmImport = async () => {
@@ -2284,16 +2368,30 @@ const GradeManagement = () => {
         </Dialog>
 
         {/* Import Preview Modal */}
-        <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <Dialog
+          open={showImportModal}
+          onOpenChange={(open) => {
+            setShowImportModal(open);
+            if (!open) {
+              setEditingImportCell(null);
+              setEditingImportValue("");
+            }
+          }}
+        >
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="flex items-center space-x-2">
                 <Clipboard className="w-4 h-4" />
                 <span>Xem trước dữ liệu import</span>
               </DialogTitle>
-              <DialogDescription>
-                Kiểm tra kỹ thông tin trước khi cập nhật điểm •{" "}
-                {importedData.length} học sinh
+              <DialogDescription className="flex items-center gap-2">
+                <span>
+                  Kiểm tra kỹ thông tin trước khi cập nhật điểm •{" "}
+                  {importedData.length} học sinh
+                </span>
+                <span className="text-xs font-medium text-blue-600">
+                  💡 Click vào ô điểm để sửa trực tiếp
+                </span>
               </DialogDescription>
             </DialogHeader>
 
@@ -2346,17 +2444,52 @@ const GradeManagement = () => {
                           flattenScoreColumns(
                             scoreConfig.score_column_config
                           ).map((column) => (
-                            <TableCell key={column.key} className="text-center">
-                              {row[column.key] !== null &&
-                              row[column.key] !== undefined ? (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-green-700 bg-green-100"
-                                >
-                                  {row[column.key]}
-                                </Badge>
+                            <TableCell
+                              key={column.key}
+                              className="p-1 text-center"
+                            >
+                              {editingImportCell?.rowIndex === index &&
+                              editingImportCell?.columnKey === column.key ? (
+                                // Edit mode - hiển thị input
+                                <Input
+                                  type="text"
+                                  value={editingImportValue}
+                                  onChange={(e) =>
+                                    setEditingImportValue(e.target.value)
+                                  }
+                                  onKeyDown={handleImportCellKeyDown}
+                                  onBlur={handleSaveImportCell}
+                                  autoFocus
+                                  className="w-16 h-8 p-1 text-sm text-center"
+                                  placeholder="0-10"
+                                />
                               ) : (
-                                <span className="text-muted-foreground">-</span>
+                                // View mode - click để edit
+                                <div
+                                  onClick={() =>
+                                    handleStartEditImportCell(
+                                      index,
+                                      column.key,
+                                      row[column.key]
+                                    )
+                                  }
+                                  className="cursor-pointer hover:bg-muted/50 rounded px-2 py-1 min-w-[40px] transition-colors"
+                                  title="Click để sửa điểm"
+                                >
+                                  {row[column.key] !== null &&
+                                  row[column.key] !== undefined ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-green-700 bg-green-100 hover:bg-green-200"
+                                    >
+                                      {row[column.key]}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground hover:text-primary">
+                                      -
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </TableCell>
                           ))}
@@ -2397,6 +2530,8 @@ const GradeManagement = () => {
                     setShowImportModal(false);
                     setImportedData([]);
                     setImportErrors([]);
+                    setEditingImportCell(null);
+                    setEditingImportValue("");
                   }}
                 >
                   Hủy
@@ -2407,7 +2542,7 @@ const GradeManagement = () => {
                     importedData.length === 0 || importErrors.length > 0
                   }
                 >
-                  ✅ Cập nhật điểm
+                  Cập nhật điểm
                 </Button>
               </div>
             </DialogFooter>
