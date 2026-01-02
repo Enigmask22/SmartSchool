@@ -130,7 +130,7 @@ const Sidebar = ({
           label: "Quản lý hệ thống",
           icon: "admin-management",
         },
-        { id: "ui-demo", label: "UI Demo", icon: "dashboard" },
+        // { id: "ui-demo", label: "UI Demo", icon: "dashboard" },
       ];
     } else if (selectedDashboardType === "homeroom") {
       // Dashboard chủ nhiệm - chỉ hiển thị menu chủ nhiệm (không có quản lý điểm)
@@ -220,7 +220,7 @@ const Sidebar = ({
       `}
       >
         {/* Header */}
-        <div className="flex justify-between items-center p-4 text-white bg-blue-600">
+        <div className="flex items-center justify-between p-4 text-white bg-blue-600">
           {isOpen && (
             <div className="flex items-center space-x-2">
               <School className="w-6 h-6" />
@@ -269,7 +269,7 @@ const Sidebar = ({
               </div>
             ) : (
               <div className="flex justify-center">
-                <div className="flex justify-center items-center w-8 h-8 text-sm font-bold text-white bg-blue-600 rounded-full">
+                <div className="flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-blue-600 rounded-full">
                   {user.full_name.charAt(0).toUpperCase()}
                 </div>
               </div>
@@ -278,7 +278,7 @@ const Sidebar = ({
         )}
 
         {/* Navigation */}
-        <nav className="overflow-y-auto flex-1 px-2 py-4 space-y-1">
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {menuItems.map((item) => (
             <Button
               key={item.id}
@@ -353,7 +353,7 @@ const Sidebar = ({
         <Button
           size="icon"
           onClick={() => setIsOpen(true)}
-          className="fixed top-4 left-4 z-30 text-white bg-blue-600 shadow-lg hover:bg-blue-700 lg:hidden"
+          className="fixed z-30 text-white bg-blue-600 shadow-lg top-4 left-4 hover:bg-blue-700 lg:hidden"
         >
           <Menu className="w-5 h-5" />
         </Button>
