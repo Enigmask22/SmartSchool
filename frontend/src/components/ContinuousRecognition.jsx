@@ -891,10 +891,9 @@ const ContinuousRecognition = () => {
               <Info className="w-4 h-4 text-primary mt-0.5" />
               <div className="text-sm text-primary">
                 <strong>Về độ tin cậy:</strong> InsightFace AI sử dụng thuật
-                toán ArcFace với độ tin cậy 20-50% là bình thường và rất chính
-                xác. Hệ thống hiển thị cả <strong>độ tin cậy gốc</strong>{" "}
-                (20-50%) và <strong>độ chính xác quy đổi</strong> (40-100%) để
-                dễ hiểu hơn.
+                toán ArcFace (cosine similarity). Độ tin cậy từ{" "}
+                <strong>20%</strong> trở lên là đủ để nhận diện chính xác, và từ{" "}
+                <strong>45%+</strong> là xuất sắc.
               </div>
             </div>
           </CardContent>
@@ -948,23 +947,23 @@ const ContinuousRecognition = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 rounded bg-emerald-600"></div>
-                  <span>≥45% (90%+): Xuất sắc</span>
+                  <span>≥45%: Xuất sắc</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-green-600 rounded"></div>
-                  <span>35-44% (70-88%): Rất cao</span>
+                  <span>35-44%: Rất cao</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-blue-600 rounded"></div>
-                  <span>25-34% (50-68%): Cao</span>
+                  <span>25-34%: Cao</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-yellow-600 rounded"></div>
-                  <span>20-24% (40-48%): Tốt</span>
+                  <span>20-24%: Tốt</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-orange-600 rounded"></div>
-                  <span>&lt;20% (&lt;40%): Chấp nhận được</span>
+                  <span>&lt;20%: Chấp nhận được</span>
                 </div>
               </div>
             </CardContent>
@@ -1696,10 +1695,7 @@ const ContinuousRecognition = () => {
                                 {recognition.student.full_name}
                               </div>
                               <div className="text-sm opacity-90">
-                                Độ tin cậy:{" "}
-                                {(recognition.confidence / 100).toFixed(3)} | Độ
-                                chính xác:{" "}
-                                {Math.round(recognition.confidence * 2)}%
+                                Độ tin cậy: {recognition.confidence.toFixed(1)}%
                               </div>
                               <div className="text-xs opacity-75">
                                 {confidenceLabel} - InsightFace AI
@@ -1785,8 +1781,7 @@ const ContinuousRecognition = () => {
                               {recognition.student.student_code}
                             </div>
                             <div className="text-sm text-green-600">
-                              {(recognition.confidence / 100).toFixed(3)} (
-                              {Math.round(recognition.confidence * 2)}%) -{" "}
+                              {recognition.confidence.toFixed(1)}% -{" "}
                               {recognition.timestamp}
                             </div>
                           </div>
