@@ -331,9 +331,14 @@ const GradeManagement = () => {
       const flatColumns = flattenScoreColumns(scoreConfig.score_column_config);
 
       flatColumns.forEach((column) => {
+        const existingDiem = existingScore?.score_data?.[column.key]?.Diem;
         form[column.key] = {
           He_so: column.he_so,
-          Diem: existingScore?.score_data?.[column.key]?.Diem || "",
+          // Dùng ?? thay vì || để giữ giá trị 0 (vì 0 là falsy nhưng hợp lệ)
+          Diem:
+            existingDiem !== undefined && existingDiem !== null
+              ? existingDiem
+              : "",
         };
       });
     }
@@ -2051,8 +2056,13 @@ const GradeManagement = () => {
                                     key={child.key}
                                     className="px-3 py-3 text-center"
                                   >
+                                    {/* Check !== undefined để hiển thị đúng giá trị 0 */}
                                     {studentData.score?.score_data?.[child.key]
-                                      ?.Diem ? (
+                                      ?.Diem !== undefined &&
+                                    studentData.score?.score_data?.[child.key]
+                                      ?.Diem !== null &&
+                                    studentData.score?.score_data?.[child.key]
+                                      ?.Diem !== "" ? (
                                       <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
                                         {
                                           studentData.score.score_data[
@@ -2074,8 +2084,13 @@ const GradeManagement = () => {
                                     key={column.key}
                                     className="px-5 py-3 text-center"
                                   >
+                                    {/* Check !== undefined để hiển thị đúng giá trị 0 */}
                                     {studentData.score?.score_data?.[column.key]
-                                      ?.Diem ? (
+                                      ?.Diem !== undefined &&
+                                    studentData.score?.score_data?.[column.key]
+                                      ?.Diem !== null &&
+                                    studentData.score?.score_data?.[column.key]
+                                      ?.Diem !== "" ? (
                                       <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
                                         {
                                           studentData.score.score_data[
@@ -2298,7 +2313,7 @@ const GradeManagement = () => {
                                   <Input
                                     type="text"
                                     placeholder="-"
-                                    value={scoreForm[child.key]?.Diem || ""}
+                                    value={scoreForm[child.key]?.Diem ?? ""}
                                     onChange={(e) =>
                                       handleScoreInputChange(
                                         child.key,
@@ -2335,7 +2350,7 @@ const GradeManagement = () => {
                               <Input
                                 type="text"
                                 placeholder="0.0, Đ, hoặc KĐ"
-                                value={scoreForm[column.key]?.Diem || ""}
+                                value={scoreForm[column.key]?.Diem ?? ""}
                                 onChange={(e) =>
                                   handleScoreInputChange(
                                     column.key,

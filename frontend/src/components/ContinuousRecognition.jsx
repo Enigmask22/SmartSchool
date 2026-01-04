@@ -53,7 +53,7 @@ const ContinuousRecognition = () => {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [recognizedStudents, setRecognizedStudents] = useState([]);
   const [recentRecognitions, setRecentRecognitions] = useState([]);
-  const [cooldownPeriod, setCooldownPeriod] = useState(60);
+  const [cooldownPeriod, setCooldownPeriod] = useState(5);
   const [totalRecognitionsToday, setTotalRecognitionsToday] = useState(0);
   const [activeCooldowns, setActiveCooldowns] = useState({});
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
@@ -69,7 +69,7 @@ const ContinuousRecognition = () => {
   const [cameraPreviews, setCameraPreviews] = useState({}); // { cameraId: base64Image }
   const [streamErrors, setStreamErrors] = useState({}); // { cameraId: true/false } - track stream errors để fallback
   const [settings, setSettings] = useState({
-    cooldownPeriod: 60,
+    cooldownPeriod: 5,
   });
   const [startTime, setStartTime] = useState(null);
   const [message, setMessage] = useState("");
@@ -845,7 +845,7 @@ const ContinuousRecognition = () => {
 
                 {/* Camera Info for Managed Camera */}
                 {cameraSource === "managed" && selectedCameraId && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 px-3 py-2 border border-blue-200 rounded-lg bg-blue-50">
                     <Video className="w-4 h-4 text-blue-600" />
                     <span className="text-sm font-medium text-blue-900">
                       {availableCameras.find(
@@ -890,10 +890,10 @@ const ContinuousRecognition = () => {
             <div className="flex items-start p-3 space-x-2 border rounded-lg bg-primary/5 border-primary/20">
               <Info className="w-4 h-4 text-primary mt-0.5" />
               <div className="text-sm text-primary">
-                <strong>Về độ tin cậy:</strong> InsightFace AI sử dụng thuật
-                toán ArcFace (cosine similarity). Độ tin cậy từ{" "}
-                <strong>20%</strong> trở lên là đủ để nhận diện chính xác, và từ{" "}
-                <strong>45%+</strong> là xuất sắc.
+                <strong>Về mức độ khớp:</strong> InsightFace AI so sánh khuôn
+                mặt với dữ liệu đã lưu. Điểm khớp từ <strong>★★☆☆☆</strong> (20
+                điểm) trở lên là đủ để nhận diện chính xác. Điểm càng cao thì độ
+                chính xác càng tốt.
               </div>
             </div>
           </CardContent>
@@ -940,30 +940,30 @@ const ContinuousRecognition = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Info className="w-5 h-5 text-green-600" />
-                <span>Hướng Dẫn Độ Tin Cậy</span>
+                <span>Hướng Dẫn Mức Độ Khớp</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 rounded bg-emerald-600"></div>
-                  <span>≥45%: Xuất sắc</span>
+                  <span>★★★★★ Xuất sắc (≥45 điểm)</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-green-600 rounded"></div>
-                  <span>35-44%: Rất cao</span>
+                  <span>★★★★☆ Rất tốt (35-44 điểm)</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-blue-600 rounded"></div>
-                  <span>25-34%: Cao</span>
+                  <span>★★★☆☆ Tốt (25-34 điểm)</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-yellow-600 rounded"></div>
-                  <span>20-24%: Tốt</span>
+                  <span>★★☆☆☆ Khá (20-24 điểm)</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 mr-2 bg-orange-600 rounded"></div>
-                  <span>&lt;20%: Chấp nhận được</span>
+                  <span>★☆☆☆☆ Đạt (&lt;20 điểm)</span>
                 </div>
               </div>
             </CardContent>
@@ -991,12 +991,12 @@ const ContinuousRecognition = () => {
                     {isConnected ? "Đã kết nối" : "Mất kết nối"}
                   </Badge>
                 </div>
-                <div className="flex justify-between">
+                {/* <div className="flex justify-between">
                   <span className="text-muted-foreground">Camera:</span>
                   <Badge variant={isCameraOn ? "default" : "destructive"}>
                     {isCameraOn ? "Hoạt động" : "Tắt"}
                   </Badge>
-                </div>
+                </div> */}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cooldown:</span>
                   <span className="font-semibold text-primary">
@@ -1100,7 +1100,7 @@ const ContinuousRecognition = () => {
                             >
                               Đa luồng
                               {availableCameras.length < 2 && (
-                                <span className="text-xs text-gray-500 ml-1">
+                                <span className="ml-1 text-xs text-gray-500">
                                   (cần ≥2 camera)
                                 </span>
                               )}
@@ -1115,7 +1115,7 @@ const ContinuousRecognition = () => {
               <CardContent>
                 {/* Multi-camera mode info banner */}
                 {cameraSource === "managed" && useMultiCamera && (
-                  <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                  <div className="p-3 mb-4 border border-blue-200 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
                     <div className="flex items-center gap-2 mb-2">
                       <Video className="w-5 h-5 text-blue-600" />
                       <Label className="text-sm font-semibold text-blue-900">
@@ -1178,7 +1178,7 @@ const ContinuousRecognition = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-orange-600 mt-2">
+                      <p className="mt-2 text-sm text-orange-600">
                         ⚠️ Cần ít nhất 2 camera để sử dụng chế độ đa luồng. Hiện
                         có {availableCameras.length} camera.
                       </p>
@@ -1186,13 +1186,13 @@ const ContinuousRecognition = () => {
 
                     {selectedMultiCameras.length === 0 &&
                       availableCameras.length > 1 && (
-                        <p className="text-xs text-red-600 mt-2 font-medium">
+                        <p className="mt-2 text-xs font-medium text-red-600">
                           ⚠️ Vui lòng chọn ít nhất 1 camera để bắt đầu nhận diện
                         </p>
                       )}
 
                     {selectedMultiCameras.length > 0 && (
-                      <p className="text-xs text-green-600 mt-2 font-medium">
+                      <p className="mt-2 text-xs font-medium text-green-600">
                         ✓ Đã chọn {selectedMultiCameras.length} camera(s) - Sẵn
                         sàng nhận diện đa luồng
                       </p>
@@ -1218,7 +1218,7 @@ const ContinuousRecognition = () => {
                   {cameraSource === "managed" &&
                     (useMultiCamera && selectedMultiCameras.length > 0 ? (
                       // Multi-camera grid view
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {selectedMultiCameras.map((cameraId) => {
                           const camera = availableCameras.find(
                             (c) => c.camera_id === cameraId
@@ -1293,7 +1293,7 @@ const ContinuousRecognition = () => {
 
                                 {/* Status badge - di chuyển lên header để không che camera */}
                                 {isRunning && (
-                                  <div className="flex items-center gap-2 px-2 py-1 bg-green-100 rounded text-xs">
+                                  <div className="flex items-center gap-2 px-2 py-1 text-xs bg-green-100 rounded">
                                     <AlertCircle className="w-3 h-3 text-green-600 animate-pulse" />
                                     <span className="font-medium text-green-700">
                                       ĐANG NHẬN DIỆN
@@ -1302,12 +1302,12 @@ const ContinuousRecognition = () => {
                                 )}
                               </CardHeader>
                               <CardContent className="space-y-2">
-                                {/* Video Stream với fallback preview - ưu tiên proxy backend */}
-                                <div className="relative w-full bg-black rounded-lg aspect-video flex items-center justify-center overflow-hidden">
-                                  {/* Ưu tiên: proxy backend stream, fallback: direct stream, fallback: preview image */}
+                                {/* MJPEG Stream với img tag - tối ưu cho MJPEG native */}
+                                <div className="relative flex items-center justify-center w-full overflow-hidden bg-black rounded-lg aspect-video">
+                                  {/* Ưu tiên: MJPEG stream với img tag (native decode), fallback: preview image */}
                                   {!streamErrors[cameraId] &&
                                   (streamUrl || directStreamUrl) ? (
-                                    <video
+                                    <img
                                       key={`stream-${cameraId}-${
                                         streamErrors[cameraId] === "direct"
                                           ? "direct"
@@ -1318,10 +1318,8 @@ const ContinuousRecognition = () => {
                                           ? directStreamUrl
                                           : streamUrl || directStreamUrl
                                       }
-                                      autoPlay
-                                      muted
-                                      playsInline
-                                      className="w-full h-full object-contain"
+                                      alt={`${camera?.name} stream`}
+                                      className="object-contain w-full h-full"
                                       onError={(e) => {
                                         logger.warn(
                                           `Stream error for camera ${cameraId}, trying fallback:`,
@@ -1342,7 +1340,7 @@ const ContinuousRecognition = () => {
                                           }));
                                         }
                                       }}
-                                      onLoadedData={() => {
+                                      onLoad={() => {
                                         setStreamErrors((prev) => {
                                           const newErrors = { ...prev };
                                           delete newErrors[cameraId];
@@ -1359,7 +1357,7 @@ const ContinuousRecognition = () => {
                                       key={`preview-${cameraId}`}
                                       src={preview}
                                       alt={`${camera?.name} preview`}
-                                      className="w-full h-full object-contain"
+                                      className="object-contain w-full h-full"
                                       onError={() => {
                                         // Refresh preview nếu image lỗi
                                         captureFromManagedCamera(
@@ -1371,7 +1369,7 @@ const ContinuousRecognition = () => {
                                   ) : (
                                     // Loading state
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="text-white text-center">
+                                      <div className="text-center text-white">
                                         <Video className="w-12 h-12 mx-auto mb-2 text-gray-400 animate-pulse" />
                                         <p className="text-xs">
                                           Đang kết nối camera...
@@ -1382,7 +1380,7 @@ const ContinuousRecognition = () => {
 
                                   {/* Retry button nếu stream lỗi */}
                                   {streamErrors[cameraId] && (
-                                    <div className="absolute bottom-2 right-2 z-10">
+                                    <div className="absolute z-10 bottom-2 right-2">
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -1401,7 +1399,7 @@ const ContinuousRecognition = () => {
                                             videoEl.load();
                                           }
                                         }}
-                                        className="text-xs bg-blue-600 text-white hover:bg-blue-700 border-none"
+                                        className="text-xs text-white bg-blue-600 border-none hover:bg-blue-700"
                                       >
                                         Thử lại
                                       </Button>
@@ -1431,14 +1429,14 @@ const ContinuousRecognition = () => {
 
                                 {/* Recent recognition cho camera này */}
                                 {recs.length > 0 && (
-                                  <div className="text-xs border-t pt-2">
-                                    <p className="font-medium mb-1">
+                                  <div className="pt-2 text-xs border-t">
+                                    <p className="mb-1 font-medium">
                                       Nhận diện gần đây:
                                     </p>
                                     {recs.slice(0, 2).map((rec) => (
                                       <div
                                         key={rec.id}
-                                        className="flex justify-between items-center mb-1"
+                                        className="flex items-center justify-between mb-1"
                                       >
                                         <span className="text-muted-foreground">
                                           {rec.student?.full_name || "Unknown"}
@@ -1494,11 +1492,11 @@ const ContinuousRecognition = () => {
                           getDirectStreamUrl(selectedCamera);
 
                         return (
-                          <div className="w-full bg-black rounded-lg min-h-96 flex items-center justify-center relative overflow-hidden">
-                            {/* Video stream với fallback - ưu tiên proxy backend */}
+                          <div className="relative flex items-center justify-center w-full overflow-hidden bg-black rounded-lg min-h-96">
+                            {/* MJPEG stream với img tag - tối ưu cho native decode */}
                             {!streamErrors[selectedCameraId] &&
                             (streamUrl || directStreamUrl) ? (
-                              <video
+                              <img
                                 key={`stream-${selectedCameraId}-${
                                   streamErrors[selectedCameraId] === "direct"
                                     ? "direct"
@@ -1509,10 +1507,8 @@ const ContinuousRecognition = () => {
                                     ? directStreamUrl
                                     : streamUrl || directStreamUrl
                                 }
-                                autoPlay
-                                muted
-                                playsInline
-                                className="w-full h-full object-contain"
+                                alt="Camera stream"
+                                className="object-contain w-full h-full"
                                 style={{ maxHeight: "100%" }}
                                 onError={(e) => {
                                   logger.warn(
@@ -1534,7 +1530,7 @@ const ContinuousRecognition = () => {
                                     }));
                                   }
                                 }}
-                                onLoadedData={() => {
+                                onLoad={() => {
                                   setStreamErrors((prev) => {
                                     const newErrors = { ...prev };
                                     delete newErrors[selectedCameraId];
@@ -1550,7 +1546,7 @@ const ContinuousRecognition = () => {
                                 key={`preview-${selectedCameraId}`}
                                 src={cameraPreviews[selectedCameraId]}
                                 alt="Camera preview"
-                                className="max-w-full max-h-96 object-contain"
+                                className="object-contain max-w-full max-h-96"
                                 onError={() => {
                                   captureFromManagedCamera(
                                     selectedCameraId,
@@ -1559,7 +1555,7 @@ const ContinuousRecognition = () => {
                                 }}
                               />
                             ) : (
-                              <div className="text-white text-center">
+                              <div className="text-center text-white">
                                 <Video className="w-16 h-16 mx-auto mb-2 text-gray-400 animate-pulse" />
                                 <p className="text-sm">
                                   Đang kết nối camera...
@@ -1577,7 +1573,7 @@ const ContinuousRecognition = () => {
 
                             {/* Retry button nếu stream lỗi */}
                             {streamErrors[selectedCameraId] && (
-                              <div className="absolute bottom-3 right-3 z-10">
+                              <div className="absolute z-10 bottom-3 right-3">
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1594,7 +1590,7 @@ const ContinuousRecognition = () => {
                                       videoEl.load();
                                     }
                                   }}
-                                  className="text-xs bg-blue-600 text-white hover:bg-blue-700"
+                                  className="text-xs text-white bg-blue-600 hover:bg-blue-700"
                                 >
                                   Thử lại stream
                                 </Button>
@@ -1666,23 +1662,29 @@ const ContinuousRecognition = () => {
                         // Color coding based on confidence level
                         const confidence = recognition.confidence;
                         let bgColor = "bg-green-600";
-                        let confidenceLabel = "Tốt";
+                        let confidenceLabel = "★★★☆☆ Tốt";
+                        let stars = "★★★☆☆";
 
                         if (confidence >= 45) {
                           bgColor = "bg-emerald-600";
-                          confidenceLabel = "Xuất sắc";
+                          confidenceLabel = "★★★★★ Xuất sắc";
+                          stars = "★★★★★";
                         } else if (confidence >= 35) {
                           bgColor = "bg-green-600";
-                          confidenceLabel = "Rất cao";
+                          confidenceLabel = "★★★★☆ Rất tốt";
+                          stars = "★★★★☆";
                         } else if (confidence >= 25) {
                           bgColor = "bg-blue-600";
-                          confidenceLabel = "Cao";
+                          confidenceLabel = "★★★☆☆ Tốt";
+                          stars = "★★★☆☆";
                         } else if (confidence >= 20) {
                           bgColor = "bg-yellow-600";
-                          confidenceLabel = "Tốt";
+                          confidenceLabel = "★★☆☆☆ Khá";
+                          stars = "★★☆☆☆";
                         } else {
                           bgColor = "bg-orange-600";
-                          confidenceLabel = "Chấp nhận được";
+                          confidenceLabel = "★☆☆☆☆ Đạt";
+                          stars = "★☆☆☆☆";
                         }
 
                         return (
@@ -1695,7 +1697,7 @@ const ContinuousRecognition = () => {
                                 {recognition.student.full_name}
                               </div>
                               <div className="text-sm opacity-90">
-                                Độ tin cậy: {recognition.confidence.toFixed(1)}%
+                                Điểm khớp: {recognition.confidence.toFixed(1)}
                               </div>
                               <div className="text-xs opacity-75">
                                 {confidenceLabel} - InsightFace AI
@@ -1767,40 +1769,51 @@ const ContinuousRecognition = () => {
                       Chưa có nhận diện nào
                     </p>
                   ) : (
-                    recentRecognitions.map((recognition) => (
-                      <div
-                        key={recognition.id}
-                        className="p-3 border rounded-lg"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="font-semibold text-foreground">
-                              {recognition.student.full_name}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {recognition.student.student_code}
-                            </div>
-                            <div className="text-sm text-green-600">
-                              {recognition.confidence.toFixed(1)}% -{" "}
-                              {recognition.timestamp}
-                            </div>
-                          </div>
+                    recentRecognitions.map((recognition) => {
+                      // Tính số sao dựa trên điểm khớp
+                      const conf = recognition.confidence;
+                      let stars = "★★★☆☆";
+                      if (conf >= 45) stars = "★★★★★";
+                      else if (conf >= 35) stars = "★★★★☆";
+                      else if (conf >= 25) stars = "★★★☆☆";
+                      else if (conf >= 20) stars = "★★☆☆☆";
+                      else stars = "★☆☆☆☆";
 
-                          <Badge
-                            variant={
-                              recognition.attendance.type === "created"
-                                ? "success"
-                                : "default"
-                            }
-                            className="text-xs"
-                          >
-                            {recognition.attendance.type === "created"
-                              ? "Mới"
-                              : "Cập nhật"}
-                          </Badge>
+                      return (
+                        <div
+                          key={recognition.id}
+                          className="p-3 border rounded-lg"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="font-semibold text-foreground">
+                                {recognition.student.full_name}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {recognition.student.student_code}
+                              </div>
+                              <div className="text-sm text-green-600">
+                                {stars} {recognition.confidence.toFixed(1)} điểm
+                                - {recognition.timestamp}
+                              </div>
+                            </div>
+
+                            <Badge
+                              variant={
+                                recognition.attendance.type === "created"
+                                  ? "success"
+                                  : "default"
+                              }
+                              className="text-xs"
+                            >
+                              {recognition.attendance.type === "created"
+                                ? "Mới"
+                                : "Cập nhật"}
+                            </Badge>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </CardContent>
@@ -1822,11 +1835,11 @@ const ContinuousRecognition = () => {
                     </label>
                     <Input
                       type="number"
-                      min="5"
+                      min="1"
                       max="300"
                       value={cooldownPeriod}
                       onChange={(e) =>
-                        setCooldownPeriod(parseInt(e.target.value))
+                        setCooldownPeriod(parseInt(e.target.value) || 1)
                       }
                     />
                     <p className="mt-1 text-xs text-muted-foreground">

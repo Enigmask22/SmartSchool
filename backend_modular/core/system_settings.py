@@ -75,12 +75,37 @@ def get_current_semester(use_cache: bool = True) -> str:
 
 def get_attendance_cutoff_time(use_cache: bool = True) -> str:
     """
-    Lấy giờ cutoff điểm danh từ system settings
+    Lấy giờ cutoff điểm danh vào (check-in) từ system settings
     
     Returns:
-        Giờ cutoff (VD: "07:15:00")
+        Giờ cutoff check-in (VD: "06:45")
     """
-    return get_setting_value("attendance_cutoff_time", default="07:15:00", use_cache=use_cache)
+    return get_setting_value("attendance_cutoff_time", default="06:45", use_cache=use_cache)
+
+
+def get_checkout_cutoff_time(use_cache: bool = True) -> str:
+    """
+    Lấy giờ cutoff điểm danh ra (check-out) từ system settings
+    Học sinh phải điểm danh ra sau giờ này để được tính là có mặt đầy đủ
+    
+    Returns:
+        Giờ cutoff check-out (VD: "11:05")
+    """
+    return get_setting_value("checkout_cutoff_time", default="11:05", use_cache=use_cache)
+
+
+def get_recognition_cooldown_seconds(use_cache: bool = True) -> int:
+    """
+    Lấy thời gian chờ giữa các lần nhận diện cho cùng 1 học sinh (giây)
+    
+    Returns:
+        Số giây cooldown (mặc định 5 giây)
+    """
+    value = get_setting_value("recognition_cooldown_seconds", default="5", use_cache=use_cache)
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return 5
 
 
 def clear_settings_cache():

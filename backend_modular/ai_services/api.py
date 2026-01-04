@@ -19,14 +19,16 @@ from ai_services.models import (
 from ai_services.services import ai_service, ACTIVE_SERVICE
 from core.database import get_db
 from core.logger import setup_logger
+from core.system_settings import get_recognition_cooldown_seconds, get_setting_value, clear_settings_cache
 
 logger = setup_logger("ai_api")
 router = APIRouter()
 
 # Thread pool cho AI recognition (GIL-free: InsightFace + FAISS chạy C++/CUDA)
-# 10 workers = hỗ trợ 10 cameras xử lý song song
+# 20 workers = hỗ trợ 10 cameras @ 30 FPS mỗi cái (tổng 300 frames/s)
+# Capacity: 20 workers × 20 frames/s = 400 frames/s (có buffer 33%)
 AI_RECOGNITION_POOL = ThreadPoolExecutor(
-    max_workers=10,
+    max_workers=40,
     thread_name_prefix="ai_recognition_worker"
 )
 
@@ -34,7 +36,7 @@ AI_RECOGNITION_POOL = ThreadPoolExecutor(
 continuous_recognition_state = {
     "is_running": False,
     "last_recognition": {},
-    "cooldown_period": 30,
+    "cooldown_period": 5,  # Giá trị mặc định, sẽ được cập nhật từ database
     "active_connections": set(),
     "camera_connections": {},  # {camera_id: {"websocket": ws, "last_frame_time": timestamp}}
     "service_name": "Not Available",
@@ -46,10 +48,14 @@ continuous_recognition_state = {
 }
 
 def update_continuous_state():
-    """Cập nhật continuous_recognition_state với thông tin từ AI service"""
+    """Cập nhật continuous_recognition_state với thông tin từ AI service và database"""
     try:
         continuous_recognition_state["service_name"] = ai_service.service_name
         continuous_recognition_state["accuracy"] = ai_service.accuracy
+        # Lấy cooldown từ database
+        db_cooldown = get_recognition_cooldown_seconds(use_cache=False)
+        continuous_recognition_state["cooldown_period"] = db_cooldown
+        logger.info(f"Loaded cooldown_period from database: {db_cooldown}s")
     except Exception as e:
         logger.error(f"Error updating continuous state: {e}")
 
@@ -104,14 +110,31 @@ async def get_recognition_status():
 
 @router.put("/recognition/settings")
 async def update_recognition_settings(settings: dict):
-    """Cập nhật settings cho continuous recognition"""
+    """Cập nhật settings cho continuous recognition và lưu vào database"""
     try:
-        cooldown_period = settings.get("cooldown_period", 30)
+        cooldown_period = settings.get("cooldown_period", 5)
         
-        if cooldown_period < 5 or cooldown_period > 300:
-            raise HTTPException(status_code=400, detail="Cooldown period must be between 5-300 seconds")
+        if cooldown_period < 1 or cooldown_period > 300:
+            raise HTTPException(status_code=400, detail="Cooldown period must be between 1-300 seconds")
         
+        # Cập nhật state trong memory
         continuous_recognition_state["cooldown_period"] = cooldown_period
+        
+        # Lưu vào database system_settings
+        try:
+            db = get_db()
+            # Upsert vào system_settings
+            db.table("system_settings").upsert({
+                "setting_key": "recognition_cooldown_seconds",
+                "setting_value": str(cooldown_period),
+                "description": "Thời gian chờ giữa các lần nhận diện cho cùng 1 học sinh (giây)"
+            }, on_conflict="setting_key").execute()
+            
+            # Clear cache để lần sau đọc giá trị mới
+            clear_settings_cache()
+            logger.info(f"Saved cooldown period {cooldown_period}s to database")
+        except Exception as db_error:
+            logger.warning(f"Could not save to database: {db_error}")
         
         logger.info(f"Updated cooldown period to {cooldown_period} seconds")
         
@@ -213,8 +236,8 @@ async def continuous_recognition_stream(websocket: WebSocket):
                     if camera_id in continuous_recognition_state["camera_connections"]:
                         last_frame_time = continuous_recognition_state["camera_connections"][camera_id].get("last_frame_time", 0)
                         time_since_last = current_time - last_frame_time
-                        # Min 100ms giữa các frame (max 10 FPS per camera)
-                        if time_since_last < 0.1:
+                        # Min 33ms giữa các frame (max 30 FPS per camera)
+                        if time_since_last < 0.033:
                             # Skip frame nếu quá nhanh
                             await websocket.send_text(json.dumps({
                                 "type": "rate_limit",
