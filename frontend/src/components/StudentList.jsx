@@ -3979,7 +3979,13 @@ const StudentList = () => {
                                       .filter(
                                         (key) =>
                                           key !== "Mon_hoc" &&
-                                          scoreRecord.score_data[key]?.Diem
+                                          // Check !== undefined để giữ lại giá trị 0
+                                          scoreRecord.score_data[key]?.Diem !==
+                                            undefined &&
+                                          scoreRecord.score_data[key]?.Diem !==
+                                            null &&
+                                          scoreRecord.score_data[key]?.Diem !==
+                                            ""
                                       )
                                       .sort((a, b) => {
                                         const wa = Number(

@@ -1,40 +1,46 @@
-import React, { useState, useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
-import ForgotPassword from './ForgotPassword';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { School, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useContext } from "react";
+import { AuthContext } from "../contexts/AuthContext";
+import ForgotPassword from "./ForgotPassword";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { School, AlertCircle, Loader2 } from "lucide-react";
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    username: '',
-    password: ''
+    username: "",
+    password: "",
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  
+
   const { login } = useContext(AuthContext);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
-    setError(''); // Clear error when user types
+    setError(""); // Clear error when user types
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       await login(formData.username, formData.password);
     } catch (err) {
-      setError(err.message || 'Đăng nhập thất bại');
+      setError(err.message || "Đăng nhập thất bại");
     } finally {
       setLoading(false);
     }
@@ -42,28 +48,28 @@ const Login = () => {
 
   // Nếu đang hiển thị forgot password
   if (showForgotPassword) {
-    return <ForgotPassword onBackToLogin={() => setShowForgotPassword(false)} />;
+    return (
+      <ForgotPassword onBackToLogin={() => setShowForgotPassword(false)} />
+    );
   }
 
   return (
-    <div 
-      className="flex justify-center items-center p-4 min-h-screen bg-cover bg-center bg-no-repeat"
+    <div
+      className="flex items-center justify-center min-h-screen p-4 bg-center bg-no-repeat bg-cover"
       style={{
-        backgroundImage: 'url(/background_login.png)',
+        backgroundImage: "url(/background_login.png)",
       }}
     >
       {/* Overlay để làm mờ background */}
       <div className="absolute inset-0 bg-black/40"></div>
-      
-      <div className="relative z-10 space-y-8 w-full max-w-md">
+
+      <div className="relative z-10 w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="flex justify-center items-center mx-auto w-16 h-16 bg-blue-600 rounded-full">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto bg-blue-600 rounded-full">
             <School className="w-8 h-8 text-white" />
           </div>
-          <h1 className="mt-6 text-3xl font-bold text-white">
-            SynapseS
-          </h1>
+          <h1 className="mt-6 text-3xl font-bold text-white">SynapseS</h1>
           <p className="mt-2 text-sm text-white/90">
             Đăng nhập để truy cập hệ thống quản lý trường học
           </p>
@@ -80,14 +86,17 @@ const Login = () => {
           <CardContent>
             <form className="space-y-6" onSubmit={handleSubmit}>
               {error && (
-                <div className="flex items-center space-x-2 p-4 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex items-center p-4 space-x-2 border border-red-200 rounded-lg bg-red-50">
                   <AlertCircle className="w-5 h-5 text-red-500" />
                   <p className="text-sm text-red-800">{error}</p>
                 </div>
               )}
 
               <div className="space-y-2">
-                <label htmlFor="username" className="text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="username"
+                  className="text-sm font-medium text-gray-700"
+                >
                   Username
                 </label>
                 <Input
@@ -103,7 +112,10 @@ const Login = () => {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="password"
+                  className="text-sm font-medium text-gray-700"
+                >
                   Mật khẩu
                 </label>
                 <Input
@@ -118,18 +130,14 @@ const Login = () => {
                 />
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full"
-              >
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? (
                   <>
-                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Đang đăng nhập...
                   </>
                 ) : (
-                  'Đăng nhập'
+                  "Đăng nhập"
                 )}
               </Button>
 
@@ -146,19 +154,19 @@ const Login = () => {
             </form>
 
             {/* Demo accounts */}
-            <div className="pt-6 mt-6 border-t border-gray-200">
+            {/* <div className="pt-6 mt-6 border-t border-gray-200">
               <div className="text-center">
                 <p className="mb-3 text-xs text-gray-500">Tài khoản demo:</p>
                 <div className="space-y-2 text-xs text-gray-600">
-                  <div className="p-2 bg-gray-50 rounded-lg">
+                  <div className="p-2 rounded-lg bg-gray-50">
                     <strong>Admin:</strong> admin.chuyen_le_quy_don.tphcm / password
                   </div>
-                  <div className="p-2 bg-gray-50 rounded-lg">
+                  <div className="p-2 rounded-lg bg-gray-50">
                     <strong>Giáo viên:</strong> nguyen_thi_lan.chuyen_le_quy_don.tphcm / password
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       </div>

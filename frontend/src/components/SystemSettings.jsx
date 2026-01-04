@@ -313,7 +313,7 @@ const SystemSettings = () => {
 
           <div>
             <Label>Chọn ngày nghỉ</Label>
-            <div className="mt-2 grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-2 mt-2">
               {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                 <Button
                   key={d}
