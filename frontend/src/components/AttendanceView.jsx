@@ -825,7 +825,6 @@ const AttendanceView = () => {
                   <TableHead className="w-[100px]">Giờ vào</TableHead>
                   <TableHead className="w-[100px]">Giờ ra</TableHead>
                   <TableHead className="w-[100px]">Trạng thái</TableHead>
-                  <TableHead className="w-[100px]">Độ chính xác</TableHead>
                   <TableHead className="w-[150px]">Ghi chú</TableHead>
                   <TableHead className="w-[120px] text-center">
                     Thao tác
@@ -836,7 +835,7 @@ const AttendanceView = () => {
               <TableBody>
                 {attendanceRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center">
+                    <TableCell colSpan={8} className="py-8 text-center">
                       {loading ? (
                         <div className="flex justify-center">
                           <div className="w-8 h-8 border-b-2 rounded-full animate-spin border-primary"></div>
@@ -901,13 +900,6 @@ const AttendanceView = () => {
                           ) : (
                             getStatusBadge(record.status)
                           )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {record.confidence_score
-                            ? `${(record.confidence_score * 100 * 2).toFixed(
-                                1
-                              )}%`
-                            : "-"}
                         </TableCell>
                         <TableCell>
                           {isEditingRecord(record) ? (
