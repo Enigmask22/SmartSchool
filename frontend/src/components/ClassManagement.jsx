@@ -76,6 +76,7 @@ const ClassManagement = () => {
     full_name: "",
     email: "",
     phone: "",
+    received_email: "",
     class_name: "",
     grade: "",
     class_id: null,
@@ -119,7 +120,7 @@ const ClassManagement = () => {
     try {
       const endpoint = selectedAcademicYear
         ? `/admin/classes?academic_year=${encodeURIComponent(
-            selectedAcademicYear
+            selectedAcademicYear,
           )}`
         : "/admin/classes";
       const response = await api.request(endpoint);
@@ -129,7 +130,7 @@ const ClassManagement = () => {
         // Lọc thêm theo khối nếu đã chọn
         if (selectedGrade) {
           filteredClasses = filteredClasses.filter(
-            (cls) => cls.grade.toString() === selectedGrade
+            (cls) => cls.grade.toString() === selectedGrade,
           );
         }
 
@@ -149,7 +150,7 @@ const ClassManagement = () => {
 
     try {
       const response = await api.request(
-        `/admin/classes/${selectedClassForManagement}/students`
+        `/admin/classes/${selectedClassForManagement}/students`,
       );
       if (response.success) {
         let students = response.data || [];
@@ -172,7 +173,7 @@ const ClassManagement = () => {
 
         // Load thông tin giáo viên chủ nhiệm
         const classInfo = classes.find(
-          (c) => c.id === parseInt(selectedClassForManagement)
+          (c) => c.id === parseInt(selectedClassForManagement),
         );
         if (classInfo) {
           setHomeroomTeacher({
@@ -209,7 +210,7 @@ const ClassManagement = () => {
 
       // Query tất cả học sinh có mã bắt đầu bằng yearPrefix
       const response = await api.request(
-        `/admin/students/by-grade?grade=${grade}`
+        `/admin/students/by-grade?grade=${grade}`,
       );
       if (response.success) {
         const students = response.data || [];
@@ -218,7 +219,7 @@ const ClassManagement = () => {
         const filteredStudents = students
           .filter(
             (student) =>
-              student.student_id && student.student_id.startsWith(yearPrefix)
+              student.student_id && student.student_id.startsWith(yearPrefix),
           )
           .map((student) => parseInt(student.student_id))
           .filter((id) => !isNaN(id))
@@ -280,7 +281,7 @@ const ClassManagement = () => {
     setStudentFormData((prev) => ({
       ...prev,
       parent_contacts: (prev.parent_contacts || []).filter(
-        (_, i) => i !== index
+        (_, i) => i !== index,
       ),
     }));
   };
@@ -308,7 +309,7 @@ const ClassManagement = () => {
     setEditForm((prev) => ({
       ...prev,
       parent_contacts: (prev.parent_contacts || []).filter(
-        (_, i) => i !== index
+        (_, i) => i !== index,
       ),
     }));
   };
@@ -365,10 +366,14 @@ const ClassManagement = () => {
       };
 
       // Filter out empty strings
+      // Các trường cho phép xóa (gửi null để clear trong DB)
+      const nullableFields = ["received_email"];
       const cleanData = {};
       Object.keys(studentData).forEach((key) => {
         const value = studentData[key];
-        if (value !== "" && value !== null && value !== undefined) {
+        if (nullableFields.includes(key)) {
+          cleanData[key] = value && value.trim() !== "" ? value.trim() : null;
+        } else if (value !== "" && value !== null && value !== undefined) {
           cleanData[key] = value;
         }
       });
@@ -402,6 +407,7 @@ const ClassManagement = () => {
           full_name: "",
           email: "",
           phone: "",
+          received_email: "",
           class_name: "",
           grade: "",
           date_of_birth: "",
@@ -605,14 +611,14 @@ const ClassManagement = () => {
         const requiredColumns = ["ho_va_ten", "lop_hoc", "khoi"];
         const firstRow = jsonData[0];
         const missingColumns = requiredColumns.filter(
-          (col) => !(col in firstRow)
+          (col) => !(col in firstRow),
         );
 
         if (missingColumns.length > 0) {
           alert(
             `❌ File thiếu các cột bắt buộc: ${missingColumns.join(
-              ", "
-            )}\n\nVui lòng tải template để có đúng định dạng!`
+              ", ",
+            )}\n\nVui lòng tải template để có đúng định dạng!`,
           );
           return;
         }
@@ -688,7 +694,7 @@ const ClassManagement = () => {
 
               if (relation && !validRelations.includes(relation)) {
                 rowErrors.push(
-                  `Phụ huynh ${parentIndex}: Quan hệ không hợp lệ (phải là: Bố, Mẹ, Phụ huynh, Người giám hộ)`
+                  `Phụ huynh ${parentIndex}: Quan hệ không hợp lệ (phải là: Bố, Mẹ, Phụ huynh, Người giám hộ)`,
                 );
               }
 
@@ -785,7 +791,7 @@ const ClassManagement = () => {
             response.data.error_count > 0
               ? `\nLỗi: ${response.data.error_count} học sinh`
               : ""
-          }`
+          }`,
         );
 
         if (response.data.errors && response.data.errors.length > 0) {
@@ -858,7 +864,7 @@ const ClassManagement = () => {
       loadClassStudents();
       // Auto fill form class_name, grade, class_id theo lớp chọn
       const cls = classes.find(
-        (c) => c.id === parseInt(selectedClassForManagement)
+        (c) => c.id === parseInt(selectedClassForManagement),
       );
       if (cls) {
         setStudentFormData((prev) => ({
@@ -884,7 +890,7 @@ const ClassManagement = () => {
         const response = await api.deleteStudent(studentId);
         if (response.success) {
           alert(
-            "Xóa tạm thời học sinh thành công! Bạn có thể khôi phục trong tab 'Hiển thị học sinh đã xóa'."
+            "Xóa tạm thời học sinh thành công! Bạn có thể khôi phục trong tab 'Hiển thị học sinh đã xóa'.",
           );
           loadClassStudents(); // Reload danh sách học sinh
         } else {
@@ -901,7 +907,7 @@ const ClassManagement = () => {
   const handlePermanentDeleteStudent = async (studentId, studentName) => {
     if (
       window.confirm(
-        `⚠️ CẢNH BÁO: Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN học sinh ${studentName}?\n\nHành động này sẽ xóa:\n- Thông tin học sinh\n- Tất cả bản ghi điểm danh\n- Tất cả bản ghi điểm số\n\nHành động này KHÔNG THỂ HOÀN TÁC!`
+        `⚠️ CẢNH BÁO: Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN học sinh ${studentName}?\n\nHành động này sẽ xóa:\n- Thông tin học sinh\n- Tất cả bản ghi điểm danh\n- Tất cả bản ghi điểm số\n\nHành động này KHÔNG THỂ HOÀN TÁC!`,
       )
     ) {
       try {
@@ -911,7 +917,7 @@ const ClassManagement = () => {
           loadClassStudents(); // Reload danh sách học sinh
         } else {
           alert(
-            `Lỗi: ${response.message || "Không thể xóa vĩnh viễn học sinh"}`
+            `Lỗi: ${response.message || "Không thể xóa vĩnh viễn học sinh"}`,
           );
         }
       } catch (error) {
@@ -928,6 +934,7 @@ const ClassManagement = () => {
       full_name: student.full_name || "",
       email: student.email || "",
       phone: student.phone || "",
+      received_email: student.received_email || "",
       class_name: student.class_name || "",
       grade: student.grade || "",
       date_of_birth: student.date_of_birth || "",
@@ -951,7 +958,7 @@ const ClassManagement = () => {
 
     if (
       window.confirm(
-        `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`
+        `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`,
       )
     ) {
       setRestoreLoading(true);
@@ -995,6 +1002,13 @@ const ClassManagement = () => {
       // Prepare payload with parent_contacts
       const payload = { ...editForm };
 
+      // Cho phép xóa received_email (gửi null khi chuỗi rỗng)
+      if (!payload.received_email || payload.received_email.trim() === "") {
+        payload.received_email = null;
+      } else {
+        payload.received_email = payload.received_email.trim();
+      }
+
       // Process parent_contacts
       if (Array.isArray(payload.parent_contacts)) {
         payload.parent_contacts = payload.parent_contacts
@@ -1013,7 +1027,7 @@ const ClassManagement = () => {
       logger.debug("Updating student:", selectedStudentForEdit.id, payload);
       const response = await api.updateStudent(
         selectedStudentForEdit.id,
-        payload
+        payload,
       );
       logger.debug("Update response:", response);
 
@@ -1029,7 +1043,7 @@ const ClassManagement = () => {
         setEditForm({});
       } else {
         alert(
-          `Lỗi: ${response.message || "Không thể cập nhật thông tin học sinh"}`
+          `Lỗi: ${response.message || "Không thể cập nhật thông tin học sinh"}`,
         );
       }
     } catch (error) {
@@ -1338,7 +1352,7 @@ const ClassManagement = () => {
                               setSelectedStudentIds((prev) =>
                                 e.target.checked
                                   ? [...prev, student.id]
-                                  : prev.filter((id) => id !== student.id)
+                                  : prev.filter((id) => id !== student.id),
                               );
                             }}
                           />
@@ -1356,7 +1370,8 @@ const ClassManagement = () => {
                         </TableCell>
                         <TableCell>{student.class_name}</TableCell>
                         <TableCell>
-                          {student.face_samples_count && student.face_samples_count > 0 ? (
+                          {student.face_samples_count &&
+                          student.face_samples_count > 0 ? (
                             <Badge
                               variant="default"
                               className="text-green-800 bg-green-100"
@@ -1396,7 +1411,7 @@ const ClassManagement = () => {
                                   onClick={() =>
                                     handlePermanentDeleteStudent(
                                       student.id,
-                                      student.full_name
+                                      student.full_name,
                                     )
                                   }
                                   variant="outline"
@@ -1456,7 +1471,7 @@ const ClassManagement = () => {
                           <span className="font-semibold">
                             {Math.min(
                               currentPage * classManagementPageSize,
-                              totalStudents
+                              totalStudents,
                             )}
                           </span>{" "}
                           trong tổng số{" "}
@@ -1500,7 +1515,7 @@ const ClassManagement = () => {
                         <div className="flex items-center space-x-1">
                           {Array.from(
                             { length: totalPages },
-                            (_, i) => i + 1
+                            (_, i) => i + 1,
                           ).map((pageNum) => {
                             const showPage =
                               pageNum === 1 ||
@@ -1547,7 +1562,7 @@ const ClassManagement = () => {
                           size="sm"
                           onClick={() =>
                             setCurrentPage(
-                              Math.min(totalPages, currentPage + 1)
+                              Math.min(totalPages, currentPage + 1),
                             )
                           }
                           disabled={currentPage === totalPages}
@@ -1634,6 +1649,22 @@ const ClassManagement = () => {
                 />
               </div>
 
+              {/* Email phụ huynh */}
+              <div className="space-y-2">
+                <Label htmlFor="received_email">
+                  Email phụ huynh (nhận phiếu điểm)
+                </Label>
+                <Input
+                  id="received_email"
+                  type="email"
+                  value={studentFormData.received_email}
+                  onChange={(e) =>
+                    handleStudentFormChange("received_email", e.target.value)
+                  }
+                  placeholder="VD: phuhuynh@example.com"
+                />
+              </div>
+
               {/* Lớp */}
               <div className="space-y-2">
                 <Label htmlFor="class_name">Lớp học *</Label>
@@ -1666,7 +1697,7 @@ const ClassManagement = () => {
                   onValueChange={(value) =>
                     handleStudentFormChange(
                       "grade",
-                      value === "none" ? "" : value
+                      value === "none" ? "" : value,
                     )
                   }
                   disabled
@@ -1825,7 +1856,7 @@ const ClassManagement = () => {
                             updateParentContactField(
                               idx,
                               "name",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           placeholder="Nhập họ tên"
@@ -1844,7 +1875,7 @@ const ClassManagement = () => {
                             updateParentContactField(
                               idx,
                               "phone",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           placeholder="Nhập số điện thoại"
@@ -2157,6 +2188,21 @@ const ClassManagement = () => {
               </div>
 
               <div>
+                <Label htmlFor="edit-received-email">
+                  Email phụ huynh (nhận phiếu điểm)
+                </Label>
+                <Input
+                  id="edit-received-email"
+                  type="email"
+                  value={editForm.received_email || ""}
+                  onChange={(e) =>
+                    handleEditFormChange("received_email", e.target.value)
+                  }
+                  placeholder="VD: phuhuynh@example.com"
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="edit-class-name">Lớp</Label>
                 <Input
                   id="edit-class-name"
@@ -2348,7 +2394,7 @@ const ClassManagement = () => {
                             updateParentContactFieldEdit(
                               idx,
                               "name",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           placeholder="Nhập họ tên"
@@ -2367,7 +2413,7 @@ const ClassManagement = () => {
                             updateParentContactFieldEdit(
                               idx,
                               "phone",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           placeholder="Nhập số điện thoại"
@@ -2463,9 +2509,9 @@ const ClassManagement = () => {
                     const res = await api.request(
                       y
                         ? `/admin/classes?academic_year=${encodeURIComponent(
-                            y
+                            y,
                           )}`
-                        : "/admin/classes"
+                        : "/admin/classes",
                     );
                     if (res.success) setMoveClasses(res.data || []);
                   } catch (e) {
@@ -2526,7 +2572,7 @@ const ClassManagement = () => {
                   setMoveLoading(true);
                   const res = await api.moveStudentsClass(
                     selectedStudentIds,
-                    parseInt(moveTargetClassId)
+                    parseInt(moveTargetClassId),
                   );
                   if (res.success) {
                     setShowMoveModal(false);

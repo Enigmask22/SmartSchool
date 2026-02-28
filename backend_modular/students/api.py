@@ -197,10 +197,15 @@ async def update_student(
     try:
         update_data = {}
         parent_contacts = None
+        # Các trường cho phép set null (xóa giá trị)
+        nullable_fields = {"received_email"}
         
         for field, value in student.dict(exclude_unset=True).items():
             if field == "parent_contacts":
                 parent_contacts = value
+            elif field in nullable_fields:
+                # Cho phép clear các trường này bằng cách set null
+                update_data[field] = None if (value is None or value == "") else value
             elif value is not None:
                 if field == "date_of_birth" and value:
                     update_data[field] = value.isoformat() if hasattr(value, "isoformat") else value

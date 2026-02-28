@@ -15,7 +15,7 @@ class GeminiFeedbackService:
     Service tạo nhận xét học sinh sử dụng Google Gemini API
     """
     
-    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-2.0-flash"):
         """
         Khởi tạo Gemini Service
         

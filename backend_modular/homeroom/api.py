@@ -4,7 +4,8 @@ API Router cho Homeroom Teachers
 
 from datetime import datetime, date
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Depends, Query
+import uuid
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
 from homeroom.models import ResponseModel
 from core.database import get_db
 from core.logger import setup_logger
@@ -80,7 +81,7 @@ async def homeroom_bootstrap(
                 sresp = (
                     db.table("students")
                     .select(
-                        "id, student_id, full_name, email, phone, date_of_birth, address, profile_image, class_name, grade, gender, subject_selected, is_active"
+                        "id, student_id, full_name, email, phone, date_of_birth, address, profile_image, class_name, grade, gender, subject_selected, is_active, received_email"
                     )
                     .in_("id", sids)
                     .execute()
@@ -198,7 +199,7 @@ async def homeroom_attendance_bootstrap(
                 students_list.sort(key=sort_key)
                 smap = {s["id"]: s for s in students_list}
                 # attendance map
-                att = db.table("attendance").select("id, student_id, status, check_in_time, check_out_time, method, confidence_score, notes").eq("date", target_date.isoformat()).in_("student_id", student_ids).execute()
+                att = db.table("attendance").select("id, student_id, status, check_in_time, check_out_time, method, confidence_score, notes, leave_request_image").eq("date", target_date.isoformat()).in_("student_id", student_ids).execute()
                 amap = {a["student_id"]: a for a in (att.data or [])}
                 present = late = 0
                 # iterate theo danh sách students đã sort để records có thứ tự mã HS
@@ -223,6 +224,7 @@ async def homeroom_attendance_bootstrap(
                         "check_out_time": a.get("check_out_time") if a else None,
                         "confidence_score": a.get("confidence_score") if a else None,
                         "notes": a.get("notes") if a else None,
+                        "leave_request_image": a.get("leave_request_image") if a else None,
                     })
                 stats["present_count"] = present
                 stats["late_count"] = late
@@ -497,7 +499,8 @@ async def get_homeroom_students(
             gender,
             face_samples_count,
             recognition_enabled,
-            subject_selected
+            subject_selected,
+            received_email
             """
             )
             .in_("id", student_ids)
@@ -536,7 +539,8 @@ async def get_homeroom_students(
                     "gender": student["gender"],
                     "face_samples_count": student["face_samples_count"],
                     "recognition_enabled": student["recognition_enabled"],
-                    "subject_selected": student["subject_selected"]
+                    "subject_selected": student["subject_selected"],
+                    "received_email": student.get("received_email")
                 })
 
         return {
@@ -779,7 +783,8 @@ async def get_homeroom_attendance_records(
                 "check_out_time": attendance["check_out_time"] if attendance else None,
                 "method": attendance["method"] if attendance else "manual",
                 "confidence_score": attendance["confidence_score"] if attendance else None,
-                "notes": attendance["notes"] if attendance else None
+                "notes": attendance["notes"] if attendance else None,
+                "leave_request_image": attendance.get("leave_request_image") if attendance else None,
             }
             attendance_records.append(record)
 
@@ -1213,3 +1218,221 @@ async def homeroom_dashboard_bootstrap(
     except Exception as e:
         logger.error(f"Error dashboard bootstrap: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+
+# ===============================================
+# LEAVE REQUEST IMAGE - Đơn xin nghỉ học
+# ===============================================
+
+LEAVE_REQUEST_BUCKET = "leave-requests"
+
+
+@router.post("/attendance/leave-request/{student_id}")
+async def upload_leave_request_image(
+    student_id: int,
+    target_date: Optional[date] = Query(default=None, description="Ngày điểm danh (YYYY-MM-DD)"),
+    file: UploadFile = File(..., description="Ảnh đơn xin nghỉ học (JPEG/PNG/WebP, tối đa 5MB)"),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Upload ảnh đơn xin nghỉ học cho học sinh.
+    
+    Tận dụng Supabase Storage bucket 'leave-requests'.
+    File được lưu theo cấu trúc: {student_id}/{date}_{uuid}.{ext}
+    URL public sẽ được lưu vào cột leave_request_image trong bảng attendance.
+    """
+    try:
+        if target_date is None:
+            target_date = date.today()
+
+        # Kiểm tra học sinh có thuộc lớp chủ nhiệm không
+        teacher_resp = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+        if not teacher_id:
+            raise HTTPException(status_code=403, detail="Không tìm thấy thông tin giáo viên")
+
+        hsh_resp = db.table("homeroom_students_history").select("student_id").eq("teacher_id", teacher_id).execute()
+        allowed_ids = {r["student_id"] for r in (hsh_resp.data or [])}
+        if student_id not in allowed_ids:
+            raise HTTPException(status_code=403, detail="Học sinh không thuộc lớp chủ nhiệm của bạn")
+
+        # Validate file
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Chỉ chấp nhận file ảnh (JPEG, PNG, WebP)")
+
+        content = await file.read()
+        max_size = 5 * 1024 * 1024  # 5MB
+        if len(content) > max_size:
+            raise HTTPException(status_code=400, detail="File ảnh vượt quá 5MB")
+
+        # Tạo tên file unique
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "jpg"
+        file_name = f"{student_id}/{target_date.isoformat()}_{uuid.uuid4().hex[:8]}.{ext}"
+
+        # Upload lên Supabase Storage
+        storage_resp = db.storage.from_(LEAVE_REQUEST_BUCKET).upload(
+            path=file_name,
+            file=content,
+            file_options={"content-type": file.content_type, "upsert": "true"},
+        )
+
+        # Lấy public URL
+        public_url = db.storage.from_(LEAVE_REQUEST_BUCKET).get_public_url(file_name)
+
+        # Cập nhật hoặc tạo attendance record với leave_request_image
+        existing = (
+            db.table("attendance")
+            .select("id")
+            .eq("student_id", student_id)
+            .eq("date", target_date.isoformat())
+            .execute()
+        )
+
+        if existing.data:
+            # Update record hiện tại
+            db.table("attendance").update({
+                "leave_request_image": public_url,
+                "updated_at": datetime.now().isoformat(),
+            }).eq("id", existing.data[0]["id"]).execute()
+        else:
+            # Tạo record mới với status absent + đơn xin nghỉ
+            db.table("attendance").insert({
+                "student_id": student_id,
+                "date": target_date.isoformat(),
+                "status": "absent",
+                "method": "manual",
+                "leave_request_image": public_url,
+                "created_by": current_user["id"],
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            }).execute()
+
+        return {
+            "success": True,
+            "message": "Upload đơn xin nghỉ thành công",
+            "data": {
+                "student_id": student_id,
+                "date": target_date.isoformat(),
+                "leave_request_image": public_url,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading leave request image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi upload đơn xin nghỉ: {str(e)}")
+
+
+@router.get("/attendance/leave-request/{student_id}")
+async def get_leave_request_image(
+    student_id: int,
+    target_date: Optional[date] = Query(default=None, description="Ngày điểm danh (YYYY-MM-DD)"),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Lấy thông tin ảnh đơn xin nghỉ của học sinh theo ngày."""
+    try:
+        if target_date is None:
+            target_date = date.today()
+
+        # Kiểm tra quyền
+        teacher_resp = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+        if not teacher_id:
+            raise HTTPException(status_code=403, detail="Không tìm thấy thông tin giáo viên")
+
+        hsh_resp = db.table("homeroom_students_history").select("student_id").eq("teacher_id", teacher_id).execute()
+        allowed_ids = {r["student_id"] for r in (hsh_resp.data or [])}
+        if student_id not in allowed_ids:
+            raise HTTPException(status_code=403, detail="Học sinh không thuộc lớp chủ nhiệm của bạn")
+
+        # Lấy attendance record
+        att_resp = (
+            db.table("attendance")
+            .select("id, student_id, date, status, leave_request_image")
+            .eq("student_id", student_id)
+            .eq("date", target_date.isoformat())
+            .execute()
+        )
+
+        if not att_resp.data:
+            return {
+                "success": True,
+                "message": "Chưa có đơn xin nghỉ cho ngày này",
+                "data": {
+                    "student_id": student_id,
+                    "date": target_date.isoformat(),
+                    "leave_request_image": None,
+                },
+            }
+
+        record = att_resp.data[0]
+        return {
+            "success": True,
+            "message": "Lấy thông tin đơn xin nghỉ thành công",
+            "data": {
+                "student_id": student_id,
+                "date": target_date.isoformat(),
+                "leave_request_image": record.get("leave_request_image"),
+                "status": record.get("status"),
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting leave request image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi lấy đơn xin nghỉ: {str(e)}")
+
+
+@router.delete("/attendance/leave-request/{student_id}")
+async def delete_leave_request_image(
+    student_id: int,
+    target_date: Optional[date] = Query(default=None, description="Ngày điểm danh (YYYY-MM-DD)"),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Xóa ảnh đơn xin nghỉ học của học sinh (chỉ xóa URL, không xóa file trên storage)."""
+    try:
+        if target_date is None:
+            target_date = date.today()
+
+        # Kiểm tra quyền
+        teacher_resp = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+        if not teacher_id:
+            raise HTTPException(status_code=403, detail="Không tìm thấy thông tin giáo viên")
+
+        hsh_resp = db.table("homeroom_students_history").select("student_id").eq("teacher_id", teacher_id).execute()
+        allowed_ids = {r["student_id"] for r in (hsh_resp.data or [])}
+        if student_id not in allowed_ids:
+            raise HTTPException(status_code=403, detail="Học sinh không thuộc lớp chủ nhiệm của bạn")
+
+        existing = (
+            db.table("attendance")
+            .select("id, leave_request_image")
+            .eq("student_id", student_id)
+            .eq("date", target_date.isoformat())
+            .execute()
+        )
+
+        if not existing.data or not existing.data[0].get("leave_request_image"):
+            raise HTTPException(status_code=404, detail="Không tìm thấy đơn xin nghỉ")
+
+        # Xóa URL khỏi database (giữ file trên storage để tránh mất dữ liệu)
+        db.table("attendance").update({
+            "leave_request_image": None,
+            "updated_at": datetime.now().isoformat(),
+        }).eq("id", existing.data[0]["id"]).execute()
+
+        return {
+            "success": True,
+            "message": "Đã xóa đơn xin nghỉ thành công",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting leave request image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi xóa đơn xin nghỉ: {str(e)}")

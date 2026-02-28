@@ -179,6 +179,13 @@ const StudentList = () => {
   });
   const [subjectLoading, setSubjectLoading] = useState(false);
 
+  // Email report card states
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState(false);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -227,7 +234,7 @@ const StudentList = () => {
             selectedAcademicYear
               ? `?academic_year=${encodeURIComponent(selectedAcademicYear)}`
               : ""
-          }`
+          }`,
         );
         if (resp.success && resp.data) {
           const { academic_years, year, classes, selected_class, students } =
@@ -265,7 +272,7 @@ const StudentList = () => {
             selectedAcademicYear
               ? `?academic_year=${encodeURIComponent(selectedAcademicYear)}`
               : ""
-          }`
+          }`,
         );
         if (resp.success && resp.data) {
           const { classes, selected_class } = resp.data;
@@ -279,7 +286,7 @@ const StudentList = () => {
             selected_class?.class_name &&
             classNames.includes(selected_class.class_name);
           setSelectedClass(
-            exists ? selected_class.class_name : classNames[0] || "all"
+            exists ? selected_class.class_name : classNames[0] || "all",
           );
           // Không gọi fetchStudents riêng nếu bootstrap đã trả về sau này cần; ở đây chỉ cập nhật lớp.
         }
@@ -309,7 +316,7 @@ const StudentList = () => {
         // If homeroom teacher but no class selected, don't fetch
         if (!selectedClass || selectedClass === "all") {
           logger.debug(
-            "🚫 No class selected for homeroom teacher, skipping fetch"
+            "🚫 No class selected for homeroom teacher, skipping fetch",
           );
           setStudents([]);
           setLoading(false);
@@ -317,15 +324,15 @@ const StudentList = () => {
         }
         // If homeroom teacher, get only their homeroom students theo class/year
         const found = homeroomClasses.find(
-          (c) => c.class_name === selectedClass
+          (c) => c.class_name === selectedClass,
         );
         const classId = found?.id;
         response = await ApiService.request(
           classId
             ? `/homeroom/students?class_id=${classId}`
             : `/homeroom/students?class_name=${encodeURIComponent(
-                selectedClass
-              )}&academic_year=${encodeURIComponent(selectedAcademicYear)}`
+                selectedClass,
+              )}&academic_year=${encodeURIComponent(selectedAcademicYear)}`,
         );
       } else {
         // If admin or other roles, get all students (luôn lấy tất cả, kể cả inactive)
@@ -344,7 +351,7 @@ const StudentList = () => {
     } catch (error) {
       logger.error("Error fetching students:", error);
       setError(
-        "Không thể tải danh sách học sinh từ server. Hiển thị dữ liệu mẫu."
+        "Không thể tải danh sách học sinh từ server. Hiển thị dữ liệu mẫu.",
       );
 
       // Mock data fallback
@@ -452,7 +459,7 @@ const StudentList = () => {
         let year = yearOverride ?? selectedAcademicYear;
         if (!year) {
           const defaultYearResp = await ApiService.request(
-            "/homeroom/default-academic-year"
+            "/homeroom/default-academic-year",
           );
           const defaultYear = defaultYearResp.success
             ? defaultYearResp.data
@@ -465,7 +472,7 @@ const StudentList = () => {
         const classesResponse = await ApiService.request(
           `/homeroom/classes${
             year ? `?academic_year=${encodeURIComponent(year)}` : ""
-          }`
+          }`,
         );
 
         if (reqId !== classesReqIdRef.current) return; // ignore stale
@@ -507,7 +514,7 @@ const StudentList = () => {
       const fallbackClasses = Array.isArray(students)
         ? [
             ...new Set(
-              students.map((student) => student.class_name).filter(Boolean)
+              students.map((student) => student.class_name).filter(Boolean),
             ),
           ].sort()
         : [];
@@ -557,7 +564,7 @@ const StudentList = () => {
     } catch (error) {
       logger.error("Error accessing camera:", error);
       setCameraError(
-        "Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập."
+        "Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập.",
       );
       setRegistrationMode("upload"); // Chuyển sang upload mode nếu không có camera
     }
@@ -642,7 +649,7 @@ const StudentList = () => {
     } catch (error) {
       logger.error("Error restarting camera:", error);
       setCameraError(
-        "Không thể khởi động lại camera. Vui lòng kiểm tra quyền truy cập."
+        "Không thể khởi động lại camera. Vui lòng kiểm tra quyền truy cập.",
       );
     }
   };
@@ -680,7 +687,7 @@ const StudentList = () => {
           {
             method: "POST",
             body: formData,
-          }
+          },
         );
       } else if (capturedImage) {
         // Use base64 for camera capture
@@ -697,7 +704,7 @@ const StudentList = () => {
               image_base64: base64Image,
               confidence_threshold: 0.6,
             }),
-          }
+          },
         );
       }
 
@@ -705,7 +712,7 @@ const StudentList = () => {
 
       if (result.success) {
         alert(
-          `Đăng ký khuôn mặt thành công cho ${selectedStudentForFace.full_name}!`
+          `Đăng ký khuôn mặt thành công cho ${selectedStudentForFace.full_name}!`,
         );
         closeFaceModal();
         // Refresh students list to show updated status
@@ -816,7 +823,7 @@ const StudentList = () => {
         {
           method: "POST",
           body: formData,
-        }
+        },
       );
 
       const result = await response.json();
@@ -824,7 +831,7 @@ const StudentList = () => {
       if (result.success) {
         setMultipleResults(result.data.results || []);
         alert(
-          `Đăng ký thành công ${result.data.successful_registrations}/${result.data.total_images} ảnh cho ${selectedStudentForFace.full_name}!`
+          `Đăng ký thành công ${result.data.successful_registrations}/${result.data.total_images} ảnh cho ${selectedStudentForFace.full_name}!`,
         );
 
         // Update file statuses
@@ -833,7 +840,7 @@ const StudentList = () => {
             ...file,
             status: result.data.results[index]?.success ? "success" : "error",
             message: result.data.results[index]?.message || "",
-          }))
+          })),
         );
 
         // Refresh students list
@@ -868,6 +875,7 @@ const StudentList = () => {
       full_name: student.full_name || "",
       email: student.email || "",
       phone: student.phone || "",
+      received_email: student.received_email || "",
       class_name: student.class_name || "",
       grade: student.grade || "",
       date_of_birth: student.date_of_birth || "",
@@ -899,7 +907,7 @@ const StudentList = () => {
     setEditForm((prev) => ({
       ...prev,
       parent_contacts: (prev.parent_contacts || []).filter(
-        (_, i) => i !== index
+        (_, i) => i !== index,
       ),
     }));
   };
@@ -919,10 +927,15 @@ const StudentList = () => {
     }
 
     // Filter out empty strings and convert to null for optional fields
+    // Các trường cho phép xóa (gửi null để clear trong DB)
+    const nullableFields = ["received_email"];
     const cleanFormData = {};
     Object.keys(editForm).forEach((key) => {
       const value = editForm[key];
-      if (value !== "" && value !== null && value !== undefined) {
+      if (nullableFields.includes(key)) {
+        // Cho phép gửi null khi user xóa trắng
+        cleanFormData[key] = value && value.trim() !== "" ? value.trim() : null;
+      } else if (value !== "" && value !== null && value !== undefined) {
         cleanFormData[key] = value;
       }
     });
@@ -970,7 +983,7 @@ const StudentList = () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(cleanFormData),
-        }
+        },
       );
 
       if (response.ok) {
@@ -984,8 +997,8 @@ const StudentList = () => {
         logger.error("API Error Response:", errorData);
         throw new Error(
           `Failed to update student: ${response.status} - ${JSON.stringify(
-            errorData
-          )}`
+            errorData,
+          )}`,
         );
       }
     } catch (error) {
@@ -1007,7 +1020,7 @@ const StudentList = () => {
 
     if (
       window.confirm(
-        `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`
+        `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`,
       )
     ) {
       setRestoreLoading(true);
@@ -1055,7 +1068,7 @@ const StudentList = () => {
       const response = await ApiService.getStudentScores(
         student.id,
         selectedAcademicYear,
-        selectedSemester
+        selectedSemester,
       );
 
       if (response.success) {
@@ -1132,12 +1145,12 @@ const StudentList = () => {
     try {
       logger.debug(
         "🎯 Fetching scores for feedback form for student:",
-        student
+        student,
       );
       const scoresResponse = await ApiService.getStudentScores(
         student.id,
         selectedAcademicYear,
-        selectedSemester
+        selectedSemester,
       );
       logger.debug("📊 Scores response for feedback:", scoresResponse);
 
@@ -1153,7 +1166,7 @@ const StudentList = () => {
           // Use final_score (điểm trung bình môn) instead of individual scores
           const validScores = scores.filter(
             (score) =>
-              score.final_score !== null && score.final_score !== undefined
+              score.final_score !== null && score.final_score !== undefined,
           );
           logger.debug("✅ Valid scores with final_score:", validScores);
 
@@ -1161,7 +1174,7 @@ const StudentList = () => {
             const avgScore = (
               validScores.reduce(
                 (sum, score) => sum + (score.final_score || 0),
-                0
+                0,
               ) / validScores.length
             ).toFixed(1);
             logger.debug("📊 Calculated average score for feedback:", avgScore);
@@ -1198,7 +1211,7 @@ const StudentList = () => {
           }
         } else {
           logger.debug(
-            "⚠️ No scores found for student - not an array or empty"
+            "⚠️ No scores found for student - not an array or empty",
           );
           logger.debug("📋 Scores type:", typeof scores);
           logger.debug("📋 Is array:", Array.isArray(scores));
@@ -1224,7 +1237,7 @@ const StudentList = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (commentResponse.ok) {
@@ -1325,7 +1338,7 @@ const StudentList = () => {
             subject: feedbackForm.subject || null, // Thêm môn học
             notes: feedbackForm.notes,
           }),
-        }
+        },
       );
 
       const result = await response.json();
@@ -1405,7 +1418,7 @@ const StudentList = () => {
       // Lấy tất cả comments của lớp
       const token = localStorage.getItem("access_token");
       logger.info(
-        `🔍 Đang lấy comments cho class_id: ${classId}, class_name: ${selectedClass}`
+        `🔍 Đang lấy comments cho class_id: ${classId}, class_name: ${selectedClass}`,
       );
 
       const response = await fetch(
@@ -1416,7 +1429,7 @@ const StudentList = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -1452,7 +1465,7 @@ const StudentList = () => {
         const comment = comments[i];
         logger.info(
           `📄 Đang xử lý comment ${i + 1}/${comments.length}:`,
-          comment
+          comment,
         );
 
         const student = {
@@ -1524,9 +1537,8 @@ const StudentList = () => {
         currentRow += 2;
 
         // Student info
-        worksheet.getCell(
-          `A${currentRow}`
-        ).value = `Học sinh: ${student.full_name}`;
+        worksheet.getCell(`A${currentRow}`).value =
+          `Học sinh: ${student.full_name}`;
         const studentIdCell = worksheet.getCell(`E${currentRow}`);
         studentIdCell.value = `Mã số: ${student.student_id}`;
         studentIdCell.alignment = { horizontal: "right", vertical: "middle" };
@@ -1632,9 +1644,9 @@ const StudentList = () => {
               .trim();
           };
           const fileName = `PhieuDiem_${sanitizeFileName(
-            student.student_id
+            student.student_id,
           )}_${sanitizeFileName(
-            student.full_name
+            student.full_name,
           )}_${selectedAcademicYear}_${selectedSemester}.xlsx`;
           link.download = fileName;
 
@@ -1650,7 +1662,7 @@ const StudentList = () => {
 
           downloadedCount++;
           logger.info(
-            `✅ Đã tải file ${downloadedCount}/${comments.length}: ${fileName}`
+            `✅ Đã tải file ${downloadedCount}/${comments.length}: ${fileName}`,
           );
 
           // Delay lớn hơn giữa các lần download để tránh browser block multiple downloads
@@ -1660,7 +1672,7 @@ const StudentList = () => {
         } catch (fileError) {
           logger.error(
             `❌ Lỗi khi tạo file cho học sinh ${student.full_name}:`,
-            fileError
+            fileError,
           );
           // Tiếp tục với học sinh tiếp theo thay vì dừng
         }
@@ -1670,7 +1682,7 @@ const StudentList = () => {
         alert(`✅ Đã tải ${downloadedCount} phiếu điểm thành công!`);
       } else {
         alert(
-          `⚠️ Đã tải ${downloadedCount}/${comments.length} phiếu điểm. Có thể một số file bị browser chặn.`
+          `⚠️ Đã tải ${downloadedCount}/${comments.length} phiếu điểm. Có thể một số file bị browser chặn.`,
         );
       }
     } catch (error) {
@@ -1695,7 +1707,7 @@ const StudentList = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -1748,7 +1760,7 @@ const StudentList = () => {
             Authorization: `Bearer ${token}`,
           },
           body: formData,
-        }
+        },
       );
 
       if (!response.ok) {
@@ -1766,7 +1778,7 @@ const StudentList = () => {
               ? `• Số lỗi: ${result.total_errors}\n${
                   result.errors?.join("\n") || ""
                 }`
-              : "")
+              : ""),
         );
 
         // Reset và đóng modal
@@ -1802,13 +1814,13 @@ const StudentList = () => {
         const response = await ApiService.getStudentScores(
           student.id,
           selectedAcademicYear,
-          selectedSemester
+          selectedSemester,
         );
         if (response.success && response.data?.scores) {
           scores = response.data.scores;
         } else {
           alert(
-            "⚠️ Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét."
+            "⚠️ Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét.",
           );
           scores = [];
         }
@@ -1877,9 +1889,8 @@ const StudentList = () => {
       currentRow += 2; // Skip a row
 
       // Student info
-      worksheet.getCell(
-        `A${currentRow}`
-      ).value = `Học sinh: ${student.full_name}`;
+      worksheet.getCell(`A${currentRow}`).value =
+        `Học sinh: ${student.full_name}`;
       const studentIdCell = worksheet.getCell(`E${currentRow}`);
       studentIdCell.value = `Mã số: ${student.student_id}`;
       studentIdCell.alignment = { horizontal: "right", vertical: "middle" };
@@ -1897,7 +1908,7 @@ const StudentList = () => {
 
         // Calculate overall average
         const validScores = scores.filter(
-          (g) => g.final_score !== null && g.final_score !== undefined
+          (g) => g.final_score !== null && g.final_score !== undefined,
         );
         const overallAverage =
           validScores.length > 0
@@ -1908,9 +1919,8 @@ const StudentList = () => {
             : "N/A";
 
         worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
-        worksheet.getCell(
-          `A${currentRow}`
-        ).value = `Điểm trung bình học kỳ: ${overallAverage}`;
+        worksheet.getCell(`A${currentRow}`).value =
+          `Điểm trung bình học kỳ: ${overallAverage}`;
         currentRow += 2; // Skip a row
 
         // Table headers: Môn học | Điểm, đánh giá thường xuyên | GK | CK | TBM HK
@@ -1954,13 +1964,13 @@ const StudentList = () => {
           // Ưu tiên bắt các khóa dạng Thường xuyên hoặc TX (TX1, TX_2, Diem_tx3...)
           let keys = Object.keys(data).filter((k) =>
             /(diem[_ ]?thuong[_ ]?xuyen|^tx[_ ]?\d+|diem[_ ]?tx[_ ]?\d+)/i.test(
-              k
-            )
+              k,
+            ),
           );
           // Nếu tồn tại parent Diem_thuong_xuyen dạng object lồng, dồn các child vào
           if (keys.length === 0) {
             const parentKey = Object.keys(data).find((k) =>
-              /diem[_ ]?thuong[_ ]?xuyen/i.test(k)
+              /diem[_ ]?thuong[_ ]?xuyen/i.test(k),
             );
             const parent =
               parentKey && typeof data[parentKey] === "object"
@@ -1977,7 +1987,7 @@ const StudentList = () => {
                 .map((e) =>
                   e.value !== null && e.value !== undefined
                     ? String(e.value)
-                    : ""
+                    : "",
                 )
                 .filter((s) => s !== "")
                 .join(" ");
@@ -1988,7 +1998,7 @@ const StudentList = () => {
             keys = Object.keys(data).filter(
               (k) =>
                 /(\d+)/.test(k) &&
-                !/(giua[_ ]?ki|cuoi[_ ]?ki|hk|final|tbm?)/i.test(k)
+                !/(giua[_ ]?ki|cuoi[_ ]?ki|hk|final|tbm?)/i.test(k),
             );
           }
           const entries = keys
@@ -2000,7 +2010,7 @@ const StudentList = () => {
             .sort((a, b) => a.order - b.order);
           return entries
             .map((e) =>
-              e.value !== null && e.value !== undefined ? String(e.value) : ""
+              e.value !== null && e.value !== undefined ? String(e.value) : "",
             )
             .filter((s) => s !== "")
             .join(" ");
@@ -2150,8 +2160,117 @@ const StudentList = () => {
     } catch (error) {
       logger.error("Error exporting report card:", error);
       alert(
-        "❌ Lỗi khi xuất phiếu điểm: " + (error.message || "Unknown error")
+        "❌ Lỗi khi xuất phiếu điểm: " + (error.message || "Unknown error"),
       );
+    }
+  };
+
+  // ====== GỬI EMAIL PHIẾU ĐIỂM ======
+
+  const openEmailDialog = () => {
+    if (!selectedStudentForFeedback) return;
+    // Pre-fill email từ student data nếu có
+    setEmailRecipient(
+      selectedStudentForFeedback.received_email ||
+        selectedStudentForFeedback.email ||
+        "",
+    );
+    setEmailError("");
+    setEmailSuccess(false);
+    setShowEmailDialog(true);
+  };
+
+  const closeEmailDialog = () => {
+    setShowEmailDialog(false);
+    setEmailError("");
+    setEmailSuccess(false);
+  };
+
+  const handleSendEmailReportCard = async () => {
+    if (!selectedStudentForFeedback) return;
+
+    if (!emailRecipient || !emailRecipient.includes("@")) {
+      setEmailError("Vui lòng nhập địa chỉ email hợp lệ.");
+      return;
+    }
+
+    setEmailSending(true);
+    setEmailError("");
+    setEmailSuccess(false);
+
+    try {
+      const student = selectedStudentForFeedback;
+
+      // Lưu received_email vào DB nếu khác với giá trị cũ
+      if (emailRecipient !== student.received_email) {
+        await ApiService.updateStudent(student.id, {
+          received_email: emailRecipient,
+        });
+        // Cập nhật local state
+        student.received_email = emailRecipient;
+      }
+
+      // Fetch scores nếu chưa có
+      let scores = studentScores;
+      if (!scores || scores.length === 0) {
+        const response = await ApiService.getStudentScores(
+          student.id,
+          selectedAcademicYear,
+          selectedSemester,
+        );
+        if (response.success && response.data?.scores) {
+          scores = response.data.scores;
+        } else {
+          scores = [];
+        }
+      }
+
+      // Tính điểm trung bình
+      const validScores = scores.filter(
+        (g) => g.final_score !== null && g.final_score !== undefined,
+      );
+      const overallAverage =
+        validScores.length > 0
+          ? parseFloat(
+              (
+                validScores.reduce((sum, g) => sum + g.final_score, 0) /
+                validScores.length
+              ).toFixed(2),
+            )
+          : null;
+
+      // Gửi email
+      const result = await ApiService.sendEmailReportCard({
+        student_id: student.id,
+        student_code: student.student_id,
+        student_name: student.full_name,
+        class_name: student.class_name || "",
+        grade: student.grade || "",
+        teacher_name: user?.full_name || "",
+        academic_year: academicYear || selectedAcademicYear,
+        semester: semester || selectedSemester,
+        feedback: generatedFeedback || "",
+        scores: scores.map((s) => ({
+          subject_name: s.subject_name,
+          final_score: s.final_score,
+          score_data: s.score_data || {},
+        })),
+        overall_average: overallAverage,
+        received_email: emailRecipient,
+      });
+
+      if (result.success) {
+        setEmailSuccess(true);
+        setEmailError("");
+        logger.info(`✅ Đã gửi email phiếu điểm đến ${emailRecipient}`);
+      } else {
+        setEmailError(result.detail || result.message || "Không thể gửi email");
+      }
+    } catch (error) {
+      logger.error("Error sending email report card:", error);
+      setEmailError(error.message || "Lỗi kết nối server khi gửi email");
+    } finally {
+      setEmailSending(false);
     }
   };
 
@@ -2253,14 +2372,14 @@ const StudentList = () => {
       } else {
         // Add subject - Tính max từ available subjects
         const mandatoryCount = availableSubjects.filter(
-          (s) => s.is_mandatory
+          (s) => s.is_mandatory,
         ).length;
         const maxSubjects = type === "core_subjects" ? mandatoryCount : 4; // Dynamic môn chính, 4 môn tự chọn
         if (currentSubjects.length >= maxSubjects) {
           alert(
             `Tối đa ${maxSubjects} môn ${
               type === "core_subjects" ? "chính" : "tự chọn"
-            }`
+            }`,
           );
           return prev;
         }
@@ -2287,7 +2406,7 @@ const StudentList = () => {
           body: JSON.stringify({
             subject_selected: selectedSubjects,
           }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -2299,8 +2418,8 @@ const StudentList = () => {
           prevStudents.map((student) =>
             student.id === selectedStudentForSubject.id
               ? { ...student, subject_selected: selectedSubjects }
-              : student
-          )
+              : student,
+          ),
         );
       } else {
         const errorData = await response.json();
@@ -2422,8 +2541,8 @@ const StudentList = () => {
                             {sem === "HK1"
                               ? "Học kỳ 1"
                               : sem === "HK2"
-                              ? "Học kỳ 2"
-                              : "Cả năm"}
+                                ? "Học kỳ 2"
+                                : "Cả năm"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -3104,7 +3223,7 @@ const StudentList = () => {
                         {pageNum}
                       </Button>
                     );
-                  }
+                  },
                 )}
               </div>
 
@@ -3401,7 +3520,7 @@ const StudentList = () => {
                       <button
                         onClick={() => {
                           multipleFiles.forEach((file) =>
-                            URL.revokeObjectURL(file.previewUrl)
+                            URL.revokeObjectURL(file.previewUrl),
                           );
                           setMultipleFiles([]);
                           setMultipleResults([]);
@@ -3551,6 +3670,21 @@ const StudentList = () => {
 
                 <div>
                   <label className="block mb-2 text-sm font-medium text-gray-700">
+                    Email phụ huynh (nhận phiếu điểm)
+                  </label>
+                  <input
+                    type="email"
+                    value={editForm.received_email || ""}
+                    onChange={(e) =>
+                      handleEditFormChange("received_email", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="VD: phuhuynh@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Lớp
                   </label>
                   <input
@@ -3575,7 +3709,7 @@ const StudentList = () => {
                     onValueChange={(value) =>
                       handleEditFormChange(
                         "grade",
-                        value === "none" ? "" : value
+                        value === "none" ? "" : value,
                       )
                     }
                     disabled={isHomeroomTeacher()}
@@ -3706,7 +3840,7 @@ const StudentList = () => {
                                   updateParentContactField(
                                     idx,
                                     "relation",
-                                    value
+                                    value,
                                   )
                                 }
                               >
@@ -3737,7 +3871,7 @@ const StudentList = () => {
                                   updateParentContactField(
                                     idx,
                                     "name",
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                                 placeholder="Nhập họ tên"
@@ -3756,7 +3890,7 @@ const StudentList = () => {
                                   updateParentContactField(
                                     idx,
                                     "phone",
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                                 placeholder="Nhập số điện thoại"
@@ -3961,7 +4095,7 @@ const StudentList = () => {
                                     // Sắp xếp các cột điểm theo: trọng số tăng dần, rồi theo giai đoạn (thường xuyên -> giữa kì -> cuối kì)
                                     const getPriority = (name) => {
                                       const s = String(
-                                        name || ""
+                                        name || "",
                                       ).toLowerCase();
                                       if (s.includes("thuong")) return 0; // thường xuyên
                                       if (s.includes("giua")) return 1; // giữa kì
@@ -3974,7 +4108,7 @@ const StudentList = () => {
                                       return 99;
                                     };
                                     const keys = Object.keys(
-                                      scoreRecord.score_data
+                                      scoreRecord.score_data,
                                     )
                                       .filter(
                                         (key) =>
@@ -3985,14 +4119,14 @@ const StudentList = () => {
                                           scoreRecord.score_data[key]?.Diem !==
                                             null &&
                                           scoreRecord.score_data[key]?.Diem !==
-                                            ""
+                                            "",
                                       )
                                       .sort((a, b) => {
                                         const wa = Number(
-                                          scoreRecord.score_data[a]?.He_so ?? 1
+                                          scoreRecord.score_data[a]?.He_so ?? 1,
                                         );
                                         const wb = Number(
-                                          scoreRecord.score_data[b]?.He_so ?? 1
+                                          scoreRecord.score_data[b]?.He_so ?? 1,
                                         );
                                         if (wa !== wb) return wa - wb;
                                         return getPriority(a) - getPriority(b);
@@ -4007,7 +4141,7 @@ const StudentList = () => {
                                       // Fallback: chuyển đổi gần đúng từ khóa ASCII sang có dấu
                                       let text = String(key || "").replace(
                                         /_/g,
-                                        " "
+                                        " ",
                                       );
                                       text = text.replace(/Diem/g, "Điểm");
                                       text = text.replace(/thuong/g, "thường");
@@ -4094,7 +4228,7 @@ const StudentList = () => {
                                 studentScores.reduce(
                                   (sum, score) =>
                                     sum + (score.final_score || 0),
-                                  0
+                                  0,
                                 ) / studentScores.length
                               ).toFixed(2)
                             : "0.00"}
@@ -4107,7 +4241,7 @@ const StudentList = () => {
                         <p className="text-2xl font-bold text-green-600">
                           {
                             studentScores.filter(
-                              (score) => (score.final_score || 0) >= 8.0
+                              (score) => (score.final_score || 0) >= 8.0,
                             ).length
                           }
                         </p>
@@ -4117,7 +4251,7 @@ const StudentList = () => {
                         <p className="text-2xl font-bold text-red-600">
                           {
                             studentScores.filter(
-                              (score) => (score.final_score || 0) < 5.0
+                              (score) => (score.final_score || 0) < 5.0,
                             ).length
                           }
                         </p>
@@ -4212,7 +4346,7 @@ const StudentList = () => {
                         onChange={(e) =>
                           handleFeedbackFormChange(
                             "student_name",
-                            e.target.value
+                            e.target.value,
                           )
                         }
                         placeholder="Nhập tên học sinh"
@@ -4452,13 +4586,22 @@ const StudentList = () => {
             <div className="px-6 py-4 rounded-b-lg bg-gray-50">
               <div className="flex items-center justify-between">
                 {generatedFeedback && (
-                  <Button
-                    onClick={exportStudentReportCard}
-                    className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700"
-                  >
-                    <Download className="w-4 h-4" />
-                    Xuất phiếu điểm
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={exportStudentReportCard}
+                      className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700"
+                    >
+                      <Download className="w-4 h-4" />
+                      Xuất phiếu điểm
+                    </Button>
+                    <Button
+                      onClick={openEmailDialog}
+                      className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Gửi email
+                    </Button>
+                  </div>
                 )}
                 <div className="ml-auto">
                   <Button variant="secondary" onClick={closeFeedbackModal}>
@@ -4467,6 +4610,121 @@ const StudentList = () => {
                 </div>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Email Report Card Dialog */}
+      {showEmailDialog && selectedStudentForFeedback && (
+        <Dialog
+          open={showEmailDialog}
+          onOpenChange={(open) => !open && closeEmailDialog()}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-blue-600" />
+                Gửi phiếu điểm qua email
+              </DialogTitle>
+              <DialogDescription>
+                {selectedStudentForFeedback.full_name} -{" "}
+                {selectedStudentForFeedback.student_id}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-4 space-y-4">
+              {/* Email Success */}
+              {emailSuccess && (
+                <div className="p-3 border border-green-200 rounded-md bg-green-50">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <p className="text-sm font-medium text-green-800">
+                      Đã gửi phiếu điểm thành công đến {emailRecipient}!
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Email Error */}
+              {emailError && (
+                <div className="p-3 border border-red-200 rounded-md bg-red-50">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                    <p className="text-sm text-red-800">{emailError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Email Input */}
+              <div>
+                <Label
+                  htmlFor="email-recipient"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Email phụ huynh
+                </Label>
+                <Input
+                  id="email-recipient"
+                  type="email"
+                  placeholder="phuhuynh@example.com"
+                  value={emailRecipient}
+                  onChange={(e) => setEmailRecipient(e.target.value)}
+                  className="mt-1"
+                  disabled={emailSending}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Email sẽ được lưu lại cho lần gửi sau.
+                </p>
+              </div>
+
+              {/* Preview info */}
+              <div className="p-3 rounded-md bg-gray-50">
+                <p className="mb-1 text-xs font-medium text-gray-500 uppercase">
+                  Nội dung gửi
+                </p>
+                <ul className="space-y-1 text-sm text-gray-700">
+                  <li>
+                    📊 Bảng điểm chi tiết ({semester || selectedSemester})
+                  </li>
+                  <li>
+                    💬 Nhận xét:{" "}
+                    {generatedFeedback
+                      ? `"${generatedFeedback.substring(0, 60)}..."`
+                      : "Chưa có"}
+                  </li>
+                  <li>🎓 Năm học: {academicYear || selectedAcademicYear}</li>
+                </ul>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="secondary"
+                onClick={closeEmailDialog}
+                disabled={emailSending}
+              >
+                {emailSuccess ? "Đóng" : "Hủy"}
+              </Button>
+              {!emailSuccess && (
+                <Button
+                  onClick={handleSendEmailReportCard}
+                  disabled={emailSending || !emailRecipient}
+                  className="text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  {emailSending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Đang gửi...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Gửi email
+                    </>
+                  )}
+                </Button>
+              )}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
@@ -4518,12 +4776,12 @@ const StudentList = () => {
                           <input
                             type="checkbox"
                             checked={selectedSubjects.core_subjects.includes(
-                              subject.subject_code
+                              subject.subject_code,
                             )}
                             onChange={() =>
                               toggleSubjectSelection(
                                 subject.subject_code,
-                                "core_subjects"
+                                "core_subjects",
                               )
                             }
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -4532,7 +4790,7 @@ const StudentList = () => {
                             {subject.subject_name} ({subject.subject_code})
                           </span>
                           {selectedSubjects.core_subjects.includes(
-                            subject.subject_code
+                            subject.subject_code,
                           ) && <Check className="w-4 h-4 text-blue-600" />}
                         </label>
                       ))}
@@ -4568,12 +4826,12 @@ const StudentList = () => {
                           <input
                             type="checkbox"
                             checked={selectedSubjects.elective_subjects.includes(
-                              subject.subject_code
+                              subject.subject_code,
                             )}
                             onChange={() =>
                               toggleSubjectSelection(
                                 subject.subject_code,
-                                "elective_subjects"
+                                "elective_subjects",
                               )
                             }
                             className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
@@ -4582,7 +4840,7 @@ const StudentList = () => {
                             {subject.subject_name} ({subject.subject_code})
                           </span>
                           {selectedSubjects.elective_subjects.includes(
-                            subject.subject_code
+                            subject.subject_code,
                           ) && <Check className="w-4 h-4 text-green-600" />}
                         </label>
                       ))}

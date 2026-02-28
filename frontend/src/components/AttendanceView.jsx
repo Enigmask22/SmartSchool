@@ -27,8 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { Users, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Users, CheckCircle, XCircle, Clock, FileText } from "lucide-react";
 import logger from "../utils/logger";
+import LeaveRequestModal from "./attendance/LeaveRequestModal";
 
 const AttendanceView = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
@@ -39,7 +40,7 @@ const AttendanceView = () => {
 
   // Filter states
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -64,6 +65,10 @@ const AttendanceView = () => {
 
   // View mode toggle
   const [showFullList, setShowFullList] = useState(true);
+
+  // Leave request modal states
+  const [leaveRequestOpen, setLeaveRequestOpen] = useState(false);
+  const [leaveRequestRecord, setLeaveRequestRecord] = useState(null);
 
   useEffect(() => {
     if (bootstrapLoading) return;
@@ -133,7 +138,7 @@ const AttendanceView = () => {
           selected_class?.class_name &&
           classNames.includes(selected_class.class_name);
         setSelectedClass(
-          exists ? selected_class.class_name : classNames[0] || "all"
+          exists ? selected_class.class_name : classNames[0] || "all",
         );
         // Attendance data + stats
         setAttendanceRecords(records || []);
@@ -167,7 +172,7 @@ const AttendanceView = () => {
       // If homeroom teacher but no class selected, don't fetch
       if (isHomeroomTeacher() && (!selectedClass || selectedClass === "all")) {
         logger.debug(
-          "🚫 No class selected for homeroom teacher, skipping attendance fetch"
+          "🚫 No class selected for homeroom teacher, skipping attendance fetch",
         );
         setAttendanceRecords([]);
         setStats({
@@ -185,13 +190,13 @@ const AttendanceView = () => {
         let response;
         if (isHomeroomTeacher() && selectedClass && selectedClass !== "all") {
           const found = homeroomClasses.find(
-            (c) => c.class_name === selectedClass
+            (c) => c.class_name === selectedClass,
           );
           const classId = found?.id;
           response = await ApiService.request(
             `/homeroom/attendance/records?target_date=${selectedDate}${
               classId ? `&class_id=${classId}` : ""
-            }`
+            }`,
           );
           if (response.success) {
             // Chuyển dữ liệu thành cấu trúc giống API full list: { students: {...}, ... }
@@ -209,7 +214,7 @@ const AttendanceView = () => {
         } else {
           response = await ApiService.getFullAttendanceList(
             selectedDate,
-            selectedClass === "all" ? "" : selectedClass
+            selectedClass === "all" ? "" : selectedClass,
           );
         }
         if (response.success) {
@@ -218,7 +223,7 @@ const AttendanceView = () => {
           // Apply status filter if specified
           if (selectedStatus && selectedStatus !== "all") {
             filteredData = filteredData.filter(
-              (record) => record.status === selectedStatus
+              (record) => record.status === selectedStatus,
             );
           }
 
@@ -250,7 +255,7 @@ const AttendanceView = () => {
 
               if (selectedStatus && selectedStatus !== "all") {
                 filteredData = filteredData.filter(
-                  (record) => record.status === selectedStatus
+                  (record) => record.status === selectedStatus,
                 );
               }
 
@@ -266,13 +271,13 @@ const AttendanceView = () => {
                 filteredData = filteredData.filter(
                   (record) =>
                     record.students &&
-                    record.students.class_name === selectedClass
+                    record.students.class_name === selectedClass,
                 );
               }
 
               if (selectedStatus && selectedStatus !== "all") {
                 filteredData = filteredData.filter(
-                  (record) => record.status === selectedStatus
+                  (record) => record.status === selectedStatus,
                 );
               }
 
@@ -389,7 +394,7 @@ const AttendanceView = () => {
   const calculateStatsFromData = (data) => {
     const totalStudents = data.length;
     const presentCount = data.filter(
-      (record) => record.status === "present"
+      (record) => record.status === "present",
     ).length;
     const lateCount = data.filter((record) => record.status === "late").length;
     const absentCount = totalStudents - presentCount - lateCount; // Đơn giản hơn!
@@ -493,6 +498,27 @@ const AttendanceView = () => {
     return String(editingKey) === String(recordKey) && editingKey !== null;
   };
 
+  const handleOpenLeaveRequest = (record) => {
+    setLeaveRequestRecord(record);
+    setLeaveRequestOpen(true);
+  };
+
+  const handleLeaveRequestClose = () => {
+    setLeaveRequestOpen(false);
+    setLeaveRequestRecord(null);
+  };
+
+  const handleLeaveRequestUploadSuccess = (imageUrl) => {
+    // Cập nhật record trong danh sách để hiển thị đúng trạng thái icon
+    setAttendanceRecords((prev) =>
+      prev.map((r) =>
+        r.student_id === leaveRequestRecord?.student_id
+          ? { ...r, leave_request_image: imageUrl }
+          : r,
+      ),
+    );
+  };
+
   const handleEditRecord = (record) => {
     // Store the entire record including student_id for unique identification
     setEditingRecord(record);
@@ -527,7 +553,7 @@ const AttendanceView = () => {
         response = await ApiService.updateAttendanceStatus(
           editingRecord.id,
           editStatus,
-          editNotes
+          editNotes,
         );
       }
 
@@ -540,7 +566,7 @@ const AttendanceView = () => {
         setSuccessMessage(
           editingRecord.id === null
             ? "Tạo mới điểm danh thành công!"
-            : "Cập nhật trạng thái điểm danh thành công!"
+            : "Cập nhật trạng thái điểm danh thành công!",
         );
         setTimeout(() => setSuccessMessage(null), 3000);
 
@@ -735,8 +761,8 @@ const AttendanceView = () => {
                       classesLoading
                         ? "Đang tải lớp…"
                         : isHomeroomTeacher()
-                        ? "Chọn lớp chủ nhiệm"
-                        : "Tất cả lớp"
+                          ? "Chọn lớp chủ nhiệm"
+                          : "Tất cả lớp"
                     }
                   />
                   {classesLoading && (
@@ -826,7 +852,7 @@ const AttendanceView = () => {
                   <TableHead className="w-[100px]">Giờ ra</TableHead>
                   <TableHead className="w-[100px]">Trạng thái</TableHead>
                   <TableHead className="w-[150px]">Ghi chú</TableHead>
-                  <TableHead className="w-[120px] text-center">
+                  <TableHead className="w-[180px] text-center">
                     Thao tác
                   </TableHead>
                 </TableRow>
@@ -852,7 +878,7 @@ const AttendanceView = () => {
                     const endIndex = startIndex + pageSize;
                     const paginatedRecords = attendanceRecords.slice(
                       startIndex,
-                      endIndex
+                      endIndex,
                     );
 
                     return paginatedRecords.map((record, idx) => (
@@ -941,17 +967,41 @@ const AttendanceView = () => {
                               </Button>
                             </div>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                logger.debug("🖱️ Click Sửa button", { record });
-                                handleEditRecord(record);
-                              }}
-                              className="h-8 text-xs"
-                            >
-                              Sửa
-                            </Button>
+                            <div className="flex justify-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  logger.debug("🖱️ Click Sửa button", {
+                                    record,
+                                  });
+                                  handleEditRecord(record);
+                                }}
+                                className="h-8 text-xs"
+                              >
+                                Sửa
+                              </Button>
+                              {isHomeroomTeacher() && (
+                                <Button
+                                  size="sm"
+                                  variant={
+                                    record.leave_request_image
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  onClick={() => handleOpenLeaveRequest(record)}
+                                  className={`h-8 text-xs ${record.leave_request_image ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}`}
+                                  title={
+                                    record.leave_request_image
+                                      ? "Xem đơn xin nghỉ"
+                                      : "Thêm đơn xin nghỉ"
+                                  }
+                                >
+                                  <FileText className="w-3 h-3 mr-1" />
+                                  Đơn nghỉ
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -1053,7 +1103,7 @@ const AttendanceView = () => {
                             {pageNum}
                           </Button>
                         );
-                      }
+                      },
                     )}
                   </div>
 
@@ -1084,6 +1134,28 @@ const AttendanceView = () => {
           </p>
         </CardContent>
       </Card>
+
+      {/* Leave Request Modal */}
+      {leaveRequestRecord && (
+        <LeaveRequestModal
+          open={leaveRequestOpen}
+          onClose={handleLeaveRequestClose}
+          studentId={leaveRequestRecord.student_id}
+          studentName={
+            leaveRequestRecord.students?.full_name ||
+            leaveRequestRecord.student_name ||
+            ""
+          }
+          studentCode={
+            leaveRequestRecord.students?.student_id ||
+            leaveRequestRecord.student_code ||
+            ""
+          }
+          targetDate={selectedDate}
+          existingImageUrl={leaveRequestRecord.leave_request_image || null}
+          onUploadSuccess={handleLeaveRequestUploadSuccess}
+        />
+      )}
     </div>
   );
 };

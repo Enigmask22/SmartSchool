@@ -30,6 +30,7 @@ class StudentCreate(BaseModel):
     phone: Optional[str] = None
     parent_contacts: Optional[list] = None
     address: Optional[str] = None
+    received_email: Optional[str] = None  # Email phụ huynh để nhận phiếu điểm
     is_active: Optional[bool] = True
 
 class StudentUpdate(BaseModel):
@@ -45,6 +46,7 @@ class StudentUpdate(BaseModel):
     address: Optional[str] = None
     is_active: Optional[bool] = None
     subject_selected: Optional[dict] = None
+    received_email: Optional[str] = None  # Email phụ huynh để nhận phiếu điểm
 
 class Student(StudentBase):
     id: int

@@ -64,3 +64,19 @@ class CommentResponseModel(BaseModel):
     success: bool
     message: str
     data: Optional[CommentResponse] = None
+
+
+class EmailReportCardRequest(BaseModel):
+    """Request model cho gửi phiếu điểm qua email"""
+    student_id: int = Field(..., description="ID học sinh (internal)")
+    student_code: str = Field(..., description="Mã số học sinh (vd: 250001)")
+    student_name: str = Field(..., description="Họ và tên học sinh")
+    class_name: str = Field(default="", description="Lớp học")
+    grade: str = Field(default="", description="Khối")
+    teacher_name: str = Field(default="", description="Tên giáo viên chủ nhiệm")
+    academic_year: str = Field(default="", description="Năm học")
+    semester: str = Field(default="HK1", description="Học kỳ")
+    feedback: str = Field(default="", description="Nhận xét của giáo viên")
+    scores: list = Field(default=[], description="Danh sách điểm [{subject_name, final_score, score_data}]")
+    overall_average: Optional[float] = Field(default=None, description="Điểm trung bình tổng kết")
+    received_email: Optional[str] = Field(default=None, description="Email phụ huynh (override từ DB)")

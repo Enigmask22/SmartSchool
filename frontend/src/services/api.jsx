@@ -474,7 +474,63 @@ class ApiService {
       `/attendance/${attendanceId}/status?${params.toString()}`,
       {
         method: "PATCH",
-      }
+      },
+    );
+  }
+
+  // ===============================================
+  // LEAVE REQUEST - Đơn xin nghỉ học
+  // ===============================================
+
+  /**
+   * Upload ảnh đơn xin nghỉ học cho học sinh
+   * @param {number} studentId - ID học sinh (students.id)
+   * @param {File} imageFile - File ảnh đơn xin nghỉ
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async uploadLeaveRequestImage(studentId, imageFile, targetDate) {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const params = new URLSearchParams();
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/leave-request/${studentId}?${params.toString()}`,
+      {
+        method: "POST",
+        headers: {}, // Để browser tự set Content-Type với boundary
+        body: formData,
+      },
+    );
+  }
+
+  /**
+   * Lấy thông tin ảnh đơn xin nghỉ cho học sinh theo ngày
+   * @param {number} studentId - ID học sinh
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async getLeaveRequestImage(studentId, targetDate) {
+    const params = new URLSearchParams();
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/leave-request/${studentId}?${params.toString()}`,
+    );
+  }
+
+  /**
+   * Xóa ảnh đơn xin nghỉ
+   * @param {number} studentId - ID học sinh
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async deleteLeaveRequestImage(studentId, targetDate) {
+    const params = new URLSearchParams();
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/leave-request/${studentId}?${params.toString()}`,
+      { method: "DELETE" },
     );
   }
 
@@ -490,7 +546,7 @@ class ApiService {
 
     const queryString = params.toString();
     return this.request(
-      `/attendance/full-list${queryString ? "?" + queryString : ""}`
+      `/attendance/full-list${queryString ? "?" + queryString : ""}`,
     );
   }
 
@@ -561,7 +617,7 @@ class ApiService {
       {
         method: "POST",
         body: JSON.stringify(configs),
-      }
+      },
     );
   }
 
@@ -571,7 +627,7 @@ class ApiService {
       `/school-days-config/apply-temporary/${grade}${queryParams}`,
       {
         method: "POST",
-      }
+      },
     );
   }
 
@@ -658,13 +714,13 @@ class ApiService {
 
     const queryString = queryParams.toString();
     return this.request(
-      `/scores/class-subjects${queryString ? "?" + queryString : ""}`
+      `/scores/class-subjects${queryString ? "?" + queryString : ""}`,
     );
   }
 
   async getScoreConfig(teacherId, subjectId, academicYear, semester) {
     return this.request(
-      `/scores/config/${teacherId}/${subjectId}/${academicYear}/${semester}`
+      `/scores/config/${teacherId}/${subjectId}/${academicYear}/${semester}`,
     );
   }
 
@@ -673,24 +729,24 @@ class ApiService {
     subjectId,
     academicYear,
     semester,
-    config
+    config,
   ) {
     return this.request(
       `/scores/config/${teacherId}/${subjectId}/${academicYear}/${semester}`,
       {
         method: "PUT",
         body: JSON.stringify(config),
-      }
+      },
     );
   }
 
   async getStudentsByClassSubject(
     classSubjectId,
     academicYear = "2024-2025",
-    semester = "HK1"
+    semester = "HK1",
   ) {
     return this.request(
-      `/scores/teacher/students/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`
+      `/scores/teacher/students/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
@@ -756,17 +812,17 @@ class ApiService {
 
   async getStudentScore(studentId, classSubjectId, academicYear, semester) {
     return this.request(
-      `/scores/score/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`
+      `/scores/score/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
   async getStudentScores(
     studentId,
     academicYear = "2024-2025",
-    semester = "HK1"
+    semester = "HK1",
   ) {
     return this.request(
-      `/scores/student/${studentId}?academic_year=${academicYear}&semester=${semester}`
+      `/scores/student/${studentId}?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
@@ -801,7 +857,7 @@ class ApiService {
       let filename = "template_diem.xlsx";
       if (contentDisposition) {
         const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(
-          contentDisposition
+          contentDisposition,
         );
         if (matches != null && matches[1]) {
           filename = matches[1].replace(/['"]/g, "");
@@ -840,7 +896,7 @@ class ApiService {
   // Teacher Classes List (for dropdown filter)
   async getTeacherClasses(academicYear = "2024-2025", semester = "HK1") {
     return this.request(
-      `/scores/teacher/classes?academic_year=${academicYear}&semester=${semester}`
+      `/scores/teacher/classes?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
@@ -848,7 +904,7 @@ class ApiService {
   async getTeacherDashboardAnalytics(
     academicYear = "2024-2025",
     semester = "HK1",
-    classId = null
+    classId = null,
   ) {
     let url = `/scores/teacher/dashboard/analytics?academic_year=${academicYear}&semester=${semester}`;
     if (classId) {
@@ -1042,7 +1098,7 @@ class ApiService {
       `/admin/subject-teachers/${subjectTeacherId}/permanent`,
       {
         method: "DELETE",
-      }
+      },
     );
   }
 
@@ -1182,6 +1238,21 @@ class ApiService {
   }
 
   // ===============================================
+  // EMAIL REPORT CARD API
+  // ===============================================
+
+  /**
+   * Gửi phiếu điểm qua email cho phụ huynh
+   * @param {Object} reportData - Dữ liệu phiếu điểm
+   */
+  async sendEmailReportCard(reportData) {
+    return this.request("/feedback/send-email-report-card", {
+      method: "POST",
+      body: JSON.stringify(reportData),
+    });
+  }
+
+  // ===============================================
   // BULK STUDENT IMPORT APIs
   // ===============================================
 
@@ -1215,7 +1286,7 @@ class ApiService {
             // Không set Content-Type để browser tự động set với boundary cho multipart/form-data
           },
           body: formData,
-        }
+        },
       );
 
       if (!response.ok) {
@@ -1272,7 +1343,7 @@ class ApiService {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(data),
-        }
+        },
       );
 
       if (!response.ok) {

@@ -1,95 +1,83 @@
 """
-Service xử lý OCR cho bảng điểm viết tay sử dụng Google Gemini Vision API
+Service xử lý OCR cho bảng điểm viết tay sử dụng OpenRouter API (Gemma 3 27B)
+Model: google/gemma-3-27b-it:free - Vision Language Model miễn phí qua OpenRouter
 """
 
 import os
 import json
+import base64
 from typing import List, Dict, Optional
-import google.generativeai as genai
 from PIL import Image
 import re
+import io
+
+from openai import OpenAI
 
 from core.logger import setup_logger
 
-logger = setup_logger("gemini_ocr")
+logger = setup_logger("openrouter_ocr")
 
 
-class GeminiOCRService:
+class OpenRouterOCRService:
     """
-    Service để phân tích bảng điểm viết tay sử dụng Gemini Vision API
+    Service để phân tích bảng điểm viết tay sử dụng OpenRouter API (Gemma 3 27B)
     
     Ưu điểm:
-    - Độ chính xác cao: 95-98% với chữ viết tay
-    - Context understanding tốt
-    - API đơn giản, dễ sử dụng
-    - Không cần GPU (cloud-based)
+    - Miễn phí hoàn toàn (free tier trên OpenRouter)
+    - Hỗ trợ Vision (multimodal) - đọc được ảnh
+    - Không cần GPU local
+    - Độ chính xác tốt với chữ viết tay
     
     Nhược điểm:
-    - Cần API key
     - Phụ thuộc vào kết nối mạng
-    - Chi phí API calls
+    - Rate limit của free tier
+    - Tốc độ có thể chậm hơn Gemini
+    
+    Model: google/gemma-3-27b-it:free
     """
     
-    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-2.0-flash"):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_name: Optional[str] = None,
+    ):
         """
-        Khởi tạo Gemini OCR Service
+        Khởi tạo OpenRouter OCR Service
         
         Args:
-            api_key: API key cho Google AI Studio
-            model_name: Tên model Gemini để sử dụng
+            api_key: OpenRouter API key
+            model_name: Tên model trên OpenRouter (mặc định: google/gemma-3-27b-it:free)
         """
-        self.api_key = api_key or self._load_api_key()
-        self.model_name = model_name
-        self.model = None
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.model_name = model_name or os.getenv(
+            "OPENROUTER_OCR_MODEL", "google/gemma-3-27b-it:free"
+        )
         
         if not self.api_key:
-            raise ValueError("API key không được tìm thấy. Vui lòng cấu hình GEMINI_API_KEY.")
-        
-        self._initialize_model()
-        logger.info(f"✅ GeminiOCRService initialized successfully with {self.model_name}")
-    
-    def _load_api_key(self) -> Optional[str]:
-        """
-        Tải API key từ biến môi trường
-        
-        Returns:
-            API key nếu tìm thấy, None nếu không
-        """
-        # Thử lấy từ biến môi trường
-        api_key = os.getenv('GEMINI_API_KEY')
-        if api_key:
-            return api_key
-        
-        # Fallback API key (chỉ dùng cho development)
-        return 'AIzaSyAJLXNgLaKPxTv_rn_iERKxgiUhMPvLlMw'
-    
-    def _initialize_model(self):
-        """
-        Khởi tạo model Gemini với Vision capability
-        """
-        try:
-            # Cấu hình API key
-            genai.configure(api_key=self.api_key)
-            
-            # Khởi tạo model với vision capability
-            self.model = genai.GenerativeModel(self.model_name)
-            
-            # Cấu hình generation
-            self.generation_config = genai.types.GenerationConfig(
-                candidate_count=1,
-                max_output_tokens=7200,
-                temperature=0.1,  # Low temperature for accuracy
+            raise ValueError(
+                "OpenRouter API key không được tìm thấy. "
+                "Vui lòng cấu hình OPENROUTER_API_KEY trong .env"
             )
-            
-            logger.info(f"✅ Đã kết nối thành công với {self.model_name}")
-            
-        except Exception as e:
-            logger.error(f"❌ ERROR: Lỗi khi khởi tạo Gemini model: {e}")
-            raise
+        
+        # Headers bắt buộc cho free models trên OpenRouter
+        self.extra_headers = {
+            "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:3000"),
+            "X-Title": os.getenv("OPENROUTER_APP_NAME", "Smart School"),
+        }
+        
+        # Sử dụng synchronous client (giống GeminiOCRService dùng sync API)
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.api_key,
+            default_headers=self.extra_headers,
+        )
+        
+        logger.info(f"✅ OpenRouterOCRService initialized với model: {self.model_name}")
     
     def _create_ocr_prompt(self) -> str:
         """
-        Tạo prompt chi tiết cho Gemini để đọc bảng điểm
+        Tạo prompt chi tiết để model đọc bảng điểm
+        (Dùng chung logic prompt với GeminiOCRService)
         
         Returns:
             Prompt đã được định dạng
@@ -106,7 +94,7 @@ Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là 
    - Mỗi dòng là thông tin của một học sinh
 
 2. **Quy tắc đọc dữ liệu:**
-   - **ID học sinh**: Thường có dạng 6 số như 250001, 250002,... 
+   - **ID học sinh**: Thường có dạng 6 số như 250001, 250002,...
    - **Họ và tên**: Tên đầy đủ của học sinh (chữ tiếng Việt có dấu)
    - **Điểm số - có 3 loại:**
      * **Điểm số (numeric)**: Số thập phân từ 0 đến 10, bước nhảy 0.25
@@ -153,15 +141,43 @@ Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là 
    - Nếu điểm số không hợp lệ (< 0 hoặc > 10 cho điểm số, hoặc không phải Đ/KĐ cho điểm chữ), ghi vào errors
    - Key của JSON phải CHÍNH XÁC theo tên cột trong header (viết hoa, viết thường, dấu gạch dưới)
 
-**CHỈ TRẢ VỀ JSON, KHÔNG THÊM BẤT KỲ VÁN BẢN NÀO KHÁC.**
+**CHỈ TRẢ VỀ JSON, KHÔNG THÊM BẤT KỲ VĂN BẢN NÀO KHÁC.**
 
 Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu theo format trên.
 """
         return prompt.strip()
     
+    def _encode_image_to_base64(self, image_path: str) -> str:
+        """
+        Đọc ảnh và encode sang base64 data URL
+
+        Args:
+            image_path: Đường dẫn đến file ảnh
+
+        Returns:
+            Base64 data URL string (data:image/xxx;base64,...)
+        """
+        # Xác định MIME type
+        ext = os.path.splitext(image_path)[1].lower()
+        mime_map = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+        }
+        mime_type = mime_map.get(ext, "image/jpeg")
+        
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+        
+        b64 = base64.b64encode(image_data).decode("utf-8")
+        return f"data:{mime_type};base64,{b64}"
+    
     def parse_score_sheet(self, image_path: str) -> Dict:
         """
-        Phân tích toàn bộ bảng điểm sử dụng Gemini Vision API
+        Phân tích toàn bộ bảng điểm sử dụng OpenRouter Vision API (Gemma 3 27B)
         
         Args:
             image_path: Đường dẫn đến file ảnh bảng điểm
@@ -177,7 +193,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
         try:
             logger.debug(f"Processing score sheet: {image_path}")
             
-            # Bước 1: Mở và validate ảnh
+            # Bước 1: Validate file tồn tại
             if not os.path.exists(image_path):
                 return {
                     'success': False,
@@ -187,9 +203,10 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                     'total_rows': 0
                 }
             
-            # Bước 2: Đọc ảnh
+            # Bước 2: Validate ảnh có mở được không
             try:
                 image = Image.open(image_path)
+                image.close()
             except Exception as e:
                 return {
                     'success': False,
@@ -199,35 +216,61 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                     'total_rows': 0
                 }
             
-            # Bước 3: Tạo prompt
+            # Bước 3: Encode ảnh sang base64
+            image_data_url = self._encode_image_to_base64(image_path)
+            
+            # Bước 4: Tạo prompt
             prompt = self._create_ocr_prompt()
             
-            # Bước 4: Gửi request đến Gemini
-            response = self.model.generate_content(
-                [prompt, image],
-                generation_config=self.generation_config
+            # Bước 5: Gửi request đến OpenRouter (Gemma 3 27B vision)
+            logger.info(f"🤖 [OpenRouter OCR] Gửi ảnh đến {self.model_name}...")
+            
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": prompt,
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_data_url,
+                                },
+                            },
+                        ],
+                    }
+                ],
+                max_tokens=7200,
+                temperature=0.1,  # Low temperature cho OCR accuracy
             )
             
-            if not response or not response.text:
+            if not response or not response.choices or not response.choices[0].message.content:
                 return {
                     'success': False,
                     'headers': [],
                     'rows': [],
-                    'errors': ['Không nhận được phản hồi từ Gemini API'],
+                    'errors': ['Không nhận được phản hồi từ OpenRouter API'],
                     'total_rows': 0
                 }
             
-            # Bước 5: Parse JSON response
-            parsed_data = self._parse_gemini_response(response.text)
+            response_text = response.choices[0].message.content
+            logger.debug(f"OpenRouter response length: {len(response_text)} chars")
             
-            # Bước 6: Validate và chuẩn hóa dữ liệu
+            # Bước 6: Parse JSON response
+            parsed_data = self._parse_response(response_text)
+            
+            # Bước 7: Validate và chuẩn hóa dữ liệu
             validated_data = self._validate_and_normalize(parsed_data)
             
-            logger.debug(f"Parsed {validated_data.get('total_rows', 0)} rows")
+            logger.info(f"✅ [OpenRouter OCR] Parsed {validated_data.get('total_rows', 0)} rows")
             return validated_data
             
         except Exception as e:
-            logger.error(f"❌ Error parsing score sheet: {str(e)}", exc_info=True)
+            logger.error(f"❌ [OpenRouter OCR] Error parsing score sheet: {str(e)}", exc_info=True)
             return {
                 'success': False,
                 'headers': [],
@@ -236,12 +279,12 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                 'total_rows': 0
             }
     
-    def _parse_gemini_response(self, response_text: str) -> Dict:
+    def _parse_response(self, response_text: str) -> Dict:
         """
-        Parse JSON response từ Gemini
+        Parse JSON response từ OpenRouter model
         
         Args:
-            response_text: Text response từ Gemini API
+            response_text: Text response từ API
             
         Returns:
             Parsed data dictionary
@@ -250,7 +293,6 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
             # Remove markdown code blocks nếu có
             response_text = response_text.strip()
             
-            # Remove ```json và ``` nếu có
             if response_text.startswith('```json'):
                 response_text = response_text[7:]
             elif response_text.startswith('```'):
@@ -264,26 +306,27 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
             # Parse JSON
             data = json.loads(response_text)
             
-            logger.debug(f"Parsed Gemini response: {data.get('total_rows', 0)} rows")
+            logger.debug(f"Parsed OpenRouter response: {data.get('total_rows', 0)} rows")
             return data
             
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
-            logger.debug(f"Response text: {response_text[:500]}...")  # Log first 500 chars
+            logger.debug(f"Response text: {response_text[:500]}...")
             return {
                 'success': False,
                 'headers': [],
                 'rows': [],
-                'errors': [f'Không thể parse JSON từ Gemini: {str(e)}'],
+                'errors': [f'Không thể parse JSON từ OpenRouter: {str(e)}'],
                 'total_rows': 0
             }
     
     def _validate_and_normalize(self, data: Dict) -> Dict:
         """
-        Validate và chuẩn hóa dữ liệu từ Gemini
+        Validate và chuẩn hóa dữ liệu từ model response
+        (Logic giống GeminiOCRService._validate_and_normalize)
         
         Args:
-            data: Raw data từ Gemini
+            data: Raw data từ model
             
         Returns:
             Validated và normalized data
@@ -301,7 +344,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                 validated_row = {}
                 
                 # Validate student_id
-                student_id = row.get('student_id', '').strip()
+                student_id = str(row.get('student_id', '')).strip()
                 if not student_id:
                     errors.append(f"Row {idx}: Thiếu student_id")
                     continue
@@ -316,7 +359,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                 
                 # Validate ho_va_ten (optional)
                 if 'ho_va_ten' in row:
-                    validated_row['ho_va_ten'] = row['ho_va_ten'].strip()
+                    validated_row['ho_va_ten'] = str(row['ho_va_ten']).strip()
                 
                 # Validate và normalize TẤT CẢ các cột điểm (dynamic)
                 for score_col in score_columns:
@@ -348,12 +391,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
     def _normalize_student_id(self, student_id: str) -> Optional[str]:
         """
         Chuẩn hóa student_id
-        
-        Args:
-            student_id: Raw student ID
-            
-        Returns:
-            Normalized student ID (format: 250001, 250002, ...)
+        (Logic giống GeminiOCRService._normalize_student_id)
         """
         student_id = student_id.strip().upper()
         
@@ -374,17 +412,9 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
     def _normalize_score(self, score):
         """
         Chuẩn hóa điểm số - hỗ trợ cả điểm số (float) và điểm chữ (Đ, KĐ)
-        
-        Args:
-            score: Raw score (có thể là int, float, hoặc string)
-            
-        Returns:
-            - float: Điểm số (0-10, bước 0.25)
-            - str: Điểm chữ ("Đ" hoặc "KĐ")
-            - None: Không hợp lệ
+        (Logic giống GeminiOCRService._normalize_score)
         """
         try:
-            # Nếu là string, check xem có phải điểm chữ không
             if isinstance(score, str):
                 score_str = score.strip().upper()
                 
@@ -396,8 +426,7 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
                 if score_str in ['KĐ', 'KD', 'KHONG DAT', 'KHÔNG ĐẠT', 'KHONGDAT']:
                     return 'KĐ'
                 
-                # Nếu không phải điểm chữ, thử convert sang số
-                # Replace comma with dot
+                # Thử convert sang số
                 score = score.replace(',', '.')
                 score = float(score)
             elif isinstance(score, (int, float)):
@@ -423,11 +452,12 @@ Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu the
     def export_to_excel_format(self, parsed_data: Dict) -> List[Dict]:
         """
         Convert parsed data sang format phù hợp với bulk import
+        (Tương thích với GeminiOCRService.export_to_excel_format)
         
         Args:
             parsed_data: Data từ parse_score_sheet()
             
-        Returns: 
+        Returns:
             List[{student_id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki}]
         """
         if not parsed_data.get('success'):
