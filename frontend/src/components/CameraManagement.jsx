@@ -59,7 +59,7 @@ const CameraManagement = () => {
     location: "",
     description: "",
     enabled: true,
-    fps: 30,
+    fps: 60,
     width: "",
     height: "",
     username: "",
@@ -115,7 +115,7 @@ const CameraManagement = () => {
       location: "",
       description: "",
       enabled: true,
-      fps: 30,
+      fps: 60,
       width: "",
       height: "",
       username: "",
@@ -132,7 +132,7 @@ const CameraManagement = () => {
       location: camera.location || "",
       description: camera.description || "",
       enabled: camera.enabled ?? true,
-      fps: camera.fps || 30,
+      fps: camera.fps || 60,
       width: camera.width || "",
       height: camera.height || "",
       username: camera.username || "",
@@ -316,7 +316,7 @@ const CameraManagement = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-2xl font-bold flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-2xl font-bold">
                 <Camera className="w-6 h-6" />
                 Quản lý Camera
               </CardTitle>
@@ -334,7 +334,7 @@ const CameraManagement = () => {
           {/* Search */}
           <div className="mb-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
               <Input
                 placeholder="Tìm kiếm camera (tên, vị trí, source)..."
                 value={searchTerm}
@@ -346,19 +346,19 @@ const CameraManagement = () => {
 
           {/* Error */}
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            <div className="p-3 mb-4 text-red-700 bg-red-100 border border-red-400 rounded">
               {error}
             </div>
           )}
 
           {/* Table */}
           {loading && cameras.length === 0 ? (
-            <div className="text-center py-8">
-              <Loader className="w-8 h-8 animate-spin mx-auto mb-2" />
+            <div className="py-8 text-center">
+              <Loader className="w-8 h-8 mx-auto mb-2 animate-spin" />
               <p className="text-muted-foreground">Đang tải...</p>
             </div>
           ) : filteredCameras.length === 0 ? (
-            <div className="text-center py-8">
+            <div className="py-8 text-center">
               <Camera className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
               <p className="text-muted-foreground">
                 {searchTerm
@@ -387,7 +387,7 @@ const CameraManagement = () => {
                         {camera.name}
                       </TableCell>
                       <TableCell>
-                        <code className="text-xs bg-muted px-2 py-1 rounded">
+                        <code className="px-2 py-1 text-xs rounded bg-muted">
                           {camera.source}
                         </code>
                       </TableCell>
@@ -479,7 +479,7 @@ const CameraManagement = () => {
                   placeholder="http://192.168.1.100:8080/video hoặc 0, 1 (cho webcam)"
                   required
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-muted-foreground">
                   URL camera IP hoặc số thứ tự webcam (0, 1, 2...)
                 </p>
               </div>
@@ -512,13 +512,29 @@ const CameraManagement = () => {
                   <Label>FPS</Label>
                   <Input
                     type="number"
-                    value={formData.fps}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        fps: parseInt(e.target.value) || 30,
-                      })
-                    }
+                    value={formData.fps === "" ? "" : formData.fps}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Cho phép xóa trống để nhập số mới
+                      if (value === "") {
+                        setFormData({ ...formData, fps: "" });
+                      } else {
+                        const numValue = parseInt(value);
+                        if (
+                          !isNaN(numValue) &&
+                          numValue >= 1 &&
+                          numValue <= 60
+                        ) {
+                          setFormData({ ...formData, fps: numValue });
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Khi blur, nếu trống thì set về default 60
+                      if (formData.fps === "" || formData.fps === null) {
+                        setFormData({ ...formData, fps: 60 });
+                      }
+                    }}
                     min={1}
                     max={60}
                   />

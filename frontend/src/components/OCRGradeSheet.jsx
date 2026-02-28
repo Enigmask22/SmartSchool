@@ -12,6 +12,9 @@ import {
   FileText,
   Clock,
   RefreshCw,
+  Edit2,
+  Trash2,
+  Save,
 } from "lucide-react";
 import {
   Card,
@@ -38,6 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
+import { Input } from "./ui/input";
 import api from "../services/api";
 import logger from "../utils/logger";
 
@@ -64,6 +68,171 @@ const OCRGradeSheet = ({
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20); // 20 rows per page
+
+  // Editing states - cho phép sửa điểm trực tiếp trong preview
+  const [editingRowIndex, setEditingRowIndex] = useState(null); // Index của row đang edit (trong sorted list)
+  const [editValues, setEditValues] = useState({}); // Giá trị đang edit
+
+  // Hàm cập nhật điểm trong parsedData
+  const handleScoreChange = (globalIndex, field, value) => {
+    // Validate score value
+    let normalizedValue = value.trim();
+
+    if (normalizedValue !== "") {
+      const upperValue = normalizedValue.toUpperCase();
+
+      // Accept letter grades
+      if (["Đ", "D", "DAT", "ĐẠT"].includes(upperValue)) {
+        normalizedValue = "Đ";
+      } else if (
+        [
+          "KĐ",
+          "KD",
+          "KHONG_DAT",
+          "KHONGDAT",
+          "KHÔNG_ĐẠT",
+          "KHÔNG ĐẠT",
+        ].includes(upperValue)
+      ) {
+        normalizedValue = "KĐ";
+      } else {
+        // Try parsing as number
+        const numValue = parseFloat(normalizedValue);
+        if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
+          normalizedValue = numValue;
+        }
+      }
+    } else {
+      normalizedValue = null;
+    }
+
+    // Update editValues for current editing session
+    setEditValues((prev) => ({
+      ...prev,
+      [field]: value, // Keep original input value for display
+    }));
+  };
+
+  // Lưu thay đổi vào parsedData
+  const handleSaveEdit = (globalIndex) => {
+    if (!parsedData || !parsedData.parsed_rows) return;
+
+    // Sort rows giống như trong render
+    const sortedRows = [...parsedData.parsed_rows].sort((a, b) => {
+      const aId = parseInt(a.student_id) || 0;
+      const bId = parseInt(b.student_id) || 0;
+      return aId - bId;
+    });
+
+    // Tìm original index trong parsedData.parsed_rows
+    const rowToUpdate = sortedRows[globalIndex];
+    const originalIndex = parsedData.parsed_rows.findIndex(
+      (r) => r.student_id === rowToUpdate.student_id
+    );
+
+    if (originalIndex === -1) return;
+
+    // Normalize và update values
+    const updatedRows = [...parsedData.parsed_rows];
+    const row = { ...updatedRows[originalIndex] };
+
+    // Update each field if it was edited
+    ["diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"].forEach(
+      (field) => {
+        if (editValues[field] !== undefined) {
+          const value = editValues[field].trim();
+          if (value === "") {
+            row[field] = null;
+          } else {
+            const upperValue = value.toUpperCase();
+            if (["Đ", "D", "DAT", "ĐẠT"].includes(upperValue)) {
+              row[field] = "Đ";
+            } else if (
+              [
+                "KĐ",
+                "KD",
+                "KHONG_DAT",
+                "KHONGDAT",
+                "KHÔNG_ĐẠT",
+                "KHÔNG ĐẠT",
+              ].includes(upperValue)
+            ) {
+              row[field] = "KĐ";
+            } else {
+              const numValue = parseFloat(value);
+              if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
+                row[field] = numValue;
+              }
+            }
+          }
+        }
+      }
+    );
+
+    updatedRows[originalIndex] = row;
+
+    setParsedData({
+      ...parsedData,
+      parsed_rows: updatedRows,
+    });
+
+    // Reset editing state
+    setEditingRowIndex(null);
+    setEditValues({});
+  };
+
+  // Bắt đầu edit một row
+  const handleStartEdit = (globalIndex, row) => {
+    setEditingRowIndex(globalIndex);
+    setEditValues({
+      diem_thuong_xuyen:
+        row.diem_thuong_xuyen !== null && row.diem_thuong_xuyen !== undefined
+          ? String(row.diem_thuong_xuyen)
+          : "",
+      diem_thi_giua_ki:
+        row.diem_thi_giua_ki !== null && row.diem_thi_giua_ki !== undefined
+          ? String(row.diem_thi_giua_ki)
+          : "",
+      diem_thi_cuoi_ki:
+        row.diem_thi_cuoi_ki !== null && row.diem_thi_cuoi_ki !== undefined
+          ? String(row.diem_thi_cuoi_ki)
+          : "",
+    });
+  };
+
+  // Hủy edit
+  const handleCancelEdit = () => {
+    setEditingRowIndex(null);
+    setEditValues({});
+  };
+
+  // Xóa một row
+  const handleDeleteRow = (globalIndex) => {
+    if (!parsedData || !parsedData.parsed_rows) return;
+
+    if (!window.confirm("Bạn có chắc muốn xóa học sinh này khỏi danh sách?")) {
+      return;
+    }
+
+    // Sort rows giống như trong render
+    const sortedRows = [...parsedData.parsed_rows].sort((a, b) => {
+      const aId = parseInt(a.student_id) || 0;
+      const bId = parseInt(b.student_id) || 0;
+      return aId - bId;
+    });
+
+    const rowToDelete = sortedRows[globalIndex];
+    const updatedRows = parsedData.parsed_rows.filter(
+      (r) => r.student_id !== rowToDelete.student_id
+    );
+
+    setParsedData({
+      ...parsedData,
+      parsed_rows: updatedRows,
+      total_rows: updatedRows.length,
+      total_valid: updatedRows.length,
+    });
+  };
 
   // Reset page when parsedData changes
   React.useEffect(() => {
@@ -656,6 +825,18 @@ const OCRGradeSheet = ({
 
                 {/* Data Table */}
                 <Card>
+                  <CardHeader className="py-3 px-4 border-b bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Dữ liệu đã nhận dạng
+                      </CardTitle>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Edit2 className="w-3 h-3" />
+                        <span>Click vào hàng để chỉnh sửa điểm</span>
+                      </div>
+                    </div>
+                  </CardHeader>
                   <CardContent className="p-0">
                     <div className="overflow-x-auto max-h-96">
                       <Table>
@@ -682,6 +863,9 @@ const OCRGradeSheet = ({
                             <TableHead className="text-xs font-medium text-center">
                               ĐCK
                             </TableHead>
+                            <TableHead className="text-xs font-medium text-center w-24">
+                              Thao tác
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -690,7 +874,7 @@ const OCRGradeSheet = ({
                             const startIndex = (currentPage - 1) * pageSize;
                             const endIndex = startIndex + pageSize;
                             // Sắp xếp theo student_id tăng dần trước khi phân trang
-                            const sortedRows = parsedData.parsed_rows.sort(
+                            const sortedRows = [...parsedData.parsed_rows].sort(
                               (a, b) => {
                                 const aId = parseInt(a.student_id) || 0;
                                 const bId = parseInt(b.student_id) || 0;
@@ -702,70 +886,210 @@ const OCRGradeSheet = ({
                               endIndex
                             );
 
-                            return paginatedRows.map((row, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell className="text-sm">
-                                  {startIndex + idx + 1}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-primary">
-                                  {row.student_id}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  {row.full_name}
-                                  {row.ocr_name &&
-                                    row.ocr_name !== row.full_name && (
-                                      <span className="block text-xs text-muted-foreground">
-                                        OCR: {row.ocr_name}
+                            return paginatedRows.map((row, idx) => {
+                              const globalIndex = startIndex + idx; // Index trong sorted list
+                              const isEditing = editingRowIndex === globalIndex;
+
+                              return (
+                                <TableRow
+                                  key={idx}
+                                  className={`${
+                                    isEditing
+                                      ? "bg-blue-50"
+                                      : "hover:bg-muted/50 cursor-pointer"
+                                  }`}
+                                  onClick={() =>
+                                    !isEditing &&
+                                    handleStartEdit(globalIndex, row)
+                                  }
+                                >
+                                  <TableCell className="text-sm">
+                                    {startIndex + idx + 1}
+                                  </TableCell>
+                                  <TableCell className="text-sm font-medium text-primary">
+                                    {row.student_id}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {row.full_name}
+                                    {row.ocr_name &&
+                                      row.ocr_name !== row.full_name && (
+                                        <span className="block text-xs text-muted-foreground">
+                                          OCR: {row.ocr_name}
+                                        </span>
+                                      )}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {row.class_name}
+                                  </TableCell>
+
+                                  {/* ĐTX */}
+                                  <TableCell
+                                    className="text-sm text-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {isEditing ? (
+                                      <Input
+                                        type="text"
+                                        value={
+                                          editValues.diem_thuong_xuyen ?? ""
+                                        }
+                                        onChange={(e) =>
+                                          handleScoreChange(
+                                            globalIndex,
+                                            "diem_thuong_xuyen",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="0-10, Đ, KĐ"
+                                        className="w-16 h-7 text-xs text-center mx-auto"
+                                      />
+                                    ) : row.diem_thuong_xuyen !== null &&
+                                      row.diem_thuong_xuyen !== undefined ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-blue-100 text-blue-700"
+                                      >
+                                        {row.diem_thuong_xuyen}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground">
+                                        -
                                       </span>
                                     )}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {row.class_name}
-                                </TableCell>
-                                <TableCell className="text-sm text-center">
-                                  {row.diem_thuong_xuyen !== null ? (
-                                    <Badge
-                                      variant="secondary"
-                                      className="bg-blue-100 text-blue-700"
-                                    >
-                                      {row.diem_thuong_xuyen}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground">
-                                      -
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-sm text-center">
-                                  {row.diem_thi_giua_ki !== null ? (
-                                    <Badge
-                                      variant="secondary"
-                                      className="bg-blue-100 text-blue-700"
-                                    >
-                                      {row.diem_thi_giua_ki}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground">
-                                      -
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-sm text-center">
-                                  {row.diem_thi_cuoi_ki !== null ? (
-                                    <Badge
-                                      variant="secondary"
-                                      className="bg-blue-100 text-blue-700"
-                                    >
-                                      {row.diem_thi_cuoi_ki}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground">
-                                      -
-                                    </span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ));
+                                  </TableCell>
+
+                                  {/* ĐGK */}
+                                  <TableCell
+                                    className="text-sm text-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {isEditing ? (
+                                      <Input
+                                        type="text"
+                                        value={
+                                          editValues.diem_thi_giua_ki ?? ""
+                                        }
+                                        onChange={(e) =>
+                                          handleScoreChange(
+                                            globalIndex,
+                                            "diem_thi_giua_ki",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="0-10, Đ, KĐ"
+                                        className="w-16 h-7 text-xs text-center mx-auto"
+                                      />
+                                    ) : row.diem_thi_giua_ki !== null &&
+                                      row.diem_thi_giua_ki !== undefined ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-blue-100 text-blue-700"
+                                      >
+                                        {row.diem_thi_giua_ki}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground">
+                                        -
+                                      </span>
+                                    )}
+                                  </TableCell>
+
+                                  {/* ĐCK */}
+                                  <TableCell
+                                    className="text-sm text-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {isEditing ? (
+                                      <Input
+                                        type="text"
+                                        value={
+                                          editValues.diem_thi_cuoi_ki ?? ""
+                                        }
+                                        onChange={(e) =>
+                                          handleScoreChange(
+                                            globalIndex,
+                                            "diem_thi_cuoi_ki",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="0-10, Đ, KĐ"
+                                        className="w-16 h-7 text-xs text-center mx-auto"
+                                      />
+                                    ) : row.diem_thi_cuoi_ki !== null &&
+                                      row.diem_thi_cuoi_ki !== undefined ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-blue-100 text-blue-700"
+                                      >
+                                        {row.diem_thi_cuoi_ki}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground">
+                                        -
+                                      </span>
+                                    )}
+                                  </TableCell>
+
+                                  {/* Actions */}
+                                  <TableCell
+                                    className="text-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {isEditing ? (
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          className="h-6 w-6 p-0"
+                                          onClick={() =>
+                                            handleSaveEdit(globalIndex)
+                                          }
+                                          title="Lưu"
+                                        >
+                                          <Save className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0"
+                                          onClick={handleCancelEdit}
+                                          title="Hủy"
+                                        >
+                                          <XCircle className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStartEdit(globalIndex, row);
+                                          }}
+                                          title="Sửa"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-100"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteRow(globalIndex);
+                                          }}
+                                          title="Xóa"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            });
                           })()}
                         </TableBody>
                       </Table>
