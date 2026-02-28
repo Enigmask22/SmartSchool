@@ -1,28 +1,59 @@
 """
-Feedback Services - Tích hợp với Gemini AI
+Feedback Services - Tích hợp AI (Gemini / OpenRouter)
+Chọn provider qua biến môi trường FEEDBACK_PROVIDER (gemini | openrouter)
 """
 
 import os
 from typing import List, Dict
 from core.logger import setup_logger
-from .gemini_service import get_gemini_service
 
 logger = setup_logger("feedback_service")
 
-class FeedbackService:
-    """Service tạo feedback bằng Gemini AI"""
-    
-    def __init__(self):
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        self.use_ai = True  # Flag để bật/tắt AI generation
-        
-        # Kiểm tra xem Gemini service có khả dụng không
+
+def _create_ai_service():
+    """
+    Factory function: khởi tạo AI feedback service dựa trên FEEDBACK_PROVIDER.
+
+    Returns:
+        Tuple[service_instance | None, str] - (service, provider_name)
+    """
+    provider = os.getenv("FEEDBACK_PROVIDER", "gemini").lower().strip()
+
+    if provider == "openrouter":
         try:
-            self.gemini_service = get_gemini_service()
-            logger.info("✅ Gemini AI service initialized successfully")
+            from .openrouter_service import OpenRouterFeedbackService
+            service = OpenRouterFeedbackService()
+            logger.info("✅ OpenRouter AI feedback service initialized")
+            return service, "openrouter"
         except Exception as e:
-            logger.error(f"⚠️ Cannot initialize Gemini service: {str(e)}")
-            logger.warning("📝 Falling back to template-based feedback")
+            logger.error(f"⚠️ Cannot initialize OpenRouter service: {e}")
+            # Fallback sang Gemini
+            logger.warning("🔄 Fallback sang Gemini service...")
+            provider = "gemini"
+
+    # Default: Gemini
+    if provider == "gemini":
+        try:
+            from .gemini_service import get_gemini_service
+            service = get_gemini_service()
+            logger.info("✅ Gemini AI feedback service initialized")
+            return service, "gemini"
+        except Exception as e:
+            logger.error(f"⚠️ Cannot initialize Gemini service: {e}")
+
+    return None, "none"
+
+
+class FeedbackService:
+    """Service tạo feedback bằng AI (Gemini hoặc OpenRouter)"""
+
+    def __init__(self):
+        self.use_ai = True
+        self.provider_name = "none"
+
+        self.ai_service, self.provider_name = _create_ai_service()
+        if self.ai_service is None:
+            logger.warning("📝 No AI service available – falling back to template-based feedback")
             self.use_ai = False
         
     async def generate_feedback(
@@ -50,10 +81,10 @@ class FeedbackService:
             Nhận xét được tạo bởi AI hoặc template
         """
         try:
-            # Sử dụng Gemini AI nếu có
+            # Sử dụng AI service nếu có
             if self.use_ai:
                 try:
-                    feedback = await self.gemini_service.generate_student_feedback(
+                    feedback = await self.ai_service.generate_student_feedback(
                         student_name=student_name,
                         score=score,
                         attendance_rate=attendance_rate,
@@ -61,7 +92,7 @@ class FeedbackService:
                         weak_subjects=weak_subjects,
                         notes=(notes or "").strip(),
                     )
-                    logger.info(f"🤖 AI-generated feedback for {student_name}")
+                    logger.info(f"🤖 [{self.provider_name}] AI-generated feedback for {student_name}")
                     return feedback
                 except Exception as ai_error:
                     logger.error(f"❌ AI generation failed: {str(ai_error)}")
@@ -116,11 +147,11 @@ class FeedbackService:
             Dictionary chứa kết quả và danh sách feedbacks
         """
         try:
-            # Sử dụng Gemini AI batch generation nếu có
+            # Sử dụng AI batch generation nếu có
             if self.use_ai:
                 try:
-                    result = await self.gemini_service.generate_batch_feedback(students_data)
-                    logger.info(f"🤖 AI batch generation: {result['success_count']}/{len(students_data)} successful")
+                    result = await self.ai_service.generate_batch_feedback(students_data)
+                    logger.info(f"🤖 [{self.provider_name}] AI batch: {result['success_count']}/{len(students_data)} successful")
                     return result
                 except Exception as ai_error:
                     logger.error(f"❌ AI batch generation failed: {str(ai_error)}")

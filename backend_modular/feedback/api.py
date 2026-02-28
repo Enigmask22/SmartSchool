@@ -14,9 +14,11 @@ from feedback.models import (
     ResponseModel,
     CommentCreateRequest,
     CommentResponse,
-    CommentResponseModel
+    CommentResponseModel,
+    EmailReportCardRequest
 )
 from feedback.services import feedback_service
+from feedback.email_report_card_service import email_report_card_service
 from core.logger import setup_logger
 from core.database import get_db
 
@@ -423,6 +425,70 @@ async def get_class_comments(
             
     except Exception as e:
         logger.error(f"ERROR: Lỗi lấy nhận xét lớp: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi server: {str(e)}"
+        )
+
+
+@router.post("/send-email-report-card")
+async def send_email_report_card(request: EmailReportCardRequest, db=Depends(get_db)):
+    """
+    Gửi phiếu điểm qua email cho phụ huynh
+
+    - Lấy received_email từ request hoặc từ DB (students.received_email)
+    - Tạo HTML phiếu điểm chuyên nghiệp
+    - Gửi qua SMTP
+    """
+    try:
+        # Xác định email nhận
+        recipient_email = request.received_email
+
+        if not recipient_email:
+            # Lấy từ database
+            student_response = db.table("students").select("received_email, email").eq("id", request.student_id).execute()
+            if student_response.data and len(student_response.data) > 0:
+                student_data = student_response.data[0]
+                recipient_email = student_data.get("received_email") or student_data.get("email")
+
+        if not recipient_email:
+            raise HTTPException(
+                status_code=400,
+                detail="Chưa có email phụ huynh. Vui lòng nhập email trước khi gửi."
+            )
+
+        # Gửi email
+        result = email_report_card_service.send_report_card_email(
+            recipient_email=recipient_email,
+            student_name=request.student_name,
+            student_code=request.student_code,
+            class_name=request.class_name,
+            grade=request.grade,
+            teacher_name=request.teacher_name,
+            academic_year=request.academic_year,
+            semester=request.semester,
+            scores=request.scores,
+            overall_average=request.overall_average,
+            feedback=request.feedback,
+        )
+
+        if result["success"]:
+            logger.info(f"✅ Đã gửi email phiếu điểm cho {request.student_name} đến {recipient_email}")
+            return {
+                "success": True,
+                "message": result["message"],
+                "data": {"recipient_email": recipient_email}
+            }
+        else:
+            logger.error(f"❌ Lỗi gửi email: {result['message']}")
+            raise HTTPException(status_code=500, detail=result["message"])
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Lỗi gửi email phiếu điểm: {str(e)}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(

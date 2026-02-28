@@ -16,6 +16,7 @@ class OCRModel(Enum):
     """Enum định nghĩa các OCR model có sẵn"""
     GEMINI = "gemini"
     QWEN = "qwen"
+    OPENROUTER = "openrouter"
     # Có thể thêm model khác nếu cần
 
 
@@ -101,6 +102,9 @@ class OCRFactory:
             # Auto-detect device (CUDA if available, else CPU)
             device = None  # Let QwenOCRService auto-detect
             service = QwenOCRService(device=device)
+        elif model == OCRModel.OPENROUTER:
+            from .openrouter_ocr_service import OpenRouterOCRService
+            service = OpenRouterOCRService()
         else:
             raise ValueError(f"Unsupported OCR model: {model}")
         
