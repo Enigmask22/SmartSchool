@@ -1,16 +1,17 @@
 import React, { useState, useContext } from "react";
-import { AuthContext } from "../contexts/AuthContext";
-import ForgotPassword from "./ForgotPassword";
+import { AuthContext } from "@/contexts/AuthContext";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { School, AlertCircle, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [formData, setFormData] = useState({

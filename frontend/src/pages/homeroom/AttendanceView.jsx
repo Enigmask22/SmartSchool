@@ -26,10 +26,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import { Users, CheckCircle, XCircle, Clock, FileText } from "lucide-react";
-import logger from "../utils/logger";
-import LeaveRequestModal from "./attendance/LeaveRequestModal";
+import logger from "@/utils/logger";
+import LeaveRequestModal from "@/components/attendance/LeaveRequestModal";
 
 const AttendanceView = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);

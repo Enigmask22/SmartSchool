@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useState, useEffect, useRef, useContext, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Search,
   RefreshCw,
@@ -85,6 +86,13 @@ const StudentList = () => {
   const [selectedClass, setSelectedClass] = useState("all");
   const [availableClasses, setAvailableClasses] = useState([]);
   const [classesLoading, setClassesLoading] = useState(false);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
   const [homeroomClasses, setHomeroomClasses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
@@ -1015,46 +1023,45 @@ const StudentList = () => {
     setEditForm({});
   };
 
-  const handleRestore = async (student) => {
+  const handleRestore = (student) => {
     logger.debug("Restore button clicked for student:", student);
 
-    if (
-      window.confirm(
-        `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`,
-      )
-    ) {
-      setRestoreLoading(true);
-      try {
-        logger.debug("Sending restore request for student ID:", student.id);
-        const response = await fetch(`${API_BASE_URL}/students/${student.id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            is_active: true,
-          }),
-        });
+    openConfirm({
+      title: "Khôi phục học sinh",
+      description: `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`,
+      confirmText: "Khôi phục",
+      variant: "default",
+      onConfirm: async () => {
+        closeConfirm();
+        setRestoreLoading(true);
+        try {
+          logger.debug("Sending restore request for student ID:", student.id);
+          const response = await fetch(`${API_BASE_URL}/students/${student.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: true }),
+          });
 
-        logger.debug("Restore response status:", response.status);
+          logger.debug("Restore response status:", response.status);
 
-        if (response.ok) {
-          const result = await response.json();
-          logger.debug("Restore successful:", result);
-          alert("Khôi phục học sinh thành công!");
-          fetchStudents(); // Refresh danh sách
-        } else {
-          const errorData = await response.json();
-          logger.error("API Error Response:", errorData);
-          alert(`Lỗi khi khôi phục: ${errorData.detail || "Unknown error"}`);
+          if (response.ok) {
+            const result = await response.json();
+            logger.debug("Restore successful:", result);
+            alert("Khôi phục học sinh thành công!");
+            fetchStudents();
+          } else {
+            const errorData = await response.json();
+            logger.error("API Error Response:", errorData);
+            alert(`Lỗi khi khôi phục: ${errorData.detail || "Unknown error"}`);
+          }
+        } catch (error) {
+          logger.error("Error restoring student:", error);
+          alert("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
+        } finally {
+          setRestoreLoading(false);
         }
-      } catch (error) {
-        logger.error("Error restoring student:", error);
-        alert("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
-      } finally {
-        setRestoreLoading(false);
-      }
-    }
+      },
+    });
   };
 
   const handleViewScores = async (student) => {
@@ -4995,6 +5002,8 @@ const StudentList = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };

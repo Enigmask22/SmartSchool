@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Users,
   Camera,
@@ -53,6 +54,13 @@ const FaceManagement = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
 
   // Filter states
   const [selectedClass, setSelectedClass] = useState("all");
@@ -240,15 +248,19 @@ const FaceManagement = () => {
     ]);
   };
 
-  const deleteFaceEncoding = async (studentId, studentName) => {
-    if (
-      !window.confirm(
-        `Bạn có chắc muốn xóa khuôn mặt đã đăng ký của ${studentName}?`
-      )
-    ) {
-      return;
-    }
+  const deleteFaceEncoding = (studentId, studentName) => {
+    openConfirm({
+      title: "Xóa khuôn mặt đã đăng ký",
+      description: `Bạn có chắc muốn xóa khuôn mặt đã đăng ký của ${studentName}?`,
+      confirmText: "Xóa",
+      onConfirm: async () => {
+        closeConfirm();
+        await doDeleteFaceEncoding(studentId);
+      },
+    });
+  };
 
+  const doDeleteFaceEncoding = async (studentId) => {
     try {
       const response = await fetch(
         `${API_BASE_URL}/ai/student/${studentId}/encoding`,
@@ -802,6 +814,8 @@ const FaceManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   GraduationCap,
   Settings,
@@ -90,6 +91,13 @@ const GradeManagement = () => {
   const [selectedClassSubject, setSelectedClassSubject] = useState(null);
   const [students, setStudents] = useState([]);
   const [scoreConfig, setScoreConfig] = useState(null);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
   const [editingStudent, setEditingStudent] = useState(null);
   const [scoreForm, setScoreForm] = useState({});
   const [showConfigEditor, setShowConfigEditor] = useState(false);
@@ -673,19 +681,19 @@ const GradeManagement = () => {
       return;
     }
 
-    if (
-      window.confirm(
-        `Bạn có chắc muốn xóa cột "${
-          configForm[columnName]?.label || columnName
-        }"?\n\nViệc xóa sẽ làm mất tất cả điểm số đã nhập cho cột này.`
-      )
-    ) {
-      setConfigForm((prev) => {
-        const newForm = { ...prev };
-        delete newForm[columnName];
-        return newForm;
-      });
-    }
+    openConfirm({
+      title: "Xóa cột điểm",
+      description: `Bạn có chắc muốn xóa cột "${configForm[columnName]?.label || columnName}"?\n\nViệc xóa sẽ làm mất tất cả điểm số đã nhập cho cột này.`,
+      confirmText: "Xóa cột",
+      onConfirm: () => {
+        closeConfirm();
+        setConfigForm((prev) => {
+          const newForm = { ...prev };
+          delete newForm[columnName];
+          return newForm;
+        });
+      },
+    });
   };
 
   const handleSaveConfig = async () => {
@@ -2564,6 +2572,8 @@ const GradeManagement = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };

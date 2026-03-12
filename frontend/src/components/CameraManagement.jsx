@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Plus,
   Edit,
@@ -21,10 +23,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -32,7 +34,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -40,9 +42,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const CameraManagement = () => {
   const [cameras, setCameras] = useState([]);
@@ -50,6 +52,13 @@ const CameraManagement = () => {
   const [error, setError] = useState(null);
   const [editingCamera, setEditingCamera] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     name: "",
@@ -140,18 +149,22 @@ const CameraManagement = () => {
     setShowAddForm(true);
   };
 
-  const handleDelete = async (cameraId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa camera này?")) {
-      return;
-    }
-
-    try {
-      await api.delete(`/cameras/${cameraId}`);
-      await loadCameras();
-    } catch (err) {
-      logger.error("Error deleting camera:", err);
-      alert("Không thể xóa camera");
-    }
+  const handleDelete = (cameraId) => {
+    openConfirm({
+      title: "Xóa camera",
+      description: "Bạn có chắc chắn muốn xóa camera này?",
+      confirmText: "Xóa",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          await api.delete(`/cameras/${cameraId}`);
+          await loadCameras();
+        } catch (err) {
+          logger.error("Error deleting camera:", err);
+          toast.error("Không thể xóa camera");
+        }
+      },
+    });
   };
 
   const handleStart = async (cameraId) => {
@@ -160,7 +173,7 @@ const CameraManagement = () => {
       await loadCameras();
     } catch (err) {
       logger.error("Error starting camera:", err);
-      alert("Không thể bắt đầu camera");
+      toast.error("Không thể bắt đầu camera");
     }
   };
 
@@ -170,7 +183,7 @@ const CameraManagement = () => {
       await loadCameras();
     } catch (err) {
       logger.error("Error stopping camera:", err);
-      alert("Không thể dừng camera");
+      toast.error("Không thể dừng camera");
     }
   };
 
@@ -212,7 +225,7 @@ const CameraManagement = () => {
     // Validate URL
     const urlValidation = validateUrl(formData.source);
     if (!urlValidation.valid) {
-      alert(urlValidation.error);
+      toast.warning(urlValidation.error);
       return;
     }
 
@@ -259,7 +272,7 @@ const CameraManagement = () => {
         err.response?.data?.detail ||
         err.response?.data?.message ||
         `Không thể ${editingCamera ? "cập nhật" : "tạo"} camera`;
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -631,6 +644,8 @@ const CameraManagement = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };
