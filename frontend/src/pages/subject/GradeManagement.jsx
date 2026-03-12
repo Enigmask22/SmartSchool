@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   GraduationCap,
   Settings,
@@ -91,6 +92,13 @@ const GradeManagement = () => {
   const [students, setStudents] = useState([]);
   const [scoreConfig, setScoreConfig] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
   const [scoreForm, setScoreForm] = useState({});
   const [showConfigEditor, setShowConfigEditor] = useState(false);
   const [configForm, setConfigForm] = useState({});
@@ -664,19 +672,19 @@ const GradeManagement = () => {
       return;
     }
 
-    if (
-      window.confirm(
-        `Bạn có chắc muốn xóa cột "${
-          configForm[columnName]?.label || columnName
-        }"?\n\nViệc xóa sẽ làm mất tất cả điểm số đã nhập cho cột này.`
-      )
-    ) {
-      setConfigForm((prev) => {
-        const newForm = { ...prev };
-        delete newForm[columnName];
-        return newForm;
-      });
-    }
+    openConfirm({
+      title: "Xóa cột điểm",
+      description: `Bạn có chắc muốn xóa cột "${configForm[columnName]?.label || columnName}"?\n\nViệc xóa sẽ làm mất tất cả điểm số đã nhập cho cột này.`,
+      confirmText: "Xóa cột",
+      onConfirm: () => {
+        closeConfirm();
+        setConfigForm((prev) => {
+          const newForm = { ...prev };
+          delete newForm[columnName];
+          return newForm;
+        });
+      },
+    });
   };
 
   const handleSaveConfig = async () => {
@@ -1353,7 +1361,7 @@ const GradeManagement = () => {
               <div className="flex items-center justify-center rounded-lg w-14 h-14 bg-primary/10">
                 <GraduationCap className="w-8 h-8 text-primary" />
               </div>
-              <div>
+              <div className="ml-3">
                 <CardTitle className="text-2xl font-bold">
                   Quản lý điểm số
                 </CardTitle>
@@ -2407,13 +2415,15 @@ const GradeManagement = () => {
                     importedData.length === 0 || importErrors.length > 0
                   }
                 >
-                  ✅ Cập nhật điểm
+                  Cập nhật điểm
                 </Button>
               </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };

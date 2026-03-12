@@ -38,6 +38,7 @@ import SubjectGradeManagement from "@/pages/subject/GradeManagement";
 
 // Protected Route Wrapper
 import ProtectedRoute from "@/components/routing/ProtectedRoute";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   return (
@@ -90,6 +91,7 @@ function App() {
           </Routes>
         </SystemSettingsProvider>
       </AuthProvider>
+      <Toaster />
     </BrowserRouter>
   );
 }

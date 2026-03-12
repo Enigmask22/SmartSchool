@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Plus,
   Edit,
@@ -71,6 +72,13 @@ const AdminManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
 
   // Soft delete state
   const [showDeleted, setShowDeleted] = useState(false);
@@ -500,20 +508,25 @@ const AdminManagement = () => {
   }, [activeTab, classes, selectedAcademicYear, selectedGrade]);
 
   // Handle initialize all subjects for a class
-  const handleInitializeClassSubjects = async () => {
+  const handleInitializeClassSubjects = () => {
     if (!selectedClassId || !selectedAcademicYear) {
       alert("Vui lòng chọn lớp và năm học!");
       return;
     }
 
-    if (
-      !window.confirm(
-        `Bạn có chắc chắn muốn khởi tạo tất cả môn học cho lớp này?\n\nHệ thống sẽ tạo phân công giảng dạy cho tất cả ${subjects.length} môn học hiện có.`
-      )
-    ) {
-      return;
-    }
+    openConfirm({
+      title: "Khởi tạo môn học cho lớp",
+      description: `Bạn có chắc chắn muốn khởi tạo tất cả môn học cho lớp này?\n\nHệ thống sẽ tạo phân công giảng dạy cho tất cả ${subjects.length} môn học hiện có.`,
+      confirmText: "Khởi tạo",
+      variant: "default",
+      onConfirm: async () => {
+        closeConfirm();
+        await doInitializeClassSubjects();
+      },
+    });
+  };
 
+  const doInitializeClassSubjects = async () => {
     try {
       setLoading(true);
 
@@ -882,80 +895,85 @@ const AdminManagement = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!currentConfig?.endpoint) return;
 
-    if (!window.confirm("Bạn có chắc muốn xóa tạm thời bản ghi này?")) return;
-
-    try {
-      const response = await api.request(`${currentConfig.endpoint}/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.success) {
-        loadData();
-        alert(
-          'Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".'
-        );
-      } else {
-        setError(response.message || "Không thể xóa");
-      }
-    } catch (err) {
-      setError("Lỗi khi xóa: " + err.message);
-    }
+    openConfirm({
+      title: "Xóa tạm thời bản ghi",
+      description: "Bạn có chắc muốn xóa tạm thời bản ghi này?\nBạn có thể khôi phục lại trong tab \"Đã xóa tạm thời\".",
+      confirmText: "Xóa tạm thời",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.request(`${currentConfig.endpoint}/${id}`, {
+            method: "DELETE",
+          });
+          if (response.success) {
+            loadData();
+            alert('Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".');
+          } else {
+            setError(response.message || "Không thể xóa");
+          }
+        } catch (err) {
+          setError("Lỗi khi xóa: " + err.message);
+        }
+      },
+    });
   };
 
-  const handleRestore = async (id) => {
+  const handleRestore = (id) => {
     if (!currentConfig?.endpoint) return;
 
-    if (!window.confirm("Bạn có chắc muốn khôi phục bản ghi này?")) return;
-
-    try {
-      const response = await api.request(
-        `${currentConfig.endpoint}/${id}/restore`,
-        {
-          method: "POST",
+    openConfirm({
+      title: "Khôi phục bản ghi",
+      description: "Bạn có chắc muốn khôi phục bản ghi này?",
+      confirmText: "Khôi phục",
+      variant: "default",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.request(
+            `${currentConfig.endpoint}/${id}/restore`,
+            { method: "POST" }
+          );
+          if (response.success) {
+            loadData();
+            alert("Khôi phục thành công!");
+          } else {
+            setError(response.message || "Không thể khôi phục");
+          }
+        } catch (err) {
+          setError("Lỗi khi khôi phục: " + err.message);
         }
-      );
-
-      if (response.success) {
-        loadData();
-        alert("Khôi phục thành công!");
-      } else {
-        setError(response.message || "Không thể khôi phục");
-      }
-    } catch (err) {
-      setError("Lỗi khi khôi phục: " + err.message);
-    }
+      },
+    });
   };
 
-  const handlePermanentDelete = async (id) => {
+  const handlePermanentDelete = (id) => {
     if (!currentConfig?.endpoint) return;
 
-    if (
-      !window.confirm(
-        "⚠️ CẢNH BÁO: Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!"
-      )
-    )
-      return;
-
-    try {
-      const response = await api.request(
-        `${currentConfig.endpoint}/${id}/permanent`,
-        {
-          method: "DELETE",
+    openConfirm({
+      title: "⚠️ Xóa vĩnh viễn bản ghi",
+      description: "Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!",
+      confirmText: "Xóa vĩnh viễn",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.request(
+            `${currentConfig.endpoint}/${id}/permanent`,
+            { method: "DELETE" }
+          );
+          if (response.success) {
+            loadData();
+            alert("Xóa vĩnh viễn thành công!");
+          } else {
+            setError(response.message || "Không thể xóa vĩnh viễn");
+          }
+        } catch (err) {
+          setError("Lỗi khi xóa vĩnh viễn: " + err.message);
         }
-      );
-
-      if (response.success) {
-        loadData();
-        alert("Xóa vĩnh viễn thành công!");
-      } else {
-        setError(response.message || "Không thể xóa vĩnh viễn");
-      }
-    } catch (err) {
-      setError("Lỗi khi xóa vĩnh viễn: " + err.message);
-    }
+      },
+    });
   };
 
   const handleChange = (field, value) => {
@@ -2895,6 +2913,8 @@ const AdminManagement = () => {
           </Dialog>
         </>
       )}
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };

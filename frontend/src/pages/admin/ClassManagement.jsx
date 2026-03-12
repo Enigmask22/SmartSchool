@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Plus,
   Upload,
@@ -63,6 +65,13 @@ const ClassManagement = () => {
   const [loadingClassData, setLoadingClassData] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
 
   // Edit student states
   const [showEditModal, setShowEditModal] = useState(false);
@@ -421,7 +430,7 @@ const ClassManagement = () => {
         // Reload danh sách học sinh
         loadClassStudents();
 
-        alert("Thêm học sinh thành công!");
+        toast.success("Thêm học sinh thành công!");
       } else {
         setError(response.message || "Không thể thêm học sinh");
       }
@@ -603,7 +612,7 @@ const ClassManagement = () => {
         const validData = [];
 
         if (jsonData.length === 0) {
-          alert("❌ File không có dữ liệu!");
+          toast.error("File không có dữ liệu!");
           return;
         }
 
@@ -615,11 +624,9 @@ const ClassManagement = () => {
         );
 
         if (missingColumns.length > 0) {
-          alert(
-            `❌ File thiếu các cột bắt buộc: ${missingColumns.join(
-              ", ",
-            )}\n\nVui lòng tải template để có đúng định dạng!`,
-          );
+          toast.error(`File thiếu các cột bắt buộc: ${missingColumns.join(", ")}`, {
+            description: "Vui lòng tải template để có đúng định dạng!",
+          });
           return;
         }
 
@@ -745,7 +752,7 @@ const ClassManagement = () => {
 
         if (errors.length > 0) {
           setImportErrors(errors);
-          alert(`❌ File có ${errors.length} lỗi. Vui lòng kiểm tra!`);
+          toast.error(`File có ${errors.length} lỗi. Vui lòng kiểm tra!`);
           return;
         }
 
@@ -754,7 +761,7 @@ const ClassManagement = () => {
         setShowImportModal(true);
       } catch (error) {
         logger.error("Error parsing file:", error);
-        alert("❌ Lỗi khi đọc file! Vui lòng kiểm tra định dạng file.");
+        toast.error("Lỗi khi đọc file! Vui lòng kiểm tra định dạng file.");
       }
     };
 
@@ -766,7 +773,7 @@ const ClassManagement = () => {
   // Hàm confirm import
   const handleConfirmImport = async () => {
     if (importedData.length === 0) {
-      alert("Không có dữ liệu để import!");
+      toast.warning("Không có dữ liệu để import!");
       return;
     }
 
@@ -784,15 +791,13 @@ const ClassManagement = () => {
       const response = await api.bulkImportStudents(importPayload);
 
       if (response.success) {
-        alert(
-          `✅ ${response.message}\n\nThành công: ${
-            response.data.success_count
-          } học sinh${
+        toast.success(response.message, {
+          description: `Thành công: ${response.data.success_count} học sinh${
             response.data.error_count > 0
-              ? `\nLỗi: ${response.data.error_count} học sinh`
+              ? ` • Lỗi: ${response.data.error_count} học sinh`
               : ""
           }`,
-        );
+        });
 
         if (response.data.errors && response.data.errors.length > 0) {
           logger.debug("Import errors:", response.data.errors);
@@ -806,11 +811,11 @@ const ClassManagement = () => {
         setImportedData([]);
         setImportErrors([]);
       } else {
-        alert("❌ Lỗi khi import học sinh: " + response.message);
+        toast.error("Lỗi khi import học sinh: " + response.message);
       }
     } catch (error) {
       logger.error("Error importing students:", error);
-      alert("❌ Lỗi khi import học sinh!");
+      toast.error("Lỗi khi import học sinh!");
     } finally {
       setImportLoading(false);
     }
@@ -883,48 +888,53 @@ const ClassManagement = () => {
   }, [searchTerm]);
 
   // Hàm xử lý xóa học sinh
-  // Hàm xử lý xóa học sinh
-  const handleDeleteStudent = async (studentId) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa tạm thời học sinh này?")) {
-      try {
-        const response = await api.deleteStudent(studentId);
-        if (response.success) {
-          alert(
-            "Xóa tạm thời học sinh thành công! Bạn có thể khôi phục trong tab 'Hiển thị học sinh đã xóa'.",
-          );
-          loadClassStudents(); // Reload danh sách học sinh
-        } else {
-          alert(`Lỗi: ${response.message || "Không thể xóa học sinh"}`);
+  const handleDeleteStudent = (studentId) => {
+    openConfirm({
+      title: "Xóa tạm thời học sinh",
+      description: "Bạn có chắc chắn muốn xóa tạm thời học sinh này?\nBạn có thể khôi phục trong tab 'Hiển thị học sinh đã xóa'.",
+      confirmText: "Xóa tạm thời",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.deleteStudent(studentId);
+          if (response.success) {
+            toast.success("Xóa tạm thời học sinh thành công!", {
+              description: "Bạn có thể khôi phục trong tab 'Hiển thị học sinh đã xóa'.",
+            });
+            loadClassStudents();
+          } else {
+            toast.error(response.message || "Không thể xóa học sinh");
+          }
+        } catch (error) {
+          logger.error("Error deleting student:", error);
+          toast.error("Có lỗi xảy ra khi xóa học sinh: " + error.message);
         }
-      } catch (error) {
-        logger.error("Error deleting student:", error);
-        alert("Có lỗi xảy ra khi xóa học sinh: " + error.message);
-      }
-    }
+      },
+    });
   };
 
   // Hàm xử lý xóa vĩnh viễn học sinh
-  const handlePermanentDeleteStudent = async (studentId, studentName) => {
-    if (
-      window.confirm(
-        `⚠️ CẢNH BÁO: Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN học sinh ${studentName}?\n\nHành động này sẽ xóa:\n- Thông tin học sinh\n- Tất cả bản ghi điểm danh\n- Tất cả bản ghi điểm số\n\nHành động này KHÔNG THỂ HOÀN TÁC!`,
-      )
-    ) {
-      try {
-        const response = await api.permanentDeleteStudent(studentId);
-        if (response.success) {
-          alert("Xóa vĩnh viễn học sinh thành công!");
-          loadClassStudents(); // Reload danh sách học sinh
-        } else {
-          alert(
-            `Lỗi: ${response.message || "Không thể xóa vĩnh viễn học sinh"}`,
-          );
+  const handlePermanentDeleteStudent = (studentId, studentName) => {
+    openConfirm({
+      title: "Xóa vĩnh viễn học sinh",
+      description: `Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN học sinh ${studentName}?\n\nHành động này sẽ xóa:\n- Thông tin học sinh\n- Tất cả bản ghi điểm danh\n- Tất cả bản ghi điểm số\n\nHành động này KHÔNG THỂ HOÀN TÁC!`,
+      confirmText: "Xóa vĩnh viễn",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.permanentDeleteStudent(studentId);
+          if (response.success) {
+            toast.success("Xóa vĩnh viễn học sinh thành công!");
+            loadClassStudents();
+          } else {
+            toast.error(response.message || "Không thể xóa vĩnh viễn học sinh");
+          }
+        } catch (error) {
+          logger.error("Error permanently deleting student:", error);
+          toast.error("Có lỗi xảy ra khi xóa vĩnh viễn học sinh: " + error.message);
         }
-      } catch (error) {
-        logger.error("Error permanently deleting student:", error);
-        alert("Có lỗi xảy ra khi xóa vĩnh viễn học sinh: " + error.message);
-      }
-    }
+      },
+    });
   };
 
   // Hàm xử lý sửa học sinh
@@ -953,33 +963,36 @@ const ClassManagement = () => {
   };
 
   // Hàm xử lý khôi phục học sinh
-  const handleRestore = async (student) => {
+  const handleRestore = (student) => {
     logger.debug("Restore button clicked for student:", student);
 
-    if (
-      window.confirm(
-        `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`,
-      )
-    ) {
-      setRestoreLoading(true);
-      try {
-        logger.debug("Sending restore request for student ID:", student.id);
-        const response = await api.restoreStudent(student.id);
-        logger.debug("Restore response:", response);
+    openConfirm({
+      title: "Khôi phục học sinh",
+      description: `Bạn có chắc chắn muốn khôi phục học sinh ${student.full_name}?`,
+      confirmText: "Khôi phục",
+      variant: "default",
+      onConfirm: async () => {
+        closeConfirm();
+        setRestoreLoading(true);
+        try {
+          logger.debug("Sending restore request for student ID:", student.id);
+          const response = await api.restoreStudent(student.id);
+          logger.debug("Restore response:", response);
 
-        if (response.success) {
-          alert("Khôi phục học sinh thành công!");
-          loadClassStudents(); // Refresh danh sách học sinh
-        } else {
-          alert(`Lỗi: ${response.message || "Không thể khôi phục học sinh"}`);
+          if (response.success) {
+            toast.success("Khôi phục học sinh thành công!");
+            loadClassStudents();
+          } else {
+            toast.error(response.message || "Không thể khôi phục học sinh");
+          }
+        } catch (error) {
+          logger.error("Error restoring student:", error);
+          toast.error("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
+        } finally {
+          setRestoreLoading(false);
         }
-      } catch (error) {
-        logger.error("Error restoring student:", error);
-        alert("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
-      } finally {
-        setRestoreLoading(false);
-      }
-    }
+      },
+    });
   };
 
   // Hàm xử lý thay đổi form edit
@@ -993,7 +1006,7 @@ const ClassManagement = () => {
   // Hàm submit edit form
   const submitEditForm = async () => {
     if (!selectedStudentForEdit || !editForm.full_name.trim()) {
-      alert("Vui lòng nhập đầy đủ thông tin bắt buộc");
+      toast.warning("Vui lòng nhập đầy đủ thông tin bắt buộc");
       return;
     }
 
@@ -1032,7 +1045,7 @@ const ClassManagement = () => {
       logger.debug("Update response:", response);
 
       if (response.success) {
-        alert("Cập nhật thông tin học sinh thành công!");
+        toast.success("Cập nhật thông tin học sinh thành công!");
 
         // Fetch students để cập nhật danh sách
         await loadClassStudents();
@@ -1042,13 +1055,11 @@ const ClassManagement = () => {
         setSelectedStudentForEdit(null);
         setEditForm({});
       } else {
-        alert(
-          `Lỗi: ${response.message || "Không thể cập nhật thông tin học sinh"}`,
-        );
+        toast.error(response.message || "Không thể cập nhật thông tin học sinh");
       }
     } catch (error) {
       logger.error("Error updating student:", error);
-      alert("Có lỗi xảy ra khi cập nhật thông tin học sinh");
+      toast.error("Có lỗi xảy ra khi cập nhật thông tin học sinh");
     } finally {
       setEditLoading(false);
     }
@@ -1230,7 +1241,7 @@ const ClassManagement = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <CardTitle className="flex items-center space-x-2">
+                <CardTitle className="flex items-center space-x-2 mb-2">
                   <Users className="w-5 h-5" />
                   <span>Danh sách học sinh</span>
                 </CardTitle>
@@ -2579,10 +2590,10 @@ const ClassManagement = () => {
                     setSelectedStudentIds([]);
                     await loadClassStudents();
                   } else {
-                    alert(res.message || "Không thể chuyển lớp");
+                    toast.error(res.message || "Không thể chuyển lớp");
                   }
                 } catch (e) {
-                  alert("Lỗi khi chuyển lớp: " + e.message);
+                  toast.error("Lỗi khi chuyển lớp: " + e.message);
                 } finally {
                   setMoveLoading(false);
                 }
@@ -2600,6 +2611,8 @@ const ClassManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };
