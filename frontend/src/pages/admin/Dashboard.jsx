@@ -24,17 +24,17 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -42,10 +42,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
-import { Progress } from "./ui/progress";
-import ApiService from "../services/api";
-import logger from "../utils/logger";
+} from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import ApiService from "@/services/api";
+import logger from "@/utils/logger";
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);

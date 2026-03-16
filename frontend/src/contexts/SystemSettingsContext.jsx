@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import api from "../services/api";
-import logger from "../utils/logger";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
 const SystemSettingsContext = createContext();
 

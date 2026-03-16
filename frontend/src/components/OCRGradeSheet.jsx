@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Upload,
   Camera,
@@ -6,7 +8,6 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Eye,
   Download,
   BarChart3,
   FileText,
@@ -19,20 +20,18 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -40,10 +39,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
-import { Input } from "./ui/input";
-import api from "../services/api";
-import logger from "../utils/logger";
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
 const OCRGradeSheet = ({
   selectedClassSubject,
@@ -55,6 +54,13 @@ const OCRGradeSheet = ({
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parsedData, setParsedData] = useState(null);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
 
@@ -210,9 +216,19 @@ const OCRGradeSheet = ({
   const handleDeleteRow = (globalIndex) => {
     if (!parsedData || !parsedData.parsed_rows) return;
 
-    if (!window.confirm("Bạn có chắc muốn xóa học sinh này khỏi danh sách?")) {
-      return;
-    }
+    openConfirm({
+      title: "Xóa học sinh khỏi danh sách",
+      description: "Bạn có chắc muốn xóa học sinh này khỏi danh sách?",
+      confirmText: "Xóa",
+      onConfirm: () => {
+        closeConfirm();
+        doDeleteRow(globalIndex);
+      },
+    });
+  };
+
+  const doDeleteRow = (globalIndex) => {
+    if (!parsedData || !parsedData.parsed_rows) return;
 
     // Sort rows giống như trong render
     const sortedRows = [...parsedData.parsed_rows].sort((a, b) => {
@@ -263,14 +279,14 @@ const OCRGradeSheet = ({
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      alert("❌ Vui lòng chọn file ảnh (jpg, png, etc.)");
+      toast.warning("Vui lòng chọn file ảnh (jpg, png, etc.)");
       return;
     }
 
     // Validate file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
-      alert("❌ File ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 10MB.");
+      toast.warning("File ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 10MB.");
       return;
     }
 
@@ -316,23 +332,17 @@ const OCRGradeSheet = ({
           setStatusMessage("");
 
           if (result.total_valid === 0) {
-            alert(
-              "⚠️ Không tìm thấy dữ liệu hợp lệ trong ảnh!\n\n" +
-                "Vui lòng kiểm tra:\n" +
-                "- Ảnh có đủ sáng và rõ nét\n" +
-                "- Bảng điểm có đúng format (id, họ và tên, điểm)"
-            );
+            toast.warning("Không tìm thấy dữ liệu hợp lệ trong ảnh!", {
+              description: "Kiểm tra: ảnh đủ sáng, rõ nét và đúng format (id, họ và tên, điểm).",
+            });
           } else if (result.total_errors > 0) {
-            alert(
-              `⚠️ Phân tích thành công nhưng có ${result.total_errors} lỗi!\n\n` +
-                `✅ Tìm thấy: ${result.total_valid} học sinh hợp lệ\n` +
-                `❌ Lỗi: ${result.total_errors} dòng`
-            );
+            toast.warning(`Phân tích thành công nhưng có ${result.total_errors} lỗi!`, {
+              description: `Hợp lệ: ${result.total_valid} học sinh • Lỗi: ${result.total_errors} dòng`,
+            });
           } else {
-            alert(
-              `✅ Phân tích bảng điểm thành công!\n\n` +
-                `Tìm thấy ${result.total_valid} học sinh.`
-            );
+            toast.success("Phân tích bảng điểm thành công!", {
+              description: `Tìm thấy ${result.total_valid} học sinh.`,
+            });
           }
         } else if (status === "failed") {
           // Failed
@@ -341,9 +351,7 @@ const OCRGradeSheet = ({
           setOcrStatus(null); // Clear status
           setProgress(0);
           setStatusMessage("");
-          alert(
-            "❌ Lỗi khi xử lý ảnh: " + (response.data.error || "Unknown error")
-          );
+          toast.error("Lỗi khi xử lý ảnh: " + (response.data.error || "Unknown error"));
         }
       } else {
         throw new Error(response.message || "Failed to get status");
@@ -352,13 +360,13 @@ const OCRGradeSheet = ({
       logger.error("Error polling OCR status:", error);
       setParsing(false);
       setUploading(false);
-      alert("❌ Lỗi khi kiểm tra trạng thái OCR!");
+      toast.error("Lỗi khi kiểm tra trạng thái OCR!");
     }
   };
 
   const handleUploadAndParse = async () => {
     if (!selectedImage) {
-      alert("❌ Vui lòng chọn ảnh bảng điểm!");
+      toast.warning("Vui lòng chọn ảnh bảng điểm!");
       return;
     }
 
@@ -372,7 +380,7 @@ const OCRGradeSheet = ({
       const formData = new FormData();
       formData.append("file", selectedImage);
 
-      const response = await api.parseGradeSheetOCR(formData);
+      const response = await api.parseScoreSheetOCR(formData);
 
       if (response.success) {
         // Get request_id and start polling
@@ -385,7 +393,7 @@ const OCRGradeSheet = ({
         // Start polling status
         setTimeout(() => pollOCRStatus(reqId), 2000); // Start polling after 2s
       } else {
-        alert("❌ Lỗi khi upload ảnh: " + response.message);
+        toast.error("Lỗi khi upload ảnh: " + response.message);
         setUploading(false);
         setParsing(false);
       }
@@ -394,11 +402,11 @@ const OCRGradeSheet = ({
 
       // Check if queue is full (HTTP 503)
       if (error.response && error.response.status === 503) {
-        alert(
-          "⚠️ Hệ thống đang quá tải!\n\nHàng chờ đã đầy. Vui lòng thử lại sau vài phút."
-        );
+        toast.warning("Hệ thống đang quá tải!", {
+          description: "Hàng chờ đã đầy. Vui lòng thử lại sau vài phút.",
+        });
       } else {
-        alert("❌ Lỗi khi xử lý ảnh! Vui lòng thử lại.");
+        toast.error("Lỗi khi xử lý ảnh! Vui lòng thử lại.");
       }
 
       setUploading(false);
@@ -412,7 +420,7 @@ const OCRGradeSheet = ({
       !parsedData.parsed_rows ||
       parsedData.parsed_rows.length === 0
     ) {
-      alert("❌ Không có dữ liệu để import!");
+      toast.warning("Không có dữ liệu để import!");
       return;
     }
 
@@ -437,13 +445,13 @@ const OCRGradeSheet = ({
       const response = await api.bulkImportScores(importPayload);
 
       if (response.success) {
-        alert(
-          `✅ ${response.message}\n\n` +
-            `Thành công: ${response.data.success_count} bản ghi` +
-            (response.data.error_count > 0
-              ? `\nLỗi: ${response.data.error_count} bản ghi`
-              : "")
-        );
+        toast.success(response.message, {
+          description: `Thành công: ${response.data.success_count} bản ghi${
+            response.data.error_count > 0
+              ? ` • Lỗi: ${response.data.error_count} bản ghi`
+              : ""
+          }`,
+        });
 
         // Reset and close
         handleCloseModal();
@@ -453,11 +461,11 @@ const OCRGradeSheet = ({
           onImportSuccess();
         }
       } else {
-        alert("❌ Lỗi khi import điểm: " + response.message);
+        toast.error("Lỗi khi import điểm: " + response.message);
       }
     } catch (error) {
       logger.error("Error importing grades from OCR:", error);
-      alert("❌ Lỗi khi import điểm!");
+      toast.error("Lỗi khi import điểm!");
     } finally {
       setUploading(false);
     }
@@ -469,16 +477,16 @@ const OCRGradeSheet = ({
       !parsedData.parsed_rows ||
       parsedData.parsed_rows.length === 0
     ) {
-      alert("❌ Không có dữ liệu để export!");
+      toast.warning("Không có dữ liệu để export!");
       return;
     }
 
     try {
       await api.exportParsedOCRToExcel({ parsed_rows: parsedData.parsed_rows });
-      alert("✅ Tải file Excel thành công!");
+      toast.success("Tải file Excel thành công!");
     } catch (error) {
       logger.error("Error exporting OCR data:", error);
-      alert("❌ Lỗi khi export file!");
+      toast.error("Lỗi khi export file!");
     }
   };
 
@@ -775,7 +783,7 @@ const OCRGradeSheet = ({
                 {/* Pagination Summary */}
                 {(() => {
                   const totalRows = parsedData.parsed_rows.length;
-                  const totalPages = Math.ceil(totalRows / pageSize);
+                  // const totalPages = Math.ceil(totalRows / pageSize);
                   const startIndex = (currentPage - 1) * pageSize;
                   const endIndex = startIndex + pageSize;
 
@@ -870,7 +878,7 @@ const OCRGradeSheet = ({
                         </TableHeader>
                         <TableBody>
                           {(() => {
-                            const totalRows = parsedData.parsed_rows.length;
+                            // const totalRows = parsedData.parsed_rows.length;
                             const startIndex = (currentPage - 1) * pageSize;
                             const endIndex = startIndex + pageSize;
                             // Sắp xếp theo student_id tăng dần trước khi phân trang
@@ -1101,8 +1109,8 @@ const OCRGradeSheet = ({
                 {(() => {
                   const totalRows = parsedData.parsed_rows.length;
                   const totalPages = Math.ceil(totalRows / pageSize);
-                  const startIndex = (currentPage - 1) * pageSize;
-                  const endIndex = startIndex + pageSize;
+                  // const startIndex = (currentPage - 1) * pageSize;
+                  // const endIndex = startIndex + pageSize;
 
                   if (totalPages <= 1) return null;
 
@@ -1225,6 +1233,8 @@ const OCRGradeSheet = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </>
   );
 };

@@ -1,9 +1,9 @@
 // API Service để giao tiếp với backend
 // Sử dụng environment variable hoặc fallback về localhost
-import logger from "../utils/logger";
+import logger from "@/utils/logger";
 
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
 class ApiService {
   constructor() {

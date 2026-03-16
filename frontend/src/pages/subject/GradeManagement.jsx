@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   GraduationCap,
   Settings,
@@ -29,17 +30,17 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -47,7 +48,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -55,15 +56,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import { Label } from "./ui/label";
-import { AuthContext } from "../contexts/AuthContext";
-import { useSystemSettings } from "../contexts/SystemSettingsContext";
-import api from "../services/api";
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { AuthContext } from "@/contexts/AuthContext";
+import { useSystemSettings } from "@/contexts/SystemSettingsContext";
+import api from "@/services/api";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
-import OCRGradeSheet from "./OCRGradeSheet";
-import logger from "../utils/logger";
+import OCRGradeSheet from "@/components/OCRGradeSheet";
+import logger from "@/utils/logger";
 
 // Tạo danh sách năm học từ 2024-2025 đến 2035-2036
 const generateAcademicYears = () => {
@@ -91,6 +92,13 @@ const GradeManagement = () => {
   const [students, setStudents] = useState([]);
   const [scoreConfig, setScoreConfig] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
   const [scoreForm, setScoreForm] = useState({});
   const [showConfigEditor, setShowConfigEditor] = useState(false);
   const [configForm, setConfigForm] = useState({});
@@ -103,10 +111,6 @@ const GradeManagement = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importedData, setImportedData] = useState([]);
   const [importErrors, setImportErrors] = useState([]);
-
-  // State for editing cells in import preview
-  const [editingImportCell, setEditingImportCell] = useState(null); // {rowIndex, columnKey}
-  const [editingImportValue, setEditingImportValue] = useState("");
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -331,14 +335,9 @@ const GradeManagement = () => {
       const flatColumns = flattenScoreColumns(scoreConfig.score_column_config);
 
       flatColumns.forEach((column) => {
-        const existingDiem = existingScore?.score_data?.[column.key]?.Diem;
         form[column.key] = {
           He_so: column.he_so,
-          // Dùng ?? thay vì || để giữ giá trị 0 (vì 0 là falsy nhưng hợp lệ)
-          Diem:
-            existingDiem !== undefined && existingDiem !== null
-              ? existingDiem
-              : "",
+          Diem: existingScore?.score_data?.[column.key]?.Diem || "",
         };
       });
     }
@@ -673,19 +672,19 @@ const GradeManagement = () => {
       return;
     }
 
-    if (
-      window.confirm(
-        `Bạn có chắc muốn xóa cột "${
-          configForm[columnName]?.label || columnName
-        }"?\n\nViệc xóa sẽ làm mất tất cả điểm số đã nhập cho cột này.`
-      )
-    ) {
-      setConfigForm((prev) => {
-        const newForm = { ...prev };
-        delete newForm[columnName];
-        return newForm;
-      });
-    }
+    openConfirm({
+      title: "Xóa cột điểm",
+      description: `Bạn có chắc muốn xóa cột "${configForm[columnName]?.label || columnName}"?\n\nViệc xóa sẽ làm mất tất cả điểm số đã nhập cho cột này.`,
+      confirmText: "Xóa cột",
+      onConfirm: () => {
+        closeConfirm();
+        setConfigForm((prev) => {
+          const newForm = { ...prev };
+          delete newForm[columnName];
+          return newForm;
+        });
+      },
+    });
   };
 
   const handleSaveConfig = async () => {
@@ -902,86 +901,6 @@ const GradeManagement = () => {
     reader.readAsArrayBuffer(file);
     // Reset input để có thể upload lại cùng file
     event.target.value = "";
-  };
-
-  // Handler để bắt đầu edit một cell trong import preview
-  const handleStartEditImportCell = (rowIndex, columnKey, currentValue) => {
-    setEditingImportCell({ rowIndex, columnKey });
-    setEditingImportValue(
-      currentValue !== null && currentValue !== undefined
-        ? String(currentValue)
-        : ""
-    );
-  };
-
-  // Handler để lưu giá trị đã edit trong import preview
-  const handleSaveImportCell = () => {
-    if (!editingImportCell) return;
-
-    const { rowIndex, columnKey } = editingImportCell;
-
-    // Parse giá trị - xử lý cả điểm số và điểm chữ (Đ, KĐ)
-    let newValue = editingImportValue.trim();
-
-    if (newValue === "" || newValue === "-") {
-      newValue = null;
-    } else if (
-      newValue.toUpperCase() === "Đ" ||
-      newValue.toUpperCase() === "D"
-    ) {
-      newValue = "Đ";
-    } else if (
-      newValue.toUpperCase() === "KĐ" ||
-      newValue.toUpperCase() === "KD"
-    ) {
-      newValue = "KĐ";
-    } else {
-      // Thử parse thành số
-      const numValue = parseFloat(newValue.replace(",", "."));
-      if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
-        // Làm tròn đến 0.25
-        newValue = Math.round(numValue * 4) / 4;
-      } else if (!isNaN(numValue)) {
-        // Số không hợp lệ (ngoài 0-10)
-        alert("Điểm phải nằm trong khoảng 0-10!");
-        return;
-      }
-      // Nếu không parse được, giữ nguyên giá trị text
-    }
-
-    // Cập nhật importedData
-    setImportedData((prevData) => {
-      const newData = [...prevData];
-      newData[rowIndex] = {
-        ...newData[rowIndex],
-        [columnKey]: newValue,
-      };
-      return newData;
-    });
-
-    // Reset editing state
-    setEditingImportCell(null);
-    setEditingImportValue("");
-  };
-
-  // Handler để hủy edit
-  const handleCancelEditImportCell = () => {
-    setEditingImportCell(null);
-    setEditingImportValue("");
-  };
-
-  // Handler cho phím Enter và Escape khi đang edit
-  const handleImportCellKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSaveImportCell();
-    } else if (e.key === "Escape") {
-      handleCancelEditImportCell();
-    } else if (e.key === "Tab") {
-      e.preventDefault();
-      handleSaveImportCell();
-      // Có thể thêm logic để move sang cell tiếp theo nếu cần
-    }
   };
 
   const handleConfirmImport = async () => {
@@ -1438,11 +1357,11 @@ const GradeManagement = () => {
         {/* Header Card */}
         <Card className="border-l-4 border-l-primary">
           <CardHeader>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center justify-center rounded-lg w-14 h-14 bg-primary/10">
                 <GraduationCap className="w-8 h-8 text-primary" />
               </div>
-              <div>
+              <div className="ml-3">
                 <CardTitle className="text-2xl font-bold">
                   Quản lý điểm số
                 </CardTitle>
@@ -2056,13 +1975,8 @@ const GradeManagement = () => {
                                     key={child.key}
                                     className="px-3 py-3 text-center"
                                   >
-                                    {/* Check !== undefined để hiển thị đúng giá trị 0 */}
                                     {studentData.score?.score_data?.[child.key]
-                                      ?.Diem !== undefined &&
-                                    studentData.score?.score_data?.[child.key]
-                                      ?.Diem !== null &&
-                                    studentData.score?.score_data?.[child.key]
-                                      ?.Diem !== "" ? (
+                                      ?.Diem ? (
                                       <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
                                         {
                                           studentData.score.score_data[
@@ -2084,13 +1998,8 @@ const GradeManagement = () => {
                                     key={column.key}
                                     className="px-5 py-3 text-center"
                                   >
-                                    {/* Check !== undefined để hiển thị đúng giá trị 0 */}
                                     {studentData.score?.score_data?.[column.key]
-                                      ?.Diem !== undefined &&
-                                    studentData.score?.score_data?.[column.key]
-                                      ?.Diem !== null &&
-                                    studentData.score?.score_data?.[column.key]
-                                      ?.Diem !== "" ? (
+                                      ?.Diem ? (
                                       <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
                                         {
                                           studentData.score.score_data[
@@ -2313,7 +2222,7 @@ const GradeManagement = () => {
                                   <Input
                                     type="text"
                                     placeholder="-"
-                                    value={scoreForm[child.key]?.Diem ?? ""}
+                                    value={scoreForm[child.key]?.Diem || ""}
                                     onChange={(e) =>
                                       handleScoreInputChange(
                                         child.key,
@@ -2350,7 +2259,7 @@ const GradeManagement = () => {
                               <Input
                                 type="text"
                                 placeholder="0.0, Đ, hoặc KĐ"
-                                value={scoreForm[column.key]?.Diem ?? ""}
+                                value={scoreForm[column.key]?.Diem || ""}
                                 onChange={(e) =>
                                   handleScoreInputChange(
                                     column.key,
@@ -2383,30 +2292,16 @@ const GradeManagement = () => {
         </Dialog>
 
         {/* Import Preview Modal */}
-        <Dialog
-          open={showImportModal}
-          onOpenChange={(open) => {
-            setShowImportModal(open);
-            if (!open) {
-              setEditingImportCell(null);
-              setEditingImportValue("");
-            }
-          }}
-        >
+        <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="flex items-center space-x-2">
                 <Clipboard className="w-4 h-4" />
                 <span>Xem trước dữ liệu import</span>
               </DialogTitle>
-              <DialogDescription className="flex items-center gap-2">
-                <span>
-                  Kiểm tra kỹ thông tin trước khi cập nhật điểm •{" "}
-                  {importedData.length} học sinh
-                </span>
-                <span className="text-xs font-medium text-blue-600">
-                  💡 Click vào ô điểm để sửa trực tiếp
-                </span>
+              <DialogDescription>
+                Kiểm tra kỹ thông tin trước khi cập nhật điểm •{" "}
+                {importedData.length} học sinh
               </DialogDescription>
             </DialogHeader>
 
@@ -2459,52 +2354,17 @@ const GradeManagement = () => {
                           flattenScoreColumns(
                             scoreConfig.score_column_config
                           ).map((column) => (
-                            <TableCell
-                              key={column.key}
-                              className="p-1 text-center"
-                            >
-                              {editingImportCell?.rowIndex === index &&
-                              editingImportCell?.columnKey === column.key ? (
-                                // Edit mode - hiển thị input
-                                <Input
-                                  type="text"
-                                  value={editingImportValue}
-                                  onChange={(e) =>
-                                    setEditingImportValue(e.target.value)
-                                  }
-                                  onKeyDown={handleImportCellKeyDown}
-                                  onBlur={handleSaveImportCell}
-                                  autoFocus
-                                  className="w-16 h-8 p-1 text-sm text-center"
-                                  placeholder="0-10"
-                                />
-                              ) : (
-                                // View mode - click để edit
-                                <div
-                                  onClick={() =>
-                                    handleStartEditImportCell(
-                                      index,
-                                      column.key,
-                                      row[column.key]
-                                    )
-                                  }
-                                  className="cursor-pointer hover:bg-muted/50 rounded px-2 py-1 min-w-[40px] transition-colors"
-                                  title="Click để sửa điểm"
+                            <TableCell key={column.key} className="text-center">
+                              {row[column.key] !== null &&
+                              row[column.key] !== undefined ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-green-700 bg-green-100"
                                 >
-                                  {row[column.key] !== null &&
-                                  row[column.key] !== undefined ? (
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-green-700 bg-green-100 hover:bg-green-200"
-                                    >
-                                      {row[column.key]}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground hover:text-primary">
-                                      -
-                                    </span>
-                                  )}
-                                </div>
+                                  {row[column.key]}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
                               )}
                             </TableCell>
                           ))}
@@ -2545,8 +2405,6 @@ const GradeManagement = () => {
                     setShowImportModal(false);
                     setImportedData([]);
                     setImportErrors([]);
-                    setEditingImportCell(null);
-                    setEditingImportValue("");
                   }}
                 >
                   Hủy
@@ -2564,6 +2422,8 @@ const GradeManagement = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };
