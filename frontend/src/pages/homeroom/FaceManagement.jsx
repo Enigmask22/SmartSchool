@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Users,
   Camera,
@@ -19,18 +20,18 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
-import { Label } from "./ui/label";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -38,14 +39,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
-import ApiService from "../services/api";
-import { AuthContext } from "../contexts/AuthContext";
-import logger from "../utils/logger";
+} from "@/components/ui/table";
+import ApiService from "@/services/api";
+import { AuthContext } from "@/contexts/AuthContext";
+import logger from "@/utils/logger";
 
 // API Configuration
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
 const FaceManagement = () => {
   const { user, isHomeroomTeacher } = useContext(AuthContext);
@@ -53,6 +54,13 @@ const FaceManagement = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
 
   // Filter states
   const [selectedClass, setSelectedClass] = useState("all");
@@ -240,15 +248,19 @@ const FaceManagement = () => {
     ]);
   };
 
-  const deleteFaceEncoding = async (studentId, studentName) => {
-    if (
-      !window.confirm(
-        `Bạn có chắc muốn xóa khuôn mặt đã đăng ký của ${studentName}?`
-      )
-    ) {
-      return;
-    }
+  const deleteFaceEncoding = (studentId, studentName) => {
+    openConfirm({
+      title: "Xóa khuôn mặt đã đăng ký",
+      description: `Bạn có chắc muốn xóa khuôn mặt đã đăng ký của ${studentName}?`,
+      confirmText: "Xóa",
+      onConfirm: async () => {
+        closeConfirm();
+        await doDeleteFaceEncoding(studentId);
+      },
+    });
+  };
 
+  const doDeleteFaceEncoding = async (studentId) => {
     try {
       const response = await fetch(
         `${API_BASE_URL}/ai/student/${studentId}/encoding`,
@@ -802,6 +814,8 @@ const FaceManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Mail, Key, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import api from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { Key, CheckCircle, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import api from '@/services/api';
 
-const ForgotPassword = ({ onBackToLogin }) => {
+const ForgotPassword = () => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Nhập username, 2: Nhập OTP, 3: Đặt mật khẩu mới
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -171,7 +170,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
         
         // Chuyển về trang login sau 2 giây
         setTimeout(() => {
-          onBackToLogin();
+          navigate('/login');
         }, 2000);
       } else {
         throw new Error(response.message || 'Đặt lại mật khẩu thất bại');
@@ -186,8 +185,8 @@ const ForgotPassword = ({ onBackToLogin }) => {
   const renderStep1 = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-white">Quên mật khẩu?</h2>
-        <p className="mt-2 text-sm text-white/90">
+        <h2 className="text-2xl font-bold">Quên mật khẩu?</h2>
+        <p className="mt-2 text-sm">
           Nhập username đăng nhập và email nhận OTP để đặt lại mật khẩu
         </p>
       </div>
@@ -235,7 +234,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
         <div className="flex space-x-3">
           <button
             type="button"
-            onClick={onBackToLogin}
+            onClick={() => navigate('/login')}
             className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             Quay lại

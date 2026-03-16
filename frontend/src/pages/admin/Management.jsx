@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   Plus,
   Edit,
@@ -21,26 +22,26 @@ import {
   Settings,
   Camera,
 } from "lucide-react";
-import api from "../services/api";
-import logger from "../utils/logger";
-import { SimpleDatePicker } from "./ui/simple-date-picker";
+import api from "@/services/api";
+import logger from "@/utils/logger";
+import { SimpleDatePicker } from "@/components/ui/simple-date-picker";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -48,7 +49,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -56,9 +57,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import SystemSettings from "./SystemSettings";
-import CameraManagement from "./CameraManagement";
+} from "@/components/ui/dialog";
+import SystemSettings from "@/components/SystemSettings";
+import CameraManagement from "@/components/CameraManagement";
 // import SchoolDaysConfig from "./SchoolDaysConfig";
 
 const AdminManagement = () => {
@@ -71,6 +72,13 @@ const AdminManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const openConfirm = useCallback((config) =>
+    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+
+  const closeConfirm = useCallback(() =>
+    setConfirmState((prev) => ({ ...prev, open: false })), []);
 
   // Soft delete state
   const [showDeleted, setShowDeleted] = useState(false);
@@ -500,20 +508,25 @@ const AdminManagement = () => {
   }, [activeTab, classes, selectedAcademicYear, selectedGrade]);
 
   // Handle initialize all subjects for a class
-  const handleInitializeClassSubjects = async () => {
+  const handleInitializeClassSubjects = () => {
     if (!selectedClassId || !selectedAcademicYear) {
       alert("Vui lòng chọn lớp và năm học!");
       return;
     }
 
-    if (
-      !window.confirm(
-        `Bạn có chắc chắn muốn khởi tạo tất cả môn học cho lớp này?\n\nHệ thống sẽ tạo phân công giảng dạy cho tất cả ${subjects.length} môn học hiện có.`
-      )
-    ) {
-      return;
-    }
+    openConfirm({
+      title: "Khởi tạo môn học cho lớp",
+      description: `Bạn có chắc chắn muốn khởi tạo tất cả môn học cho lớp này?\n\nHệ thống sẽ tạo phân công giảng dạy cho tất cả ${subjects.length} môn học hiện có.`,
+      confirmText: "Khởi tạo",
+      variant: "default",
+      onConfirm: async () => {
+        closeConfirm();
+        await doInitializeClassSubjects();
+      },
+    });
+  };
 
+  const doInitializeClassSubjects = async () => {
     try {
       setLoading(true);
 
@@ -882,80 +895,85 @@ const AdminManagement = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!currentConfig?.endpoint) return;
 
-    if (!window.confirm("Bạn có chắc muốn xóa tạm thời bản ghi này?")) return;
-
-    try {
-      const response = await api.request(`${currentConfig.endpoint}/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.success) {
-        loadData();
-        alert(
-          'Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".'
-        );
-      } else {
-        setError(response.message || "Không thể xóa");
-      }
-    } catch (err) {
-      setError("Lỗi khi xóa: " + err.message);
-    }
+    openConfirm({
+      title: "Xóa tạm thời bản ghi",
+      description: "Bạn có chắc muốn xóa tạm thời bản ghi này?\nBạn có thể khôi phục lại trong tab \"Đã xóa tạm thời\".",
+      confirmText: "Xóa tạm thời",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.request(`${currentConfig.endpoint}/${id}`, {
+            method: "DELETE",
+          });
+          if (response.success) {
+            loadData();
+            alert('Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".');
+          } else {
+            setError(response.message || "Không thể xóa");
+          }
+        } catch (err) {
+          setError("Lỗi khi xóa: " + err.message);
+        }
+      },
+    });
   };
 
-  const handleRestore = async (id) => {
+  const handleRestore = (id) => {
     if (!currentConfig?.endpoint) return;
 
-    if (!window.confirm("Bạn có chắc muốn khôi phục bản ghi này?")) return;
-
-    try {
-      const response = await api.request(
-        `${currentConfig.endpoint}/${id}/restore`,
-        {
-          method: "POST",
+    openConfirm({
+      title: "Khôi phục bản ghi",
+      description: "Bạn có chắc muốn khôi phục bản ghi này?",
+      confirmText: "Khôi phục",
+      variant: "default",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.request(
+            `${currentConfig.endpoint}/${id}/restore`,
+            { method: "POST" }
+          );
+          if (response.success) {
+            loadData();
+            alert("Khôi phục thành công!");
+          } else {
+            setError(response.message || "Không thể khôi phục");
+          }
+        } catch (err) {
+          setError("Lỗi khi khôi phục: " + err.message);
         }
-      );
-
-      if (response.success) {
-        loadData();
-        alert("Khôi phục thành công!");
-      } else {
-        setError(response.message || "Không thể khôi phục");
-      }
-    } catch (err) {
-      setError("Lỗi khi khôi phục: " + err.message);
-    }
+      },
+    });
   };
 
-  const handlePermanentDelete = async (id) => {
+  const handlePermanentDelete = (id) => {
     if (!currentConfig?.endpoint) return;
 
-    if (
-      !window.confirm(
-        "⚠️ CẢNH BÁO: Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!"
-      )
-    )
-      return;
-
-    try {
-      const response = await api.request(
-        `${currentConfig.endpoint}/${id}/permanent`,
-        {
-          method: "DELETE",
+    openConfirm({
+      title: "⚠️ Xóa vĩnh viễn bản ghi",
+      description: "Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!",
+      confirmText: "Xóa vĩnh viễn",
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const response = await api.request(
+            `${currentConfig.endpoint}/${id}/permanent`,
+            { method: "DELETE" }
+          );
+          if (response.success) {
+            loadData();
+            alert("Xóa vĩnh viễn thành công!");
+          } else {
+            setError(response.message || "Không thể xóa vĩnh viễn");
+          }
+        } catch (err) {
+          setError("Lỗi khi xóa vĩnh viễn: " + err.message);
         }
-      );
-
-      if (response.success) {
-        loadData();
-        alert("Xóa vĩnh viễn thành công!");
-      } else {
-        setError(response.message || "Không thể xóa vĩnh viễn");
-      }
-    } catch (err) {
-      setError("Lỗi khi xóa vĩnh viễn: " + err.message);
-    }
+      },
+    });
   };
 
   const handleChange = (field, value) => {
@@ -2036,27 +2054,26 @@ const AdminManagement = () => {
       {/* Enhanced Tabs */}
       <div className="mb-8">
         <Card>
-          <CardContent className="p-0">
-            <nav className="flex space-x-0 overflow-x-auto">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-2 justify-start">
               {tabs.map((tab) => (
-                <Button
+                <button
                   key={tab.id}
-                  variant={activeTab === tab.id ? "default" : "ghost"}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-4 font-medium text-sm transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
                     activeTab === tab.id
-                      ? "bg-primary text-primary-foreground shadow-lg"
+                      ? "bg-primary text-primary-foreground shadow-md"
                       : "text-muted-foreground hover:text-primary hover:bg-muted"
                   }`}
                 >
-                  <tab.icon className="w-5 h-5 mr-3" />
-                  {tab.label}
+                  <tab.icon className="w-5 h-5" />
+                  <span>{tab.label}</span>
                   {activeTab === tab.id && (
-                    <div className="w-2 h-2 ml-2 rounded-full animate-pulse bg-primary-foreground"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground"></div>
                   )}
-                </Button>
+                </button>
               ))}
-            </nav>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -2072,9 +2089,9 @@ const AdminManagement = () => {
           <Card>
             {/* Enhanced Header */}
             <CardHeader className="bg-muted/50">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <CardTitle className="text-2xl font-bold">
+                  <CardTitle className="text-2xl font-bold mb-1">
                     {currentConfig?.title || "Quản lý"}
                   </CardTitle>
                   <CardDescription>
@@ -2896,6 +2913,8 @@ const AdminManagement = () => {
           </Dialog>
         </>
       )}
+
+      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
     </div>
   );
 };

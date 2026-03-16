@@ -1,7 +1,16 @@
 import React, { useContext, useState, useEffect, useCallback } from "react";
-import { AuthContext } from "../contexts/AuthContext";
-import { Button } from "./ui/button";
-import { Card } from "./ui/card";
+import { useNavigate, useLocation } from "react-router-dom";
+import { AuthContext } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Home,
   Users,
@@ -20,12 +29,17 @@ import {
   School,
   UserCircle,
 } from "lucide-react";
-import api from "../services/api";
-import logger from "../utils/logger";
+import api from "@/services/api";
+import logger from "@/utils/logger";
+import {
+  ADMIN_ROUTES,
+  HOMEROOM_ROUTES,
+  SUBJECT_ROUTES,
+  COMMON_ROUTES,
+} from "@/utils/constants";
+import { Separator } from "./ui/separator";
 
 const Sidebar = ({
-  currentView,
-  setCurrentView,
   user,
   isOpen,
   setIsOpen,
@@ -34,7 +48,10 @@ const Sidebar = ({
 }) => {
   const { logout, isHomeroomTeacher, isSubjectTeacher, isAdmin } =
     useContext(AuthContext);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [hasBothRoles, setHasBothRoles] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
   const checkBothRoles = useCallback(async () => {
     if (!user) return;
@@ -102,74 +119,48 @@ const Sidebar = ({
   // Menu items based on selected dashboard type (ưu tiên selectedDashboardType hơn role functions)
   const getMenuItems = () => {
     const baseItems = [
-      { id: "dashboard", label: "Trang chủ", icon: "dashboard" },
-      {
-        id: "personal-info",
-        label: "Thông tin cá nhân",
-        icon: "personal-info",
-      },
+      { label: "Trang chủ", icon: "dashboard", route: HOMEROOM_ROUTES.DASHBOARD },
+      { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
     ];
 
     if (isAdmin()) {
-      // Admin chỉ có các menu cấu hình và quản trị
       return [
-        { id: "dashboard", label: "Dashboard Thống Kê", icon: "dashboard" },
-        {
-          id: "personal-info",
-          label: "Thông tin cá nhân",
-          icon: "personal-info",
-        },
-        { id: "continuous", label: "Điểm danh tự động", icon: "continuous" },
-        {
-          id: "class-management",
-          label: "Quản lý học sinh",
-          icon: "class-management",
-        },
-        {
-          id: "admin-management",
-          label: "Quản lý hệ thống",
-          icon: "admin-management",
-        },
-        // { id: "ui-demo", label: "UI Demo", icon: "dashboard" },
+        { label: "Dashboard Thống Kê", icon: "dashboard", route: ADMIN_ROUTES.DASHBOARD },
+        { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
+        { label: "Điểm danh tự động", icon: "continuous", route: ADMIN_ROUTES.CONTINUOUS },
+        { label: "Quản lý học sinh", icon: "class-management", route: ADMIN_ROUTES.CLASSES },
+        { label: "Quản lý hệ thống", icon: "admin-management", route: ADMIN_ROUTES.MANAGEMENT },
       ];
     } else if (selectedDashboardType === "homeroom") {
       // Dashboard chủ nhiệm - chỉ hiển thị menu chủ nhiệm (không có quản lý điểm)
       return [
         ...baseItems,
-        { id: "students", label: "Học sinh lớp chủ nhiệm", icon: "students" },
-        { id: "attendance", label: "Điểm danh lớp", icon: "attendance" },
-        { id: "faces", label: "Quản lý khuôn mặt", icon: "faces" },
+        { label: "Học sinh lớp chủ nhiệm", icon: "students", route: HOMEROOM_ROUTES.STUDENTS },
+        { label: "Điểm danh lớp", icon: "attendance", route: HOMEROOM_ROUTES.ATTENDANCE },
+        { label: "Quản lý khuôn mặt", icon: "faces", route: HOMEROOM_ROUTES.FACES },
       ];
     } else if (selectedDashboardType === "subject") {
       // Dashboard bộ môn - chỉ hiển thị menu bộ môn
       return [
-        { id: "dashboard", label: "Dashboard Phân Tích", icon: "dashboard" },
-        {
-          id: "personal-info",
-          label: "Thông tin cá nhân",
-          icon: "personal-info",
-        },
-        { id: "grades", label: "Quản lý điểm", icon: "grades" },
+        { label: "Dashboard Phân Tích", icon: "dashboard", route: SUBJECT_ROUTES.DASHBOARD },
+        { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
+        { label: "Quản lý điểm", icon: "grades", route: SUBJECT_ROUTES.GRADES },
       ];
     } else {
       // Fallback: sử dụng role functions nếu chưa có selectedDashboardType
       if (isHomeroomTeacher()) {
         return [
           ...baseItems,
-          { id: "students", label: "Học sinh lớp chủ nhiệm", icon: "students" },
-          { id: "attendance", label: "Điểm danh lớp", icon: "attendance" },
-          { id: "continuous", label: "Điểm danh tự động", icon: "continuous" },
-          { id: "faces", label: "Quản lý khuôn mặt", icon: "faces" },
+          { label: "Học sinh lớp chủ nhiệm", icon: "students", route: HOMEROOM_ROUTES.STUDENTS },
+          { label: "Điểm danh lớp", icon: "attendance", route: HOMEROOM_ROUTES.ATTENDANCE },
+          { label: "Điểm danh tự động", icon: "continuous", route: HOMEROOM_ROUTES.CONTINUOUS },
+          { label: "Quản lý khuôn mặt", icon: "faces", route: HOMEROOM_ROUTES.FACES },
         ];
       } else if (isSubjectTeacher()) {
         return [
-          { id: "dashboard", label: "Dashboard Phân Tích", icon: "dashboard" },
-          {
-            id: "personal-info",
-            label: "Thông tin cá nhân",
-            icon: "personal-info",
-          },
-          { id: "grades", label: "Quản lý điểm", icon: "grades" },
+          { label: "Dashboard Phân Tích", icon: "dashboard", route: SUBJECT_ROUTES.DASHBOARD },
+          { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
+          { label: "Quản lý điểm", icon: "grades", route: SUBJECT_ROUTES.GRADES },
         ];
       } else {
         return baseItems;
@@ -180,14 +171,18 @@ const Sidebar = ({
   const menuItems = getMenuItems();
 
   const handleLogout = () => {
-    if (window.confirm("Bạn có chắc muốn đăng xuất?")) {
-      logout();
-    }
+    setLogoutDialogOpen(true);
   };
 
-  const handleMenuClick = (viewId) => {
-    setCurrentView(viewId);
-    // Close sidebar on mobile after clicking menu item
+  const confirmLogout = () => {
+    setLogoutDialogOpen(false);
+    logout();
+  };
+
+  const handleMenuClick = (item) => {
+    if (item.route) {
+      navigate(item.route);
+    }
     if (window.innerWidth < 1024) {
       setIsOpen(false);
     }
@@ -279,15 +274,17 @@ const Sidebar = ({
 
         {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => (
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.route;
+            return (
             <Button
-              key={item.id}
-              variant={currentView === item.id ? "secondary" : "ghost"}
-              onClick={() => handleMenuClick(item.id)}
+              key={item.route}
+              variant={isActive ? "secondary" : "ghost"}
+              onClick={() => handleMenuClick(item)}
               className={`
                 w-full justify-start h-10 px-3 text-sm font-medium
                 ${
-                  currentView === item.id
+                  isActive
                     ? "bg-blue-100 text-blue-900 border-r-2 border-blue-600"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }
@@ -298,7 +295,8 @@ const Sidebar = ({
               {getIcon(item.icon)}
               {isOpen && <span className="ml-3 truncate">{item.label}</span>}
             </Button>
-          ))}
+            );
+          })}
 
           {/* Dashboard Switch Button - Only show if user has both roles AND not admin */}
           {hasBothRoles && onDashboardSwitch && !isAdmin() && (
@@ -358,6 +356,26 @@ const Sidebar = ({
           <Menu className="w-5 h-5" />
         </Button>
       )}
+
+      {/* Logout confirmation dialog */}
+      <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận đăng xuất</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc muốn đăng xuất khỏi hệ thống? Mọi phiên làm việc hiện tại sẽ bị kết thúc.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLogoutDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={confirmLogout}>
+              Đăng xuất
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

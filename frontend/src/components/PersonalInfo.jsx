@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import { AuthContext } from "../contexts/AuthContext";
+import { AuthContext } from "@/contexts/AuthContext";
 import {
   Card,
   CardContent,
@@ -37,8 +37,8 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import api from "../services/api";
-import logger from "../utils/logger";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
 const PersonalInfo = () => {
   const { user } = useContext(AuthContext);

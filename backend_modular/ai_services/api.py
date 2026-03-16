@@ -175,10 +175,9 @@ async def control_recognition(control: dict):
 async def get_ai_status(db=Depends(get_db)):
     """Lấy trạng thái AI service"""
     try:
-        # Thống kê database - Check từ face_embeddings table
-        embeddings_response = db.table("face_embeddings").select("student_id").execute()
-        unique_students = set(emb['student_id'] for emb in embeddings_response.data) if embeddings_response.data else set()
-        database_count = len(unique_students)
+        # Thống kê database - Only check InsightFace encoding
+        db_response = db.table("students").select("id, full_name, insightface_encoding").not_.is_("insightface_encoding", "null").execute()
+        database_count = len(db_response.data) if db_response.data else 0
         local_count = len(ai_service.face_database) if ai_service.is_available else 0
         
         # Kiểm tra sync status
@@ -256,16 +255,12 @@ async def continuous_recognition_stream(websocket: WebSocket):
                         # Process recognition với active service (chạy trong thread pool)
                         result = await process_continuous_recognition(image_base64, websocket, camera_id)
                         
-                        # Thêm camera_id vào result
-                        result["camera_id"] = camera_id
-                        
                         # Send result back
                         await websocket.send_text(json.dumps({
                             "type": "recognition_result",
                             "data": result,
                             "service": ai_service.service_name,
-                            "accuracy": ai_service.accuracy,
-                            "camera_id": camera_id  # Trả về camera_id để frontend biết
+                            "accuracy": ai_service.accuracy
                         }))
                 
                 elif frame_data.get("type") == "control":
@@ -336,11 +331,6 @@ async def recognize_face_upload(
                     
                     if student_response.data:
                         student_data = student_response.data[0]
-                        
-                        # Fetch parent_info
-                        parent_info = db.table("parent_info").select("*").eq("student_id", student_id_int).execute()
-                        student_data["parent_contacts"] = parent_info.data if parent_info.data else []
-                        
                         return FaceRecognitionResponse(
                             recognized=True,
                             student=student_data,
@@ -388,11 +378,6 @@ async def recognize_face_base64(
                     
                     if student_response.data:
                         student_data = student_response.data[0]
-                        
-                        # Fetch parent_info
-                        parent_info = db.table("parent_info").select("*").eq("student_id", student_id_int).execute()
-                        student_data["parent_contacts"] = parent_info.data if parent_info.data else []
-                        
                         return FaceRecognitionResponse(
                             recognized=True,
                             student=student_data,
@@ -431,10 +416,10 @@ async def register_student_face_upload(
         contents = await file.read()
         image_base64 = base64.b64encode(contents).decode('utf-8')
         
-        result = await ai_service.register_student_face(student_id, image_base64, db)
+        result = await ai_service.register_student_face(student_id, image_base64)
         
-        # Đồng bộ lên database (sync_face_encoding_to_db đã được gọi trong register_student_face nếu có db)
-        if result.get('success') and db:
+        # Đồng bộ lên database
+        if result.get('success'):
             await sync_face_encoding_to_db(student_id, result, db)
         
         return FaceEncodingResponse(**result)
@@ -459,7 +444,7 @@ async def register_student_face_base64(
         if not student_response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
-        result = await ai_service.register_student_face(student_id, request.image_base64, db)
+        result = await ai_service.register_student_face(student_id, request.image_base64)
         
         # Đồng bộ lên database
         if result.get('success'):
@@ -531,26 +516,23 @@ async def delete_student_encoding(
 ):
     """Xóa face encoding của học sinh"""
     try:
-        # Pass db to delete_student_face để reload từ database
         # Kiểm tra student tồn tại
         student_response = db.table("students").select("*").eq("id", student_id).execute()
         
         if not student_response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
-        # Xóa từ face_embeddings table trước (để khi reload, student đã bị xóa)
-        delete_response = db.table("face_embeddings").delete().eq("student_id", student_id).execute()
+        # Xóa từ AI service
+        ai_result = await ai_service.delete_student_face(student_id)
         
-        # Xóa từ AI service (pass db để reload từ database sau khi xóa)
-        ai_result = await ai_service.delete_student_face(student_id, db=db)
-        
-        # Update face_samples_count (trigger sẽ tự động update, nhưng để chắc chắn)
-        update_response = db.table("students").update({
+        # Xóa từ database
+        db_response = db.table("students").update({
+            "insightface_encoding": None,
             "face_samples_count": 0,
             "updated_at": "now()"
         }).eq("id", student_id).execute()
         
-        if update_response.data:
+        if db_response.data:
             logger.info(f"Face encoding deleted for student {student_id}")
             
             return {
@@ -592,7 +574,7 @@ async def register_multiple_student_faces(
                 contents = await file.read()
                 image_base64 = base64.b64encode(contents).decode('utf-8')
                 
-                result = await ai_service.register_student_face(student_id, image_base64, db)
+                result = await ai_service.register_student_face(student_id, image_base64)
                 
                 if result.get('success'):
                     successful_registrations += 1
@@ -663,55 +645,48 @@ async def get_debug_info():
         return {"success": False, "message": str(e)}
 
 async def sync_face_encoding_to_db(student_id: int, result: dict, db):
-    """Helper function để đồng bộ face encoding lên bảng face_embeddings"""
+    """Helper function để đồng bộ face encoding lên database"""
     if not result.get('success') or not ACTIVE_SERVICE:
         return
         
-    logger.info(f"Syncing face encoding to face_embeddings table for student {student_id}")
+    logger.info(f"Syncing face encoding for student {student_id}")
     try:
         student_id_str = str(student_id)
         face_features = ACTIVE_SERVICE.face_database.get(student_id_str)
         
-        if not face_features or not isinstance(face_features, list):
-            logger.warning(f"No face features found for student {student_id}")
-            return
-
-        # Get current embeddings from database để determine embedding_index
-        existing_response = db.table("face_embeddings").select("embedding_index").eq("student_id", student_id).order("embedding_index", desc=True).limit(1).execute()
-        next_index = 0
-        if existing_response.data and len(existing_response.data) > 0:
-            next_index = existing_response.data[0].get('embedding_index', -1) + 1
-        
-        # Sync tất cả embeddings vào face_embeddings table
-        # Lưu ý: Chỉ sync embeddings mới (chưa có trong DB)
-        # Hoặc replace toàn bộ nếu cần (safer approach: sync all)
-        
-        # Delete existing embeddings cho student này (clean slate)
-        db.table("face_embeddings").delete().eq("student_id", student_id).execute()
-        
-        # Insert tất cả embeddings hiện tại
-        embeddings_to_insert = []
-        for idx, embedding in enumerate(face_features):
-            embedding_array = embedding.tolist() if isinstance(embedding, np.ndarray) else embedding
-            
-            embeddings_to_insert.append({
+        face_data = {}
+        if face_features and isinstance(face_features, list):
+            # InsightFace embeddings are numpy arrays
+            embeddings = [emb.tolist() for emb in face_features]
+            face_data = {
                 "student_id": student_id,
-                "embedding_vector": embedding_array,
-                "embedding_index": idx,
-                "quality_score": result.get('detection_score', 0.0),
-                "detection_score": result.get('detection_score', 0.0),
+                "service": "InsightFace",
+                "embeddings": embeddings,
+                "embedding_size": 512,
+                "sample_count": len(face_features),
                 "registered_at": "now()"
-            })
-        
-        # Batch insert
-        if embeddings_to_insert:
-            db.table("face_embeddings").insert(embeddings_to_insert).execute()
-            logger.info(f"✅ Successfully synced {len(embeddings_to_insert)} embeddings to face_embeddings for student {student_id}")
+            }
+            
+            logger.info(f"Prepared insightface_encoding with {len(face_features)} samples")
         else:
-            logger.warning(f"No embeddings to sync for student {student_id}")
+            logger.warning(f"No face features found for student {student_id}")
+            face_data = {"student_id": student_id, "service": "InsightFace", "registered_at": "now()"}
+
+        # Update database
+        import json
+        db_response = db.table("students").update({
+            "insightface_encoding": json.dumps(face_data),
+            "face_samples_count": len(face_features) if face_features else 0,
+            "updated_at": "now()"
+        }).eq("id", student_id).execute()
+        
+        if db_response.data:
+            logger.info(f"Successfully synced face encoding for student {student_id}")
+        else:
+            logger.warning(f"DB update returned no data for student {student_id}")
             
     except Exception as sync_error:
-        logger.error(f"Error syncing face encoding to face_embeddings: {sync_error}")
+        logger.error(f"Error syncing face encoding: {sync_error}")
         import traceback
         logger.error(traceback.format_exc())
 
@@ -822,10 +797,6 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
                             if student_response.data:
                                 student_data = student_response.data[0]
                                 
-                                # Fetch parent_info from separate table
-                                parent_info_response = db.table("parent_info").select("*").eq("student_id", int(student_id)).execute()
-                                student_data["parent_contacts"] = parent_info_response.data if parent_info_response.data else []
-                                
                                 # Auto-create attendance record
                                 attendance_result = await create_auto_attendance(student_data, db, confidence)
                                 
@@ -881,12 +852,7 @@ async def process_continuous_recognition(image_base64: str, websocket: WebSocket
         }
 
 async def create_auto_attendance(student_data: dict, db, confidence: float = 0.85):
-    """Tạo attendance record tự động cho học sinh
-    
-    Note: Stored procedure process_attendance_checkin tự động đọc attendance_cutoff_time 
-    từ system_settings để xác định status (Dung gio/Tre). Không cần pass cutoff_time 
-    vào stored procedure.
-    """
+    """Tạo attendance record tự động cho học sinh"""
     try:
         student_id = student_data["id"]
         student_name = student_data["full_name"]
@@ -900,7 +866,6 @@ async def create_auto_attendance(student_data: dict, db, confidence: float = 0.8
         current_vietnam_date = datetime.now(vietnam_tz).date().isoformat()
         
         # Try to use database function if available
-        # Stored procedure sẽ tự động đọc attendance_cutoff_time từ system_settings
         try:
             function_result = db.rpc('process_attendance_checkin', {
                 'p_student_id': student_id,

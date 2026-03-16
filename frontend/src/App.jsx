@@ -1,263 +1,98 @@
-import React, { useState, useContext } from "react";
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
-import logger from "./utils/logger";
+import { ROUTES } from "@/utils/constants";
 
 // Context
-import { AuthProvider, AuthContext } from "./contexts/AuthContext";
-import { SystemSettingsProvider } from "./contexts/SystemSettingsContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { SystemSettingsProvider } from "@/contexts/SystemSettingsContext";
 
-// Components
-import Sidebar from "./components/Sidebar";
-// import Dashboard from "./components/Dashboard";
-import StudentList from "./components/StudentList";
-import AttendanceView from "./components/AttendanceView";
-import FaceManagement from "./components/FaceManagement";
-import ContinuousRecognition from "./components/ContinuousRecognition";
-import Login from "./components/Login";
-import GradeManagement from "./components/GradeManagement";
-import HomeroomDashboard from "./components/HomeroomDashboard";
-import AdminManagement from "./components/AdminManagement";
-import AdminDashboard from "./components/AdminDashboard";
-import ClassManagement from "./components/ClassManagement";
-import SubjectTeacherDashboard from "./components/SubjectTeacherDashboard";
-import DashboardSelector from "./components/DashboardSelector";
-import UIDemo from "./components/UIDemo";
-import PersonalInfo from "./components/PersonalInfo";
+// Layouts
+import MainLayout from "@/layouts/MainLayout";
 
-function AppContent() {
-  const {
-    user,
-    loading,
-    isAuthenticated,
-    isHomeroomTeacher,
-    isSubjectTeacher,
-    isAdmin,
-  } = useContext(AuthContext);
-  const [currentView, setCurrentView] = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [hasRedirected, setHasRedirected] = useState(false);
-  const [selectedDashboardType, setSelectedDashboardType] = useState(null); // 'homeroom' or 'subject'
-  const [showDashboardSelector, setShowDashboardSelector] = useState(false);
+// Auth Pages
+import Login from "@/pages/auth/Login";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
+import DashboardSelector from "@/pages/auth/DashboardSelector";
 
-  // Reset view when user changes (login/logout)
-  React.useEffect(() => {
-    if (!user) {
-      // User logged out - reset to default
-      setCurrentView("dashboard");
-      setHasRedirected(false);
-      setSelectedDashboardType(null);
-      setShowDashboardSelector(false);
-    } else if (!hasRedirected) {
-      // User logged in - check if need to show dashboard selector
+// Common Pages
+import PersonalInfo from "@/components/PersonalInfo";
 
-      // Admin không cần chọn dashboard - bypass trực tiếp
-      if (isAdmin()) {
-        logger.debug("Admin logged in - bypassing dashboard selector");
-        setShowDashboardSelector(false);
-        setSelectedDashboardType("admin"); // Set special type for admin
-        setCurrentView("dashboard");
-        setHasRedirected(true);
-        return;
-      }
+// Admin Pages
+import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminManagement from "@/pages/admin/Management";
+import ClassManagement from "@/pages/admin/ClassManagement";
+import ContinuousRecognition from "@/pages/admin/ContinuousRecognition";
+import UIDemo from "@/pages/admin/UIDemo";
 
-      // Nếu chưa chọn dashboard type, hiển thị selector cho giáo viên
-      if (!selectedDashboardType) {
-        logger.debug("Showing dashboard selector");
-        setShowDashboardSelector(true);
-      }
-      setHasRedirected(true);
-    }
-  }, [user, hasRedirected, selectedDashboardType, isAdmin]); // Include user as dependency
+// Homeroom Pages
+import HomeroomDashboard from "@/pages/homeroom/Dashboard";
+import StudentList from "@/pages/homeroom/StudentList";
+import AttendanceView from "@/pages/homeroom/AttendanceView";
+import FaceManagement from "@/pages/homeroom/FaceManagement";
+import HomeroomGradeManagement from "@/pages/homeroom/GradeManagement";
 
-  // Handle dashboard selection
-  const handleDashboardSelect = (type) => {
-    logger.debug(`Dashboard type selected: ${type}`);
-    setSelectedDashboardType(type);
-    setShowDashboardSelector(false);
-    setCurrentView("dashboard");
-  };
+// Subject Teacher Pages
+import SubjectDashboard from "@/pages/subject/Dashboard";
+import SubjectGradeManagement from "@/pages/subject/GradeManagement";
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="w-12 h-12 border-b-2 border-indigo-600 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated()) {
-    return <Login />;
-  }
-
-  // Nếu cần hiển thị dashboard selector
-  if (showDashboardSelector) {
-    return <DashboardSelector onSelectDashboard={handleDashboardSelect} />;
-  }
-
-  const renderContent = () => {
-    // Admin có dashboard riêng - không cần chọn
-    if (selectedDashboardType === "admin" || isAdmin()) {
-      switch (currentView) {
-        case "dashboard":
-          return <AdminDashboard />;
-        case "personal-info":
-          return <PersonalInfo />;
-        // Ẩn các tab không cần thiết cho Admin
-        // case 'students':
-        //   return <StudentList />;
-        // case 'attendance':
-        //   return <AttendanceView />;
-        // case 'camera':
-        //   return <AICamera />;
-        case "continuous":
-          return <ContinuousRecognition isAdmin={true} />;
-        // case 'faces':
-        //   return <FaceManagement />;
-        case "class-management":
-          return <ClassManagement />;
-        // case 'grades':
-        //   return <GradeManagement />;
-        case "admin-management":
-          return <AdminManagement />;
-        case "ui-demo":
-          return <UIDemo />;
-        // default:
-        //   return <Dashboard setCurrentView={setCurrentView} />;
-      }
-    }
-
-    // Nếu user đã chọn dashboard type, ưu tiên theo lựa chọn đó
-    if (selectedDashboardType === "homeroom") {
-      // Homeroom dashboard view
-      switch (currentView) {
-        case "dashboard":
-          return <HomeroomDashboard />;
-        case "personal-info":
-          return <PersonalInfo />;
-        case "students":
-          return <StudentList isHomeroom={true} />;
-        case "attendance":
-          return <AttendanceView isHomeroom={true} />;
-        case "continuous":
-          return <ContinuousRecognition isHomeroom={true} />;
-        case "faces":
-          return <FaceManagement isHomeroom={true} />;
-        case "grades":
-          return <GradeManagement isHomeroom={true} />;
-        default:
-          return <HomeroomDashboard />;
-      }
-    } else if (selectedDashboardType === "subject") {
-      // Subject teacher dashboard view
-      switch (currentView) {
-        case "dashboard":
-          return <SubjectTeacherDashboard />;
-        case "personal-info":
-          return <PersonalInfo />;
-        case "grades":
-          return <GradeManagement />;
-        default:
-          return <SubjectTeacherDashboard />;
-      }
-    }
-
-    // Fallback to role-based rendering nếu chưa chọn
-    if (isHomeroomTeacher()) {
-      // Giáo viên chủ nhiệm - tất cả components được filter theo lớp chủ nhiệm
-      switch (currentView) {
-        case "dashboard":
-          return <HomeroomDashboard />;
-        case "personal-info":
-          return <PersonalInfo />;
-        case "students":
-          return <StudentList isHomeroom={true} />;
-        case "attendance":
-          return <AttendanceView isHomeroom={true} />;
-        case "continuous":
-          return <ContinuousRecognition isHomeroom={true} />;
-        case "faces":
-          return <FaceManagement isHomeroom={true} />;
-        // case 'feedback': // Tạm ẩn AI Nhận xét
-        //   return <AIFeedback isHomeroom={true} />;
-        case "grades":
-          return <GradeManagement isHomeroom={true} />;
-        default:
-          return <HomeroomDashboard />;
-      }
-    } else if (isSubjectTeacher()) {
-      // Giáo viên bộ môn - mặc định vào trang Dashboard Analytics
-      switch (currentView) {
-        case "dashboard":
-          return <SubjectTeacherDashboard />;
-        case "personal-info":
-          return <PersonalInfo />;
-        case "grades":
-          return <GradeManagement />;
-        default:
-          return <SubjectTeacherDashboard />; // Default cho giáo viên bộ môn là Dashboard
-      }
-    } else {
-      // Default fallback
-      return (
-        <div className="py-12 text-center">
-          <h2 className="mb-2 text-2xl font-bold text-gray-900">
-            Chưa được phân quyền
-          </h2>
-          <p className="text-gray-600">
-            Vui lòng liên hệ quản trị viên để được cấp quyền truy cập
-          </p>
-        </div>
-      );
-    }
-  };
-
-  // Handle dashboard switch
-  const handleDashboardSwitch = () => {
-    // Admin không có dashboard switch
-    if (isAdmin()) {
-      return;
-    }
-
-    const newType =
-      selectedDashboardType === "homeroom" ? "subject" : "homeroom";
-    logger.debug(
-      `Switching dashboard from ${selectedDashboardType} to ${newType}`
-    );
-    setSelectedDashboardType(newType);
-    setCurrentView("dashboard"); // Reset to dashboard view
-  };
-
-  return (
-    <div className="flex h-screen bg-gray-50 App">
-      <Sidebar
-        currentView={currentView}
-        setCurrentView={setCurrentView}
-        user={user}
-        isOpen={sidebarOpen}
-        setIsOpen={setSidebarOpen}
-        selectedDashboardType={selectedDashboardType}
-        onDashboardSwitch={handleDashboardSwitch}
-      />
-      <main
-        className={`
-        flex-1 transition-all duration-300 overflow-auto bg-white
-        ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"}
-        ml-0
-      `}
-      >
-        <div className="p-4 lg:p-6">{renderContent()}</div>
-      </main>
-    </div>
-  );
-}
+// Protected Route Wrapper
+import ProtectedRoute from "@/components/routing/ProtectedRoute";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   return (
-    <AuthProvider>
-      <SystemSettingsProvider>
-        <AppContent />
-      </SystemSettingsProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <SystemSettingsProvider>
+          <Routes>
+            {/* Public Routes */}
+            <Route path={ROUTES.LOGIN} element={<Login />} />
+            <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
+            
+            {/* Dashboard Selector - Protected but outside MainLayout */}
+            <Route path={ROUTES.SELECT_DASHBOARD} element={<DashboardSelector />} />
+
+            {/* Protected Routes wrapped in MainLayout */}
+            <Route path={ROUTES.ROOT} element={<MainLayout />}>
+              
+              {/* Common Routes */}
+              <Route path={ROUTES.PROFILE.substring(1)} element={<PersonalInfo />} />
+              
+              {/* Admin Routes */}
+              <Route element={<ProtectedRoute roles={['admin']} />}>
+                <Route index element={<AdminDashboard />} /> {/* Default for Admin */}
+                <Route path={ROUTES.ADMIN.DASHBOARD.substring(1)} element={<AdminDashboard />} />
+                <Route path={ROUTES.ADMIN.MANAGEMENT.substring(1)} element={<AdminManagement />} />
+                <Route path={ROUTES.ADMIN.CLASSES.substring(1)} element={<ClassManagement />} />
+                <Route path={ROUTES.ADMIN.CONTINUOUS.substring(1)} element={<ContinuousRecognition isAdmin={true} />} />
+                <Route path={ROUTES.ADMIN.UI_DEMO.substring(1)} element={<UIDemo />} />
+              </Route>
+
+              {/* Homeroom Teacher Routes */}
+              <Route element={<ProtectedRoute roles={['teacher', 'homeroom_teacher']} />}>
+                <Route path={ROUTES.HOMEROOM.DASHBOARD.substring(1)} element={<HomeroomDashboard />} />
+                <Route path={ROUTES.HOMEROOM.STUDENTS.substring(1)} element={<StudentList isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.ATTENDANCE.substring(1)} element={<AttendanceView isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.FACES.substring(1)} element={<FaceManagement isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.CONTINUOUS.substring(1)} element={<ContinuousRecognition isHomeroom={true} />} />
+                <Route path={ROUTES.HOMEROOM.GRADES.substring(1)} element={<HomeroomGradeManagement isHomeroom={true} />} />
+              </Route>
+
+              {/* Subject Teacher Routes */}
+              <Route element={<ProtectedRoute roles={['teacher', 'subject_teacher']} />}>
+                <Route path={ROUTES.SUBJECT.DASHBOARD.substring(1)} element={<SubjectDashboard />} />
+                <Route path={ROUTES.SUBJECT.GRADES.substring(1)} element={<SubjectGradeManagement />} />
+              </Route>
+
+              {/* Fallback route */}
+              <Route path="*" element={<Navigate to={ROUTES.ROOT} replace />} />
+            </Route>
+          </Routes>
+        </SystemSettingsProvider>
+      </AuthProvider>
+      <Toaster />
+    </BrowserRouter>
   );
 }
 

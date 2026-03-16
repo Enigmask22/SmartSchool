@@ -1,16 +1,17 @@
 import React, { useState, useContext } from "react";
-import { AuthContext } from "../contexts/AuthContext";
-import ForgotPassword from "./ForgotPassword";
+import { AuthContext } from "@/contexts/AuthContext";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { School, AlertCircle, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -22,6 +23,7 @@ const Login = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -38,7 +40,15 @@ const Login = () => {
     setError("");
 
     try {
-      await login(formData.username, formData.password);
+      const user = await login(formData.username, formData.password);
+      
+      // Redirect based on role
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        // Teachers go to dashboard selector
+        navigate('/select-dashboard');
+      }
     } catch (err) {
       setError(err.message || "Đăng nhập thất bại");
     } finally {
@@ -145,7 +155,7 @@ const Login = () => {
                 <Button
                   type="button"
                   variant="link"
-                  onClick={() => setShowForgotPassword(true)}
+                  onClick={() => navigate('/forgot-password')}
                   className="text-sm text-blue-600 hover:text-blue-500"
                 >
                   Quên mật khẩu?
