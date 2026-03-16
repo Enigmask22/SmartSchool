@@ -202,7 +202,7 @@
   
   /* Loading spinner */
   .spinner {
-    @apply rounded-full border-2 border-gray-300 animate-spin border-t-primary-600;
+    @apply rounded-full border-2 border-gray-300 animate-spin border-t-blue-600;
   }
 
   /* Dual color loading spinner */

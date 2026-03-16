@@ -195,6 +195,14 @@ temp/
 frontend/build/
 build/
 
+#Test local
+test-results/
+playwright-report/
+.auth/
+
+#Local
+local doc/
+
 # ================
 # AI & ML MODELS
 # ================

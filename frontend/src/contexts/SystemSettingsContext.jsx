@@ -15,6 +15,10 @@ export const useSystemSettings = () => {
 };
 
 export const SystemSettingsProvider = ({ children }) => {
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user;
+  const isAdmin = user?.role === USER_ROLES.ADMIN;
+
   const [settings, setSettings] = useState({
     academic_year: "2024-2025",
     semester: "HK1",
@@ -26,6 +30,12 @@ export const SystemSettingsProvider = ({ children }) => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
+      // Only fetch admin settings if user is admin
+      if (!isAdmin) {
+        setLoading(false);
+        return;
+      }
+
       const response = await api.request("/admin/system-settings", {
         method: "GET",
       });
@@ -55,7 +65,7 @@ export const SystemSettingsProvider = ({ children }) => {
     const interval = setInterval(fetchSettings, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const refreshSettings = () => {
     fetchSettings();
