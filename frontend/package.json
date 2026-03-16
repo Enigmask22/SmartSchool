@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Frontend cho hệ thống trường học thông minh",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
@@ -49,6 +50,9 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@percy/cli": "^1.31.4",
+    "@percy/playwright": "^1.0.10",
+    "@playwright/test": "^1.57.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^5.1.1",
@@ -60,7 +64,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",  
+    "test:e2e:ui": "playwright test --ui",  
+    "test:e2e:debug": "playwright test --debug"
   },
   "eslintConfig": {
     "extends": [
