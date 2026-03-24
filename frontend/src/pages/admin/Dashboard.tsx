@@ -8,7 +8,7 @@ import {
   ClassPerformanceTab,
   TeacherPerformanceTab,
 } from "@/components/admin-dashboard";
-import { useAdminDashboard } from "@/hooks/useAdminDashboard";
+import { useAdminDashboard } from "@/hooks/admin-dashboard/useAdminDashboard";
 
 export default function AdminDashboard() {
   const {

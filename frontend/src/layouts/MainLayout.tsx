@@ -1,5 +1,5 @@
-import { useState, useContext } from "react";
-import { Outlet, Navigate, useLocation } from "react-router-dom";
+import { useState, useContext, useEffect } from "react";
+import { Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "@/components/common/Sidebar";
 import { AuthContext } from "@/contexts/AuthContext";
 
@@ -9,9 +9,26 @@ const MainLayout = () => {
     throw new Error('MainLayout must be used within AuthProvider');
   }
   const { user, loading, isAuthenticated, isAdmin } = context;
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedDashboardType, setSelectedDashboardType] = useState<'homeroom' | 'subject' | null>(null);
   const location = useLocation();
+
+  // Determine dashboard type from URL path
+  const getDashboardTypeFromPath = () => {
+    if (location.pathname.startsWith('/admin')) return 'admin';
+    if (location.pathname.startsWith('/homeroom')) return 'homeroom';
+    if (location.pathname.startsWith('/subject')) return 'subject';
+    return null;
+  };
+
+  // Sync selectedDashboardType with URL path
+  useEffect(() => {
+    const dashboardTypeFromUrl = getDashboardTypeFromPath();
+    if (dashboardTypeFromUrl && dashboardTypeFromUrl !== 'admin') {
+      setSelectedDashboardType(dashboardTypeFromUrl as 'homeroom' | 'subject');
+    }
+  }, [location.pathname]);
 
   // Handle loading state
   if (loading) {
@@ -38,16 +55,15 @@ const MainLayout = () => {
     }
   }
 
-  // Determine dashboard type from URL path if not set
-  const getDashboardTypeFromPath = () => {
-    if (location.pathname.startsWith('/admin')) return 'admin';
-    if (location.pathname.startsWith('/homeroom')) return 'homeroom';
-    if (location.pathname.startsWith('/subject')) return 'subject';
-    // If on profile or other common routes, use the selected dashboard type or default to subject/homeroom
-    return selectedDashboardType || (isAdmin() ? 'admin' : 'subject');
-  };
+  // Determine current dashboard type for Sidebar (prefer URL, fallback to state)
+  const currentDashboardType = getDashboardTypeFromPath() || selectedDashboardType || (isAdmin() ? 'admin' : 'subject');
 
-  const dashboardType = getDashboardTypeFromPath();
+  const handleDashboardSwitch = () => {
+    const newType = selectedDashboardType === 'homeroom' ? 'subject' : 'homeroom';
+    setSelectedDashboardType(newType);
+    // Navigate to the new dashboard
+    navigate(`/${newType}/dashboard`);
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 App">
@@ -55,9 +71,8 @@ const MainLayout = () => {
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
         user={user}
-        selectedDashboardType={dashboardType}
-        // Pass a function to switch context if needed
-        onDashboardSwitch={() => setSelectedDashboardType(prev => (prev === 'homeroom' ? 'subject' : 'homeroom'))}
+        selectedDashboardType={currentDashboardType}
+        onDashboardSwitch={handleDashboardSwitch}
       />
       <main
         className={`
@@ -67,7 +82,7 @@ const MainLayout = () => {
         `}
       >
         <div className="p-4 lg:p-6">
-          <Outlet context={{ dashboardType }} />
+          <Outlet context={{ dashboardType: currentDashboardType }} />
         </div>
       </main>
     </div>

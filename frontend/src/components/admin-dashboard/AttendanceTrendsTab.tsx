@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import type { AttendanceTrend } from "@/hooks/useAdminDashboard";
+import type { AttendanceTrend } from "@/hooks/admin-dashboard/useAdminDashboard";
 
 interface AttendanceTrendsTabProps {
   attendanceTrends: AttendanceTrend[];

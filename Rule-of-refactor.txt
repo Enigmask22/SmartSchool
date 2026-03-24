@@ -1,0 +1,7 @@
+UI State (Toggles, inputs): Keep in the component.
+
+Repeated Logic (Window size, click-outside): Move to a reusable custom hook.
+
+Complex Domain Logic (Multi-step forms, heavy data formatting): Move to a dedicated custom hook.
+
+Component is too long? Break it into smaller child components, not just smaller hooks.

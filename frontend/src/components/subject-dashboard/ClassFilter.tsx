@@ -2,6 +2,7 @@ import React from 'react';
 import { Users, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Subject {
   subject_id: string;
@@ -47,14 +48,12 @@ export const ClassFilter: React.FC<ClassFilterProps> = ({
           <GraduationCap className="w-4 h-4 mr-1" />
           Tất cả lớp ({totalClasses})
         </Button>
-        {loadingClasses ? (
-          <div className="flex items-center px-4 py-2 text-sm text-gray-500">
-            <div className="w-4 h-4 mr-2 border-2 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
-            Đang tải danh sách lớp...
-          </div>
-        ) : classList && classList.length > 0 ? (
-          <>
-            {classList.map((classItem) => (
+        {loadingClasses
+          ? [...Array(4)].map((_, idx) => (
+              <Skeleton key={idx} className="w-24 h-9 rounded" />
+            ))
+          : classList && classList.length > 0
+          ? classList.map((classItem) => (
               <Button
                 key={classItem.class_id}
                 variant={selectedClass === classItem.class_id ? "default" : "outline"}
@@ -69,9 +68,8 @@ export const ClassFilter: React.FC<ClassFilterProps> = ({
                   </span>
                 )}
               </Button>
-            ))}
-          </>
-        ) : null}
+            ))
+          : null}
       </div>
       {selectedClass && (
         <Badge variant="secondary" className="text-blue-700 bg-blue-100">

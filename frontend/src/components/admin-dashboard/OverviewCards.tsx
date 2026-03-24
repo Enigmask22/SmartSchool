@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { AdminOverviewData } from "@/hooks/useAdminDashboard";
+import type { AdminOverviewData } from "@/hooks/admin-dashboard/useAdminDashboard";
 
 interface OverviewCardsProps {
   overview: AdminOverviewData | null;

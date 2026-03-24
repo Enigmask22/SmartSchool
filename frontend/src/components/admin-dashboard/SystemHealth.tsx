@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { SystemHealthData } from "@/hooks/useAdminDashboard";
+import type { SystemHealthData } from "@/hooks/admin-dashboard/useAdminDashboard";
 
 interface SystemHealthProps {
   systemHealth: SystemHealthData | null;

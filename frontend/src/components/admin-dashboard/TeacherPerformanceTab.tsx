@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { TeacherPerformanceData } from "@/hooks/useAdminDashboard";
+import type { TeacherPerformanceData } from "@/hooks/admin-dashboard/useAdminDashboard";
 
 interface TeacherPerformanceTabProps {
   teacherPerformance: TeacherPerformanceData[];

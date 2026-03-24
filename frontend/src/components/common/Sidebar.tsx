@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useCallback } from "react";
+import { useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,6 @@ import {
   SUBJECT_ROUTES,
   COMMON_ROUTES,
 } from "@/utils/constants";
-import { Separator } from "../ui/separator";
 
 const Sidebar = ({
   user,
@@ -46,8 +45,11 @@ const Sidebar = ({
   selectedDashboardType,
   onDashboardSwitch,
 }) => {
-  const { logout, isHomeroomTeacher, isSubjectTeacher, isAdmin } =
-    useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  if (!authContext) {
+    throw new Error('Sidebar must be used within AuthProvider');
+  }
+  const { logout, isHomeroomTeacher, isSubjectTeacher, isAdmin } = authContext;
   const navigate = useNavigate();
   const location = useLocation();
   const [hasBothRoles, setHasBothRoles] = useState(false);
@@ -57,31 +59,32 @@ const Sidebar = ({
     if (!user) return;
 
     try {
+      // Make both API calls in parallel for faster response
+      const [homeroomResult, subjectResult] = await Promise.allSettled([
+        api.getHomeroomClasses(),
+        api.getTeacherInfo(),
+      ]).then((results) => [results[0], results[1]]);
+
       let hasHomeroom = false;
       let hasSubject = false;
 
       // Check homeroom role
-      try {
-        const homeroomResponse = await api.getHomeroomClasses();
-        if (
-          homeroomResponse.success &&
-          homeroomResponse.data &&
-          homeroomResponse.data.length > 0
-        ) {
-          hasHomeroom = true;
-        }
-      } catch (error) {
-        // Not a homeroom teacher
+      if (
+        homeroomResult.status === 'fulfilled' &&
+        homeroomResult.value?.success &&
+        homeroomResult.value?.data &&
+        homeroomResult.value.data.length > 0
+      ) {
+        hasHomeroom = true;
       }
 
       // Check subject teacher role
-      try {
-        const teacherResponse = await api.getTeacherInfo();
-        if (teacherResponse.success && teacherResponse.data) {
-          hasSubject = true;
-        }
-      } catch (error) {
-        // Not a subject teacher
+      if (
+        subjectResult.status === 'fulfilled' &&
+        subjectResult.value?.success &&
+        subjectResult.value?.data
+      ) {
+        hasSubject = true;
       }
 
       setHasBothRoles(hasHomeroom && hasSubject);

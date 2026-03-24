@@ -5,14 +5,36 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import type { StudentData, AttendanceStats } from '@/hooks/useHomeroomDashboard';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { StudentData, AttendanceStats } from '@/hooks/homeroom-dashboard/useHomeroomData';
 
 interface StatsCardsProps {
   students: StudentData[];
   attendanceStats: AttendanceStats | null;
+  loading?: boolean;
 }
 
-export function StatsCards({ students, attendanceStats }: StatsCardsProps) {
+export function StatsCards({ students, attendanceStats, loading = false }: StatsCardsProps) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, idx) => (
+          <Card key={idx}>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <Skeleton className="w-12 h-12 rounded-lg flex-shrink-0" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-20 mb-3" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
       <Card>

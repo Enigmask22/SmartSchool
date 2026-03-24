@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { TopAbsentLateStudent } from '@/hooks/useHomeroomDashboard';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { TopAbsentLateStudent } from '@/hooks/homeroom-dashboard/useHomeroomData';
 
 interface TopAbsentLateCardProps {
   title: string;
@@ -10,6 +11,7 @@ interface TopAbsentLateCardProps {
   selectedMonth: number;
   selectedYear: number;
   countKey: 'absent_count' | 'late_count';
+  loading?: boolean;
 }
 
 export function TopAbsentLateCard({
@@ -20,6 +22,7 @@ export function TopAbsentLateCard({
   selectedMonth,
   selectedYear,
   countKey,
+  loading = false,
 }: TopAbsentLateCardProps) {
   return (
     <Card>
@@ -30,7 +33,22 @@ export function TopAbsentLateCard({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {!data || data.length === 0 ? (
+        {loading ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, idx) => (
+              <div key={idx} className="flex items-center justify-between p-2 border rounded">
+                <div className="flex items-center gap-3 flex-1">
+                  <Skeleton className="w-6 h-6 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
+                <Skeleton className="w-12 h-6" />
+              </div>
+            ))}
+          </div>
+        ) : !data || data.length === 0 ? (
           <div className="text-sm text-muted-foreground">Không có dữ liệu</div>
         ) : (
           <div className="space-y-2">

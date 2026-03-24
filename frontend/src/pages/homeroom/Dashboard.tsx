@@ -1,10 +1,10 @@
 /**
  * HomeroomDashboard.tsx - Homeroom Dashboard Page
  * 
- * Refactored from HomeroomDashboard.jsx:
- * - Extracted state management to useHomeroomDashboard hook
- * - Added TypeScript types
- * - Organized into sub-components
+ * Refactored following Rule-of-Refactor:
+ * - UI State: Filters, date, modal state (kept in component)
+ * - Reusable Logic: usePagination (pagination for any array)
+ * - Domain Logic: useHomeroomData (API calls and data transformation)
  * 
  * Features:
  * - Multi-filter interface (academic year, class, month, year)
@@ -14,10 +14,12 @@
  * - All students modal with full list
  */
 
+import { useState, useEffect, useCallback } from 'react';
 import { Calendar } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { SimpleDatePicker } from '@/components/ui/simple-date-picker';
-import { useHomeroomDashboard } from '@/hooks/useHomeroomDashboard';
+import { useHomeroomData } from '@/hooks/homeroom-dashboard/useHomeroomData';
+import { usePagination } from '@/hooks/usePagination';
 import {
   Header,
   StatsCards,
@@ -26,7 +28,16 @@ import {
   AllStudentsModal,
 } from '@/components/homeroom-dashboard';
 
+/**
+ * HomeroomDashboard Component
+ * 
+ * Coordinates between:
+ * - useHomeroomData: Fetches and transforms dashboard data from API
+ * - usePagination: Manages pagination state for current page
+ * - Local state: Manages filters, date, and modal visibility
+ */
 export default function HomeroomDashboard() {
+  // ============ Domain Logic Hooks ============
   const {
     loading,
     homeroomInfo,
@@ -39,38 +50,62 @@ export default function HomeroomDashboard() {
     topAbsent,
     topLate,
     attendanceStats,
-    selectedDate,
-    selectedYear,
-    selectedMonth,
-    showAllStudents,
-    currentPage,
-    totalPages,
-    currentStudents,
+    fetchDashboardData,
     setSelectedAcademicYear,
     setSelectedClass,
     setSelectedClassId,
-    setSelectedDate,
-    setSelectedYear,
-    setSelectedMonth,
-    setShowAllStudents,
+  } = useHomeroomData();
+
+  // ============ Reusable Pagination Hook ============
+  const {
+    currentPage,
+    totalPages,
+    currentItems: currentStudents,
     handlePageChange,
-  } = useHomeroomDashboard();
+  } = usePagination(students, 12);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
-        </div>
-      </div>
-    );
-  }
+  // ============ UI State (kept in component) ============
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [showAllStudents, setShowAllStudents] = useState(false);
 
-  const handleClassChange = (className: string, classId: number) => {
-    setSelectedClass(className);
-    setSelectedClassId(classId);
-  };
+  /**
+   * Refetch dashboard data when filters change
+   */
+  useEffect(() => {
+    if (selectedClass !== null && selectedClassId !== null) {
+      fetchDashboardData({
+        ay: selectedAcademicYear,
+        y: selectedYear,
+        m: selectedMonth,
+        clsName: selectedClass,
+        clsId: selectedClassId,
+      });
+    }
+  }, [
+    selectedAcademicYear,
+    selectedYear,
+    selectedMonth,
+    selectedClass,
+    selectedClassId,
+    fetchDashboardData,
+  ]);
 
+  /**
+   * Handle class selection
+   */
+  const handleClassChange = useCallback(
+    (className: string, classId: number) => {
+      setSelectedClass(className);
+      setSelectedClassId(classId);
+    },
+    [setSelectedClass, setSelectedClassId]
+  );
+
+  // Render dashboard
   return (
     <div className="space-y-6 p-6">
       {/* Header with filters */}
@@ -86,10 +121,15 @@ export default function HomeroomDashboard() {
         onAcademicYearChange={setSelectedAcademicYear}
         onMonthChange={setSelectedMonth}
         onYearChange={setSelectedYear}
+        loading={loading}
       />
 
       {/* Statistics Cards */}
-      <StatsCards students={students} attendanceStats={attendanceStats} />
+      <StatsCards
+        students={students}
+        attendanceStats={attendanceStats}
+        loading={loading}
+      />
 
       {/* Date Selector */}
       <Card>
@@ -119,6 +159,7 @@ export default function HomeroomDashboard() {
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
           countKey="absent_count"
+          loading={loading}
         />
         <TopAbsentLateCard
           title="Top đi muộn nhiều nhất (tháng)"
@@ -128,6 +169,7 @@ export default function HomeroomDashboard() {
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
           countKey="late_count"
+          loading={loading}
         />
       </div>
 
@@ -141,6 +183,7 @@ export default function HomeroomDashboard() {
         totalPages={totalPages}
         onPageChange={handlePageChange}
         onViewAll={() => setShowAllStudents(true)}
+        loading={loading}
       />
 
       {/* All Students Modal */}

@@ -2,11 +2,13 @@
  * Login.tsx - Authentication Page Component
  * 
  * Main login form page component
- * - Manages form state via useLogin hook
+ * - Manages form state directly (UI layer)
  * - Displays login form with error handling
- * - Handles form submission and navigation
+ * - Delegates authentication logic to useAuthSubmit hook
  */
 
+import { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Card, 
   CardContent, 
@@ -14,7 +16,8 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card.tsx';
-import { useLogin } from '@/hooks/useLogin';
+import { AuthContext } from '@/contexts/AuthContext';
+import { useAuthSubmit } from '@/hooks/login/useAuthSubmit';
 import {
   LoginHeader,
   ErrorAlert,
@@ -35,7 +38,44 @@ import {
  * - Demo account credentials available
  */
 export function Login() {
-  const { formData, loading, error, handleInputChange, handleSubmit } = useLogin();
+  const navigate = useNavigate();
+  const authContext = useContext(AuthContext);
+
+  // Form state stays in component (UI layer)
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
+
+  // Authentication logic delegated to useAuthSubmit hook
+  const { isLoading, error, submit } = useAuthSubmit();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (authContext?.isAuthenticated?.()) {
+      // Redirect based on user role
+      if (authContext?.user?.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/select-dashboard', { replace: true });
+      }
+    }
+  }, [authContext, navigate]);
+
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await submit(formData.username, formData.password);
+  };
 
   return (
     <div 
@@ -71,7 +111,7 @@ export function Login() {
               <PasswordField value={formData.password} onChange={handleInputChange} />
 
               {/* Submit button */}
-              <SubmitButton loading={loading} />
+              <SubmitButton loading={isLoading} />
 
               {/* Forgot password link */}
               <ForgotPasswordLink onClick={() => window.location.href = '/forgot-password'} />

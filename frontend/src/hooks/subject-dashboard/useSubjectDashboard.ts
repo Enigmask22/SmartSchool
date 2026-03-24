@@ -84,10 +84,9 @@ export const useSubjectDashboard = () => {
     semester: defaultSemester,
   } = useSystemSettings();
 
-  // State
+  // State - Data Loading
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [selectedTab, setSelectedTab] = useState("overview");
   const [classList, setClassList] = useState<ClassItem[]>([]);
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [loadingClasses, setLoadingClasses] = useState(false);
@@ -196,15 +195,12 @@ export const useSubjectDashboard = () => {
   return {
     loading,
     analytics,
-    selectedTab,
     classList,
     selectedClass,
     loadingClasses,
     academicYear,
     semester,
-    setLoading,
     setAnalytics,
-    setSelectedTab,
     setClassList,
     setSelectedClass,
     setLoadingClasses,

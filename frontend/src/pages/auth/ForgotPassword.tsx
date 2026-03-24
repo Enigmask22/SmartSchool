@@ -1,14 +1,21 @@
 /**
- * ForgotPassword.jsx - Password Recovery Page Component
+ * ForgotPassword.tsx - Password Recovery Page Component
  * 
- * Main forgot password page component
- * - Manages 3-step password recovery flow via useForgotPassword hook
- * - Displays error/success messages  
- * - Handles step navigation
+ * Refactored following Rule-of-Refactor:
+ * - UI State: step, formData, loading, error, success (kept in component)
+ * - Reusable Logic: useOTPInput (6-digit OTP input behavior)
+ * - Domain Logic: usePasswordResetLogic (API calls and validation)
+ * 
+ * 3-step password recovery flow:
+ * Step 1: Enter username and email to receive OTP
+ * Step 2: Enter 6-digit OTP code
+ * Step 3: Set new password
  */
 
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useForgotPassword } from '@/hooks/useForgotPassword';
+import { useOTPInput } from '@/hooks/forgot-password/useOTPInput';
+import { usePasswordResetLogic } from '@/hooks/forgot-password/usePasswordResetLogic';
 import {
   ForgotPasswordHeader,
   ErrorAlert,
@@ -18,31 +25,151 @@ import {
   Step3Form,
 } from '@/components/forgot-password';
 
-
 /**
- * ForgotPassword - 3-step password recovery component
+ * ForgotPassword Component
  * 
- * Step 1: Enter username and email to receive OTP
- * Step 2: Enter 6-digit OTP code
- * Step 3: Set new password
+ * Manages UI state and coordinates between:
+ * - useOTPInput: For 6-digit OTP input behavior
+ * - usePasswordResetLogic: For API calls and domain validation
  */
 export function ForgotPassword() {
-  const {
-    step,
-    formData,
-    loading,
-    error,
-    success,
-    otpInputs,
-    handleInputChange,
-    handleOTPChange,
-    handleOTPKeyDown,
-    handleOTPPaste,
-    handleStep1Submit,
-    handleStep2Submit,
-    handleStep3Submit,
-    goToStep,
-  } = useForgotPassword();
+  // ============ UI State (kept in component) ============
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  const [formData, setFormData] = useState({
+    username: '',
+    otpEmail: '',
+    otp: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // ============ Reusable Logic Hooks ============
+  const { 
+    otpInputs, 
+    handleOTPChange: handleOTPChangeRaw, 
+    handleOTPKeyDown, 
+    handleOTPPaste: handleOTPPasteRaw 
+  } = useOTPInput();
+  
+  const { 
+    handleStep1Submit: submitStep1, 
+    handleStep2Submit: submitStep2, 
+    handleStep3Submit: submitStep3 
+  } = usePasswordResetLogic();
+
+  // ============ UI Event Handlers ============
+  /**
+   * Handle standard text input changes
+   */
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    setError('');
+  };
+
+  /**
+   * Handle OTP digit input with state update
+   */
+  const handleOTPChange = (index: number, value: string) => {
+    const digit = handleOTPChangeRaw(index, value);
+    if (digit !== undefined) {
+      const newOTP = formData.otp.split('');
+      newOTP[index] = digit;
+      setFormData(prev => ({
+        ...prev,
+        otp: newOTP.join('')
+      }));
+      setError('');
+    }
+  };
+
+  /**
+   * Handle OTP paste with state update
+   */
+  const handleOTPPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const otpCode = handleOTPPasteRaw(e);
+    if (otpCode) {
+      setFormData(prev => ({
+        ...prev,
+        otp: otpCode
+      }));
+      setError('');
+    }
+  };
+
+  // ============ Step Submission Handlers ============
+  /**
+   * Step 1: Send OTP
+   */
+  const handleStep1Submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await submitStep1(formData);
+      setSuccess('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư (bao gồm thư mục spam)');
+      setStep(2);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể gửi OTP. Vui lòng thử lại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Step 2: Verify OTP
+   */
+  const handleStep2Submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await submitStep2(formData);
+      setSuccess('Xác thực OTP thành công');
+      setStep(3);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Xác thực OTP thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Step 3: Reset password
+   */
+  const handleStep3Submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await submitStep3(formData);
+      setSuccess('Đặt lại mật khẩu thành công! Bạn có thể đăng nhập với mật khẩu mới.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đặt lại mật khẩu thất bại');
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Navigate to previous step
+   */
+  const goToStep = (newStep: number) => {
+    setStep(newStep);
+    setError('');
+  };
 
   return (
     <div

@@ -1,13 +1,34 @@
 import { Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { AnalyticsData } from "@/hooks/useSubjectDashboard";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { AnalyticsData } from "@/hooks/subject-dashboard/useSubjectDashboard";
 
 interface TopStudentsTabProps {
   data: AnalyticsData;
+  loading?: boolean;
 }
 
-export function TopStudentsTab({ data }: TopStudentsTabProps) {
+export function TopStudentsTab({ data, loading = false }: TopStudentsTabProps) {
   const students = data?.top_students || [];
+
+  if (loading) {
+    return (
+      <div className="overflow-hidden bg-white shadow-lg rounded-2xl">
+        <div className="px-6 py-4 bg-amber-600">
+          <Skeleton className="h-6 w-64 bg-amber-200" />
+          <Skeleton className="h-4 w-96 mt-2 bg-amber-200" />
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          {[...Array(5)].map((_, idx) => (
+            <div key={idx} className="flex items-center justify-between py-2">
+              <Skeleton className="h-4 w-96" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!students || students.length === 0) {
     return (
@@ -37,32 +58,39 @@ export function TopStudentsTab({ data }: TopStudentsTabProps) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
-                STT
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
-                Mã HS
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
-                Họ và tên
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
-                Lớp
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
-                Điểm
-              </th>
-              <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
-                Hạng
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {students.map((student, index) => (
-              <tr key={index} className="transition-colors hover:bg-amber-50">
+        {loading ? (
+          <div className="px-6 py-4 space-y-2 bg-white">
+            {[...Array(5)].map((_, idx) => (
+              <Skeleton key={idx} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : (
+          <table className="min-w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
+                  STT
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
+                  Mã HS
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
+                  Họ và tên
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
+                  Lớp
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
+                  Điểm
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
+                  Hạng
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {students.map((student, index) => (
+                <tr key={index} className="transition-colors hover:bg-amber-50">
                 <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
                   {index + 1}
                 </td>
@@ -111,6 +139,7 @@ export function TopStudentsTab({ data }: TopStudentsTabProps) {
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );
