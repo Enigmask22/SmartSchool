@@ -1,12 +1,12 @@
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "@/contexts/AuthContext";
 import { useSystemSettings } from "@/contexts/SystemSettingsContext";
-import api from "@/services/api";
+import api from "@/utils/api";
 import logger from "@/utils/logger";
 
 // Tạo danh sách năm học từ 2024-2025 đến 2035-2036
 const generateAcademicYears = () => {
-  const years = [];
+  const years: string[] = [];
   for (let year = 2024; year <= 2035; year++) {
     years.push(`${year}-${year + 1}`);
   }
@@ -75,11 +75,13 @@ export interface AnalyticsData {
 }
 
 export const useSubjectDashboard = () => {
-  const { user } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  if (!authContext) {
+    throw new Error('useSubjectDashboard must be used within AuthProvider');
+  }
   const {
     academicYear: defaultAcademicYear,
     semester: defaultSemester,
-    loading: settingsLoading,
   } = useSystemSettings();
 
   // State
@@ -149,7 +151,7 @@ export const useSubjectDashboard = () => {
       const response = await api.getTeacherDashboardAnalytics(
         academicYear,
         semester,
-        selectedClass
+        selectedClass ? parseInt(selectedClass) : null
       );
       logger.debug("Analytics response:", response);
       if (response.success) {

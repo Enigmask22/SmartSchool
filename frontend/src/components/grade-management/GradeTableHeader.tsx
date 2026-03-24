@@ -5,7 +5,7 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import OCRGradeSheet from '@/components/OCRGradeSheet';
+import OCRGradeSheet from '@/components/grade-management/OCRGradeSheet';
 
 interface ClassSubject {
   id: string;

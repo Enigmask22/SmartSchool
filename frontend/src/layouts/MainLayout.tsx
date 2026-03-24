@@ -1,12 +1,16 @@
-import React, { useState, useContext } from "react";
+import { useState, useContext } from "react";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "@/components/common/Sidebar";
 import { AuthContext } from "@/contexts/AuthContext";
 
 const MainLayout = () => {
-  const { user, loading, isAuthenticated, isAdmin } = useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('MainLayout must be used within AuthProvider');
+  }
+  const { user, loading, isAuthenticated, isAdmin } = context;
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedDashboardType, setSelectedDashboardType] = useState(null);
+  const [selectedDashboardType, setSelectedDashboardType] = useState<'homeroom' | 'subject' | null>(null);
   const location = useLocation();
 
   // Handle loading state
@@ -53,7 +57,7 @@ const MainLayout = () => {
         user={user}
         selectedDashboardType={dashboardType}
         // Pass a function to switch context if needed
-        onDashboardSwitch={() => setSelectedDashboardType(prev => prev === 'homeroom' ? 'subject' : 'homeroom')}
+        onDashboardSwitch={() => setSelectedDashboardType(prev => (prev === 'homeroom' ? 'subject' : 'homeroom'))}
       />
       <main
         className={`

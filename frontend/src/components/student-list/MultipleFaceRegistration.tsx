@@ -1,28 +1,48 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, CheckCircle, XCircle, Loader2, Camera, AlertCircle, RefreshCw, BarChart3 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import logger from "@/utils/logger";
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8000/api';
 
-const MultipleFaceRegistration = ({ student, onClose, onSuccess }) => {
-  const [files, setFiles] = useState([]);
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const fileInputRef = useRef(null);
+interface FileObject {
+  file: File;
+  id: number;
+  name: string;
+  previewUrl: string;
+  status: 'pending' | 'success' | 'error';
+}
 
-  const handleFileSelect = (event) => {
-    const selectedFiles = Array.from(event.target.files);
+interface RegistrationResult {
+  success: boolean;
+  message: string;
+  detection_score?: number;
+}
+
+interface MultipleFaceRegistrationProps {
+  student: { id: number; full_name: string; [key: string]: any };
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const MultipleFaceRegistration: React.FC<MultipleFaceRegistrationProps> = ({ student, onClose, onSuccess }) => {
+  const [files, setFiles] = useState<FileObject[]>([]);
+  const [results, setResults] = useState<RegistrationResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
     if (selectedFiles.length > 10) {
       alert('Tối đa 10 ảnh mỗi lần');
       return;
     }
     
-    const fileObjects = selectedFiles.map((file, index) => ({
+    const fileObjects: FileObject[] = selectedFiles.map((file, index) => ({
       file,
       id: Date.now() + index,
       name: file.name,

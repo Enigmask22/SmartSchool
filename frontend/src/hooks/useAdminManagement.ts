@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/services/api';
+import api from '@/utils/api';
 import logger from '@/utils/logger';
 
 // Tab Configuration
@@ -63,18 +63,18 @@ export function useAdminManagement() {
   const [activeTab, setActiveTab] = useState('users');
 
   // Main Data Management
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [editingItem, setEditingItem] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState<Record<string, any>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
 
   // Confirm Dialog
-  const [confirmState, setConfirmState] = useState({ open: false });
+  const [confirmState, setConfirmState] = useState<Record<string, any>>({ open: false });
 
   const openConfirm = useCallback(
     (config) =>
@@ -93,30 +93,30 @@ export function useAdminManagement() {
   );
 
   // Reference Data
-  const [teachers, setTeachers] = useState([]);
-  const [homeroomTeachers, setHomeroomTeachers] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [filteredTeachers, setFilteredTeachers] = useState([]);
-  const [subjectTeachersData, setSubjectTeachersData] = useState([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [homeroomTeachers, setHomeroomTeachers] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [filteredTeachers, setFilteredTeachers] = useState<any[]>([]);
+  const [subjectTeachersData, setSubjectTeachersData] = useState<any[]>([]);
 
   // Teacher Subjects (for teachers tab)
-  const [selectedSubjects, setSelectedSubjects] = useState([]);
-  const [teacherSubjects, setTeacherSubjects] = useState({});
+  const [selectedSubjects, setSelectedSubjects] = useState<any[]>([]);
+  const [teacherSubjects, setTeacherSubjects] = useState<Record<string, any>>({});
 
   // Import Modal
   const [showImportModal, setShowImportModal] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [selectedUserIds, setSelectedUserIds] = useState([]);
-  const [userSubjects, setUserSubjects] = useState({});
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<any[]>([]);
+  const [userSubjects, setUserSubjects] = useState<Record<string, any>>({});
   const [importLoading, setImportLoading] = useState(false);
 
   // Score Column Config
-  const [scoreColumns, setScoreColumns] = useState([]);
-  const [editingColumnKey, setEditingColumnKey] = useState(null);
+  const [scoreColumns, setScoreColumns] = useState<any[]>([]);
+  const [editingColumnKey, setEditingColumnKey] = useState<any>(null);
   const [showColumnForm, setShowColumnForm] = useState(false);
-  const [columnFormData, setColumnFormData] = useState({
+  const [columnFormData, setColumnFormData] = useState<Record<string, any>>({
     key: '',
     label: '',
     he_so: 1,
@@ -125,11 +125,11 @@ export function useAdminManagement() {
   });
 
   // Class Subjects Filters
-  const [academicYears, setAcademicYears] = useState([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [filteredClasses, setFilteredClasses] = useState([]);
+  const [filteredClasses, setFilteredClasses] = useState<any[]>([]);
 
   const currentConfig = TAB_CONFIG[activeTab];
 
@@ -200,7 +200,7 @@ export function useAdminManagement() {
         setError(response.message || 'Không thể tải dữ liệu');
       }
     } catch (err) {
-      setError('Lỗi khi tải dữ liệu: ' + err.message);
+      setError('Lỗi khi tải dữ liệu: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -387,7 +387,7 @@ export function useAdminManagement() {
 
       let successCount = 0;
       let errorCount = 0;
-      const errors = [];
+      const errors: string[] = [];
 
       for (const classSubject of classSubjectsToCreate) {
         try {
@@ -404,7 +404,8 @@ export function useAdminManagement() {
           }
         } catch (err) {
           errorCount++;
-          errors.push(`${classSubject.subject_id}: ${err.message}`);
+          const errMsg = err instanceof Error ? err.message : String(err);
+          errors.push(`${classSubject.subject_id}: ${errMsg}`);
         }
       }
 
@@ -421,7 +422,8 @@ export function useAdminManagement() {
       await loadData();
     } catch (error) {
       logger.error('Error initializing class subjects:', error);
-      alert('❌ Lỗi khi khởi tạo môn học: ' + error.message);
+      const errorMsg = error instanceof Error ? error.message : 'Lỗi không xác định';
+      alert('❌ Lỗi khi khởi tạo môn học: ' + errorMsg);
     } finally {
       setLoading(false);
     }
@@ -517,7 +519,7 @@ export function useAdminManagement() {
               try {
                 const subjectId = response.data?.id;
                 if (subjectId) {
-                  let existing = null;
+                  let existing: any = null;
                   try {
                     const getRes = await api.getScoreConfigBySubject(subjectId);
                     if (getRes.success) existing = getRes.data;
@@ -553,7 +555,8 @@ export function useAdminManagement() {
           }
         }
       } catch (err) {
-        const errorMsg = 'Lỗi khi tạo: ' + err.message;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = 'Lỗi khi tạo: ' + errMsg;
         setError(errorMsg);
         alert('❌ ' + errorMsg);
       }
@@ -645,7 +648,7 @@ export function useAdminManagement() {
           if (response.success) {
             if (activeTab === 'subjects' && data.score_column_config) {
               try {
-                let existing = null;
+                let existing: any = null;
                 try {
                   const getRes = await api.getScoreConfigBySubject(id);
                   if (getRes.success) existing = getRes.data;
@@ -679,7 +682,8 @@ export function useAdminManagement() {
           }
         }
       } catch (err) {
-        const errorMsg = 'Lỗi khi cập nhật: ' + err.message;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = 'Lỗi khi cập nhật: ' + errMsg;
         setError(errorMsg);
         alert('❌ ' + errorMsg);
       }
@@ -708,7 +712,8 @@ export function useAdminManagement() {
               setError(response.message || 'Không thể xóa');
             }
           } catch (err) {
-            setError('Lỗi khi xóa: ' + err.message);
+            const errMsg = err instanceof Error ? err.message : String(err);
+            setError('Lỗi khi xóa: ' + errMsg);
           }
         },
       });
@@ -738,7 +743,8 @@ export function useAdminManagement() {
               setError(response.message || 'Không thể khôi phục');
             }
           } catch (err) {
-            setError('Lỗi khi khôi phục: ' + err.message);
+            const errMsg = err instanceof Error ? err.message : String(err);
+            setError('Lỗi khi khôi phục: ' + errMsg);
           }
         },
       });
@@ -767,7 +773,8 @@ export function useAdminManagement() {
               setError(response.message || 'Không thể xóa vĩnh viễn');
             }
           } catch (err) {
-            setError('Lỗi khi xóa vĩnh viễn: ' + err.message);
+            const errMsg = err instanceof Error ? err.message : String(err);
+            setError('Lỗi khi xóa vĩnh viễn: ' + errMsg);
           }
         },
       });
@@ -819,7 +826,8 @@ export function useAdminManagement() {
         setError(response.message || 'Không thể tải danh sách users');
       }
     } catch (err) {
-      setError('Lỗi khi tải danh sách users: ' + err.message);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setError('Lỗi khi tải danh sách users: ' + errMsg);
     }
   }, []);
 
@@ -839,7 +847,7 @@ export function useAdminManagement() {
       if (response.success) {
         const createdTeachers = response.data;
 
-        const subjectTeacherPromises = [];
+        const subjectTeacherPromises: Promise<any>[] = [];
 
         createdTeachers.forEach((teacher) => {
           const subjectIds = userSubjects[teacher.user_id] || [];
@@ -878,7 +886,8 @@ export function useAdminManagement() {
         setError(response.message || 'Không thể tạo giáo viên');
       }
     } catch (err) {
-      setError('Lỗi khi tạo giáo viên: ' + err.message);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setError('Lỗi khi tạo giáo viên: ' + errMsg);
     } finally {
       setImportLoading(false);
     }

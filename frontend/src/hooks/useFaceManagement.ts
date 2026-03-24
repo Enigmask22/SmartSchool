@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
-import ApiService from '@/services/api';
+import ApiService from '@/utils/api';
 import logger from '@/utils/logger';
 
 // Type definitions
@@ -59,7 +59,9 @@ const API_BASE_URL =
   import.meta.env.VITE_APP_API_URL || 'http://localhost:8000/api';
 
 export const useFaceManagement = () => {
-  const { user, isHomeroomTeacher } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user;
+  const isHomeroomTeacher = authContext?.isHomeroomTeacher || (() => false);
   
   // State
   const [state, setState] = useState<FaceManagementState>({
@@ -79,7 +81,7 @@ export const useFaceManagement = () => {
   });
 
   // Refs
-  const classesReqIdRef = useRef(0);
+  //const classesReqIdRef = useRef(0);
   const hasBootstrappedRef = useRef(false);
 
   // Update state helper

@@ -7,7 +7,6 @@
  * - Handles step navigation
  */
 
-import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useForgotPassword } from '@/hooks/useForgotPassword';
 import {

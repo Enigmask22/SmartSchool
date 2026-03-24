@@ -5,7 +5,21 @@ import logger from "@/utils/logger";
 const API_BASE_URL =
   import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
+interface RequestOptions extends RequestInit {
+  headers?: Record<string, string>;
+  body?: string | FormData;
+}
+
+interface QueueItem {
+  resolve: (token: string) => void;
+  reject: (error: Error) => void;
+}
+
 class ApiService {
+  baseURL: string;
+  isRefreshing: boolean;
+  failedQueue: QueueItem[];
+
   constructor() {
     this.baseURL = API_BASE_URL;
     this.isRefreshing = false;
@@ -13,12 +27,12 @@ class ApiService {
   }
 
   // Helper method để xử lý hàng đợi các request bị failed
-  processQueue(error, token = null) {
+  processQueue(error: Error | null, token: string | null = null) {
     this.failedQueue.forEach(({ resolve, reject }) => {
       if (error) {
         reject(error);
       } else {
-        resolve(token);
+        resolve(token!);
       }
     });
 
@@ -26,7 +40,7 @@ class ApiService {
   }
 
   // Kiểm tra xem token có hết hạn không
-  isTokenExpired(token) {
+  isTokenExpired(token: string | null): boolean {
     if (!token) return true;
 
     try {
@@ -85,7 +99,7 @@ class ApiService {
   }
 
   // Helper method để thực hiện HTTP requests với auto-refresh
-  async request(endpoint, options = {}) {
+  async request(endpoint: string, options: RequestOptions = {}): Promise<any> {
     const url = `${this.baseURL}${endpoint}`;
 
     // Lấy access token
@@ -97,7 +111,7 @@ class ApiService {
         // Nếu đang refresh, đợi trong hàng đợi
         return new Promise((resolve, reject) => {
           this.failedQueue.push({ resolve, reject });
-        }).then((token) => {
+        }).then(() => {
           return this.request(endpoint, options);
         });
       }
@@ -108,23 +122,23 @@ class ApiService {
         accessToken = await this.refreshAccessToken();
         this.processQueue(null, accessToken);
       } catch (error) {
-        this.processQueue(error, null);
+        this.processQueue(error as Error, null);
         throw error;
       } finally {
         this.isRefreshing = false;
       }
     }
 
-    const config = {
+    const config: RequestOptions = {
       headers: {
         "Content-Type": "application/json",
-        ...options.headers,
+        ...(options.headers || {}),
       },
       ...options,
     };
 
     // Thêm JWT token nếu có
-    if (accessToken) {
+    if (accessToken && config.headers) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
@@ -137,7 +151,7 @@ class ApiService {
           // Nếu đang refresh, đợi trong hàng đợi
           return new Promise((resolve, reject) => {
             this.failedQueue.push({ resolve, reject });
-          }).then((token) => {
+          }).then(() => {
             return this.request(endpoint, options);
           });
         }
@@ -149,7 +163,9 @@ class ApiService {
           this.processQueue(null, newToken);
 
           // Thử lại request với token mới
-          config.headers.Authorization = `Bearer ${newToken}`;
+          if (config.headers) {
+            config.headers.Authorization = `Bearer ${newToken}`;
+          }
           const retryResponse = await fetch(url, config);
 
           if (!retryResponse.ok) {
@@ -158,7 +174,7 @@ class ApiService {
 
           return await retryResponse.json();
         } catch (error) {
-          this.processQueue(error, null);
+          this.processQueue(error as Error, null);
           throw error;
         } finally {
           this.isRefreshing = false;
@@ -194,27 +210,27 @@ class ApiService {
   }
 
   // Generic HTTP methods for convenience
-  async get(endpoint) {
+  async get(endpoint: string) {
     return this.request(endpoint, { method: "GET" });
   }
 
-  async post(endpoint, data = null) {
-    const options = { method: "POST" };
+  async post(endpoint: string, data: any = null) {
+    const options: RequestOptions = { method: "POST" };
     if (data) {
       options.body = JSON.stringify(data);
     }
     return this.request(endpoint, options);
   }
 
-  async put(endpoint, data = null) {
-    const options = { method: "PUT" };
+  async put(endpoint: string, data: any = null) {
+    const options: RequestOptions = { method: "PUT" };
     if (data) {
       options.body = JSON.stringify(data);
     }
     return this.request(endpoint, options);
   }
 
-  async delete(endpoint) {
+  async delete(endpoint: string) {
     return this.request(endpoint, { method: "DELETE" });
   }
 
@@ -781,7 +797,7 @@ class ApiService {
     });
   }
 
-  async getScoreConfigBySubject(subjectId, academicYear, semester) {
+  async getScoreConfigBySubject(subjectId) {
     // Sử dụng score-settings
     return this.request(`/score-settings/subject/${subjectId}`);
   }
@@ -810,16 +826,16 @@ class ApiService {
     return this.updateScoreSettings(subjectId, payload);
   }
 
-  async getStudentScore(studentId, classSubjectId, academicYear, semester) {
+  async getStudentScore(studentId: number, classSubjectId: number, academicYear: string, semester: string) {
     return this.request(
       `/scores/score/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
   async getStudentScores(
-    studentId,
-    academicYear = "2024-2025",
-    semester = "HK1",
+    studentId: number,
+    academicYear: string = "2024-2025",
+    semester: string = "HK1",
   ) {
     return this.request(
       `/scores/student/${studentId}?academic_year=${academicYear}&semester=${semester}`,
@@ -827,7 +843,7 @@ class ApiService {
   }
 
   // Upsert score config - create if not exists, update if exists
-  async upsertScoreConfig(configId, config) {
+  async upsertScoreConfig(config: any) {
     // Use backend upsert endpoint that handles both create and update automatically
     return this.request("/scores/config/upsert", {
       method: "POST",
@@ -836,7 +852,7 @@ class ApiService {
   }
 
   // Download score template
-  async downloadScoreTemplate(classSubjectId) {
+  async downloadScoreTemplate(classSubjectId: number) {
     const accessToken = localStorage.getItem("access_token");
     const url = `${this.baseURL}/scores/template/download/${classSubjectId}`;
 
@@ -886,7 +902,7 @@ class ApiService {
   }
 
   // Bulk import scores
-  async bulkImportScores(importData) {
+  async bulkImportScores(importData: any) {
     return this.request("/scores/bulk-import", {
       method: "POST",
       body: JSON.stringify(importData),
@@ -894,7 +910,7 @@ class ApiService {
   }
 
   // Teacher Classes List (for dropdown filter)
-  async getTeacherClasses(academicYear = "2024-2025", semester = "HK1") {
+  async getTeacherClasses(academicYear: string = "2024-2025", semester: string = "HK1") {
     return this.request(
       `/scores/teacher/classes?academic_year=${academicYear}&semester=${semester}`,
     );
@@ -902,9 +918,9 @@ class ApiService {
 
   // Teacher Dashboard Analytics
   async getTeacherDashboardAnalytics(
-    academicYear = "2024-2025",
-    semester = "HK1",
-    classId = null,
+    academicYear: string = "2024-2025",
+    semester: string = "HK1",
+    classId: number | null = null,
   ) {
     let url = `/scores/teacher/dashboard/analytics?academic_year=${academicYear}&semester=${semester}`;
     if (classId) {
@@ -1231,7 +1247,7 @@ class ApiService {
       logger.error("❌ Lỗi khi gửi SMS qua eSMS.vn:", error);
       return {
         success: false,
-        error: `Lỗi kết nối eSMS.vn: ${error.message}`,
+        error: `Lỗi kết nối eSMS.vn: ${(error as any).message}`,
         data: null,
       };
     }
@@ -1273,7 +1289,7 @@ class ApiService {
   /**
    * Upload và parse ảnh bảng điểm viết tay sử dụng OCR (Async với Queue)
    */
-  async parseScoreSheetOCR(formData) {
+  async parseScoreSheetOCR(formData: FormData) {
     try {
       const token = localStorage.getItem("access_token");
 
@@ -1293,7 +1309,7 @@ class ApiService {
         // Handle specific error codes
         if (response.status === 503) {
           const errorData = await response.json();
-          const error = new Error(errorData.detail || "Hệ thống đang quá tải");
+          const error: any = new Error(errorData.detail || "Hệ thống đang quá tải");
           error.response = { status: 503 };
           throw error;
         }
@@ -1312,7 +1328,7 @@ class ApiService {
   /**
    * Kiểm tra status của OCR request
    */
-  async getOCRStatus(requestId) {
+  async getOCRStatus(requestId: string | number) {
     return this.request(`/scores/ocr/status/${requestId}`, {
       method: "GET",
     });
@@ -1330,7 +1346,7 @@ class ApiService {
   /**
    * Export dữ liệu đã parse từ OCR ra Excel
    */
-  async exportParsedOCRToExcel(data) {
+  async exportParsedOCRToExcel(data: any) {
     try {
       const token = localStorage.getItem("access_token");
 

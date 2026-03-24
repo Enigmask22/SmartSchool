@@ -1,4 +1,3 @@
-import React from "react";
 import { Users, CheckCircle2, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -13,7 +12,6 @@ interface StudentSummaryProps {
 }
 
 export function StudentSummary({
-  totalStudents,
   activeStudents,
   inactiveStudents,
   filteredCount,

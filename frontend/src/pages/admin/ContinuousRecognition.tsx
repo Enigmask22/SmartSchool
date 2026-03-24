@@ -8,7 +8,7 @@
  * - RecentRecognitions: Recent recognition history
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,12 +44,10 @@ export default function ContinuousRecognitionPage() {
     availableCameras,
     cameraPreviews,
     cameraStats,
-    streamErrors,
     stats,
     videoRef,
     canvasRef,
     toggleCamera,
-    toggleRecognition,
     handleStart,
     handleStop,
     setCameraSource,

@@ -9,7 +9,6 @@ import {
   Trash2,
   Edit,
   Search,
-  X,
 } from 'lucide-react';
 import {
   Card,
@@ -37,23 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-
-interface StudentData {
-  id: number;
-  full_name: string;
-  student_id: string;
-  email: string;
-  phone: string;
-  received_email?: string;
-  class_name: string;
-  grade: string | number;
-  date_of_birth: string;
-  address: string;
-  parent_contacts: unknown[];
-  gender: string;
-  is_active: boolean;
-  face_samples_count?: number;
-}
+import { StudentData } from '@/hooks/useClassManagement';
 
 interface StudentsTableCardProps {
   selectedClassForManagement: string | null;

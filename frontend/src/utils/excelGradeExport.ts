@@ -8,7 +8,7 @@ export const exportToExcel = async (
   academicYear: string,
   semester: string,
   getDisplayColumns: (config: Record<string, any>) => any[],
-  flattenScoreColumns: (config: Record<string, any>) => any[],
+  // _flattenScoreColumns: (config: Record<string, any>) => any[],
   calculateFinalGrade: (scoreData: any) => string | number
 ) => {
   try {

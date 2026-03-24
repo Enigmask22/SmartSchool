@@ -1,15 +1,15 @@
 import { useState, useEffect, useContext, useCallback } from 'react';
 import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 import { AuthContext } from '@/contexts/AuthContext';
-import api from '@/services/api';
+import api from '@/utils/api';
 import * as XLSX from 'xlsx';
 import logger from '@/utils/logger';
 
 // Constants
 export const SEMESTERS = ['HK1', 'HK2', 'HK3'];
 
-const generateAcademicYears = () => {
-  const years = [];
+const generateAcademicYears = (): string[] => {
+  const years: string[] = [];
   for (let year = 2024; year <= 2035; year++) {
     years.push(`${year}-${year + 1}`);
   }
@@ -102,11 +102,12 @@ export interface ImportedGradeRow {
  * Returns all necessary state, handlers, and helper functions
  */
 export const useGradeManagement = () => {
-  const { user } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user;
   const {
     academicYear: defaultAcademicYear,
     semester: defaultSemester,
-    loading: settingsLoading,
+    loading: _settingsLoading,
   } = useSystemSettings();
 
   // Data states
@@ -186,7 +187,8 @@ export const useGradeManagement = () => {
   const fetchTeacherInfo = async () => {
     try {
       setLoading(true);
-      const response = await api.getTeacherInfo(academicYear, semester);
+      // Use defaults if not explicitly passed
+      const response = await api.getTeacherInfo();
       if (response.success) {
         setTeacherInfo(response.data);
         setSelectedClassSubject(null);
@@ -223,9 +225,7 @@ export const useGradeManagement = () => {
 
       // Fetch score config
       const configResponse = await api.getScoreConfigBySubject(
-        classSubject.subject_id,
-        academicYear,
-        semester
+        classSubject.subject_id
       );
 
       logger.debug('Config response:', configResponse);
@@ -345,7 +345,7 @@ export const useGradeManagement = () => {
     });
   };
 
-  const initializeScoreForm = (student: any, existingScore: Score | null = null): ScoreFormData => {
+  const initializeScoreForm = (_student: any, existingScore: Score | null = null): ScoreFormData => {
     const form: ScoreFormData = {};
 
     if (scoreConfig && scoreConfig.score_column_config) {
@@ -695,7 +695,7 @@ export const useGradeManagement = () => {
         score_column_config: configForm,
       };
 
-      const response = await api.upsertScoreConfig(scoreConfig?.id, configData);
+      const response = await api.upsertScoreConfig(configData);
 
       if (response.success) {
         setScoreConfig(response.data);

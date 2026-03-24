@@ -11,7 +11,7 @@
 
 import { useState, useCallback, useEffect, useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
-import api from '@/services/api';
+import api from '@/utils/api';
 import logger from '@/utils/logger';
 
 /**

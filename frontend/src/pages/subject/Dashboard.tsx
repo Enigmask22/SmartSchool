@@ -16,11 +16,11 @@ import {
   useSubjectDashboard,
   ACADEMIC_YEARS,
   SEMESTERS,
-  type AnalyticsData,
 } from "@/hooks/useSubjectDashboard";
 
 const SubjectTeacherDashboard = () => {
-  const { user } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user;
   const {
     loading,
     analytics,

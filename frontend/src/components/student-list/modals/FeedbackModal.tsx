@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -60,7 +59,6 @@ export function FeedbackModal({
   selectedStudent,
   form,
   onFormChange,
-  loading,
   feedbackLoading = false,
   error,
   success,

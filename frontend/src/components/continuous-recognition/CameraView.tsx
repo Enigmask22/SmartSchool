@@ -1,14 +1,12 @@
-import React from 'react';
-import { Camera, Video, CameraOff, AlertCircle, Pause, CheckCircle } from 'lucide-react';
+import { Camera, CameraOff, AlertCircle, Pause, CheckCircle } from 'lucide-react';
 import {
-  Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -50,7 +48,6 @@ const CameraView = ({
   onCameraSourceChange,
   onSelectedCameraChange,
   onMultiCameraToggle,
-  onSelectedMultiCamerasChange,
 }: CameraViewProps) => {
   return (
     <div className="lg:col-span-2">

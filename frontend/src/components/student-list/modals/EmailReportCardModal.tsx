@@ -1,4 +1,3 @@
-import React from "react";
 import { Mail, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   Dialog,

@@ -1,4 +1,4 @@
-import React from "react";
+import _React from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,8 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, BookOpen, Target, ClipboardList, Check } from "lucide-react";
 
 interface Subject {
@@ -56,14 +54,16 @@ export function SubjectSelectionModal({
   onClose,
 }: SubjectSelectionModalProps) {
   const mandatorySubjects = availableSubjects.filter(
-    (s) => s.is_mandatory || s.subject_code?.toUpperCase() === "TOAN"
+    (s) => (s.is_mandatory || s.subject_code?.toUpperCase() === "TOAN") && 
+           (s.subject_code || s.code || s.id)
   );
   const electiveSubjects = availableSubjects.filter(
-    (s) => !s.is_mandatory && s.subject_code?.toUpperCase() !== "TOAN"
+    (s) => (!s.is_mandatory && s.subject_code?.toUpperCase() !== "TOAN") &&
+           (s.subject_code || s.code || s.id)
   );
 
-  const getSubjectId = (subject: Subject) => {
-    return subject.subject_code || subject.code || subject.id;
+  const getSubjectId = (subject: Subject): string | number => {
+    return (subject.subject_code || subject.code || subject.id)!;
   };
 
   const getSubjectName = (subject: Subject) => {

@@ -12,7 +12,7 @@ interface FaceManagementProps {
   isHomeroom?: boolean;
 }
 
-export default function FaceManagement({ isHomeroom = false }: FaceManagementProps) {
+export default function FaceManagement({ isHomeroom: _isHomeroom = false }: FaceManagementProps) {
   const {
     aiStatus,
     students,
@@ -70,7 +70,7 @@ export default function FaceManagement({ isHomeroom = false }: FaceManagementPro
         classesLoading={classesLoading}
         selectedAcademicYear={selectedAcademicYear}
         academicYears={academicYears}
-        isHomeroomTeacher={isHomeroomTeacher()}
+        isHomeroomTeacher={isHomeroomTeacher}
         onClassChange={(value) => {
           updateState({ selectedClass: value });
           faceBootstrap({
@@ -93,7 +93,7 @@ export default function FaceManagement({ isHomeroom = false }: FaceManagementPro
         currentPage={currentPage}
         pageSize={pageSize}
         selectedClass={selectedClass}
-        isHomeroomTeacher={isHomeroomTeacher()}
+        isHomeroomTeacher={isHomeroomTeacher}
         totalPages={getTotalPages()}
         onDeleteFace={deleteFaceEncoding}
         onPageChange={(page) => updateState({ currentPage: page })}

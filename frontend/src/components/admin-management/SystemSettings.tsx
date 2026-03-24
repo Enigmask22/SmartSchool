@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings,
   Calendar,
@@ -16,28 +16,47 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Label } from "./ui/label";
-import { Badge } from "./ui/badge";
-import { Alert, AlertDescription } from "./ui/alert";
-import api from "@/services/api";
+} from "../ui/select";
+import { Label } from "../ui/label";
+import { Badge } from "../ui/badge";
+import { Alert, AlertDescription } from "../ui/alert";
+import api from "@/utils/api";
+
+interface Setting {
+  setting_key: string;
+  setting_value: string;
+  [key: string]: any;
+}
+
+interface SettingsMap {
+  academic_year?: Setting;
+  semester?: Setting;
+  attendance_cutoff_time?: Setting;
+  [key: string]: Setting | undefined;
+}
+
+interface FormData {
+  academic_year: string;
+  semester: string;
+  attendance_cutoff_time: string;
+}
 
 const SystemSettings = () => {
-  const [settings, setSettings] = useState({});
+  const [settings, setSettings] = useState<SettingsMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [formData, setFormData] = useState({
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [formData, setFormData] = useState<FormData>({
     academic_year: "",
     semester: "",
     attendance_cutoff_time: "",
@@ -61,8 +80,8 @@ const SystemSettings = () => {
 
       if (response.success) {
         // Chuyển đổi array thành object để dễ xử lý
-        const settingsMap = {};
-        response.data.forEach((setting) => {
+        const settingsMap: SettingsMap = {};
+        response.data.forEach((setting: Setting) => {
           settingsMap[setting.setting_key] = setting;
         });
         setSettings(settingsMap);
@@ -85,20 +104,20 @@ const SystemSettings = () => {
         setError(response.message || "Không thể tải cấu hình");
       }
     } catch (err) {
-      setError("Lỗi khi tải cấu hình: " + err.message);
+      setError("Lỗi khi tải cấu hình: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (key, value) => {
+  const handleChange = (key: keyof FormData, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [key]: value,
     }));
   };
 
-  const handleSave = async (settingKey) => {
+  const handleSave = async (settingKey: keyof FormData) => {
     try {
       setSaving(true);
       setError(null);
@@ -122,7 +141,7 @@ const SystemSettings = () => {
         setError(response.message || "Không thể cập nhật cấu hình");
       }
     } catch (err) {
-      setError("Lỗi khi cập nhật: " + err.message);
+      setError("Lỗi khi cập nhật: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSaving(false);
     }
@@ -138,7 +157,7 @@ const SystemSettings = () => {
         api.request(`/admin/system-settings/${key}`, {
           method: "PUT",
           body: JSON.stringify({
-            setting_value: formData[key],
+            setting_value: formData[key as keyof FormData],
           }),
         })
       );
@@ -154,7 +173,7 @@ const SystemSettings = () => {
         setError("Một số cấu hình không thể cập nhật");
       }
     } catch (err) {
-      setError("Lỗi khi cập nhật: " + err.message);
+      setError("Lỗi khi cập nhật: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSaving(false);
     }
@@ -173,24 +192,24 @@ const SystemSettings = () => {
   // ===== Dayoffs per grade (10/11/12) =====
   const grades = [10, 11, 12];
   const currentYear = new Date().getFullYear();
-  const [dayoffYear, setDayoffYear] = useState({
+  const [dayoffYear, setDayoffYear] = useState<{ [key: number]: number }>({
     10: currentYear,
     11: currentYear,
     12: currentYear,
   });
-  const [dayoffMonth, setDayoffMonth] = useState({
+  const [dayoffMonth, setDayoffMonth] = useState<{ [key: number]: number }>({
     10: new Date().getMonth() + 1,
     11: new Date().getMonth() + 1,
     12: new Date().getMonth() + 1,
   });
-  const [dayoffDays, setDayoffDays] = useState({
+  const [dayoffDays, setDayoffDays] = useState<{ [key: number]: Set<number> }>({
     10: new Set(),
     11: new Set(),
     12: new Set(),
   });
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  const loadDayoffConfig = async (g) => {
+  const loadDayoffConfig = async (g: number) => {
     try {
       const y = dayoffYear[g];
       const m = dayoffMonth[g];
@@ -208,12 +227,12 @@ const SystemSettings = () => {
     }
   };
 
-  const saveDayoffConfig = async (g) => {
+  const saveDayoffConfig = async (g: number) => {
     try {
       setSaving(true);
       const y = dayoffYear[g];
       const m = dayoffMonth[g];
-      const list = Array.from(dayoffDays[g]).sort((a, b) => a - b);
+      const list = Array.from(dayoffDays[g]).sort((a, b) => (a as number) - (b as number));
       const resp = await api.request(`/admin/dayoffs`, {
         method: "POST",
         body: JSON.stringify({
@@ -225,8 +244,9 @@ const SystemSettings = () => {
       });
       if (resp.success) setSuccess(`Lưu ngày nghỉ khối ${g} thành công`);
       else setError(resp.message || `Không thể lưu ngày nghỉ khối ${g}`);
-    } catch (e) {
-      setError(`Lỗi khi lưu ngày nghỉ khối ${g}: ${e.message}`);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(`Lỗi khi lưu ngày nghỉ khối ${g}: ${errorMessage}`);
     } finally {
       setSaving(false);
       setTimeout(() => setSuccess(null), 2500);
@@ -247,10 +267,10 @@ const SystemSettings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  const renderDayoffSection = (g) => {
+  const renderDayoffSection = (g: number) => {
     const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
     const selected = dayoffDays[g] || new Set();
-    const toggleDay = (d) => {
+    const toggleDay = (d: number) => {
       setDayoffDays((prev) => {
         const setCopy = new Set(prev[g] || []);
         if (setCopy.has(d)) setCopy.delete(d);

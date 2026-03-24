@@ -1,17 +1,39 @@
-import React, { createContext, useState, useEffect } from "react";
-import api from "@/services/api";
+import { createContext, useState, useEffect, ReactNode } from "react";
+import api from "@/utils/api";
 import logger from "@/utils/logger";
 import { USER_ROLES } from "@/utils/constants";
 
-export const AuthContext = createContext();
+// Define the shape of the auth context value
+interface AuthContextValue {
+  user: any;
+  accessToken: string | null;
+  refreshToken: string | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<any>;
+  logout: () => Promise<void>;
+  isAuthenticated: () => boolean;
+  isTeacher: () => boolean;
+  isHomeroomTeacher: () => boolean;
+  isSubjectTeacher: () => boolean;
+  isAdmin: () => boolean;
+  hasRole: (roles: string | string[]) => boolean;
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [accessToken, setAccessToken] = useState(
+export const AuthContext = createContext<AuthContextValue | undefined>(
+  undefined
+);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [accessToken, setAccessToken] = useState<string | null>(
     localStorage.getItem("access_token")
   );
-  const [refreshToken, setRefreshToken] = useState(
+  const [refreshToken, setRefreshToken] = useState<string | null>(
     localStorage.getItem("refresh_token")
   );
 
@@ -21,7 +43,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Kiểm tra xem token có hết hạn không
-  const isTokenExpired = (token) => {
+  const isTokenExpired = (token: string): boolean => {
     if (!token) return true;
 
     try {
@@ -98,7 +120,8 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       logger.error("Login error:", error);
-      const errorMessage = error.message || "Đăng nhập thất bại";
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMessage = errorMsg || "Đăng nhập thất bại";
       throw new Error(errorMessage);
     }
   };
@@ -164,7 +187,7 @@ export const AuthProvider = ({ children }) => {
             setAccessToken(newToken);
             logger.debug("Auto-refresh successful");
           })
-          .catch((error) => {
+          .catch(() => {
             logger.debug("Auto-refresh failed, logging out");
             logout();
           });
