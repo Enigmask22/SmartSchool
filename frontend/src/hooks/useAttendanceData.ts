@@ -29,7 +29,7 @@
  */
 
 import { useState, useEffect, useContext } from 'react';
-import ApiService from '@/services/api';
+import ApiService from '@/utils/api';
 import { AuthContext } from '@/contexts/AuthContext';
 import logger from '@/utils/logger';
 
@@ -69,7 +69,9 @@ interface BootstrapData {
 }
 
 export const useAttendanceData = () => {
-  const { user, isHomeroomTeacher } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user;
+  const isHomeroomTeacher = authContext?.isHomeroomTeacher;
 
   // Data states
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);

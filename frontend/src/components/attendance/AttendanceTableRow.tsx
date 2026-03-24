@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,7 +94,6 @@ const formatTime = (timeString?: string): string => {
 
 const AttendanceTableRow = ({
   record,
-  index,
   isEditing,
   editStatus,
   editNotes,

@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import {
   Card,
@@ -51,7 +51,8 @@ const AttendanceFilters = ({
   onSearchClick,
   onResetClick,
 }: AttendanceFiltersProps) => {
-  const { isHomeroomTeacher } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const isHomeroomTeacher = authContext?.isHomeroomTeacher;
 
   return (
     <Card className="mb-6">

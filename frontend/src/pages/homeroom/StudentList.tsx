@@ -28,15 +28,14 @@ import {
 } from "@/components/student-list/modals";
 
 const StudentListPage: React.FC = () => {
-  const { isHomeroomTeacher } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const isHomeroomTeacher = authContext?.isHomeroomTeacher || (() => false);
   const { academicYear, semester } = useSystemSettings();
 
   const hook = useStudentList();
 
   const {
     // Data
-    students,
-    loading,
     error,
     searchTerm,
     setSearchTerm,
@@ -67,42 +66,11 @@ const StudentListPage: React.FC = () => {
     endIndex,
     restoreLoading,
 
-    // Face Registration Modal
-    showFaceModal,
-    setShowFaceModal,
-    selectedStudentForFace,
-    setSelectedStudentForFace,
-    faceRegistrationLoading,
-    closeFaceModal,
-    videoRef,
-    canvasRef,
-    fileInputRef,
-    capturedImage,
-    setCapturedImage,
-    uploadedImage,
-    setUploadedImage,
-    registrationMode,
-    setRegistrationMode,
-    cameraReady,
-    cameraError,
-    capturePhoto,
-    resetCamera,
-    handleImageUpload,
-    submitFaceRegistration,
-
     // Multiple Face Registration Modal
     showMultipleModal,
     setShowMultipleModal,
     selectedStudentForMultiple,
     setSelectedStudentForMultiple,
-    multipleFiles,
-    multipleResults,
-    setMultipleFiles,
-    setMultipleResults,
-    removeMultipleFile,
-    handleMultipleFileSelect,
-    submitMultipleFaceRegistration,
-    multipleFileInputRef,
 
     // Edit Modal
     showEditModal,
@@ -131,7 +99,6 @@ const StudentListPage: React.FC = () => {
     setShowFeedbackModal,
     selectedStudentForFeedback,
     feedbackForm,
-    setFeedbackForm,
     generatedFeedback,
     setGeneratedFeedback,
     feedbackLoading,
@@ -176,7 +143,6 @@ const StudentListPage: React.FC = () => {
     // Actions
     fetchStudents,
     fetchAvailableClasses,
-    startFaceRegistration,
     handleEdit,
     handleRestore,
     handleViewScores,
@@ -267,9 +233,8 @@ const StudentListPage: React.FC = () => {
           onFeedback={handleFeedbackClick}
           onSelectSubjects={handleSubjectSelection}
           onUploadMultiple={(student) => {
-            setSelectedStudentForFace(student);
-            setRegistrationMode("multiple");
-            setShowFaceModal(true);
+            setSelectedStudentForMultiple(student);
+            setShowMultipleModal(true);
           }}
           onRestore={handleRestore}
         />
@@ -286,9 +251,8 @@ const StudentListPage: React.FC = () => {
           onFeedback={handleFeedbackClick}
           onSelectSubjects={handleSubjectSelection}
           onUploadMultiple={(student) => {
-            setSelectedStudentForFace(student);
-            setRegistrationMode("multiple");
-            setShowFaceModal(true);
+            setSelectedStudentForMultiple(student);
+            setShowMultipleModal(true);
           }}
           onRestore={handleRestore}
         />
@@ -309,35 +273,14 @@ const StudentListPage: React.FC = () => {
 
       {/* Individual Modals */}
       <FaceRegistrationModal
-        open={showFaceModal}
-        onOpenChange={setShowFaceModal}
-        selectedStudent={selectedStudentForFace}
-        showFaceModal={showFaceModal}
-        setShowFaceModal={setShowFaceModal}
-        registrationMode={registrationMode as "camera" | "upload" | "multiple"}
-        setRegistrationMode={setRegistrationMode}
-        capturedImage={capturedImage}
-        setCapturedImage={setCapturedImage}
-        uploadedImage={uploadedImage}
-        setUploadedImage={setUploadedImage}
-        cameraReady={cameraReady}
-        cameraError={cameraError}
-        faceRegistrationLoading={faceRegistrationLoading}
-        multipleFiles={multipleFiles}
-        multipleResults={multipleResults}
-        setMultipleFiles={setMultipleFiles}
-        setMultipleResults={setMultipleResults}
-        videoRef={videoRef}
-        canvasRef={canvasRef}
-        fileInputRef={fileInputRef}
-        multipleFileInputRef={multipleFileInputRef}
-        capturePhoto={capturePhoto}
-        resetCamera={resetCamera}
-        handleImageUpload={handleImageUpload}
-        submitFaceRegistration={submitFaceRegistration}
-        handleMultipleFileSelect={handleMultipleFileSelect}
-        removeMultipleFile={removeMultipleFile}
-        submitMultipleFaceRegistration={submitMultipleFaceRegistration}
+        open={showMultipleModal}
+        onOpenChange={setShowMultipleModal}
+        selectedStudent={selectedStudentForMultiple}
+        showMultipleModal={showMultipleModal}
+        setShowMultipleModal={setShowMultipleModal}
+        selectedStudentForMultiple={selectedStudentForMultiple}
+        setSelectedStudentForMultiple={setSelectedStudentForMultiple}
+        fetchStudents={fetchStudents}
       />
 
       <EditStudentModal
@@ -346,7 +289,7 @@ const StudentListPage: React.FC = () => {
         selectedStudent={selectedStudentForEdit}
         editForm={editForm}
         editLoading={editLoading}
-        isHomeroomTeacher={isHomeroomTeacher()}
+        isHomeroomTeacher={isHomeroomTeacher?.()}
         onFormChange={handleEditFormChange}
         onAddParentContact={addParentContactRow}
         onRemoveParentContact={removeParentContactRow}
@@ -371,7 +314,7 @@ const StudentListPage: React.FC = () => {
         open={showFeedbackModal}
         onOpenChange={setShowFeedbackModal}
         selectedStudent={selectedStudentForFeedback}
-        form={feedbackForm}
+        form={feedbackForm as any}
         onFormChange={handleFeedbackFormChange}
         loading={feedbackLoading}
         feedbackLoading={feedbackLoading}
@@ -411,8 +354,8 @@ const StudentListPage: React.FC = () => {
         onOpenChange={setShowSubjectModal}
         selectedStudent={selectedStudentForSubject}
         availableSubjects={availableSubjects}
-        selectedSubjects={selectedSubjects}
-        onToggleSubject={toggleSubjectSelection}
+        selectedSubjects={selectedSubjects as any}
+        onToggleSubject={(subjectId, type) => toggleSubjectSelection(subjectId as string, type || 'core_subjects')}
         loading={subjectLoading}
         onSave={saveSubjectSelection}
         onClose={closeSubjectModal}
@@ -424,7 +367,7 @@ const StudentListPage: React.FC = () => {
         selectedClass={selectedClass}
         subjectImportFile={subjectImportFile}
         subjectImportLoading={subjectImportLoading}
-        onFileSelect={setSubjectImportFile}
+        onFileSelect={(file) => setSubjectImportFile(file || null)}
         onImport={handleSubjectImport}
         onClose={() => {
           setShowSubjectImportModal(false);

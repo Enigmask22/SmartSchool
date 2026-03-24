@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useContext, useCallback } from "react";
-import ApiService from "@/services/api";
+import ApiService from "@/utils/api";
 import { AuthContext } from "@/contexts/AuthContext";
 import { useSystemSettings } from "@/contexts/SystemSettingsContext";
-import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import logger from "@/utils/logger";
 
@@ -11,22 +10,24 @@ const API_BASE_URL =
   import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
 export const useStudentList = () => {
-  const { user, isHomeroomTeacher } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user;
+  const isHomeroomTeacher = authContext?.isHomeroomTeacher;
   const { academicYear, semester } = useSystemSettings();
 
   // Basic student data states
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
-  const [availableClasses, setAvailableClasses] = useState([]);
+  const [availableClasses, setAvailableClasses] = useState<any[]>([]);
   const [classesLoading, setClassesLoading] = useState(false);
-  const [confirmState, setConfirmState] = useState({ open: false });
+  const [confirmState, setConfirmState] = useState<Record<string, any>>({ open: false });
 
   // Academic year and semester states
-  const [homeroomClasses, setHomeroomClasses] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
+  const [homeroomClasses, setHomeroomClasses] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("HK1");
   const [availableSemesters] = useState(["HK1", "HK2", "CN"]);
@@ -34,26 +35,26 @@ export const useStudentList = () => {
 
   // Face registration states
   const [showFaceModal, setShowFaceModal] = useState(false);
-  const [selectedStudentForFace, setSelectedStudentForFace] = useState(null);
+  const [selectedStudentForFace, setSelectedStudentForFace] = useState<any>(null);
   const [faceRegistrationLoading, setFaceRegistrationLoading] = useState(false);
-  const [cameraStream, setCameraStream] = useState(null);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [uploadedImage, setUploadedImage] = useState(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [registrationMode, setRegistrationMode] = useState("camera");
   const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Multiple face registration states
-  const [multipleFiles, setMultipleFiles] = useState([]);
-  const [multipleResults, setMultipleResults] = useState([]);
+  const [multipleFiles, setMultipleFiles] = useState<Array<{ file: File; id: number; name: string; previewUrl: string; status: string }>>([]);
+  const [multipleResults, setMultipleResults] = useState<any[]>([]);
   const [showMultipleModal, setShowMultipleModal] = useState(false);
   const [selectedStudentForMultiple, setSelectedStudentForMultiple] =
-    useState(null);
+    useState<any>(null);
 
   // Edit student states
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any>(null);
-  const [editForm, setEditForm] = useState<any>({});
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
   const [editLoading, setEditLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
 
@@ -65,21 +66,21 @@ export const useStudentList = () => {
 
   // Subject import states
   const [showSubjectImportModal, setShowSubjectImportModal] = useState(false);
-  const [subjectImportFile, setSubjectImportFile] = useState(null);
+  const [subjectImportFile, setSubjectImportFile] = useState<File | null>(null);
   const [subjectImportLoading, setSubjectImportLoading] = useState(false);
 
   // View scores states
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [selectedStudentForScores, setSelectedStudentForScores] =
-    useState(null);
-  const [studentScores, setStudentScores] = useState([]);
+    useState<any>(null);
+  const [studentScores, setStudentScores] = useState<any[]>([]);
   const [scoresLoading, setScoresLoading] = useState(false);
 
   // Feedback states
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [selectedStudentForFeedback, setSelectedStudentForFeedback] =
-    useState(null);
-  const [feedbackForm, setFeedbackForm] = useState({
+    useState<any>(null);
+  const [feedbackForm, setFeedbackForm] = useState<Record<string, any>>({
     student_name: "",
     score: "",
     top_subjects: [],
@@ -95,17 +96,16 @@ export const useStudentList = () => {
   const [smsLoading, setSmsLoading] = useState(false);
 
   // Score trend analysis states
-  const [scoreTrendData, setScoreTrendData] = useState(null);
-  const [trendLoading, setTrendLoading] = useState(false);
-  const [trendError, setTrendError] = useState("");
+  const [_scoreTrendData, set_scoreTrendData] = useState<any>(null);
+  const [_trendError, set_trendError] = useState("");
   const [hasScoreData, setHasScoreData] = useState(false);
 
   // Subject selection states
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [selectedStudentForSubject, setSelectedStudentForSubject] =
-    useState(null);
-  const [availableSubjects, setAvailableSubjects] = useState([]);
-  const [selectedSubjects, setSelectedSubjects] = useState({
+    useState<any>(null);
+  const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<Record<string, any[]>>({
     core_subjects: [],
     elective_subjects: [],
   });
@@ -114,15 +114,15 @@ export const useStudentList = () => {
   // Email report card states
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
-  const [emailSending, setEmailSending] = useState(false);
+  const [emailSending, _setEmailSending] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [emailSuccess, setEmailSuccess] = useState(false);
 
   // Refs
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const multipleFileInputRef = useRef(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const multipleFileInputRef = useRef<HTMLInputElement>(null);
 
   // Helper function for confirm dialog
   const openConfirm = useCallback((config) =>
@@ -202,7 +202,7 @@ export const useStudentList = () => {
 
   // When academic year changes
   useEffect(() => {
-    if (!isHomeroomTeacher()) return;
+    if (!isHomeroomTeacher) return;
     const run = async () => {
       try {
         setClassesLoading(true);
@@ -250,7 +250,7 @@ export const useStudentList = () => {
 
       let response;
 
-      if (isHomeroomTeacher()) {
+      if (isHomeroomTeacher) {
         if (!selectedClass || selectedClass === "all") {
           logger.debug(
             "🚫 No class selected for homeroom teacher, skipping fetch",
@@ -377,11 +377,11 @@ export const useStudentList = () => {
       const reqId = ++classesReqIdRef.current;
       logger.debug("👤 User role check:", {
         user,
-        isHomeroomTeacher: isHomeroomTeacher(),
+        isHomeroomTeacher: isHomeroomTeacher,
         userRole: user?.role,
       });
 
-      if (isHomeroomTeacher()) {
+      if (isHomeroomTeacher) {
         logger.debug("📚 Fetching homeroom classes...");
         const yearsResp = await ApiService.request("/homeroom/academic-years");
         if (yearsResp.success) setAcademicYears(yearsResp.data || []);
@@ -513,6 +513,10 @@ export const useStudentList = () => {
 
     try {
       const context = canvas.getContext("2d");
+      if (!context) {
+        alert("Canvas context not available. Please try again.");
+        return;
+      }
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
@@ -686,7 +690,7 @@ export const useStudentList = () => {
     }
 
     const fileObjects = files.map((file, index) => ({
-      file,
+      file: file as File,
       id: index,
       name: (file as File).name,
       previewUrl: URL.createObjectURL(file as File),
@@ -1023,15 +1027,15 @@ export const useStudentList = () => {
     setGeneratedFeedback("");
     setFeedbackError("");
     setFeedbackSuccess(false);
-    setScoreTrendData(null);
-    setTrendError("");
+    set_scoreTrendData(null);
+    set_trendError("");
     setHasScoreData(false);
 
-    let initialForm = {
+    let initialForm: Record<string, any> = {
       student_name: student.full_name,
       score: "",
-      top_subjects: [],
-      weak_subjects: [],
+      top_subjects: [] as string[],
+      weak_subjects: [] as string[],
       attendance_rate: "100",
       subject: "",
       notes: "",
@@ -1161,8 +1165,8 @@ export const useStudentList = () => {
     setGeneratedFeedback("");
     setFeedbackError("");
     setFeedbackSuccess(false);
-    setScoreTrendData(null);
-    setTrendError("");
+    set_scoreTrendData(null);
+    set_trendError("");
   };
 
   const handleFeedbackFormChange = (field: string, value: any) => {
@@ -1614,8 +1618,286 @@ export const useStudentList = () => {
   };
 
   const exportStudentReportCard = async () => {
-    // Placeholder for future implementation
-    logger.info("Export student report card - to be implemented");
+    if (!selectedStudentForFeedback) {
+      alert("Không có thông tin học sinh!");
+      return;
+    }
+
+    try {
+      const student = selectedStudentForFeedback;
+
+      // Fetch scores if not already loaded
+      let scores = studentScores;
+      if (!scores || scores.length === 0) {
+        const response = await ApiService.getStudentScores(
+          student.id,
+          selectedAcademicYear,
+          selectedSemester,
+        );
+        if (response.success && response.data?.scores) {
+          scores = response.data.scores;
+        } else {
+          alert(
+            "⚠️ Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét.",
+          );
+          scores = [];
+        }
+      }
+
+      // Create workbook and worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Phiếu điểm");
+
+      // Page setup for A4 and fit-to-width
+      worksheet.pageSetup = {
+        paperSize: 9, // A4
+        orientation: "portrait",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: {
+          left: 0.3,
+          right: 0.3,
+          top: 0.5,
+          bottom: 0.5,
+          header: 0.2,
+          footer: 0.2,
+        },
+        horizontalCentered: true,
+      };
+
+      // Set column widths
+      worksheet.columns = [
+        { width: 15 }, // A - Môn học
+        { width: 18 }, // B - Điểm thường xuyên
+        { width: 8 }, // C - GK
+        { width: 8 }, // D - CK
+        { width: 10 }, // E - TBM HK
+      ];
+
+      let currentRow = 1;
+
+      // Title
+      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+      const titleCell = worksheet.getCell(`A${currentRow}`);
+      titleCell.value = "PHIẾU ĐIỂM HỌC SINH";
+      titleCell.font = { bold: true, size: 14 };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      currentRow += 2;
+
+      // Teacher name (placeholder - will be filled later)
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      worksheet.getCell(`A${currentRow}`).value = `Giáo viên chủ nhiệm: `;
+      currentRow++;
+
+      // Class
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      worksheet.getCell(`A${currentRow}`).value = `Lớp: ${
+        student.class_name || ""
+      }`;
+      currentRow++;
+
+      // Academic year and semester
+      worksheet.getCell(`A${currentRow}`).value = `Năm học: ${academicYear}`;
+      const semesterCell = worksheet.getCell(`E${currentRow}`);
+      semesterCell.value = `Học kỳ: ${semester}`;
+      semesterCell.alignment = { horizontal: "right", vertical: "middle" };
+      currentRow += 2;
+
+      // Student info
+      worksheet.getCell(`A${currentRow}`).value =
+        `Học sinh: ${student.full_name}`;
+      const studentIdCell = worksheet.getCell(`E${currentRow}`);
+      studentIdCell.value = `Mã số: ${student.student_id}`;
+      studentIdCell.alignment = { horizontal: "right", vertical: "middle" };
+      currentRow += 2;
+
+      // Scores section
+      if (scores.length > 0) {
+        // Section title
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        const scoreTitleCell = worksheet.getCell(`A${currentRow}`);
+        scoreTitleCell.value = "BẢNG ĐIỂM TỔNG KẾT";
+        scoreTitleCell.font = { bold: true, size: 11 };
+        scoreTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+        currentRow += 2;
+
+        // Calculate overall average
+        const validScores = scores.filter(
+          (g: any) => g.final_score !== null && g.final_score !== undefined,
+        );
+        const overallAverage =
+          validScores.length > 0
+            ? (
+                validScores.reduce((sum: number, g: any) => sum + g.final_score, 0) /
+                validScores.length
+              ).toFixed(2)
+            : "N/A";
+
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value =
+          `Điểm trung bình học kỳ: ${overallAverage}`;
+        currentRow += 2;
+
+        // Table headers
+        const headerRow = worksheet.getRow(currentRow);
+        headerRow.values = [
+          "Môn học",
+          "Điểm thường xuyên",
+          "GK",
+          "CK",
+          "TBM HK",
+        ];
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFE8E8E8" },
+        };
+
+        ["A", "B", "C", "D", "E"].forEach((col) => {
+          const cell = worksheet.getCell(`${col}${currentRow}`);
+          cell.alignment = { horizontal: "left", vertical: "middle" };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+        currentRow++;
+
+        // Helper functions
+        // Note: getCellScore helper kept for potential future use in score formatting
+
+        // Score data rows
+        scores.forEach((score: any) => {
+          const dataRow = worksheet.getRow(currentRow);
+          dataRow.values = [
+            score.subject_name || "N/A",
+            "",
+            "",
+            "",
+            score.final_score ?? "",
+          ];
+
+          ["A", "B", "C", "D", "E"].forEach((col) => {
+            const cell = worksheet.getCell(`${col}${currentRow}`);
+            cell.alignment = { horizontal: "left", vertical: "middle" };
+            cell.border = {
+              top: { style: "thin" },
+              left: { style: "thin" },
+              bottom: { style: "thin" },
+              right: { style: "thin" },
+            };
+          });
+
+          currentRow++;
+        });
+
+        currentRow++;
+      }
+
+      // Comments section
+      currentRow += 2;
+      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+      const commentTitleCell = worksheet.getCell(`A${currentRow}`);
+      commentTitleCell.value = "NHẬN XÉT CỦA GIÁO VIÊN";
+      commentTitleCell.font = { bold: true, size: 11 };
+      commentTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+      const remarksTitleRow = currentRow;
+      currentRow += 2;
+
+      // Feedback text with wrapping
+      const feedbackText = generatedFeedback || "Chưa có nhận xét";
+      const wrapText = (text: string, maxLength = 70) => {
+        const words = text.split(" ");
+        const lines: string[] = [];
+        let currentLine = "";
+
+        words.forEach((word) => {
+          if ((currentLine + word).length <= maxLength) {
+            currentLine += (currentLine ? " " : "") + word;
+          } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+          }
+        });
+        if (currentLine) lines.push(currentLine);
+
+        return lines;
+      };
+
+      const feedbackLines = wrapText(feedbackText);
+      feedbackLines.forEach((line) => {
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        const feedbackCell = worksheet.getCell(`A${currentRow}`);
+        feedbackCell.value = line;
+        feedbackCell.alignment = {
+          horizontal: "center",
+          vertical: "top",
+          wrapText: true,
+        };
+        worksheet.getRow(currentRow).height = 18;
+        currentRow++;
+      });
+      const remarksEndRow = currentRow - 1;
+
+      // Apply border
+      for (let r = remarksTitleRow; r <= remarksEndRow; r++) {
+        for (let c = 1; c <= 5; c++) {
+          const cell = worksheet.getCell(r, c);
+          const border: any = {};
+          if (r === remarksTitleRow) border.top = { style: "thin" };
+          if (r === remarksEndRow) border.bottom = { style: "thin" };
+          if (c === 1) border.left = { style: "thin" };
+          if (c === 5) border.right = { style: "thin" };
+          cell.border = { ...cell.border, ...border };
+        }
+      }
+
+      // Signature section
+      currentRow += 3;
+      worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+      worksheet.mergeCells(`D${currentRow}:E${currentRow}`);
+      const sigLeftTitle = worksheet.getCell(`A${currentRow}`);
+      sigLeftTitle.value = "Giáo viên chủ nhiệm";
+      sigLeftTitle.font = { bold: true };
+      sigLeftTitle.alignment = { horizontal: "left", vertical: "middle" };
+      const sigRightTitle = worksheet.getCell(`D${currentRow}`);
+      sigRightTitle.value = "Phụ huynh";
+      sigRightTitle.font = { bold: true };
+      sigRightTitle.alignment = { horizontal: "right", vertical: "middle" };
+      currentRow++;
+
+      worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+      worksheet.mergeCells(`D${currentRow}:E${currentRow}`);
+      const sigLeftNote = worksheet.getCell(`A${currentRow}`);
+      sigLeftNote.value = "(Ký và ghi rõ họ tên)";
+      sigLeftNote.alignment = { horizontal: "left", vertical: "middle" };
+      const sigRightNote = worksheet.getCell(`D${currentRow}`);
+      sigRightNote.value = "(Ký và ghi rõ họ tên)";
+      sigRightNote.alignment = { horizontal: "right", vertical: "middle" };
+
+      // Generate and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `PhieuDiem_${student.student_id}_${student.full_name}_${selectedAcademicYear}_${selectedSemester}.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      alert("✅ Xuất phiếu điểm thành công!");
+    } catch (error) {
+      logger.error("Error exporting report card:", error);
+      alert(
+        "❌ Lỗi khi xuất phiếu điểm: " + (error instanceof Error ? error.message : "Unknown error"),
+      );
+    }
   };
   const openEmailDialog = () => {
     if (!selectedStudentForFeedback) return;

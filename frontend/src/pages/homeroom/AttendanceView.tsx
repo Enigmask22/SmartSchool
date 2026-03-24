@@ -25,7 +25,8 @@ import logger from '@/utils/logger';
  */
 
 export default function AttendanceView() {
-  const { isHomeroomTeacher } = React.useContext(AuthContext);
+  const authContext = React.useContext(AuthContext);
+  const isHomeroomTeacher = authContext?.isHomeroomTeacher;
   const {
     // Data
     attendanceRecords,
@@ -35,7 +36,6 @@ export default function AttendanceView() {
 
     // Loading states
     loading,
-    bootstrapLoading,
     classesLoading,
     updating,
 

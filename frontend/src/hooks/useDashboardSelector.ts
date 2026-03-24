@@ -7,7 +7,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '@/contexts/AuthContext';
-import api from '@/services/api';
+import api from '@/utils/api';
 import logger from "@/utils/logger";
 
 export interface UseDashboardSelectorReturn {

@@ -1,4 +1,4 @@
-import React from "react";
+// React already imported by JSX transform
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Header,

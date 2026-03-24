@@ -1,10 +1,31 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import api from "@/services/api";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import api from "@/utils/api";
 import logger from "@/utils/logger";
 import { AuthContext } from "./AuthContext";
 import { USER_ROLES } from "@/utils/constants";
 
-const SystemSettingsContext = createContext();
+// Define the shape of system settings
+interface Settings {
+  academic_year?: string;
+  semester?: string;
+  attendance_cutoff_time?: string;
+  [key: string]: any;
+}
+
+// Define the shape of the system settings context value
+interface SystemSettingsContextValue {
+  settings: Settings;
+  loading: boolean;
+  error: string | null;
+  refreshSettings: () => void;
+  academicYear: string;
+  semester: string;
+  attendanceCutoffTime: string;
+}
+
+const SystemSettingsContext = createContext<SystemSettingsContextValue | undefined>(
+  undefined
+);
 
 export const useSystemSettings = () => {
   const context = useContext(SystemSettingsContext);
@@ -16,20 +37,24 @@ export const useSystemSettings = () => {
   return context;
 };
 
-export const SystemSettingsProvider = ({ children }) => {
+interface SystemSettingsProviderProps {
+  children: ReactNode;
+}
+
+export const SystemSettingsProvider = ({ children }: SystemSettingsProviderProps) => {
   const authContext = useContext(AuthContext);
   const user = authContext?.user;
   const isAdmin = user?.role === USER_ROLES.ADMIN;
 
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<Settings>({
     academic_year: "2024-2025",
     semester: "HK1",
     attendance_cutoff_time: "07:15:00",
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchSettings = async () => {
+  const fetchSettings = async (): Promise<void> => {
     try {
       setLoading(true);
       // Only fetch admin settings if user is admin
@@ -44,14 +69,14 @@ export const SystemSettingsProvider = ({ children }) => {
 
       if (response.success) {
         // Chuyển đổi array thành object
-        const settingsMap = {};
-        response.data.forEach((setting) => {
+        const settingsMap: Settings = {};
+        response.data.forEach((setting: any) => {
           settingsMap[setting.setting_key] = setting.setting_value;
         });
         setSettings(settingsMap);
         setError(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       logger.error("Error fetching system settings:", err);
       setError(err.message);
       // Giữ nguyên giá trị mặc định nếu có lỗi
@@ -69,11 +94,11 @@ export const SystemSettingsProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [user]);
 
-  const refreshSettings = () => {
+  const refreshSettings = (): void => {
     fetchSettings();
   };
 
-  const contextValue = {
+  const contextValue: SystemSettingsContextValue = {
     settings,
     loading,
     error,

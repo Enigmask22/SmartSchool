@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "@/contexts/AuthContext";
 import {
   Card,
@@ -37,22 +37,32 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import api from "@/services/api";
+import api from "@/utils/api";
 import logger from "@/utils/logger";
 
 const PersonalInfo = () => {
-  const { user } = useContext(AuthContext);
-  const [personalData, setPersonalData] = useState(null);
-  const [userData, setUserData] = useState(null);
-  const [homeroomClasses, setHomeroomClasses] = useState([]);
-  const [subjectClasses, setSubjectClasses] = useState([]);
+  const authContext = useContext(AuthContext);
+  if (!authContext) {
+    throw new Error('PersonalInfo must be used within AuthProvider');
+  }
+  const { user } = authContext;
+  const [personalData, setPersonalData] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
+  const [homeroomClasses, setHomeroomClasses] = useState<any[]>([]);
+  const [subjectClasses, setSubjectClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // Edit mode states
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState({});
+  const [editData, setEditData] = useState<Record<string, any>>({
+    full_name: "",
+    email: "",
+    phone: "",
+    date_of_birth: "",
+    gender: "Nam",
+  });
 
   // Password change states
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -124,22 +134,22 @@ const PersonalInfo = () => {
   const handleEdit = () => {
     setIsEditing(true);
     setEditData({
-      full_name: personalData.full_name || "",
-      email: personalData.email || "",
-      phone: personalData.phone || "",
-      date_of_birth: personalData.date_of_birth || "",
-      gender: personalData.gender || "Nam",
+      full_name: personalData?.full_name || "",
+      email: personalData?.email || "",
+      phone: personalData?.phone || "",
+      date_of_birth: personalData?.date_of_birth || "",
+      gender: personalData?.gender || "Nam",
     });
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditData({
-      full_name: personalData.full_name || "",
-      email: personalData.email || "",
-      phone: personalData.phone || "",
-      date_of_birth: personalData.date_of_birth || "",
-      gender: personalData.gender || "Nam",
+      full_name: personalData?.full_name || "",
+      email: personalData?.email || "",
+      phone: personalData?.phone || "",
+      date_of_birth: personalData?.date_of_birth || "",
+      gender: personalData?.gender || "Nam",
     });
   };
 

@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { Clipboard, AlertCircle, FileText } from 'lucide-react';
 import {
   Dialog,

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useAdminManagement } from '@/hooks/useAdminManagement';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import { AdminManagementForm } from '../../components/admin-management/AdminManagementForm';
@@ -14,8 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import SystemSettings from '@/components/SystemSettings';
-import CameraManagement from '@/components/CameraManagement';
+import SystemSettings from '@/components/admin-management/SystemSettings';
+import CameraManagement from '@/components/admin-management/CameraManagement';
 
 const AdminManagement = () => {
   const hook = useAdminManagement();

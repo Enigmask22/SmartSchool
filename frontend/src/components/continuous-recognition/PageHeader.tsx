@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { Camera, Wifi, WifiOff, Square, Play, Pause, Video } from 'lucide-react';
 import {
   Card,
@@ -37,8 +37,6 @@ const PageHeader = ({
   availableCameras,
   onToggleCamera,
   onToggleRecognition,
-  totalRecognitionsToday,
-  runningTime,
 }: PageHeaderProps) => {
   return (
     <>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import api from '@/services/api';
+import api from '@/utils/api';
 import * as XLSX from 'xlsx';
 import logger from '@/utils/logger';
 
@@ -55,6 +55,7 @@ export interface StudentData {
   parent_contacts: ParentContact[];
   gender: string;
   is_active: boolean;
+  face_samples_count?: number;
 }
 
 export interface ImportedGradeRow {

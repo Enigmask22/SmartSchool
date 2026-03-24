@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import ApiService from "../../services/api";
+import { useState, useRef, useEffect } from "react";
+import ApiService from "../../utils/api";
 import {
   Dialog,
   DialogContent,
@@ -34,12 +34,12 @@ const LeaveRequestModal = ({
   existingImageUrl,
   onUploadSuccess,
 }) => {
-  const [imageUrl, setImageUrl] = useState(existingImageUrl || null);
+  const [imageUrl, setImageUrl] = useState<string | null>(existingImageUrl || null);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState(null);
-  const [successMsg, setSuccessMsg] = useState(null);
-  const [previewFile, setPreviewFile] = useState(null); // { file, previewUrl }
-  const fileInputRef = useRef(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ file: File; previewUrl: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Đồng bộ imageUrl khi prop thay đổi
   useEffect(() => {

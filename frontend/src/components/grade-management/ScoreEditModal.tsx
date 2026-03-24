@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { Pencil } from 'lucide-react';
 import {
   Dialog,

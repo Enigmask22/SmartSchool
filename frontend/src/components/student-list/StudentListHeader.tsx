@@ -1,4 +1,3 @@
-import React, { useContext } from "react";
 import {
   Search,
   RefreshCw,
@@ -21,7 +20,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { AuthContext } from "@/contexts/AuthContext";
 
 interface StudentListHeaderProps {
   searchTerm: string;

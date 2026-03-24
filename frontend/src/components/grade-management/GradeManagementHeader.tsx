@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { GraduationCap, Calendar, BookOpen } from 'lucide-react';
 import {
   Card,

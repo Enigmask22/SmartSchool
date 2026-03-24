@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +34,6 @@ export function ScoresModal({
   selectedStudent,
   scores,
   loading,
-  hasData,
   onClose,
   academicYear = "2024-2025",
   semester = "I",

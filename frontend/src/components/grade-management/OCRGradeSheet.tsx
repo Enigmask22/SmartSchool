@@ -41,7 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import api from "@/services/api";
+import api from "@/utils/api";
 import logger from "@/utils/logger";
 
 const OCRGradeSheet = ({

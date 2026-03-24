@@ -43,7 +43,7 @@ interface AddStudentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   studentFormData: StudentFormData;
-  studentFormErrors: Record<string, string>;
+  studentFormErrors: Record<string, string | null>;
   studentFormLoading: boolean;
   onFormChange: (field: string, value: unknown) => void;
   addParentContactRow: () => void;

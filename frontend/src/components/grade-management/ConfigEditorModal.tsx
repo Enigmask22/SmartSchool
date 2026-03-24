@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { Settings, Plus, Trash2, Save, FileEdit, Scale, BarChart3 } from 'lucide-react';
 import {
   Dialog,

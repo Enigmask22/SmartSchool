@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { BarChart3, Info, Settings } from 'lucide-react';
 import {
   Card,

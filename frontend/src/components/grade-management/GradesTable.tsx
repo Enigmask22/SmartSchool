@@ -1,6 +1,5 @@
-import React from 'react';
+// React already imported by JSX transform
 import { Users, User, Star, Zap, Plus, Pencil } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface GradesTableProps {
   students: any[];
@@ -151,7 +150,6 @@ const GradesTable = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {(() => {
-              const totalStudents = students.length;
               const startIndex = (currentPage - 1) * pageSize;
               const endIndex = startIndex + pageSize;
               const paginatedStudents = students.slice(startIndex, endIndex);

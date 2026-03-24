@@ -13,7 +13,7 @@ export interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description?: string;
-  onConfirm: () => void;
+  onConfirm?: () => void;
   onCancel?: () => void;
   confirmText?: string;
   cancelText?: string;

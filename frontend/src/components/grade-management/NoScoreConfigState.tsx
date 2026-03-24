@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import { Settings, BarChart3 } from 'lucide-react';
 
 interface NoScoreConfigStateProps {

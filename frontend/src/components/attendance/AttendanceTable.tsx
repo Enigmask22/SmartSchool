@@ -1,4 +1,4 @@
-import React from 'react';
+// React already imported by JSX transform
 import {
   Card,
   CardContent,
@@ -86,7 +86,6 @@ const AttendanceTable = ({
   showFullList,
   page,
   pageSize,
-  editingRecord,
   editStatus,
   editNotes,
   updating,

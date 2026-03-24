@@ -36,9 +36,9 @@ export default function GradeManagement() {
     confirmState,
     setSelectedClassSubject,
     setEditingStudent,
-    setScoreForm,
+    setScoreForm: _setScoreForm,
     setShowConfigEditor,
-    setConfigForm,
+    setConfigForm: _setConfigForm,
     setShowAddColumnModal,
     setNewColumnForm,
     setShowImportModal,
@@ -48,8 +48,6 @@ export default function GradeManagement() {
     setPageSize,
     setAcademicYear,
     setSemester,
-    setConfirmState,
-    fetchTeacherInfo,
     handleClassSubjectSelect,
     handleEditScore,
     handleScoreInputChange,
@@ -63,12 +61,9 @@ export default function GradeManagement() {
     handleDownloadTemplate,
     handleFileUpload,
     handleConfirmImport,
-    handleExportToExcel: triggerExport,
-    openConfirm,
     closeConfirm,
     getDisplayColumns,
     flattenScoreColumns,
-    initializeScoreForm,
     getSortedColumnNames,
     calculateFinalGrade,
   } = useGradeManagement();
@@ -86,7 +81,6 @@ export default function GradeManagement() {
       academicYear,
       semester,
       getDisplayColumns,
-      flattenScoreColumns,
       calculateFinalGrade
     );
   };

@@ -12,7 +12,7 @@
     "allowJs": true, // Allow .js and .ts files    
     "checkJs": false, // DON'T type-check .js files yet    
     "noImplicitAny": false, // Allow 'any' type    
-    "strict": false, // Full strict mode OFF    
+    "strict": true,  
     "noImplicitThis": false, // Allow implicit 'this: any'    
     "alwaysStrict": false, // No 'use strict'   
     "resolveJsonModule": true,
@@ -21,8 +21,8 @@
     "jsx": "react-jsx",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "noUnusedLocals": false, // Don't fail on unused vars yet    
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,    
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
