@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { LucideIcon } from 'lucide-react';
 
 interface StatCardProps {
@@ -7,6 +8,7 @@ interface StatCardProps {
   change?: number;
   icon?: LucideIcon;
   color?: string;
+  loading?: boolean;
 }
 
 export function StatCard({
@@ -15,7 +17,25 @@ export function StatCard({
   change,
   icon: Icon,
   color = 'bg-blue-50',
+  loading = false,
 }: StatCardProps) {
+  if (loading) {
+    return (
+      <Card className={color}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-8 w-16 mb-2" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="w-8 h-8 rounded flex-shrink-0" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className={color}>
       <CardContent className="p-4">

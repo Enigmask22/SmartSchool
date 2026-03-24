@@ -1,4 +1,3 @@
-import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 import { ROUTES } from "@/utils/constants";
@@ -30,7 +29,6 @@ import HomeroomDashboard from "@/pages/homeroom/Dashboard";
 import StudentList from "@/pages/homeroom/StudentList";
 import AttendanceView from "@/pages/homeroom/AttendanceView";
 import FaceManagement from "@/pages/homeroom/FaceManagement";
-// import HomeroomGradeManagement from "@/pages/homeroom/GradeManagement";
 
 // Subject Teacher Pages
 import SubjectDashboard from "@/pages/subject/Dashboard";
@@ -71,10 +69,9 @@ function App() {
               {/* Homeroom Teacher Routes */}
               <Route element={<ProtectedRoute roles={['teacher', 'homeroom_teacher']} />}>
                 <Route path={ROUTES.HOMEROOM.DASHBOARD.substring(1)} element={<HomeroomDashboard />} />
-                <Route path={ROUTES.HOMEROOM.STUDENTS.substring(1)} element={<StudentList isHomeroom={true} />} />
-                <Route path={ROUTES.HOMEROOM.ATTENDANCE.substring(1)} element={<AttendanceView isHomeroom={true} />} />
-                <Route path={ROUTES.HOMEROOM.FACES.substring(1)} element={<FaceManagement isHomeroom={true} />} />
-                {/* <Route path={ROUTES.HOMEROOM.GRADES.substring(1)} element={<HomeroomGradeManagement isHomeroom={true} />} /> */}
+                <Route path={ROUTES.HOMEROOM.STUDENTS.substring(1)} element={<StudentList />} />
+                <Route path={ROUTES.HOMEROOM.ATTENDANCE.substring(1)} element={<AttendanceView />} />
+                <Route path={ROUTES.HOMEROOM.FACES.substring(1)} element={<FaceManagement />} />
               </Route>
 
               {/* Subject Teacher Routes */}

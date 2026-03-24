@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { StudentData, HomeroomInfo } from '@/hooks/useHomeroomDashboard';
+import type { StudentData, HomeroomInfo } from '@/hooks/homeroom-dashboard/useHomeroomData';
 
 interface AllStudentsModalProps {
   open: boolean;

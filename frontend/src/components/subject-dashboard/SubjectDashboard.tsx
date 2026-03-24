@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { TabButtons } from './TabButtons';
-import { EmptyState } from './EmptyState';
 import { OverviewTab } from './tabs/OverviewTab';
 import { AttentionTab } from './tabs/AttentionTab';
 import { TopStudentsTab } from './tabs/TopStudentsTab';
 import { ComparisonTab } from './tabs/ComparisonTab';
-import { useSubjectDashboard } from '@/hooks/useSubjectDashboard';
+import { useSubjectDashboard } from '@/hooks/subject-dashboard/useSubjectDashboard';
 
 export function SubjectDashboard() {
   const [selectedTab, setSelectedTab] = useState('overview');
@@ -39,7 +38,7 @@ export function SubjectDashboard() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
-          Bảng Điều Khiển Phân Tích Điểm Số
+          Bảng điều khiển phân tích điểm số
         </h1>
         <p className="text-gray-600 mt-1">Phân tích và quản lý dữ liệu học sinh</p>
       </div>

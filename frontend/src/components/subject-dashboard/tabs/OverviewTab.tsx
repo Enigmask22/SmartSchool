@@ -1,4 +1,5 @@
 import { Target, BarChart3 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart,
   Bar,
@@ -12,20 +13,36 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { AnalyticsData } from "@/hooks/useSubjectDashboard";
+import type { AnalyticsData } from "@/hooks/subject-dashboard/useSubjectDashboard";
 
 interface OverviewTabProps {
   data: AnalyticsData;
+  loading?: boolean;
 }
 
-export function OverviewTab({ data }: OverviewTabProps) {
+export function OverviewTab({ data, loading = false }: OverviewTabProps) {
   if (!data) {
     return null;
   }
 
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="p-6 bg-white shadow-lg rounded-2xl">
+          <Skeleton className="h-6 w-40 mb-4" />
+          <Skeleton className="w-full h-80" />
+        </div>
+        <div className="p-6 bg-white shadow-lg rounded-2xl">
+          <Skeleton className="h-6 w-40 mb-4" />
+          <Skeleton className="w-full h-80" />
+        </div>
+      </div>
+    );
+  }
+
   // Prepare data for charts
   const performanceData = Object.entries(data.performance_groups || {}).map(
-    ([key, value]) => ({
+    ([, value]) => ({
       name: value.label,
       count: value.count,
       percentage: value.percentage,
@@ -65,7 +82,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: any, name: any, props: any) => [
+              formatter={(value: any, _name: any, props: any) => [
                 `${value} học sinh (${props.payload.percentage}%)`,
                 "Số lượng",
               ]}
