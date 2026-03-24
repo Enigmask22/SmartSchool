@@ -48,6 +48,7 @@ interface AttendanceRecord {
   confidence_score?: number;
   notes?: string;
   students?: Student;
+  leave_request_image?: string;
 }
 
 interface AttendanceStats {
@@ -102,6 +103,10 @@ export const useAttendanceData = () => {
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [editStatus, setEditStatus] = useState('');
   const [editNotes, setEditNotes] = useState('');
+
+  // Leave request states
+  const [leaveRequestOpen, setLeaveRequestOpen] = useState(false);
+  const [leaveRequestRecord, setLeaveRequestRecord] = useState<AttendanceRecord | null>(null);
 
   // Load data on filter changes
   useEffect(() => {
@@ -470,6 +475,27 @@ export const useAttendanceData = () => {
     }
   };
 
+  const handleOpenLeaveRequest = (record: AttendanceRecord): void => {
+    setLeaveRequestRecord(record);
+    setLeaveRequestOpen(true);
+  };
+
+  const handleLeaveRequestClose = (): void => {
+    setLeaveRequestOpen(false);
+    setLeaveRequestRecord(null);
+  };
+
+  const handleLeaveRequestUploadSuccess = (imageUrl: string): void => {
+    // Update record in list to reflect leave request image
+    setAttendanceRecords((prev) =>
+      prev.map((r) =>
+        r.student_id === leaveRequestRecord?.student_id
+          ? { ...r, leave_request_image: imageUrl }
+          : r,
+      ),
+    );
+  };
+
   const resetFilters = (): void => {
     setSelectedDate(new Date().toISOString().split('T')[0]);
     setSelectedClass('all');
@@ -530,6 +556,15 @@ export const useAttendanceData = () => {
     attendanceBootstrap,
     loadAttendanceData,
     loadStats,
+
+    // Leave request states
+    leaveRequestOpen,
+    leaveRequestRecord,
+
+    // Leave request handlers
+    handleOpenLeaveRequest,
+    handleLeaveRequestClose,
+    handleLeaveRequestUploadSuccess,
 
     // Setters
     setSelectedAcademicYear,

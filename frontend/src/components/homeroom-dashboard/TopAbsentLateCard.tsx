@@ -1,0 +1,63 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import type { TopAbsentLateStudent } from '@/hooks/useHomeroomDashboard';
+
+interface TopAbsentLateCardProps {
+  title: string;
+  description: string;
+  data: TopAbsentLateStudent[];
+  badgeVariant: 'default' | 'destructive' | 'secondary' | 'warning' | 'outline';
+  selectedMonth: number;
+  selectedYear: number;
+  countKey: 'absent_count' | 'late_count';
+}
+
+export function TopAbsentLateCard({
+  title,
+  description,
+  data,
+  badgeVariant,
+  selectedMonth,
+  selectedYear,
+  countKey,
+}: TopAbsentLateCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>
+          {description} {selectedMonth}/{selectedYear}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!data || data.length === 0 ? (
+          <div className="text-sm text-muted-foreground">Không có dữ liệu</div>
+        ) : (
+          <div className="space-y-2">
+            {data.map((s, idx) => (
+              <div
+                key={s.student_code || idx}
+                className="flex items-center justify-between p-2 border rounded"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 text-xs font-bold text-center rounded-full bg-muted">
+                    {idx + 1}
+                  </span>
+                  <div>
+                    <div className="font-medium">{s.student_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {s.student_code} • Lớp {s.class_name}
+                    </div>
+                  </div>
+                </div>
+                <Badge variant={badgeVariant}>
+                  {(s[countKey] as number) ?? 0}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

@@ -39,6 +39,7 @@ interface AttendanceRecord {
   confidence_score?: number;
   notes?: string;
   students?: Student;
+  leave_request_image?: string;
 }
 
 interface AttendanceTableProps {
@@ -61,6 +62,8 @@ interface AttendanceTableProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   isEditingRecord: (record: AttendanceRecord) => boolean;
+  onOpenLeaveRequest?: (record: AttendanceRecord) => void;
+  isHomeroomTeacher?: () => boolean;
 }
 
 const formatDate = (dateString: string): string => {
@@ -75,7 +78,7 @@ const formatDate = (dateString: string): string => {
   }
 };
 
-const AttendanceTable: React.FC<AttendanceTableProps> = ({
+const AttendanceTable = ({
   records,
   loading,
   selectedDate,
@@ -95,7 +98,9 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({
   onPageChange,
   onPageSizeChange,
   isEditingRecord,
-}) => {
+  onOpenLeaveRequest,
+  isHomeroomTeacher,
+}: AttendanceTableProps) => {
   const totalRecords = records.length;
   const totalPages = Math.ceil(totalRecords / pageSize);
   const startIndex = (page - 1) * pageSize;
@@ -162,6 +167,8 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       onSave={onSaveEdit}
                       onStatusChange={onStatusChange}
                       onNotesChange={onNotesChange}
+                      onOpenLeaveRequest={onOpenLeaveRequest}
+                      isHomeroomTeacher={isHomeroomTeacher?.()}
                     />
                   ))
                 )}

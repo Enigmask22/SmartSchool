@@ -1,9 +1,5 @@
 import * as React from "react"
-<<<<<<< HEAD:frontend/src/components/ui/badge.tsx
 import { cva, type VariantProps } from "class-variance-authority";
-=======
-import { cva } from "class-variance-authority";
->>>>>>> 79e3f56def0dec781f674a689ea7d01ab7d3eca3:frontend/src/components/ui/badge.jsx
 
 import { cn } from "@/lib/utils"
 
