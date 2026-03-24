@@ -16,7 +16,7 @@ import ForgotPassword from "@/pages/auth/ForgotPassword";
 import DashboardSelector from "@/pages/auth/DashboardSelector";
 
 // Common Pages
-import PersonalInfo from "@/components/PersonalInfo";
+import PersonalInfo from "@/components/common/PersonalInfo";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -30,7 +30,7 @@ import HomeroomDashboard from "@/pages/homeroom/Dashboard";
 import StudentList from "@/pages/homeroom/StudentList";
 import AttendanceView from "@/pages/homeroom/AttendanceView";
 import FaceManagement from "@/pages/homeroom/FaceManagement";
-import HomeroomGradeManagement from "@/pages/homeroom/GradeManagement";
+// import HomeroomGradeManagement from "@/pages/homeroom/GradeManagement";
 
 // Subject Teacher Pages
 import SubjectDashboard from "@/pages/subject/Dashboard";
@@ -74,7 +74,7 @@ function App() {
                 <Route path={ROUTES.HOMEROOM.STUDENTS.substring(1)} element={<StudentList isHomeroom={true} />} />
                 <Route path={ROUTES.HOMEROOM.ATTENDANCE.substring(1)} element={<AttendanceView isHomeroom={true} />} />
                 <Route path={ROUTES.HOMEROOM.FACES.substring(1)} element={<FaceManagement isHomeroom={true} />} />
-                <Route path={ROUTES.HOMEROOM.GRADES.substring(1)} element={<HomeroomGradeManagement isHomeroom={true} />} />
+                {/* <Route path={ROUTES.HOMEROOM.GRADES.substring(1)} element={<HomeroomGradeManagement isHomeroom={true} />} /> */}
               </Route>
 
               {/* Subject Teacher Routes */}

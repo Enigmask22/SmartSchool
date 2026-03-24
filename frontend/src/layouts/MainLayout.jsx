@@ -1,6 +1,6 @@
 import React, { useState, useContext } from "react";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
-import Sidebar from "@/components/Sidebar";
+import Sidebar from "@/components/common/Sidebar";
 import { AuthContext } from "@/contexts/AuthContext";
 
 const MainLayout = () => {

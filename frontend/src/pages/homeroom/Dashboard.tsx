@@ -14,7 +14,6 @@
  * - All students modal with full list
  */
 
-import React from 'react';
 import { Calendar } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { SimpleDatePicker } from '@/components/ui/simple-date-picker';

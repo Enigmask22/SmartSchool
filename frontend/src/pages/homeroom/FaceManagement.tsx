@@ -107,4 +107,3 @@ export default function FaceManagement({ isHomeroom = false }: FaceManagementPro
     </div>
   );
 }
-

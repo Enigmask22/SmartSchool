@@ -6,20 +6,20 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Badge } from "./ui/badge";
-import { Alert, AlertDescription } from "./ui/alert";
-import { SimpleDatePicker } from "./ui/simple-date-picker";
+} from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Badge } from "../ui/badge";
+import { Alert, AlertDescription } from "../ui/alert";
+import { SimpleDatePicker } from "../ui/simple-date-picker";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
+} from "../ui/select";
 import {
   User,
   Mail,

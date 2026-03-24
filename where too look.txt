@@ -1,0 +1,14 @@
+{/* Header Section */} 2467 - 2486
+{/* Search and Filter */} 2488 - 2680
+{/* Pagination Summary */} 2683 - 2742
+{/* Students Display */} 2744 - 3177 (two mode)
+{/* Pagination Controls */} 3179 - 3250
+{/* Face Registration Modal */} 3252 - 3588
+{/* Summary */} 3590 - 3605
+{/* Edit Student Modal */} 3607 - 3971
+{/* Multiple Face Registration Modal */} 3973 - 3985
+{/* Student Grades Modal */} 3987 - 4282
+{/* Feedback Modal */} 4284 - 4622
+{/* Email Report Card Dialog */}  4624 - 4737
+{/* Subject Selection Modal */} 4729 - 4935
+{/* Subject Import Modal */} 4927 - 5004

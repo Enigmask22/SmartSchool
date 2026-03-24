@@ -37,7 +37,7 @@ import {
   SUBJECT_ROUTES,
   COMMON_ROUTES,
 } from "@/utils/constants";
-import { Separator } from "./ui/separator";
+import { Separator } from "../ui/separator";
 
 const Sidebar = ({
   user,
