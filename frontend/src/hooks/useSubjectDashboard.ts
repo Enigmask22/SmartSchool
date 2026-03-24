@@ -1,88 +1,10 @@
-/**
- * useSubjectDashboard.ts - Subject Dashboard Hook
- * 
- * Extracted from SubjectDashboard.jsx:
- * - Filter state management (academic year, semester, class selection)
- * - Analytics data fetching
- * - Class list management
- * - Tab navigation state
- * - SystemSettings context sync
- */
+import { useState, useEffect, useContext } from "react";
+import { AuthContext } from "@/contexts/AuthContext";
+import { useSystemSettings } from "@/contexts/SystemSettingsContext";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
-import { useState, useEffect, useCallback, useContext } from 'react';
-import { AuthContext } from '@/contexts/AuthContext';
-import { useSystemSettings } from '@/contexts/SystemSettingsContext';
-import api from '@/services/api';
-import logger from '@/utils/logger';
-
-/**
- * Class with Subjects Structure
- */
-export interface ClassWithSubjects {
-  class_id: number;
-  class_name: string;
-  grade: number;
-  subjects: Array<{
-    subject_id: number;
-    subject_name: string;
-    subject_code: string;
-  }>;
-}
-
-/**
- * Performance Group Data
- */
-export interface PerformanceGroup {
-  label: string;
-  count: number;
-  percentage: number;
-  color: string;
-}
-
-/**
- * Analytics Data Structure
- */
-export interface SubjectAnalytics {
-  total_classes: number;
-  total_students: number;
-  students_with_grades: number;
-  is_letter_grade_subject: boolean;
-  performance_groups: { [key: string]: PerformanceGroup };
-  score_distribution: { [key: string]: number };
-  overview: {
-    average_score: number;
-    highest_score: number;
-    lowest_score: number;
-    pass_count: number;
-    fail_count: number;
-    pass_rate: number;
-  };
-  subjects: string[];
-  [key: string]: any;
-}
-
-/**
- * Hook Return Type
- */
-export interface UseSubjectDashboardReturn {
-  loading: boolean;
-  loadingClasses: boolean;
-  analytics: SubjectAnalytics | null;
-  classList: ClassWithSubjects[];
-  selectedClass: number | null;
-  academicYear: string;
-  semester: string;
-  selectedTab: string;
-  // Handlers
-  setSelectedClass: (classId: number | null) => void;
-  setAcademicYear: (year: string) => void;
-  setSemester: (sem: string) => void;
-  setSelectedTab: (tab: string) => void;
-  fetchClassList: () => Promise<void>;
-  fetchAnalytics: () => Promise<void>;
-}
-
-// Helper: Generate academic years
+// Tạo danh sách năm học từ 2024-2025 đến 2035-2036
 const generateAcademicYears = () => {
   const years = [];
   for (let year = 2024; year <= 2035; year++) {
@@ -91,20 +13,68 @@ const generateAcademicYears = () => {
   return years;
 };
 
-const SEMESTERS = ['HK1', 'HK2', 'HK3'];
-const ACADEMIC_YEARS = generateAcademicYears();
+// Danh sách học kỳ cố định
+export const SEMESTERS = ["HK1", "HK2", "HK3"];
+export const ACADEMIC_YEARS = generateAcademicYears();
 
-/**
- * useSubjectDashboard Hook
- * 
- * Manages subject teacher dashboard data fetching and state:
- * - Filter management (academic year, semester, class)
- * - Class list fetching
- * - Analytics data fetching
- * - Tab navigation
- * - SystemSettings synchronization
- */
-export const useSubjectDashboard = (): UseSubjectDashboardReturn => {
+// Types
+export interface Subject {
+  subject_id: string;
+  subject_name: string;
+  subject_code: string;
+}
+
+export interface ClassItem {
+  class_id: string;
+  class_name: string;
+  grade: number;
+  subjects: Subject[];
+}
+
+export interface AnalyticsData {
+  total_classes: number;
+  total_students: number;
+  students_with_grades: number;
+  is_letter_grade_subject: boolean;
+  subjects: string[];
+  overview: {
+    pass_count: number;
+    fail_count: number;
+    average_score: number;
+    highest_score: number;
+    lowest_score: number;
+    pass_rate: number;
+  };
+  performance_groups: Record<
+    string,
+    {
+      label: string;
+      count: number;
+      percentage: number;
+      color: string;
+    }
+  >;
+  score_distribution: Record<string, number>;
+  students_need_attention: Array<{
+    student_id: string;
+    student_name: string;
+    class_name: string;
+    final_score: number | string;
+  }>;
+  top_students: Array<{
+    student_id: string;
+    student_name: string;
+    class_name: string;
+    final_score: number | string;
+  }>;
+  class_comparison: Array<{
+    class_name: string;
+    average_score: number;
+    pass_rate: number;
+  }>;
+}
+
+export const useSubjectDashboard = () => {
   const { user } = useContext(AuthContext);
   const {
     academicYear: defaultAcademicYear,
@@ -112,64 +82,30 @@ export const useSubjectDashboard = (): UseSubjectDashboardReturn => {
     loading: settingsLoading,
   } = useSystemSettings();
 
+  // State
   const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [selectedTab, setSelectedTab] = useState("overview");
+  const [classList, setClassList] = useState<ClassItem[]>([]);
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [loadingClasses, setLoadingClasses] = useState(false);
-  const [analytics, setAnalytics] = useState<SubjectAnalytics | null>(null);
-  const [classList, setClassList] = useState<ClassWithSubjects[]>([]);
-  const [selectedClass, setSelectedClass] = useState<number | null>(null);
+
+  // Filter states
   const [academicYear, setAcademicYear] = useState(
-    defaultAcademicYear || '2024-2025'
+    defaultAcademicYear || "2024-2025"
   );
-  const [semester, setSemester] = useState(defaultSemester || 'HK1');
-  const [selectedTab, setSelectedTab] = useState('overview');
+  const [semester, setSemester] = useState(defaultSemester || "HK1");
 
-  /**
-   * Sync with SystemSettings when defaults change
-   */
-  useEffect(() => {
-    if (defaultAcademicYear) {
-      setAcademicYear(defaultAcademicYear);
-    }
-  }, [defaultAcademicYear]);
-
-  useEffect(() => {
-    if (defaultSemester) {
-      setSemester(defaultSemester);
-    }
-  }, [defaultSemester]);
-
-  /**
-   * Fetch class list when academic year or semester changes
-   */
-  useEffect(() => {
-    if (academicYear && semester) {
-      fetchClassList();
-    }
-  }, [academicYear, semester]);
-
-  /**
-   * Fetch analytics when filters change
-   */
-  useEffect(() => {
-    if (academicYear && semester) {
-      fetchAnalytics();
-    }
-  }, [academicYear, semester, selectedClass]);
-
-  /**
-   * Fetch list of classes for the teacher
-   */
-  const fetchClassList = useCallback(async () => {
+  // Fetch functions
+  const fetchClassList = async () => {
     try {
       setLoadingClasses(true);
       const response = await api.getTeacherClasses(academicYear, semester);
-      logger.debug('Class list response:', response);
-
+      logger.debug("Class list response:", response);
       if (response.success && response.data) {
         // Extract unique classes from class_subjects data
-        const classesMap: { [key: number]: ClassWithSubjects } = {};
-
-        response.data.forEach((cs) => {
+        const classesMap: Record<string, ClassItem> = {};
+        response.data.forEach((cs: any) => {
           if (cs.classes) {
             const classId = cs.classes.id;
             if (!classesMap[classId]) {
@@ -197,20 +133,17 @@ export const useSubjectDashboard = (): UseSubjectDashboardReturn => {
         });
 
         setClassList(classList);
-        logger.debug('Class list set to:', classList);
+        logger.debug("Class list set to:", classList);
       }
     } catch (error) {
-      logger.error('Error fetching class list:', error);
+      logger.error("Error fetching class list:", error);
       setClassList([]);
     } finally {
       setLoadingClasses(false);
     }
-  }, [academicYear, semester]);
+  };
 
-  /**
-   * Fetch analytics data from API
-   */
-  const fetchAnalytics = useCallback(async () => {
+  const fetchAnalytics = async () => {
     try {
       setLoading(true);
       const response = await api.getTeacherDashboardAnalytics(
@@ -218,34 +151,62 @@ export const useSubjectDashboard = (): UseSubjectDashboardReturn => {
         semester,
         selectedClass
       );
-      logger.debug('Analytics response:', response);
-
+      logger.debug("Analytics response:", response);
       if (response.success) {
         setAnalytics(response.data);
       } else {
-        logger.error('Failed to fetch analytics:', response.message);
+        logger.error("Failed to fetch analytics:", response.message);
       }
     } catch (error) {
-      logger.error('Error fetching analytics:', error);
+      logger.error("Error fetching analytics:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Sync with system settings
+  useEffect(() => {
+    if (defaultAcademicYear) {
+      setAcademicYear(defaultAcademicYear);
+    }
+  }, [defaultAcademicYear]);
+
+  useEffect(() => {
+    if (defaultSemester) {
+      setSemester(defaultSemester);
+    }
+  }, [defaultSemester]);
+
+  // Fetch class list when academicYear or semester changes
+  useEffect(() => {
+    if (academicYear && semester) {
+      fetchClassList();
+    }
+  }, [academicYear, semester]);
+
+  // Fetch analytics when academicYear, semester, or selectedClass changes
+  useEffect(() => {
+    if (academicYear && semester) {
+      fetchAnalytics();
     }
   }, [academicYear, semester, selectedClass]);
 
   return {
     loading,
-    loadingClasses,
     analytics,
+    selectedTab,
     classList,
     selectedClass,
+    loadingClasses,
     academicYear,
     semester,
-    selectedTab,
+    setLoading,
+    setAnalytics,
+    setSelectedTab,
+    setClassList,
     setSelectedClass,
+    setLoadingClasses,
     setAcademicYear,
     setSemester,
-    setSelectedTab,
-    fetchClassList,
-    fetchAnalytics,
   };
 };

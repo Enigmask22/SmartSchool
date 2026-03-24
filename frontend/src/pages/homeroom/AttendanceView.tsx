@@ -4,6 +4,8 @@ import { useAttendanceData } from '@/hooks/useAttendanceData';
 import AttendanceStats from '@/components/attendance/AttendanceStats';
 import AttendanceFilters from '@/components/attendance/AttendanceFilters';
 import AttendanceTable from '@/components/attendance/AttendanceTable';
+import LeaveRequestModal from '@/components/attendance/LeaveRequestModal';
+import { AuthContext } from '@/contexts/AuthContext';
 import logger from '@/utils/logger';
 
 /**
@@ -21,7 +23,8 @@ import logger from '@/utils/logger';
  * - AttendanceFilters: Filter controls
  * - AttendanceTable: Records table with pagination and edit
  */
-const AttendanceView: React.FC = () => {
+const AttendanceView = () => {
+  const { isHomeroomTeacher } = React.useContext(AuthContext);
   const {
     // Data
     attendanceRecords,
@@ -65,6 +68,15 @@ const AttendanceView: React.FC = () => {
 
     // Bootstrap
     attendanceBootstrap,
+
+    // Leave request states
+    leaveRequestOpen,
+    leaveRequestRecord,
+
+    // Leave request handlers
+    handleOpenLeaveRequest,
+    handleLeaveRequestClose,
+    handleLeaveRequestUploadSuccess,
 
     // Setters
     setSelectedAcademicYear,
@@ -165,7 +177,27 @@ const AttendanceView: React.FC = () => {
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         isEditingRecord={isEditingRecord}
+        onOpenLeaveRequest={handleOpenLeaveRequest}
+        isHomeroomTeacher={isHomeroomTeacher}
       />
+
+      {/* Leave Request Modal */}
+      {leaveRequestRecord && (
+        <LeaveRequestModal
+          open={leaveRequestOpen}
+          onClose={handleLeaveRequestClose}
+          studentId={leaveRequestRecord.student_id}
+          studentName={
+            leaveRequestRecord.students?.full_name || ''
+          }
+          studentCode={
+            leaveRequestRecord.students?.student_id || ''
+          }
+          targetDate={selectedDate}
+          existingImageUrl={leaveRequestRecord.leave_request_image || null}
+          onUploadSuccess={handleLeaveRequestUploadSuccess}
+        />
+      )}
     </div>
   );
 };

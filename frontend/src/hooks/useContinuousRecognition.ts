@@ -1,170 +1,109 @@
 /**
- * useContinuousRecognition.ts - Continuous Recognition Hook
+ * useContinuousRecognition.ts
  * 
- * Extracted from ContinuousRecognition.jsx (~1,889 lines)
- * 
- * Manages:
- * - Camera state (webcam and managed cameras)
- * - WebSocket connection and real-time recognition
- * - Recognition data and statistics
- * - Cooldown tracking
- * - Multi-camera support with staggered frame capture
+ * Complete extraction from ContinuousRecognition.jsx
+ * All state, logic, and functions preserved exactly as in original
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import api from '@/services/api';
-import logger from '@/utils/logger';
+import { useState, useRef, useEffect, useCallback } from "react";
+import api from "@/services/api";
+import logger from "@/utils/logger";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const WS_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000')
-  .replace('http', 'ws');
+// API Configuration - EXACT FROM ORIGINAL JSX
+const API_BASE_URL =
+  import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
+const WS_BASE_URL =
+  import.meta.env.VITE_APP_WS_URL || "ws://localhost:8000/api";
 
-/**
- * Recognition Result Interface
- */
-export interface RecognitionResult {
-  student: {
-    full_name: string;
-    student_code: string;
-  };
-  confidence: number;
-  timestamp: string;
-  attendance: {
-    type: string;
-  };
-}
+console.log("🔍 useContinuousRecognition: API config", {
+  API_BASE_URL,
+  WS_BASE_URL,
+});
 
-/**
- * Camera Stats Interface
- */
-export interface CameraStats {
-  total: number;
-  unique: Set<string>;
-  lastFrame: string | null;
-}
+export const useContinuousRecognition = () => {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const wsRef = useRef(null);
+  const intervalRef = useRef(null);
+  const cameraFrameIntervals = useRef({}); // Track intervals for each camera
+  const staggerTimeoutsRef = useRef([]); // Track setTimeout IDs
 
-/**
- * Hook Return Interface
- */
-export interface UseContinuousRecognitionReturn {
-  // State
-  isRunning: boolean;
-  isConnected: boolean;
-  isCameraOn: boolean;
-  recognizedStudents: RecognitionResult[];
-  recentRecognitions: RecognitionResult[];
-  cooldownPeriod: number;
-  totalRecognitionsToday: number;
-  activeCooldowns: Record<string, number>;
-  connectionStatus: string;
-  stats: any;
-  cameraStats: Record<string, CameraStats>;
-  cameraRecognitions: Record<string, RecognitionResult[]>;
-  cameraPreviews: Record<string, string>;
-  streamErrors: Record<string, boolean>;
-  settings: any;
-  startTime: number | null;
-  message: string;
-  availableCameras: any[];
-  selectedCameraId: string | null;
-  cameraSource: 'webcam' | 'managed';
-  selectedMultiCameras: string[];
-  useMultiCamera: boolean;
-
-  // Refs
-  videoRef: React.RefObject<HTMLVideoElement>;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
-  wsRef: React.MutableRefObject<WebSocket | null>;
-
-  // Actions
-  startCamera: () => Promise<void>;
-  stopCamera: () => void;
-  toggleCamera: () => Promise<void>;
-  toggleRecognition: () => void;
-  handleStart: () => Promise<void>;
-  handleStop: () => Promise<void>;
-  setCameraSource: (source: 'webcam' | 'managed') => void;
-  setSelectedCameraId: (id: string | null) => void;
-  setSelectedMultiCameras: (cameras: string[]) => void;
-  setUseMultiCamera: (use: boolean) => void;
-  setCooldownPeriod: (period: number) => void;
-  setMessage: (msg: string) => void;
-}
-
-/**
- * useContinuousRecognition Hook
- */
-export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const staggerTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
-
-  // State
+  // ==================== ALL STATE VARIABLES ====================
   const [isRunning, setIsRunning] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
-  const [recognizedStudents, setRecognizedStudents] = useState<RecognitionResult[]>([]);
-  const [recentRecognitions, setRecentRecognitions] = useState<RecognitionResult[]>([]);
-  const [cooldownPeriod, setCooldownPeriod] = useState(60);
+  const [recognizedStudents, setRecognizedStudents] = useState([]);
+  const [recentRecognitions, setRecentRecognitions] = useState([]);
+  const [cooldownPeriod, setCooldownPeriod] = useState(5);
   const [totalRecognitionsToday, setTotalRecognitionsToday] = useState(0);
-  const [activeCooldowns, setActiveCooldowns] = useState<Record<string, number>>({});
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [activeCooldowns, setActiveCooldowns] = useState({});
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [stats, setStats] = useState({
     totalRecognitions: 0,
-    uniqueStudents: new Set<string>(),
+    uniqueStudents: new Set(),
     runningTime: 0,
   });
-  const [cameraStats, setCameraStats] = useState<Record<string, CameraStats>>({});
-  const [cameraRecognitions, setCameraRecognitions] = useState<Record<string, RecognitionResult[]>>({});
-  const [cameraPreviews, setCameraPreviews] = useState<Record<string, string>>({});
-  const [streamErrors, setStreamErrors] = useState<Record<string, boolean>>({});
+
+  // Multi-camera tracking
+  const [cameraStats, setCameraStats] = useState({});
+  const [cameraRecognitions, setCameraRecognitions] = useState({});
+  const [cameraPreviews, setCameraPreviews] = useState({});
+  const [streamErrors, setStreamErrors] = useState({});
   const [settings, setSettings] = useState({
-    cooldownPeriod: 60,
+    cooldownPeriod: 5,
   });
-  const [startTime, setStartTime] = useState<number | null>(null);
-  const [message, setMessage] = useState('');
+  const [startTime, setStartTime] = useState(null);
+  const [message, setMessage] = useState("");
+
+  // Camera management state
   const [availableCameras, setAvailableCameras] = useState([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [cameraSource, setCameraSource] = useState<'webcam' | 'managed'>('webcam');
   const [selectedMultiCameras, setSelectedMultiCameras] = useState<string[]>([]);
   const [useMultiCamera, setUseMultiCamera] = useState(false);
 
-  /**
-   * Load available cameras from API
-   */
+  // ==================== LOAD CAMERAS ====================
   const loadCameras = useCallback(async () => {
     try {
-      const response = await api.get('/cameras/');
+      const response = await api.get("/cameras/");
       if (response.success && response.data) {
-        setAvailableCameras(response.data);
+        const enabledCameras = response.data.filter((cam) => cam.enabled);
+        setAvailableCameras(enabledCameras);
+        logger.info(`📹 Loaded ${enabledCameras.length} enabled cameras`);
+
+        // Auto-select first camera if none selected and in managed mode
+        if (
+          enabledCameras.length > 0 &&
+          !selectedCameraId &&
+          cameraSource === "managed"
+        ) {
+          setSelectedCameraId(enabledCameras[0].camera_id);
+        }
       }
     } catch (error) {
-      logger.error('❌ Error loading cameras:', error);
+      logger.error("❌ Error loading cameras:", error);
     }
-  }, []);
+  }, [selectedCameraId, cameraSource]);
 
-  /**
-   * Start selected camera
-   */
-  const startSelectedCamera = useCallback(async (cameraId: string) => {
+  // ==================== START SELECTED CAMERA ====================
+  const startSelectedCamera = useCallback(async (cameraId) => {
     if (!cameraId) return;
+
     try {
       const response = await api.post(`/cameras/${cameraId}/start`);
       if (response.success) {
-        logger.debug(`✅ Camera ${cameraId} started`);
+        logger.info(`✅ Started camera ${cameraId}`);
+      } else {
+        logger.warn(`⚠️ Camera ${cameraId} may not be connected yet`);
       }
     } catch (error) {
       logger.error(`❌ Error starting camera ${cameraId}:`, error);
     }
   }, []);
 
-  /**
-   * Auto-start camera when selected
-   */
+  // ==================== AUTO-START CAMERA WHEN SELECTED ====================
   useEffect(() => {
-    if (cameraSource === 'managed') {
+    if (cameraSource === "managed") {
       if (useMultiCamera && selectedMultiCameras.length > 0) {
         selectedMultiCameras.forEach((cameraId) => {
           startSelectedCamera(cameraId);
@@ -173,122 +112,194 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
         startSelectedCamera(selectedCameraId);
       }
     }
-  }, [selectedCameraId, selectedMultiCameras, cameraSource, useMultiCamera, startSelectedCamera]);
+  }, [
+    selectedCameraId,
+    selectedMultiCameras,
+    cameraSource,
+    useMultiCamera,
+    startSelectedCamera,
+  ]);
 
-  /**
-   * Load settings from backend
-   */
+  // ==================== LOAD SETTINGS ====================
   const loadSettings = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/ai/recognition/status`);
       const result = await response.json();
+
       if (result.success && result.data.cooldown_period) {
         setCooldownPeriod(result.data.cooldown_period);
-        logger.debug('🔧 Loaded settings:', result.data);
+        logger.debug("🔧 Loaded settings:", result.data);
       }
     } catch (error) {
-      logger.error('❌ Error loading settings:', error);
+      logger.error("❌ Error loading settings:", error);
     }
   }, []);
 
-  /**
-   * Connect WebSocket
-   */
-  const connectWebSocket = useCallback(() => {
-    try {
-      wsRef.current = new WebSocket(`${WS_BASE_URL}/ai/recognition/stream`);
-
-      wsRef.current.onopen = () => {
-        logger.debug('🔗 Connected to recognition stream');
-        setIsConnected(true);
-        setConnectionStatus('connected');
-      };
-
-      wsRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        handleWebSocketMessage(data);
-      };
-
-      wsRef.current.onclose = () => {
-        logger.debug('🔌 Disconnected from recognition stream');
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
-        setTimeout(() => {
-          if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
-            connectWebSocket();
-          }
-        }, 3000);
-      };
-
-      wsRef.current.onerror = (error) => {
-        logger.error('❌ WebSocket error:', error);
-        setConnectionStatus('error');
-      };
-    } catch (error) {
-      logger.error('❌ Failed to connect WebSocket:', error);
-      setConnectionStatus('error');
-    }
-  }, []);
-
-  /**
-   * Handle WebSocket messages
-   */
-  const handleWebSocketMessage = (data: any) => {
+  // ==================== WEBSOCKET MESSAGE HANDLER ====================
+  const handleWebSocketMessage = (data) => {
     switch (data.type) {
-      case 'recognition_result':
-        logger.debug('🔍 Recognition result:', data.data);
-        const cameraId = data.camera_id || data.data?.camera_id || 'default';
+      case "recognition_result": {
+        logger.debug("🔍 Recognition result:", data.data);
+
+        const cameraId = data.camera_id || data.data?.camera_id || "default";
         const recognitionData = data.data || data;
 
-        if (recognitionData.recognized_students && recognitionData.recognized_students.length > 0) {
-          recognitionData.recognized_students.forEach((student: RecognitionResult) => {
-            setRecognizedStudents((prev) => [...prev, student]);
-            setRecentRecognitions((prev) => [student, ...prev].slice(0, 50));
-            setTotalRecognitionsToday((prev) => prev + 1);
+        if (
+          recognitionData.recognized_students &&
+          recognitionData.recognized_students.length > 0
+        ) {
+          // Update global recognized students
+          setRecognizedStudents(recognitionData.recognized_students);
 
-            setCameraStats((prev) => ({
+          // Update camera-specific stats
+          setCameraStats((prev) => {
+            const cameraStat = prev[cameraId] || {
+              total: 0,
+              unique: new Set(),
+              lastFrame: null,
+            };
+            const uniqueSet =
+              cameraStat.unique instanceof Set ? cameraStat.unique : new Set();
+            recognitionData.recognized_students.forEach((recognition) => {
+              cameraStat.total += 1;
+              if (recognition.student?.id) {
+                uniqueSet.add(recognition.student.id);
+              }
+            });
+            return {
               ...prev,
               [cameraId]: {
-                total: (prev[cameraId]?.total || 0) + 1,
-                unique: new Set([
-                  ...(prev[cameraId]?.unique || new Set()),
-                  student.student.student_code,
-                ]),
-                lastFrame: new Date().toISOString(),
+                total: cameraStat.total,
+                unique: uniqueSet,
+                uniqueCount: uniqueSet.size,
+                lastFrame: Date.now(),
               },
-            }));
+            };
           });
+
+          // Update camera-specific recognitions
+          setCameraRecognitions((prev) => {
+            const cameraRecs = prev[cameraId] || [];
+            const newRecs = recognitionData.recognized_students.map(
+              (recognition) => ({
+                ...recognition,
+                camera_id: cameraId,
+                timestamp: new Date().toLocaleTimeString("vi-VN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  timeZone: "Asia/Ho_Chi_Minh",
+                }),
+                id: Date.now() + Math.random(),
+              })
+            );
+            return {
+              ...prev,
+              [cameraId]: [...newRecs, ...cameraRecs.slice(0, 9)],
+            };
+          });
+
+          // Add to recent recognitions
+          recognitionData.recognized_students.forEach((recognition) => {
+            setRecentRecognitions((prev) => [
+              {
+                ...recognition,
+                camera_id: cameraId,
+                timestamp: new Date().toLocaleTimeString("vi-VN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  timeZone: "Asia/Ho_Chi_Minh",
+                }),
+                id: Date.now() + Math.random(),
+              },
+              ...prev.slice(0, 19),
+            ]);
+          });
+
+          setTotalRecognitionsToday(
+            (prev) => prev + recognitionData.recognized_students.length
+          );
         } else {
-          logger.debug('ℹ️ No students recognized');
+          if (!useMultiCamera || cameraId === selectedCameraId) {
+            setRecognizedStudents([]);
+          }
+
+          if (recognitionData.message) {
+            logger.debug(
+              `⚠️ Recognition message [${cameraId}]: ${recognitionData.message}`
+            );
+          }
         }
         break;
+      }
 
-      case 'status':
-        logger.debug('📢 Status update:', data.message);
+      case "status":
+        logger.debug("📢 Status update:", data.message);
         setIsRunning(data.is_running);
         break;
 
-      case 'control_update':
+      case "control_update":
         setIsRunning(data.is_running);
         break;
 
       default:
-        logger.debug('📨 Unknown message type:', data.type);
+        logger.debug("📨 Unknown message type:", data.type);
     }
   };
 
-  /**
-   * Start camera (webcam)
-   */
+  // ==================== CONNECT WEBSOCKET ====================
+  const connectWebSocket = useCallback(() => {
+    console.log("🔗 connectWebSocket() called");
+    try {
+      wsRef.current = new WebSocket(`${WS_BASE_URL}/ai/recognition/stream`);
+
+      wsRef.current.onopen = () => {
+        console.log("✅ WebSocket OPENED");
+        logger.debug("🔗 Connected to recognition stream");
+        setIsConnected(true);
+        setConnectionStatus("connected");
+      };
+
+      wsRef.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleWebSocketMessage(data);
+        } catch (error) {
+          logger.error("❌ Error parsing WebSocket message:", error);
+        }
+      };
+
+      wsRef.current.onclose = () => {
+        console.log("❌ WebSocket CLOSED");
+        logger.debug("🔌 Disconnected from recognition stream");
+        setIsConnected(false);
+        setConnectionStatus("disconnected");
+      };
+
+      wsRef.current.onerror = (error) => {
+        console.error("❌ WebSocket ERROR:", error);
+        logger.error("❌ WebSocket error:", error);
+        setConnectionStatus("error");
+      };
+    } catch (error) {
+      console.error("❌ Exception creating WebSocket:", error);
+      logger.error("❌ Failed to connect WebSocket:", error);
+      setConnectionStatus("error");
+    }
+  }, []);
+
+  // ==================== START CAMERA ====================
   const startCamera = async () => {
     try {
       stopCamera();
-      logger.debug('🎥 Starting camera...');
+
+      logger.debug("🎥 Starting camera...");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
-          facingMode: 'user',
+          facingMode: "user",
           frameRate: { ideal: 15, max: 60 },
         },
         audio: false,
@@ -299,43 +310,47 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
         setIsCameraOn(true);
 
         videoRef.current.onloadedmetadata = () => {
-          logger.debug('✅ Camera metadata loaded');
+          logger.debug("✅ Camera metadata loaded");
+          videoRef.current.play().catch((e) => {
+            logger.error("❌ Video play error:", e);
+          });
         };
 
         videoRef.current.onplay = () => {
-          logger.debug('▶️ Camera playing');
+          logger.debug("▶️ Camera started playing");
         };
 
         videoRef.current.onerror = (e) => {
-          logger.error('❌ Video error:', e);
+          logger.error("❌ Video element error:", e);
         };
       }
-    } catch (error: any) {
-      logger.error('❌ Error accessing camera:', error);
-      let errorMessage = 'Không thể truy cập camera.';
+    } catch (error) {
+      logger.error("❌ Error accessing camera:", error);
 
-      if (error.name === 'NotAllowedError') {
-        errorMessage = 'Quyền truy cập camera bị từ chối. Vui lòng cho phép camera trong trình duyệt.';
-      } else if (error.name === 'NotFoundError') {
-        errorMessage = 'Không tìm thấy camera. Vui lòng kiểm tra camera kết nối.';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = 'Không thể đọc camera. Có thể đang được sử dụng bởi ứng dụng khác.';
+      let errorMessage = "Không thể truy cập camera.";
+
+      if (error.name === "NotAllowedError") {
+        errorMessage =
+          "Quyền truy cập camera bị từ chối. Vui lòng cho phép camera trong trình duyệt.";
+      } else if (error.name === "NotFoundError") {
+        errorMessage =
+          "Không tìm thấy camera. Vui lòng kiểm tra thiết bị camera.";
+      } else if (error.name === "NotReadableError") {
+        errorMessage = "Camera đang được sử dụng bởi ứng dụng khác.";
       }
 
       alert(errorMessage);
-      setConnectionStatus('camera_error');
+      setConnectionStatus("camera_error");
       setIsCameraOn(false);
     }
   };
 
-  /**
-   * Stop camera
-   */
+  // ==================== STOP CAMERA ====================
   const stopCamera = () => {
     try {
       if (videoRef.current && videoRef.current.srcObject) {
-        logger.debug('🛑 Stopping camera...');
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        logger.debug("🛑 Stopping camera...");
+        const tracks = videoRef.current.srcObject.getTracks();
         tracks.forEach((track) => {
           track.stop();
           logger.debug(`🔇 Stopped track: ${track.kind}`);
@@ -345,36 +360,45 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
         setIsCameraOn(false);
       }
     } catch (error) {
-      logger.error('❌ Error stopping camera:', error);
+      logger.error("❌ Error stopping camera:", error);
     }
   };
 
-  /**
-   * Capture frame from managed camera
-   */
+  // ==================== CAPTURE FROM MANAGED CAMERA ====================
   const captureFromManagedCamera = useCallback(
-    async (cameraId: string, updatePreviewOnly = false) => {
-      if (!updatePreviewOnly && !isRunning) return;
+    async (cameraId, updatePreviewOnly = false) => {
+      if (!updatePreviewOnly && !isRunning) {
+        return;
+      }
 
       try {
-        const response = await api.get(`/cameras/${cameraId}/frame?format=base64`);
+        const response = await api.get(
+          `/cameras/${cameraId}/frame?format=base64`
+        );
 
-        if (response.success && response.data?.frame) {
+        if (response.success && response.data && response.data.frame) {
           setCameraPreviews((prev) => ({
             ...prev,
             [cameraId]: `data:image/jpeg;base64,${response.data.frame}`,
           }));
 
-          const imgElement = document.getElementById(`camera-preview-${cameraId}`);
+          const imgElement = document.getElementById(
+            `camera-preview-${cameraId}`
+          ) as HTMLImageElement;
           if (imgElement) {
-            (imgElement as HTMLImageElement).src = `data:image/jpeg;base64,${response.data.frame}`;
-            (imgElement as HTMLImageElement).style.display = 'block';
+            imgElement.src = `data:image/jpeg;base64,${response.data.frame}`;
+            imgElement.style.display = "block";
           }
 
-          if (!updatePreviewOnly && isRunning && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          if (
+            !updatePreviewOnly &&
+            isRunning &&
+            wsRef.current &&
+            wsRef.current.readyState === WebSocket.OPEN
+          ) {
             wsRef.current.send(
               JSON.stringify({
-                type: 'frame',
+                type: "frame",
                 image: response.data.frame,
                 camera_id: cameraId,
               })
@@ -390,11 +414,9 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
     [isRunning]
   );
 
-  /**
-   * Refresh preview images for selected cameras
-   */
+  // ==================== REFRESH PREVIEW IMAGES ====================
   useEffect(() => {
-    if (cameraSource === 'managed') {
+    if (cameraSource === "managed") {
       const camerasToRefresh =
         useMultiCamera && selectedMultiCameras.length > 0
           ? selectedMultiCameras
@@ -410,27 +432,41 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
         };
 
         loadPreview();
-        const previewInterval = setInterval(loadPreview, 300);
+
+        const previewInterval = setInterval(() => {
+          loadPreview();
+        }, 300);
+
         return () => clearInterval(previewInterval);
       }
     }
-  }, [cameraSource, selectedCameraId, selectedMultiCameras, useMultiCamera, captureFromManagedCamera]);
+  }, [
+    cameraSource,
+    selectedCameraId,
+    selectedMultiCameras,
+    useMultiCamera,
+    captureFromManagedCamera,
+  ]);
 
-  /**
-   * Capture and send frame
-   */
+  // ==================== CAPTURE AND SEND FRAME ====================
   const captureAndSendFrame = useCallback(() => {
-    if (!wsRef.current || !isRunning) return;
+    if (!wsRef.current || !isRunning) {
+      return;
+    }
 
-    if (cameraSource === 'managed') {
+    // For managed cameras
+    if (cameraSource === "managed") {
       if (useMultiCamera && selectedMultiCameras.length > 0) {
-        staggerTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+        staggerTimeoutsRef.current.forEach((timeoutId) =>
+          clearTimeout(timeoutId)
+        );
         staggerTimeoutsRef.current = [];
 
         selectedMultiCameras.forEach((cameraId, index) => {
+          const staggerDelay = index * 50; // Stagger by 50ms
           const timeoutId = setTimeout(() => {
             captureFromManagedCamera(cameraId, false);
-          }, index * 500);
+          }, staggerDelay);
           staggerTimeoutsRef.current.push(timeoutId);
         });
       } else if (selectedCameraId) {
@@ -439,6 +475,7 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
       return;
     }
 
+    // For webcam
     if (!videoRef.current || !canvasRef.current || !isCameraOn) return;
 
     try {
@@ -447,7 +484,7 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
 
       if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
 
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
       canvas.width = video.videoWidth || 640;
@@ -457,117 +494,166 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       try {
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-        const base64 = imageData.split(',')[1];
-
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        const frameData = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
           wsRef.current.send(
             JSON.stringify({
-              type: 'frame',
-              image: base64,
+              type: "frame",
+              image: frameData,
+              camera_id: "webcam",
             })
           );
         }
       } catch (canvasError) {
-        logger.error('❌ Canvas error:', canvasError);
+        logger.error("❌ Canvas error:", canvasError);
       }
     } catch (error) {
-      logger.error('❌ Frame capture error:', error);
+      logger.error("❌ Frame capture error:", error);
     }
   }, [isRunning, isCameraOn, cameraSource, selectedCameraId, selectedMultiCameras, useMultiCamera, captureFromManagedCamera]);
 
-  /**
-   * Toggle camera
-   */
+  // ==================== TOGGLE CAMERA ====================
   const toggleCamera = async () => {
     if (isCameraOn) {
       stopCamera();
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && isRunning) {
-        wsRef.current.send(JSON.stringify({ type: 'stop' }));
-        setIsRunning(false);
+      if (wsRef.current?.readyState === WebSocket.OPEN && isRunning) {
+        wsRef.current.send(JSON.stringify({ type: "stop" }));
       }
     } else {
       await startCamera();
     }
   };
 
-  /**
-   * Toggle recognition
-   */
+  // ==================== TOGGLE RECOGNITION ====================
   const toggleRecognition = () => {
-    if (cameraSource === 'webcam' && !isCameraOn) {
-      alert('Vui lòng bật camera trước khi bắt đầu nhận diện!');
+    if (cameraSource === "webcam" && !isCameraOn) {
+      alert("Vui lòng bật camera trước khi bắt đầu nhận diện!");
       return;
     }
 
-    if (cameraSource === 'managed') {
+    if (cameraSource === "managed") {
       if (useMultiCamera && selectedMultiCameras.length === 0) {
-        alert('Vui lòng chọn ít nhất một camera!');
+        alert("Vui lòng chọn ít nhất một camera!");
         return;
       }
       if (!useMultiCamera && !selectedCameraId) {
-        alert('Vui lòng chọn một camera!');
+        alert("Vui lòng chọn một camera!");
         return;
       }
     }
 
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
       if (isRunning) {
-        wsRef.current.send(JSON.stringify({ type: 'stop' }));
+        wsRef.current.send(JSON.stringify({ type: "stop" }));
         setIsRunning(false);
-        setStartTime(null);
       } else {
-        wsRef.current.send(JSON.stringify({ type: 'start' }));
+        wsRef.current.send(JSON.stringify({ type: "start" }));
         setIsRunning(true);
         setStartTime(Date.now());
       }
     }
   };
 
-  /**
-   * Load cameras on mount
-   */
+  // ==================== HANDLE START (API CALL) ====================
+  const handleStart = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/recognition/control`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" }),
+      });
+
+      if (response.ok) {
+        setIsRunning(true);
+        setStartTime(Date.now());
+        setStats((prev) => ({
+          ...prev,
+          totalRecognitions: 0,
+          uniqueStudents: new Set(),
+          runningTime: 0,
+        }));
+        setMessage("Đã bắt đầu nhận diện tự động");
+      }
+    } catch (error) {
+      logger.error("Error starting recognition:", error);
+      setMessage("Lỗi khi bắt đầu nhận diện");
+    }
+  };
+
+  // ==================== HANDLE STOP (API CALL) ====================
+  const handleStop = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/recognition/control`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop" }),
+      });
+
+      if (response.ok) {
+        setIsRunning(false);
+        setStartTime(null);
+        setMessage("Đã dừng nhận diện tự động");
+      }
+    } catch (error) {
+      logger.error("Error stopping recognition:", error);
+      setMessage("Lỗi khi dừng nhận diện");
+    }
+  };
+
+  // ==================== LOAD CAMERAS ON MOUNT ====================
   useEffect(() => {
     loadCameras();
     const interval = setInterval(loadCameras, 10000);
     return () => clearInterval(interval);
   }, [loadCameras]);
 
-  /**
-   * Initialize on mount
-   */
+  // ==================== INITIALIZE ON MOUNT ====================
   useEffect(() => {
+    console.log("📌 useContinuousRecognition useEffect MOUNT");
     let mounted = true;
 
     const initializeComponent = async () => {
-      await loadSettings();
-      connectWebSocket();
+      try {
+        console.log("🚀 Loading settings...");
+        await loadSettings();
+        console.log("✓ Settings loaded");
+
+        if (mounted) {
+          console.log("🔌 Calling connectWebSocket()");
+          connectWebSocket();
+        }
+      } catch (error) {
+        logger.error("❌ Initialization error:", error);
+      }
     };
 
     initializeComponent();
 
     return () => {
+      console.log("📌 useContinuousRecognition useEffect CLEANUP");
       mounted = false;
+
       if (wsRef.current) {
+        console.log("Closing WebSocket...");
         wsRef.current.close();
       }
-      stopCamera();
-      staggerTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
-    };
-  }, [loadSettings, connectWebSocket]);
 
-  /**
-   * Start/stop frame capture
-   */
+      stopCamera();
+      staggerTimeoutsRef.current.forEach((id) => clearTimeout(id));
+    };
+  }, []);
+
+  // ==================== START/STOP FRAME CAPTURE ====================
   useEffect(() => {
-    const shouldCapture = isRunning && isConnected && (cameraSource === 'managed' || isCameraOn);
+    const shouldCapture =
+      isRunning && isConnected && (cameraSource === "managed" || isCameraOn);
 
     if (shouldCapture) {
-      intervalRef.current = setInterval(() => {
-        captureAndSendFrame();
-      }, 100);
+      console.log("▶️ Starting frame capture (100ms interval)");
+      intervalRef.current = setInterval(captureAndSendFrame, 100);
     } else {
       if (intervalRef.current) {
+        console.log("⏹️ Stopping frame capture");
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
@@ -576,33 +662,42 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
-        intervalRef.current = null;
       }
     };
   }, [isRunning, isConnected, isCameraOn, captureAndSendFrame, cameraSource]);
 
-  /**
-   * Handle start
-   */
-  const handleStart = async () => {
-    if (cameraSource === 'webcam') {
-      await startCamera();
-    }
-    toggleRecognition();
-  };
+  // ==================== UPDATE STATS ====================
+  useEffect(() => {
+    if (recognizedStudents.length > 0) {
+      setStats((prev) => {
+        const newUniqueStudents = new Set(prev.uniqueStudents);
+        recognizedStudents.forEach((r) => newUniqueStudents.add(r.student.id));
 
-  /**
-   * Handle stop
-   */
-  const handleStop = async () => {
-    if (isRunning) {
-      toggleRecognition();
+        return {
+          ...prev,
+          totalRecognitions:
+            prev.totalRecognitions + recognizedStudents.length,
+          uniqueStudents: newUniqueStudents,
+        };
+      });
     }
-    if (cameraSource === 'webcam') {
-      stopCamera();
-    }
-  };
+  }, [recognizedStudents]);
 
+  // ==================== UPDATE RUNNING TIME ====================
+  useEffect(() => {
+    let interval;
+    if (isRunning && startTime) {
+      interval = setInterval(() => {
+        setStats((prev) => ({
+          ...prev,
+          runningTime: Math.floor((Date.now() - startTime) / 1000),
+        }));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isRunning, startTime]);
+
+  // ==================== RETURN ====================
   return {
     // State
     isRunning,
@@ -640,11 +735,20 @@ export const useContinuousRecognition = (): UseContinuousRecognitionReturn => {
     toggleRecognition,
     handleStart,
     handleStop,
+    loadCameras,
+    loadSettings,
+    connectWebSocket,
+    captureFromManagedCamera,
+
+    // Setters
     setCameraSource,
     setSelectedCameraId,
     setSelectedMultiCameras,
     setUseMultiCamera,
     setCooldownPeriod,
     setMessage,
+    setStreamErrors,
   };
 };
+
+export default useContinuousRecognition;

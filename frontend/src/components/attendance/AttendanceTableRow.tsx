@@ -3,6 +3,7 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { FileText } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ interface AttendanceRecord {
   confidence_score?: number;
   notes?: string;
   students?: Student;
+  leave_request_image?: string;
 }
 
 interface AttendanceTableRowProps {
@@ -40,6 +42,8 @@ interface AttendanceTableRowProps {
   onSave: () => void;
   onStatusChange: (status: string) => void;
   onNotesChange: (notes: string) => void;
+  onOpenLeaveRequest?: (record: AttendanceRecord) => void;
+  isHomeroomTeacher?: boolean;
 }
 
 const getStatusBadge = (status: string) => {
@@ -88,7 +92,7 @@ const formatTime = (timeString?: string): string => {
   }
 };
 
-const AttendanceTableRow: React.FC<AttendanceTableRowProps> = ({
+const AttendanceTableRow = ({
   record,
   index,
   isEditing,
@@ -100,7 +104,9 @@ const AttendanceTableRow: React.FC<AttendanceTableRowProps> = ({
   onSave,
   onStatusChange,
   onNotesChange,
-}) => {
+  onOpenLeaveRequest,
+  isHomeroomTeacher,
+}: AttendanceTableRowProps) => {
   return (
     <TableRow className="hover:bg-muted/50">
       <TableCell className="font-medium">
@@ -178,14 +184,36 @@ const AttendanceTableRow: React.FC<AttendanceTableRowProps> = ({
             </Button>
           </div>
         ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(record)}
-            className="h-8 text-xs"
-          >
-            Sửa
-          </Button>
+          <div className="flex justify-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onEdit(record)}
+              className="h-8 text-xs"
+            >
+              Sửa
+            </Button>
+            {isHomeroomTeacher && (
+              <Button
+                size="sm"
+                variant={
+                  record.leave_request_image
+                    ? 'default'
+                    : 'outline'
+                }
+                onClick={() => onOpenLeaveRequest?.(record)}
+                className={`h-8 text-xs ${record.leave_request_image ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                title={
+                  record.leave_request_image
+                    ? 'Xem đơn xin nghỉ'
+                    : 'Thêm đơn xin nghỉ'
+                }
+              >
+                <FileText className="w-3 h-3 mr-1" />
+                Đơn nghỉ
+              </Button>
+            )}
+          </div>
         )}
       </TableCell>
     </TableRow>

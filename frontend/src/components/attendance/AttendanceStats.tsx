@@ -14,7 +14,7 @@ interface AttendanceStatsProps {
   stats: AttendanceStats | null;
 }
 
-const AttendanceStats: React.FC<AttendanceStatsProps> = ({ stats }) => {
+const AttendanceStats = ({ stats }: AttendanceStatsProps) => {
   if (!stats) return null;
 
   return (

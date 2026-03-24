@@ -38,7 +38,6 @@ import SubjectGradeManagement from "@/pages/subject/GradeManagement";
 
 // Protected Route Wrapper
 import ProtectedRoute from "@/components/routing/ProtectedRoute";
-import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   return (
@@ -65,7 +64,7 @@ function App() {
                 <Route path={ROUTES.ADMIN.DASHBOARD.substring(1)} element={<AdminDashboard />} />
                 <Route path={ROUTES.ADMIN.MANAGEMENT.substring(1)} element={<AdminManagement />} />
                 <Route path={ROUTES.ADMIN.CLASSES.substring(1)} element={<ClassManagement />} />
-                <Route path={ROUTES.ADMIN.CONTINUOUS.substring(1)} element={<ContinuousRecognition isAdmin={true} />} />
+                <Route path={ROUTES.ADMIN.CONTINUOUS.substring(1)} element={<ContinuousRecognition />} />
                 <Route path={ROUTES.ADMIN.UI_DEMO.substring(1)} element={<UIDemo />} />
               </Route>
 
@@ -75,7 +74,6 @@ function App() {
                 <Route path={ROUTES.HOMEROOM.STUDENTS.substring(1)} element={<StudentList isHomeroom={true} />} />
                 <Route path={ROUTES.HOMEROOM.ATTENDANCE.substring(1)} element={<AttendanceView isHomeroom={true} />} />
                 <Route path={ROUTES.HOMEROOM.FACES.substring(1)} element={<FaceManagement isHomeroom={true} />} />
-                <Route path={ROUTES.HOMEROOM.CONTINUOUS.substring(1)} element={<ContinuousRecognition isHomeroom={true} />} />
                 <Route path={ROUTES.HOMEROOM.GRADES.substring(1)} element={<HomeroomGradeManagement isHomeroom={true} />} />
               </Route>
 
@@ -91,7 +89,6 @@ function App() {
           </Routes>
         </SystemSettingsProvider>
       </AuthProvider>
-      <Toaster />
     </BrowserRouter>
   );
 }

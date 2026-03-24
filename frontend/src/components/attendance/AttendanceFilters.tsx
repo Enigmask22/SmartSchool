@@ -34,7 +34,7 @@ interface AttendanceFiltersProps {
   onResetClick: () => void;
 }
 
-const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
+const AttendanceFilters = ({
   selectedDate,
   selectedClass,
   selectedStatus,
@@ -50,7 +50,7 @@ const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
   onViewModeChange,
   onSearchClick,
   onResetClick,
-}) => {
+}: AttendanceFiltersProps) => {
   const { isHomeroomTeacher } = useContext(AuthContext);
 
   return (

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import api from "@/services/api";
 import logger from "@/utils/logger";
+import { AuthContext } from "./AuthContext";
+import { USER_ROLES } from "@/utils/constants";
 
 const SystemSettingsContext = createContext();
 
