@@ -23,7 +23,8 @@ import logger from '@/utils/logger';
  * - AttendanceFilters: Filter controls
  * - AttendanceTable: Records table with pagination and edit
  */
-const AttendanceView = () => {
+
+export default function AttendanceView() {
   const { isHomeroomTeacher } = React.useContext(AuthContext);
   const {
     // Data
@@ -201,5 +202,3 @@ const AttendanceView = () => {
     </div>
   );
 };
-
-export default AttendanceView;
