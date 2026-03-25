@@ -43,7 +43,9 @@ interface AttendanceRecord {
 }
 
 interface AttendanceTableProps {
-  records: AttendanceRecord[];
+  records: AttendanceRecord[]; // Pre-paginated records for display
+  totalRecords: number; // Total count before pagination (for info display)
+  totalPages: number; // Total pages (pre-calculated)
   loading: boolean;
   selectedDate: string;
   selectedClass: string;
@@ -80,6 +82,8 @@ const formatDate = (dateString: string): string => {
 
 const AttendanceTable = ({
   records,
+  totalRecords,
+  totalPages,
   loading,
   selectedDate,
   selectedClass,
@@ -100,11 +104,8 @@ const AttendanceTable = ({
   onOpenLeaveRequest,
   isHomeroomTeacher,
 }: AttendanceTableProps) => {
-  const totalRecords = records.length;
-  const totalPages = Math.ceil(totalRecords / pageSize);
-  const startIndex = (page - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedRecords = records.slice(startIndex, endIndex);
+  // Note: records are already paginated by the parent component
+  // No additional pagination calculation needed here
 
   return (
     <>
@@ -139,20 +140,29 @@ const AttendanceTable = ({
               </TableHeader>
 
               <TableBody>
-                {records.length === 0 ? (
+                {loading && records.length === 0 ? (
+                  // Show skeleton rows during loading
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <TableRow key={`skeleton-${idx}`}>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : records.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="py-8 text-center">
-                      {loading ? (
-                        <div className="flex justify-center">
-                          <div className="w-8 h-8 border-b-2 rounded-full animate-spin border-primary"></div>
-                        </div>
-                      ) : (
-                        'Không có dữ liệu điểm danh'
-                      )}
+                      Không có dữ liệu điểm danh
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedRecords.map((record, idx) => (
+                  records.map((record, idx) => (
                     <AttendanceTableRow
                       key={record.id ?? `record-${record.student_id}-${idx}`}
                       record={record}

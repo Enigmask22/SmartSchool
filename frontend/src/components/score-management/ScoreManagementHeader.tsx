@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 
-interface GradeManagementHeaderProps {
+interface ScoreManagementHeaderProps {
   teacherName: string;
   academicYear: string;
   semester: string;
@@ -25,7 +25,7 @@ interface GradeManagementHeaderProps {
   onSemesterChange: (sem: string) => void;
 }
 
-const GradeManagementHeader = ({
+const ScoreManagementHeader = ({
   teacherName,
   academicYear,
   semester,
@@ -33,7 +33,7 @@ const GradeManagementHeader = ({
   SEMESTERS,
   onAcademicYearChange,
   onSemesterChange,
-}: GradeManagementHeaderProps) => {
+}: ScoreManagementHeaderProps) => {
   return (
     <Card className="border-l-4 border-l-primary">
       <CardHeader>
@@ -104,4 +104,4 @@ const GradeManagementHeader = ({
   );
 };
 
-export default GradeManagementHeader;
+export default ScoreManagementHeader;

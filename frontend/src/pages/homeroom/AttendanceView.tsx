@@ -1,6 +1,8 @@
-import React from 'react';
+import { useContext, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useAttendanceData } from '@/hooks/useAttendanceData';
+import { useAttendanceAPI } from '@/hooks/attendance/useAttendanceAPI';
+import { useAttendanceFilters } from '@/hooks/attendance/useAttendanceFilters';
+import { useAttendanceEdit } from '@/hooks/attendance/useAttendanceEdit';
 import AttendanceStats from '@/components/attendance/AttendanceStats';
 import AttendanceFilters from '@/components/attendance/AttendanceFilters';
 import AttendanceTable from '@/components/attendance/AttendanceTable';
@@ -17,7 +19,13 @@ import logger from '@/utils/logger';
  * - View statistics
  * - Toggle between full list and recorded-only views
  * 
- * Uses useAttendanceData hook for all state and data management
+ * Architecture:
+ * - useAttendanceAPI: API data fetching and bootstrap
+ * - useAttendanceFilters: Filter UI state management
+ * - useAttendanceEdit: Edit form state management
+ * - usePagination: Generic pagination logic
+ * - Local state: Leave request modal (UI concern)
+ * 
  * Uses sub-components for UI organization:
  * - AttendanceStats: Display summary statistics
  * - AttendanceFilters: Filter controls
@@ -25,81 +33,104 @@ import logger from '@/utils/logger';
  */
 
 export default function AttendanceView() {
-  const authContext = React.useContext(AuthContext);
+  const authContext = useContext(AuthContext);
   const isHomeroomTeacher = authContext?.isHomeroomTeacher;
+
+  // Filter state management
+  const filters = useAttendanceFilters();
   const {
-    // Data
-    attendanceRecords,
-    stats,
-    classes,
-    academicYears,
-
-    // Loading states
-    loading,
-    classesLoading,
-    updating,
-
-    // UI states
-    error,
-    successMessage,
-
-    // Filter states
     selectedDate,
     selectedClass,
     selectedStatus,
     selectedAcademicYear,
     showFullList,
-    page,
-    pageSize,
-
-    // Edit states
-    editingRecord,
-    editStatus,
-    editNotes,
-
-    // Handlers
     handleDateChange,
     handleClassChange,
     handleStatusChange,
+    handleAcademicYearChange,
     handleViewModeChange,
-    handleEditRecord,
-    handleCancelEdit,
-    handleSaveEdit,
     resetFilters,
+  } = filters;
 
-    // Bootstrap
+  // API data fetching
+  const api = useAttendanceAPI({
+    selectedDate,
+    selectedClass,
+    selectedStatus,
+    showFullList,
+  });
+  const {
+    attendanceRecords,
+    stats,
+    classes,
+    academicYears,
+    loading,
+    classesLoading,
+    updating,
+    error,
+    successMessage,
     attendanceBootstrap,
+    updateRecord: apiUpdateRecord,
+  } = api;
 
-    // Leave request states
-    leaveRequestOpen,
-    leaveRequestRecord,
+  // Edit form state management
+  const edit = useAttendanceEdit();
+  const { editingRecord, editStatus, editNotes, startEdit, cancelEdit, isEditingRecord } = edit;
 
-    // Leave request handlers
-    handleOpenLeaveRequest,
-    handleLeaveRequestClose,
-    handleLeaveRequestUploadSuccess,
+  // Local state for pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
-    // Setters
-    setSelectedAcademicYear,
-    setPage,
-    setPageSize,
-    setEditStatus,
-    setEditNotes,
+  // Calculate pagination
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const totalRecords = attendanceRecords.length;
+  const totalPages = Math.ceil(totalRecords / pageSize);
+  const paginatedItems = attendanceRecords.slice(startIndex, endIndex);
 
-    // Helpers
-    isEditingRecord,
-  } = useAttendanceData();
+  // Local state for Leave Request Modal (UI concern)
+  const [leaveRequestOpen, setLeaveRequestOpen] = useState(false);
+  const [leaveRequestRecord, setLeaveRequestRecord] = useState<any>(null);
 
-  // Show loading spinner while initial data loads
-  if (loading && attendanceRecords.length === 0) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
-        </div>
-      </div>
+  /**
+   * Handle saving edited record - calls API and updates form state
+   */
+  const handleSaveEdit = async (): Promise<void> => {
+    if (!editingRecord) return;
+    const success = await apiUpdateRecord(editingRecord, editStatus, editNotes);
+    if (success) {
+      cancelEdit();
+    }
+  };
+
+  /**
+   * Handle opening leave request modal
+   */
+  const handleOpenLeaveRequest = (record: any): void => {
+    setLeaveRequestRecord(record);
+    setLeaveRequestOpen(true);
+  };
+
+  /**
+   * Handle closing leave request modal
+   */
+  const handleLeaveRequestClose = (): void => {
+    setLeaveRequestOpen(false);
+    setLeaveRequestRecord(null);
+  };
+
+  /**
+   * Handle successful leave request image upload
+   */
+  const handleLeaveRequestUploadSuccess = (imageUrl: string): void => {
+    // Update record in list to reflect leave request image
+    const updatedRecords = attendanceRecords.map((r: any) =>
+      r.student_id === leaveRequestRecord?.student_id
+        ? { ...r, leave_request_image: imageUrl }
+        : r
     );
-  }
+    api.setAttendanceRecords(updatedRecords);
+  };
 
   return (
     <div className="attendance-view">
@@ -124,10 +155,11 @@ export default function AttendanceView() {
       </div>
 
       {/* Statistics */}
-      <AttendanceStats stats={stats} />
+      <AttendanceStats stats={stats} loading={loading} />
 
       {/* Filters */}
       <AttendanceFilters
+        loading={loading}
         selectedDate={selectedDate}
         selectedClass={selectedClass}
         selectedStatus={selectedStatus}
@@ -140,7 +172,7 @@ export default function AttendanceView() {
         onClassChange={handleClassChange}
         onStatusChange={handleStatusChange}
         onAcademicYearChange={(year) => {
-          setSelectedAcademicYear(year);
+          handleAcademicYearChange(year);
           attendanceBootstrap({ year, date: selectedDate });
         }}
         onViewModeChange={handleViewModeChange}
@@ -156,7 +188,9 @@ export default function AttendanceView() {
 
       {/* Table */}
       <AttendanceTable
-        records={attendanceRecords}
+        records={paginatedItems}
+        totalRecords={totalRecords}
+        totalPages={totalPages}
         loading={loading}
         selectedDate={selectedDate}
         selectedClass={selectedClass}
@@ -169,12 +203,12 @@ export default function AttendanceView() {
         updating={updating}
         onEditRecord={(record) => {
           logger.debug('🖱️ Click Sửa button', { record });
-          handleEditRecord(record);
+          startEdit(record);
         }}
-        onCancelEdit={handleCancelEdit}
+        onCancelEdit={cancelEdit}
         onSaveEdit={handleSaveEdit}
-        onStatusChange={setEditStatus}
-        onNotesChange={setEditNotes}
+        onStatusChange={(status) => edit.setEditStatus(status)}
+        onNotesChange={(notes) => edit.setEditNotes(notes)}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         isEditingRecord={isEditingRecord}

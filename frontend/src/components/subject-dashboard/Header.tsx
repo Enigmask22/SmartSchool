@@ -43,7 +43,7 @@ export function Header({
           </div>
           <div className="w-full">
             <h1 className="text-3xl font-bold text-gray-800">
-              Dashboard Phân Tích Điểm Số
+              Dashboard phân tích điểm số
             </h1>
             {loading ? (
               <>

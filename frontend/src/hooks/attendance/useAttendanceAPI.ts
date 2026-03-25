@@ -1,37 +1,29 @@
-/**
- * useAttendanceData Hook
- * Manages all attendance data fetching, filtering, pagination, and state
- * 
- * Responsibilities:
- * - Bootstrap attendance data (academic years, classes, initial records)
- * - Load attendance records based on filters
- * - Load and calculate statistics
- * - Handle attendance record editing
- * - Manage pagination
- * 
- * Returns: {
- *   // Data
- *   attendanceRecords, stats, classes, academicYears, homeroomClasses,
- *   // UI States
- *   loading, bootstrapLoading, classesLoading, updating, error, successMessage,
- *   // Filters
- *   selectedDate, selectedClass, selectedStatus, selectedAcademicYear, showFullList, page, pageSize,
- *   // Edit States
- *   editingRecord, editStatus, editNotes,
- *   // Handlers
- *   handleDateChange, handleClassChange, handleStatusChange, handleViewModeChange,
- *   handleEditRecord, handleCancelEdit, handleSaveEdit, resetFilters,
- *   // Bootstrap
- *   attendanceBootstrap, loadAttendanceData, loadStats,
- *   // Setters
- *   setSelectedAcademicYear, setPage, setPageSize, setEditStatus, setEditNotes
- * }
- */
-
 import { useState, useEffect, useContext } from 'react';
 import ApiService from '@/utils/api';
 import { AuthContext } from '@/contexts/AuthContext';
 import logger from '@/utils/logger';
+
+/**
+ * useAttendanceAPI - API Data Fetching & Bootstrap Hook
+ * Manages all attendance data fetching, bootstrapping, and statistics
+ * 
+ * Responsibilities:
+ * - Bootstrap attendance data (academic years, classes, initial records)
+ * - Load attendance records based on provided filters
+ * - Load and calculate statistics
+ * - Handle loading states and errors
+ * - Provide API response data to components
+ * 
+ * Does NOT:
+ * - Manage filter state (handled by useAttendanceFilters)
+ * - Manage edit state (handled by useAttendanceEdit)
+ * - Manage pagination (handled by usePagination)
+ * - Manage modal state
+ * 
+ * Dependencies passed in:
+ * - selectedDate, selectedClass, selectedStatus, showFullList (from useAttendanceFilters)
+ * This allows the hook to recompute when filters change
+ */
 
 interface Student {
   student_id: string;
@@ -39,7 +31,7 @@ interface Student {
   class_name: string;
 }
 
-interface AttendanceRecord {
+export interface AttendanceRecord {
   id: number | null;
   student_id: string;
   status: 'present' | 'absent' | 'late';
@@ -51,7 +43,7 @@ interface AttendanceRecord {
   leave_request_image?: string;
 }
 
-interface AttendanceStats {
+export interface AttendanceStats {
   total_students: number;
   present_count: number;
   absent_count: number;
@@ -68,7 +60,84 @@ interface BootstrapData {
   stats: AttendanceStats;
 }
 
-export const useAttendanceData = () => {
+interface UseAttendanceAPIReturn {
+  // Data
+  attendanceRecords: AttendanceRecord[];
+  stats: AttendanceStats | null;
+  classes: string[];
+  homeroomClasses: Array<{ id: string; class_name: string }>;
+  academicYears: string[];
+
+  // Loading states
+  loading: boolean;
+  bootstrapLoading: boolean;
+  classesLoading: boolean;
+  updating: boolean;
+
+  // UI states
+  error: string | null;
+  successMessage: string | null;
+
+  // Handlers
+  attendanceBootstrap: (options?: {
+    year?: string;
+    date?: string;
+    className?: string;
+  }) => Promise<void>;
+  loadAttendanceData: () => Promise<void>;
+  loadStats: () => Promise<void>;
+  updateRecord: (
+    record: AttendanceRecord,
+    newStatus: string,
+    newNotes: string
+  ) => Promise<boolean>;
+
+  // Setters
+  setError: (error: string | null) => void;
+  setSuccessMessage: (msg: string | null) => void;
+  setAttendanceRecords: (records: AttendanceRecord[]) => void;
+  setStats: (stats: AttendanceStats | null) => void;
+  setSelectedAcademicYear: (year: string) => void;
+}
+
+/**
+ * useAttendanceAPI Hook
+ * 
+ * Usage:
+ * ```
+ * const {
+ *   attendanceRecords, stats, loading,
+ *   loadAttendanceData, attendanceBootstrap
+ * } = useAttendanceAPI({
+ *   selectedDate: '2024-01-15',
+ *   selectedClass: 'Class A',
+ *   selectedStatus: 'absent',
+ *   showFullList: true
+ * });
+ * 
+ * // In useEffect, trigger data load
+ * useEffect(() => {
+ *   loadAttendanceData();
+ * }, [selectedDate, selectedClass]);
+ * ```
+ */
+export const useAttendanceAPI = ({
+  selectedDate,
+  selectedClass,
+  selectedStatus,
+  showFullList,
+  pageSize = 20,
+  onRecordsUpdated,
+  onStatsUpdated,
+}: {
+  selectedDate: string;
+  selectedClass: string;
+  selectedStatus: string;
+  showFullList: boolean;
+  pageSize?: number;
+  onRecordsUpdated?: (records: AttendanceRecord[]) => void;
+  onStatsUpdated?: (stats: AttendanceStats | null) => void;
+}): UseAttendanceAPIReturn => {
   const authContext = useContext(AuthContext);
   const user = authContext?.user;
   const isHomeroomTeacher = authContext?.isHomeroomTeacher;
@@ -77,8 +146,11 @@ export const useAttendanceData = () => {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [classes, setClasses] = useState<string[]>([]);
-  const [homeroomClasses, setHomeroomClasses] = useState<Array<{ id: string; class_name: string }>>([]);
+  const [homeroomClasses, setHomeroomClasses] = useState<
+    Array<{ id: string; class_name: string }>
+  >([]);
   const [academicYears, setAcademicYears] = useState<string[]>([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
 
   // Loading states
   const [loading, setLoading] = useState(true);
@@ -90,40 +162,13 @@ export const useAttendanceData = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Filter states
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedClass, setSelectedClass] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
-  const [showFullList, setShowFullList] = useState(true);
-
-  // Pagination states
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-
-  // Edit states
-  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
-  const [editStatus, setEditStatus] = useState('');
-  const [editNotes, setEditNotes] = useState('');
-
-  // Leave request states
-  const [leaveRequestOpen, setLeaveRequestOpen] = useState(false);
-  const [leaveRequestRecord, setLeaveRequestRecord] = useState<AttendanceRecord | null>(null);
-
   // Load data on filter changes
   useEffect(() => {
     if (bootstrapLoading) return;
     loadAttendanceData();
     loadStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedDate,
-    selectedClass,
-    selectedStatus,
-    page,
-    showFullList,
-    bootstrapLoading,
-  ]);
+  }, [selectedDate, selectedClass, selectedStatus, showFullList, bootstrapLoading]);
 
   // Load bootstrap when user changes
   useEffect(() => {
@@ -143,6 +188,9 @@ export const useAttendanceData = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Bootstrap attendance data - load initial data, years, classes
+   */
   const attendanceBootstrap = async ({
     year,
     date,
@@ -173,13 +221,13 @@ export const useAttendanceData = () => {
           academic_years,
           year: resolvedYear,
           classes: cls,
-          selected_class,
           records,
           stats: bootstrapStats,
         } = data;
 
         if (Array.isArray(academic_years)) setAcademicYears(academic_years);
-        if (!selectedAcademicYear && resolvedYear) setSelectedAcademicYear(resolvedYear);
+        if (!selectedAcademicYear && resolvedYear)
+          setSelectedAcademicYear(resolvedYear);
 
         setHomeroomClasses(Array.isArray(cls) ? cls : []);
         const classNames = (cls || [])
@@ -188,21 +236,24 @@ export const useAttendanceData = () => {
           .sort();
         setClasses(classNames);
 
-        const exists =
-          selected_class?.class_name && classNames.includes(selected_class.class_name);
-        setSelectedClass(exists ? selected_class.class_name : classNames[0] || 'all');
-
         setAttendanceRecords(records || []);
         setStats(bootstrapStats || null);
+
+        onRecordsUpdated?.(records || []);
+        onStatsUpdated?.(bootstrapStats || null);
       }
     } catch (e) {
       logger.error('attendance bootstrap error', e);
+      setError('Lỗi tải dữ liệu khởi tạo');
     } finally {
       setClassesLoading(false);
       setBootstrapLoading(false);
     }
   };
 
+  /**
+   * Load attendance records based on current filters
+   */
   const loadAttendanceData = async (): Promise<void> => {
     setLoading(true);
     setAttendanceRecords([]);
@@ -225,7 +276,11 @@ export const useAttendanceData = () => {
       if (showFullList) {
         let response;
 
-        if (isHomeroomTeacher?.() && selectedClass && selectedClass !== 'all') {
+        if (
+          isHomeroomTeacher?.() &&
+          selectedClass &&
+          selectedClass !== 'all'
+        ) {
           const found = homeroomClasses.find((c) => c.class_name === selectedClass);
           const classId = found?.id;
 
@@ -249,8 +304,8 @@ export const useAttendanceData = () => {
           }
         } else {
           response = await ApiService.getFullAttendanceList(
-            selectedDate,
-            selectedClass === 'all' ? '' : selectedClass
+            selectedDate as any,
+            selectedClass === 'all' ? (null as any) : (selectedClass as any)
           );
         }
 
@@ -264,14 +319,16 @@ export const useAttendanceData = () => {
           }
 
           setAttendanceRecords(filteredData);
+          onRecordsUpdated?.(filteredData);
 
           const fullData = response.data || [];
           const calculatedStats = calculateStatsFromData(fullData);
           setStats(calculatedStats);
+          onStatsUpdated?.(calculatedStats);
         }
       } else {
         const params = {
-          page: page,
+          page: 1,
           page_size: pageSize,
           date_from: selectedDate,
           date_to: selectedDate,
@@ -279,7 +336,9 @@ export const useAttendanceData = () => {
 
         if (selectedClass && selectedClass !== 'all') {
           if (selectedDate === new Date().toISOString().split('T')[0]) {
-            const response = await ApiService.getTodayAttendance(selectedClass);
+            const response = await ApiService.getTodayAttendance(
+              selectedClass === 'all' ? (null as any) : (selectedClass as any)
+            );
             if (response.success) {
               let filteredData = response.data || [];
 
@@ -290,6 +349,7 @@ export const useAttendanceData = () => {
               }
 
               setAttendanceRecords(filteredData);
+              onRecordsUpdated?.(filteredData);
             }
           } else {
             const response = await ApiService.getAttendanceRecords(params);
@@ -310,6 +370,7 @@ export const useAttendanceData = () => {
               }
 
               setAttendanceRecords(filteredData);
+              onRecordsUpdated?.(filteredData);
             }
           }
         } else {
@@ -320,6 +381,7 @@ export const useAttendanceData = () => {
           const response = await ApiService.getAttendanceRecords(params);
           if (response.success) {
             setAttendanceRecords(response.data || []);
+            onRecordsUpdated?.(response.data || []);
           }
         }
       }
@@ -331,12 +393,16 @@ export const useAttendanceData = () => {
     }
   };
 
+  /**
+   * Load statistics for the selected date
+   */
   const loadStats = async (): Promise<void> => {
     try {
       if (!showFullList) {
-        const response = await ApiService.getAttendanceStats(selectedDate);
+        const response = await ApiService.getAttendanceStats(selectedDate as any);
         if (response.success) {
           setStats(response.data);
+          onStatsUpdated?.(response.data);
         }
       }
     } catch (error) {
@@ -344,6 +410,9 @@ export const useAttendanceData = () => {
     }
   };
 
+  /**
+   * Calculate statistics from raw attendance data
+   */
   const calculateStatsFromData = (data: AttendanceRecord[]): AttendanceStats => {
     const totalStudents = data.length;
     const presentCount = data.filter((record) => record.status === 'present').length;
@@ -362,154 +431,58 @@ export const useAttendanceData = () => {
     };
   };
 
-  const handleDateChange = (newDate: string): void => {
-    setAttendanceRecords([]);
-    setStats(null);
-    setError(null);
-    setSuccessMessage(null);
-    setPage(1);
-    setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    setSelectedDate(newDate);
-  };
-
-  const handleClassChange = (newClass: string): void => {
-    setAttendanceRecords([]);
-    setStats(null);
-    setError(null);
-    setSuccessMessage(null);
-    setPage(1);
-    setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    setSelectedClass(newClass);
-  };
-
-  const handleStatusChange = (newStatus: string): void => {
-    setAttendanceRecords([]);
-    setPage(1);
-    setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    setSelectedStatus(newStatus);
-  };
-
-  const handleViewModeChange = (showFullListMode: boolean): void => {
-    setAttendanceRecords([]);
-    setStats(null);
-    setError(null);
-    setSuccessMessage(null);
-    setPage(1);
-    setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-    setShowFullList(showFullListMode);
-  };
-
-  const getRecordKey = (record: AttendanceRecord | null): string | null => {
-    if (!record) return null;
-    return record.student_id ?? record.students?.student_id ?? null;
-  };
-
-  const isEditingRecord = (record: AttendanceRecord): boolean => {
-    if (!editingRecord || !record) return false;
-    const editingKey = getRecordKey(editingRecord);
-    const recordKey = getRecordKey(record);
-    return String(editingKey) === String(recordKey) && editingKey !== null;
-  };
-
-  const handleEditRecord = (record: AttendanceRecord): void => {
-    setEditingRecord(record);
-    setEditStatus(record.status || 'absent');
-    setEditNotes(record.notes || '');
-  };
-
-  const handleCancelEdit = (): void => {
-    setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
-  };
-
-  const handleSaveEdit = async (): Promise<void> => {
-    if (!editingRecord) return;
-
+  /**
+   * Update a single attendance record (create or update)
+   */
+  const updateRecord = async (
+    record: AttendanceRecord,
+    newStatus: string,
+    newNotes: string
+  ): Promise<boolean> => {
     setUpdating(true);
     try {
       let response;
 
-      if (editingRecord.id === null) {
+      if (record.id === null) {
         response = await ApiService.createManualAttendance({
-          student_id: editingRecord.student_id,
+          student_id: record.student_id,
           date: selectedDate,
-          status: editStatus as 'present' | 'absent' | 'late',
-          notes: editNotes,
+          status: newStatus as 'present' | 'absent' | 'late',
+          notes: (newNotes || null) as any,
           method: 'manual',
         });
       } else {
         response = await ApiService.updateAttendanceStatus(
-          editingRecord.id,
-          editStatus as 'present' | 'absent' | 'late',
-          editNotes
+          record.id,
+          newStatus as 'present' | 'absent' | 'late',
+          (newNotes || null) as any
         );
       }
 
       if (response.success) {
-        handleCancelEdit();
         setError(null);
         setSuccessMessage(
-          editingRecord.id === null
+          record.id === null
             ? 'Tạo mới điểm danh thành công!'
             : 'Cập nhật trạng thái điểm danh thành công!'
         );
         setTimeout(() => setSuccessMessage(null), 3000);
 
+        // Reload data after update
         await loadAttendanceData();
         await loadStats();
+        return true;
       } else {
         setError(response.message || 'Lỗi cập nhật trạng thái');
+        return false;
       }
     } catch (error) {
       logger.error('Error updating attendance:', error);
       setError('Không thể cập nhật trạng thái điểm danh');
+      return false;
     } finally {
       setUpdating(false);
     }
-  };
-
-  const handleOpenLeaveRequest = (record: AttendanceRecord): void => {
-    setLeaveRequestRecord(record);
-    setLeaveRequestOpen(true);
-  };
-
-  const handleLeaveRequestClose = (): void => {
-    setLeaveRequestOpen(false);
-    setLeaveRequestRecord(null);
-  };
-
-  const handleLeaveRequestUploadSuccess = (imageUrl: string): void => {
-    // Update record in list to reflect leave request image
-    setAttendanceRecords((prev) =>
-      prev.map((r) =>
-        r.student_id === leaveRequestRecord?.student_id
-          ? { ...r, leave_request_image: imageUrl }
-          : r,
-      ),
-    );
-  };
-
-  const resetFilters = (): void => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
-    setSelectedClass('all');
-    setSelectedStatus('all');
-    setPage(1);
-    setAttendanceRecords([]);
-    setStats(null);
-    setError(null);
-    setSuccessMessage(null);
-    setEditingRecord(null);
-    setEditStatus('');
-    setEditNotes('');
   };
 
   return {
@@ -530,54 +503,17 @@ export const useAttendanceData = () => {
     error,
     successMessage,
 
-    // Filter states
-    selectedDate,
-    selectedClass,
-    selectedStatus,
-    selectedAcademicYear,
-    showFullList,
-    page,
-    pageSize,
-
-    // Edit states
-    editingRecord,
-    editStatus,
-    editNotes,
-
     // Handlers
-    handleDateChange,
-    handleClassChange,
-    handleStatusChange,
-    handleViewModeChange,
-    handleEditRecord,
-    handleCancelEdit,
-    handleSaveEdit,
-    resetFilters,
-
-    // Bootstrap
     attendanceBootstrap,
     loadAttendanceData,
     loadStats,
-
-    // Leave request states
-    leaveRequestOpen,
-    leaveRequestRecord,
-
-    // Leave request handlers
-    handleOpenLeaveRequest,
-    handleLeaveRequestClose,
-    handleLeaveRequestUploadSuccess,
+    updateRecord,
 
     // Setters
+    setError,
+    setSuccessMessage,
+    setAttendanceRecords,
+    setStats,
     setSelectedAcademicYear,
-    setPage,
-    setPageSize,
-    setEditStatus,
-    setEditNotes,
-
-    // Helpers
-    isEditingRecord,
-    getRecordKey,
-    calculateStatsFromData,
   };
 };

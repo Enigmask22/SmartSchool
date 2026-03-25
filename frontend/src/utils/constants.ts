@@ -32,13 +32,12 @@ export const HOMEROOM_ROUTES = {
   ATTENDANCE: '/homeroom/attendance',
   FACES: '/homeroom/faces',
   CONTINUOUS: '/homeroom/continuous',
-  GRADES: '/homeroom/grades',
 };
 
 // ==================== SUBJECT TEACHER ROUTES ====================
 export const SUBJECT_ROUTES = {
   DASHBOARD: '/subject/dashboard',
-  GRADES: '/subject/grades',
+  GRADES: '/subject/scores',
 };
 
 // ==================== ALL ROUTES ====================

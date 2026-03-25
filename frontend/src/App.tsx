@@ -15,7 +15,7 @@ import ForgotPassword from "@/pages/auth/ForgotPassword";
 import DashboardSelector from "@/pages/auth/DashboardSelector";
 
 // Common Pages
-import PersonalInfo from "@/components/common/PersonalInfo";
+import PersonalInfo from "@/pages/profile/PersonalInfo";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -32,7 +32,7 @@ import FaceManagement from "@/pages/homeroom/FaceManagement";
 
 // Subject Teacher Pages
 import SubjectDashboard from "@/pages/subject/Dashboard";
-import SubjectGradeManagement from "@/pages/subject/GradeManagement";
+import SubjectScoreManagement from "@/pages/subject/ScoreManagement";
 
 // Protected Route Wrapper
 import ProtectedRoute from "@/components/routing/ProtectedRoute";
@@ -77,7 +77,7 @@ function App() {
               {/* Subject Teacher Routes */}
               <Route element={<ProtectedRoute roles={['teacher', 'subject_teacher']} />}>
                 <Route path={ROUTES.SUBJECT.DASHBOARD.substring(1)} element={<SubjectDashboard />} />
-                <Route path={ROUTES.SUBJECT.GRADES.substring(1)} element={<SubjectGradeManagement />} />
+                <Route path={ROUTES.SUBJECT.GRADES.substring(1)} element={<SubjectScoreManagement />} />
               </Route>
 
               {/* Fallback route */}

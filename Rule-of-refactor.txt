@@ -1,3 +1,5 @@
+## DECISION FRAMEWORK
+
 UI State (Toggles, inputs): Keep in the component.
 
 Repeated Logic (Window size, click-outside): Move to a reusable custom hook.
@@ -5,3 +7,403 @@ Repeated Logic (Window size, click-outside): Move to a reusable custom hook.
 Complex Domain Logic (Multi-step forms, heavy data formatting): Move to a dedicated custom hook.
 
 Component is too long? Break it into smaller child components, not just smaller hooks.
+
+---
+
+## CUSTOM HOOKS: When & How
+
+### When to Use Custom Hooks (vs. alternatives)
+
+**Use custom hooks if:**
+- Single hook would return 15+ items (split it) ✓
+- Logic is reusable across components ✓
+- State has distinct lifecycle/dependency patterns ✓
+- Local page state, NOT global app state ✓
+
+**DON'T use if:**
+- State only used in one place → Keep in component
+- Global state needed → Consider Context/Zustand
+- Single hook ~10 items → Keep as-is
+- State is short-lived UI toggle → Keep in component
+
+### How to Organize Multiple Hooks
+
+```
+If creating 3+ hooks, put them in a folder:
+
+✓ frontend/src/hooks/attendance/
+  ├── useAttendanceAPI.ts (API calls, data fetching)
+  ├── useAttendanceFilters.ts (filter UI state)
+  ├── useAttendanceEdit.ts (edit form state)
+  └── index.ts (export all)
+
+✗ DO NOT scatter across hooks/folder
+✗ DO NOT mix domains (attendance + grades in same hook)
+```
+
+---
+
+## LOADING STATES: Standard Pattern
+
+### The Problem
+Different loading states confusing: `loading`, `bootstrapLoading`, `classesLoading`, `updating`
+- When to show spinner?
+- What disables the UI?
+- Why multiple flags?
+- User can't interact with anything while loading
+
+### The Solution: Progressive Loading
+
+**Use this pattern for data-fetching hooks:**
+
+```typescript
+export const useAttendanceAPI = () => {
+  const [loading, setLoading] = useState(false);          // Initial load only
+  const [updating, setUpdating] = useState(false);        // Save/delete operations
+  const [error, setError] = useState<string | null>(null);
+
+  // Only show spinner if NO data yet
+  // After first load, fetch in background (no spinner)
+  const loadData = async () => {
+    if (attendanceRecords.length === 0) setLoading(true);  // Only if empty
+    try {
+      const data = await api.fetch();
+      setAttendanceRecords(data);
+    } finally {
+      setLoading(false);
+      setUpdating(false);
+    }
+  };
+
+  return {
+    attendanceRecords,
+    loading,        // true only when empty + fetching
+    updating,       // true when saving/deleting
+    error,
+    loadData,
+  };
+};
+```
+
+**Usage in component:**
+
+```typescript
+// Show PAGE-BLOCKING spinner ONLY on initial load
+if (loading && records.length === 0) {
+  return <Spinner />;
+}
+
+// For inline spinners while updating (non-blocking):
+{updating && <SmallSpinner />}
+```
+
+**Rule:**
+- ✅ Block UI only on initial load (no data yet)
+- ✅ Don't block on refetch (data exists, just updating)
+- ✅ Inline spinners for operations (save, delete)
+- ❌ Never show spinner on every filter change
+
+---
+
+### Progressive Loading: Multiple Independent Sections
+
+**When a page has multiple data-dependent sections, load them independently with skeletons:**
+
+```typescript
+// Page orchestrator
+const MyPage = () => {
+  const api = useMyAPI();
+  
+  // Show static header + skeleton sections immediately
+  return (
+    <div>
+      {/* Static header - ALWAYS visible */}
+      <Header title="My Page" />
+      
+      {/* Section 1 - Independent with skeleton */}
+      <Card>
+        {api.loading && !api.data1 ? (
+          <Skeleton />  // Shows only on initial load
+        ) : (
+          <Content data={api.data1} />
+        )}
+      </Card>
+      
+      {/* Section 2 - Independent with skeleton */}
+      <Card>
+        {api.loading && !api.data2 ? (
+          <Skeleton />  // Shows only on initial load
+        ) : (
+          <Content data={api.data2} />
+        )}
+      </Card>
+    </div>
+  );
+};
+```
+
+**User Experience Timeline:**
+
+```
+T=0ms: Page loads
+├─ Static header visible ✓
+├─ Section 1 skeleton ▓▓▓
+└─ Section 2 skeleton ▓▓▓
+
+T=100-500ms: First API calls complete
+├─ Header still visible ✓
+├─ Section 1 data arrives → shows content ✓
+└─ Section 2 skeleton ▓▓▓ (still loading)
+
+T=500-1000ms: Second API calls complete
+├─ Header still visible ✓
+├─ Section 1 data visible ✓
+└─ Section 2 data arrives → shows content ✓
+
+T=1000+: User can interact immediately
+└─ No waiting for entire page to load
+```
+
+**Key Rules:**
+- ✅ Show static parts immediately (no loading state needed)
+- ✅ Each section has own skeleton (loading && !data)
+- ✅ No page-blocking spinner
+- ✅ User can interact with available sections while others load
+- ✅ Sections load independently (one slow API doesn't block others)
+- ❌ Never show spinner for entire page just to load one section
+- ❌ Never wait for all data before showing anything
+
+---
+
+### Component Independence in Multi-Section Pages
+
+**Break large pages into smaller components that each manage their own loading:**
+
+```
+Structure: ✓ GOOD
+
+MyPage (orchestrator - lightweight)
+├─ PersonalInfoSection (independent)
+│  ├─ Manages: loading state, edit state
+│  └─ Fetches: personal data only
+├─ PasswordSection (independent)
+│  ├─ Manages: form state, update loading
+│  └─ Fetches: nothing (just API call)
+└─ TeachingInfoSection (independent)
+   ├─ Manages: loading state
+   └─ Fetches: teaching data only
+
+Structure: ✗ BAD
+
+MyPage (mega-component)
+├─ Manages: 30 state variables
+├─ 3 different API hooks
+├─ All loading states mixed
+└─ Data for all sections in one monster component
+```
+
+**Component Responsibility Rules:**
+- Each section component receives only the data it needs
+- Each section shows its own skeleton while loading
+- Each section manages its own update operations
+- Parent only orchestrates and passes callbacks
+- No prop drilling below 2 levels
+- If drilling 3+ levels, extract a wrapper component
+
+---
+
+### Skeleton Components Pattern
+
+**Create reusable skeletons for consistent loading UX:**
+
+```typescript
+// ✓ Reusable skeleton matching content structure
+export const PersonalInfoSkeleton = () => (
+  <div className="space-y-4">
+    {[1, 2, 3].map(i => (
+      <div key={i} className="space-y-2">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    ))}
+  </div>
+);
+
+// Usage in component
+{loading && !data ? <PersonalInfoSkeleton /> : <Content data={data} />}
+```
+
+**Skeleton Rules:**
+- ✅ Match the shape of actual content
+- ✅ Use same spacing/layout as real content
+- ✅ Show only on initial load (loading && !data)
+- ✅ Reusable across multiple components
+- ❌ Don't show skeleton on refetch (user already has data)
+- ❌ Don't over-animate (distracting)
+
+---
+
+## DOCUMENTATION: Minimize It
+
+### What to Document
+
+**Document ONLY:**
+1. Hook return items (TypeScript interface is enough)
+2. External dependencies (API, auth context)
+3. Side effects (re-fetches on X change)
+4. Prerequisites (must be wrapped in Provider?)
+
+### What NOT to Document
+
+**Skip these (self-explanatory via code):**
+- Implementation details ("first we call API then...")
+- Variable names (names should be clear)
+- Handler logic (read the code)
+- Step-by-step walkthroughs
+
+### Example: What to Write
+
+```typescript
+/**
+ * Fetches attendance data and bootstraps classes/academic years.
+ * 
+ * Dependencies:
+ * - authContext.currentUser (for school filtering)
+ * - API endpoints: /attendance, /classes, /academic-years
+ * 
+ * Auto-refetch on:
+ * - selectedDate changes
+ * - selectedClass changes
+ * 
+ * Returns: See UseAttendanceAPIReturn interface
+ */
+export const useAttendanceAPI = () => { ... }
+```
+
+### What NOT to Write
+
+```typescript
+// ❌ DON'T DO THIS:
+/**
+ * This hook manages attendance data state. It has several functions:
+ * 1. First we initialize the state variables
+ * 2. Then we set up the effect for bootstrapping
+ * 3. We load the attendance records from the API
+ * 4. We transform the data into the format we need
+ * ... 50 more lines of obvious step-by-step
+ */
+```
+
+---
+
+## PROPS & HOOK DISTRIBUTION: Decision Matrix
+
+### When to Pass Props vs. Use Hook Directly
+
+| Situation | Approach | Example |
+|-----------|----------|---------|
+| Child uses **same hook** data | Pass values as props | `<StatsCard stats={api.stats} />` |
+| Child needs **own hook instance** | No props, use hook | `<Table>` calls `usePagination()` directly |
+| Data from **parent's hook** to child | Pass the value | `<FilterToggle value={filters.selectedDate} />` |
+| Multiple levels deep | STOP—break into smaller components | Instead of 3-level drilling, extract a wrapper component |
+
+### Red Flag: Too Much Prop Drilling?
+
+```
+If you're passing 15+ props through 2+ levels: ❌
+
+AttendanceView
+  ├─ AttendanceTable (pass 15 props)
+  │  └─ AttendanceTableRow (pass 12 more props)
+
+Solution:
+AttendanceView
+  ├─ AttendanceTable (pass 3-5 props)
+  │  └─ AttendanceTableRow (uses useAttendanceEdit directly)
+```
+
+---
+
+## FILE CREATION: Be Minimal
+
+### Create a file ONLY if:
+
+1. **Hook is reused** (like `usePagination`) → File
+2. **Logic is 100+ lines** → File
+3. **Logic is complex** (hard to understand inline) → File
+
+### DON'T create a file for:
+
+- ❌ Simple 3-5 line useState wrapper
+- ❌ One-off event handler
+- ❌ UI toggle logic (keep in component)
+- ❌ Quick calculation (keep inline with comment)
+
+### Example: When NOT to Extract
+
+```typescript
+// ❌ DON'T extract this to a hook:
+const useActiveTab = () => {
+  const [active, setActive] = useState('details');
+  return { active, setActive };
+};
+
+// ✅ Keep it simple:
+const [activeTab, setActiveTab] = useState('details');
+```
+
+### Example: When TO Extract
+
+```typescript
+// ✅ Extract this (complex, reusable, 100+ lines):
+const usePagination = <T,>(items: T[], pageSize: number) => {
+  const [page, setPage] = useState(1);
+  // ... 20 lines of calculation
+  // ... 15 lines of handlers
+  return { page, totalPages, paginatedItems, setPage };
+};
+```
+
+---
+
+## ANALYSIS DOCUMENTS: Don't Over-Document
+
+### Document Creation Decision
+
+**Create analysis IF:**
+- Refactoring is 3+ days of work
+- Multiple files affected
+- Team needs to understand architecture
+- Future developers will need reference
+
+**DON'T create IF:**
+- Simple, obvious change
+- One file, one hook
+- Under 4 hours of work
+
+### Keep It Short
+
+**Good analysis:**
+- What's wrong (1 section)
+- What splits it into (1 diagram)
+- Implementation checklist (1 section)
+- Before/after comparison (1 section)
+
+**Don't include:**
+- Step-by-step code walk-throughs
+- Every alternative considered
+- Implementation details
+- Line-by-line analysis
+
+---
+
+## CHECKLIST: Before Shipping Refactored Code
+
+- [ ] Each hook returns ≤15 items (or 2 hooks closer to 10)
+- [ ] Each hook has single responsibility
+- [ ] Prop drilling ≤2 levels deep
+- [ ] Loading states: only `loading` + `updating`
+- [ ] No unused props/state
+- [ ] TypeScript strict mode passes
+- [ ] Unit tests per hook (NOT just integration)
+- [ ] Reusable utilities (like `usePagination`) in shared folder

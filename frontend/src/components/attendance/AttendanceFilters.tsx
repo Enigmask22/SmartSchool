@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 
 interface AttendanceFiltersProps {
+  loading?: boolean;
   selectedDate: string;
   selectedClass: string;
   selectedStatus: string;
@@ -35,6 +36,7 @@ interface AttendanceFiltersProps {
 }
 
 const AttendanceFilters = ({
+  loading,
   selectedDate,
   selectedClass,
   selectedStatus,
@@ -78,84 +80,109 @@ const AttendanceFilters = ({
           {isHomeroomTeacher?.() && (
             <div className="flex-1 max-w-[200px]">
               <label className="block mb-2 text-sm font-medium">Năm học</label>
-              <Select
-                value={selectedAcademicYear || ''}
-                onValueChange={onAcademicYearChange}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn năm học" />
-                </SelectTrigger>
-                <SelectContent>
-                  {academicYears.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {loading ? (
+                <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+              ) : (
+                <Select
+                  value={selectedAcademicYear || ''}
+                  onValueChange={onAcademicYearChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn năm học" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
 
           <div className="flex-1 max-w-[160px]">
             <label className="block mb-2 text-sm font-medium">Ngày</label>
-            <SimpleDatePicker
-              value={selectedDate}
-              onChange={onDateChange}
-              placeholder="Chọn ngày"
-              className="w-full"
-            />
+            {loading ? (
+              <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+            ) : (
+              <SimpleDatePicker
+                value={selectedDate}
+                onChange={onDateChange}
+                placeholder="Chọn ngày"
+                className="w-full"
+              />
+            )}
           </div>
 
           <div className="flex-1 max-w-[200px]">
             <label className="block mb-2 text-sm font-medium">Lớp</label>
-            <Select value={selectedClass} onValueChange={onClassChange} disabled={classesLoading}>
-              <SelectTrigger className="w-full flex items-center justify-between">
-                <SelectValue
-                  placeholder={
-                    classesLoading
-                      ? 'Đang tải lớp…'
-                      : isHomeroomTeacher?.()
-                      ? 'Chọn lớp chủ nhiệm'
-                      : 'Tất cả lớp'
-                  }
-                />
-                {classesLoading && (
-                  <span className="ml-2 inline-block w-3 h-3 border-2 border-transparent border-b-muted-foreground rounded-full animate-spin" />
-                )}
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  {isHomeroomTeacher?.() ? 'Chọn lớp chủ nhiệm' : 'Tất cả lớp'}
-                </SelectItem>
-                {classes.map((className) => (
-                  <SelectItem key={className} value={className}>
-                    {className}
+            {loading ? (
+              <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+            ) : (
+              <Select value={selectedClass} onValueChange={onClassChange} disabled={classesLoading}>
+                <SelectTrigger className="w-full flex items-center justify-between">
+                  <SelectValue
+                    placeholder={
+                      classesLoading
+                        ? 'Đang tải lớp…'
+                        : isHomeroomTeacher?.()
+                        ? 'Chọn lớp chủ nhiệm'
+                        : 'Tất cả lớp'
+                    }
+                  />
+                  {classesLoading && (
+                    <span className="ml-2 inline-block w-3 h-3 border-2 border-transparent border-b-muted-foreground rounded-full animate-spin" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {isHomeroomTeacher?.() ? 'Chọn lớp chủ nhiệm' : 'Tất cả lớp'}
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  {classes.map((className) => (
+                    <SelectItem key={className} value={className}>
+                      {className}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="flex-1 max-w-[200px]">
             <label className="block mb-2 text-sm font-medium">Trạng thái</label>
-            <Select value={selectedStatus} onValueChange={onStatusChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Tất cả trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="present">Có mặt</SelectItem>
-                <SelectItem value="absent">Vắng mặt</SelectItem>
-                <SelectItem value="late">Muộn</SelectItem>
-              </SelectContent>
-            </Select>
+            {loading ? (
+              <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+            ) : (
+              <Select value={selectedStatus} onValueChange={onStatusChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Tất cả trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="present">Có mặt</SelectItem>
+                  <SelectItem value="absent">Vắng mặt</SelectItem>
+                  <SelectItem value="late">Muộn</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onResetClick}>
-              Đặt lại
-            </Button>
-            <Button onClick={onSearchClick}>Tìm kiếm</Button>
+            {loading ? (
+              <>
+                <div className="w-20 h-10 bg-muted rounded-md animate-pulse" />
+                <div className="w-24 h-10 bg-muted rounded-md animate-pulse" />
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={onResetClick}>
+                  Đặt lại
+                </Button>
+                <Button onClick={onSearchClick}>Tìm kiếm</Button>
+              </>
+            )}
           </div>
         </div>
       </CardContent>
