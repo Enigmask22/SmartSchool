@@ -96,12 +96,12 @@ export interface ImportedGradeRow {
 }
 
 /**
- * useGradeManagement Hook
+ * useScoreManagement Hook
  * Manages all grade management state and logic
  *
  * Returns all necessary state, handlers, and helper functions
  */
-export const useGradeManagement = () => {
+export const useScoreManagement = () => {
   const authContext = useContext(AuthContext);
   const user = authContext?.user;
   const {

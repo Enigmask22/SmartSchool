@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Student } from '@/hooks/useFaceManagement';
+import { Student } from '@/hooks/face-management/useFaceManagement';
 
 interface StudentsTableProps {
   students: Student[];

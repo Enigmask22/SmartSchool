@@ -20,10 +20,12 @@ import type { TeacherPerformanceData } from "@/hooks/admin-dashboard/useAdminDas
 
 interface TeacherPerformanceTabProps {
   teacherPerformance: TeacherPerformanceData[];
+  loading?: boolean;
 }
 
 export function TeacherPerformanceTab({
   teacherPerformance,
+  loading = false,
 }: TeacherPerformanceTabProps) {
   return (
     <Card>
@@ -37,7 +39,32 @@ export function TeacherPerformanceTab({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {teacherPerformance.length > 0 ? (
+        {loading ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Giáo Viên</TableHead>
+                <TableHead>Mã GV</TableHead>
+                <TableHead>Số Lớp</TableHead>
+                <TableHead>Tổng Học Sinh</TableHead>
+                <TableHead>Tỷ Lệ Điểm Danh</TableHead>
+                <TableHead>Ghi Chú</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i}>
+                  <TableCell><div className="h-4 w-24 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-16 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-32 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-16 rounded bg-muted animate-pulse"></div></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : teacherPerformance.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>

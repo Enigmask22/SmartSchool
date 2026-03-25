@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AIStatus } from '@/hooks/useFaceManagement';
+import { AIStatus } from '@/hooks/face-management/useFaceManagement';
 
 interface AIStatusCardProps {
   aiStatus: AIStatus | null;

@@ -122,14 +122,12 @@ const Sidebar = ({
   // Menu items based on selected dashboard type (ưu tiên selectedDashboardType hơn role functions)
   const getMenuItems = () => {
     const baseItems = [
-      { label: "Trang chủ", icon: "dashboard", route: HOMEROOM_ROUTES.DASHBOARD },
-      { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
+      { label: "Tổng quan", icon: "dashboard", route: HOMEROOM_ROUTES.DASHBOARD },
     ];
 
     if (isAdmin()) {
       return [
-        { label: "Dashboard Thống Kê", icon: "dashboard", route: ADMIN_ROUTES.DASHBOARD },
-        { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
+        { label: "Tổng quan", icon: "dashboard", route: ADMIN_ROUTES.DASHBOARD },
         { label: "Điểm danh tự động", icon: "continuous", route: ADMIN_ROUTES.CONTINUOUS },
         { label: "Quản lý học sinh", icon: "class-management", route: ADMIN_ROUTES.CLASSES },
         { label: "Quản lý hệ thống", icon: "admin-management", route: ADMIN_ROUTES.MANAGEMENT },
@@ -145,8 +143,7 @@ const Sidebar = ({
     } else if (selectedDashboardType === "subject") {
       // Dashboard bộ môn - chỉ hiển thị menu bộ môn
       return [
-        { label: "Dashboard Phân Tích", icon: "dashboard", route: SUBJECT_ROUTES.DASHBOARD },
-        { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
+        { label: "Tổng quan", icon: "dashboard", route: SUBJECT_ROUTES.DASHBOARD },
         { label: "Quản lý điểm", icon: "grades", route: SUBJECT_ROUTES.GRADES },
       ];
     } else {
@@ -162,7 +159,6 @@ const Sidebar = ({
       } else if (isSubjectTeacher()) {
         return [
           { label: "Dashboard Phân Tích", icon: "dashboard", route: SUBJECT_ROUTES.DASHBOARD },
-          { label: "Thông tin cá nhân", icon: "personal-info", route: COMMON_ROUTES.PROFILE },
           { label: "Quản lý điểm", icon: "grades", route: SUBJECT_ROUTES.GRADES },
         ];
       } else {
@@ -212,7 +208,7 @@ const Sidebar = ({
       {/* Sidebar */}
       <Card
         className={`
-        fixed top-0 left-0 h-full bg-white shadow-xl z-50 transition-all duration-300 ease-in-out border-0 rounded-none
+        fixed top-0 left-0 h-full bg-white shadow-xl z-50 transition-all duration-300 ease-in-out border-0 rounded-none flex flex-col
         ${isOpen ? "w-64" : "w-16"}
         ${!isOpen ? "-translate-x-full lg:translate-x-0" : "translate-x-0"}
       `}
@@ -241,38 +237,42 @@ const Sidebar = ({
 
         {/* User Info */}
         {user && (
-          <div
-            className={`p-4 border-b border-gray-200 bg-blue-50 ${
+          <button
+            onClick={() => navigate(COMMON_ROUTES.PROFILE)}
+            className={`w-full p-4 border-b border-gray-200 bg-blue-50 hover:bg-blue-100 transition-colors ${
               !isOpen && "px-2"
             }`}
           >
             {isOpen ? (
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-900 truncate">
-                  {user.full_name}
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-2 flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {user.full_name}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {user.role === "admin"
+                      ? "Quản trị viên"
+                      : selectedDashboardType === "homeroom"
+                      ? "Giáo viên chủ nhiệm"
+                      : selectedDashboardType === "subject"
+                      ? "Giáo viên bộ môn"
+                      : user.role === "homeroom_teacher"
+                      ? "Giáo viên chủ nhiệm"
+                      : user.role === "teacher"
+                      ? "Giáo viên bộ môn"
+                      : "Nhân viên"}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {user.role === "admin"
-                    ? "Quản trị viên"
-                    : selectedDashboardType === "homeroom"
-                    ? "Giáo viên chủ nhiệm"
-                    : selectedDashboardType === "subject"
-                    ? "Giáo viên bộ môn"
-                    : user.role === "homeroom_teacher"
-                    ? "Giáo viên chủ nhiệm"
-                    : user.role === "teacher"
-                    ? "Giáo viên bộ môn"
-                    : "Nhân viên"}
+                <div className="flex-shrink-0">
+                  <UserCircle className="w-10 h-10 text-blue-600" />
                 </div>
               </div>
             ) : (
               <div className="flex justify-center">
-                <div className="flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-blue-600 rounded-full">
-                  {user.full_name.charAt(0).toUpperCase()}
-                </div>
+                <UserCircle className="w-10 h-10 text-blue-600" />
               </div>
             )}
-          </div>
+          </button>
         )}
 
         {/* Navigation */}
@@ -300,10 +300,13 @@ const Sidebar = ({
             </Button>
             );
           })}
+        </nav>
 
+        {/* Bottom Section - Switch & Logout */}
+        <div className="mt-auto">
           {/* Dashboard Switch Button - Only show if user has both roles AND not admin */}
           {hasBothRoles && onDashboardSwitch && !isAdmin() && (
-            <div className="pt-4 mt-4 border-t border-gray-200">
+            <div className="p-4 border-t border-gray-200">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -313,7 +316,7 @@ const Sidebar = ({
                   }
                 }}
                 className={`
-                  w-full justify-start h-10 px-3 text-sm font-medium
+                  w-full justify-start h-10 px-2 text-sm font-medium
                   bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-800
                   ${!isOpen && "justify-center px-2"}
                 `}
@@ -330,10 +333,9 @@ const Sidebar = ({
               </Button>
             </div>
           )}
-        </nav>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-gray-200">
+          {/* Logout */}
+          <div className="p-4 border-t border-gray-200">
           <Button
             variant="ghost"
             onClick={handleLogout}
@@ -346,6 +348,7 @@ const Sidebar = ({
             {getIcon("logout")}
             {isOpen && <span className="ml-3">Đăng xuất</span>}
           </Button>
+          </div>
         </div>
       </Card>
 

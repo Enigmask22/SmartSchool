@@ -19,24 +19,53 @@ import type { ClassPerformanceData } from "@/hooks/admin-dashboard/useAdminDashb
 
 interface ClassPerformanceTabProps {
   classPerformance: ClassPerformanceData[];
+  loading?: boolean;
 }
 
 export function ClassPerformanceTab({
   classPerformance,
+  loading = false,
 }: ClassPerformanceTabProps) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Award className="w-5 h-5" />
-          <span>Hiệu Suất Học Tập Theo Lớp</span>
+          <span>Hiệu suất học tập theo lớp</span>
         </CardTitle>
         <CardDescription>
           Xếp hạng lớp học theo điểm trung bình
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {classPerformance.length > 0 ? (
+        {loading ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Lớp</TableHead>
+                <TableHead>Số Học Sinh</TableHead>
+                <TableHead>Điểm TB</TableHead>
+                <TableHead>Xuất Sắc</TableHead>
+                <TableHead>Khá</TableHead>
+                <TableHead>Trung Bình</TableHead>
+                <TableHead>Yếu</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i}>
+                  <TableCell><div className="h-4 w-20 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-16 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : classPerformance.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>

@@ -1,16 +1,17 @@
 /**
  * useAdminDashboard.ts - Admin Dashboard Hook
  * 
- * Extracted from AdminDashboard.jsx:
- * - State management for overview, trends, performance data
+ * Domain logic for admin dashboard:
+ * - State management for dashboard data (overview, trends, performance, health)
  * - API data fetching
- * - Period filtering (7, 30, 90 days)
  * - Refresh functionality
+ * - Uses usePeriodFilter for period management (reusable logic)
  */
 
 import { useState, useCallback, useEffect } from 'react';
 // import ApiService from '@/utils/api';
 import logger from '@/utils/logger';
+import { usePeriodFilter } from '../usePeriodFilter';
 
 /**
  * Overview Data Structure
@@ -103,9 +104,12 @@ export interface UseAdminDashboardReturn {
  * - System health status
  */
 export const useAdminDashboard = (): UseAdminDashboardReturn => {
+  // Period filtering - using reusable hook
+  const { selectedPeriod, handlePeriodChange } = usePeriodFilter('30');
+
+  // Data state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState('30');
   const [overview, setOverview] = useState<AdminOverviewData | null>(null);
   const [attendanceTrends, setAttendanceTrends] = useState<AttendanceTrend[]>([]);
   const [classPerformance, setClassPerformance] = useState<ClassPerformanceData[]>([]);
@@ -134,13 +138,6 @@ export const useAdminDashboard = (): UseAdminDashboardReturn => {
       setLoading(false);
     }
   }, [selectedPeriod]);
-
-  /**
-   * Handle period selection change
-   */
-  const handlePeriodChange = useCallback((period: string) => {
-    setSelectedPeriod(period);
-  }, []);
 
   /**
    * Refresh dashboard data

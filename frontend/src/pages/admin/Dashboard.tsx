@@ -9,8 +9,10 @@ import {
   TeacherPerformanceTab,
 } from "@/components/admin-dashboard";
 import { useAdminDashboard } from "@/hooks/admin-dashboard/useAdminDashboard";
+import { useTabState } from "@/hooks/useTabState";
 
 export default function AdminDashboard() {
+  // Domain logic hook
   const {
     loading,
     refreshing,
@@ -24,9 +26,8 @@ export default function AdminDashboard() {
     handleRefresh,
   } = useAdminDashboard();
 
-  if (loading) {
-    return null;
-  }
+  // UI state hook
+  const { activeTab, handleTabChange } = useTabState('attendance');
 
   return (
     <div className="space-y-6 p-6 min-h-screen bg-gray-50">
@@ -39,13 +40,13 @@ export default function AdminDashboard() {
       />
 
       {/* Overview Cards */}
-      <OverviewCards overview={overview} />
+      <OverviewCards overview={overview} loading={loading} />
 
       {/* System Health */}
-      <SystemHealth systemHealth={systemHealth} />
+      <SystemHealth systemHealth={systemHealth} loading={loading} />
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="attendance" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
           <TabsTrigger value="attendance">Điểm Danh</TabsTrigger>
           <TabsTrigger value="performance">Hiệu Suất Lớp</TabsTrigger>
@@ -57,17 +58,18 @@ export default function AdminDashboard() {
           <AttendanceTrendsTab
             attendanceTrends={attendanceTrends}
             selectedPeriod={selectedPeriod}
+            loading={loading}
           />
         </TabsContent>
 
         {/* Class Performance */}
         <TabsContent value="performance" className="space-y-4">
-          <ClassPerformanceTab classPerformance={classPerformance} />
+          <ClassPerformanceTab classPerformance={classPerformance} loading={loading} />
         </TabsContent>
 
         {/* Teacher Performance */}
         <TabsContent value="teachers" className="space-y-4">
-          <TeacherPerformanceTab teacherPerformance={teacherPerformance} />
+          <TeacherPerformanceTab teacherPerformance={teacherPerformance} loading={loading} />
         </TabsContent>
       </Tabs>
     </div>
