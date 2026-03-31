@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 import { ROUTES } from "@/utils/constants";
+import { Toaster } from "@/components/ui/sonner";
 
 // Context
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -85,6 +86,7 @@ function App() {
             </Route>
           </Routes>
         </SystemSettingsProvider>
+        <Toaster/>
       </AuthProvider>
     </BrowserRouter>
   );

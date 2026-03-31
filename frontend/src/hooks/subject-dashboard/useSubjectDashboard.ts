@@ -34,7 +34,8 @@ export interface ClassItem {
 export interface AnalyticsData {
   total_classes: number;
   total_students: number;
-  students_with_grades: number;
+  students_with_scores: number;
+  students_without_scores: number;
   is_letter_grade_subject: boolean;
   subjects: string[];
   overview: {

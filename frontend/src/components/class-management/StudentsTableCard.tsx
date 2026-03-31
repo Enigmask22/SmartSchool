@@ -36,7 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { StudentData } from '@/hooks/useClassManagement';
+import { StudentData } from '@/hooks/class-management/useClassManagement';
 
 interface StudentsTableCardProps {
   selectedClassForManagement: string | null;

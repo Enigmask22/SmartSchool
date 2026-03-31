@@ -1,4 +1,3 @@
-export { SubjectDashboard } from './SubjectDashboard';
 export { Header } from './Header';
 export { StatsCards } from './StatsCards';
 export { ClassFilter } from './ClassFilter';

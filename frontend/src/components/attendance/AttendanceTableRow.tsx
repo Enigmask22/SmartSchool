@@ -50,24 +50,24 @@ const getStatusBadge = (status: string) => {
   const statusConfig: Record<string, { variant: string; className: string; label: string }> = {
     present: {
       variant: 'default',
-      className: 'bg-green-100 text-green-800',
+      className: 'bg-green-100 text-green-800 whitespace-nowrap',
       label: 'Có mặt',
     },
     absent: {
       variant: 'destructive',
-      className: '',
+      className: 'whitespace-nowrap',
       label: 'Vắng mặt',
     },
     late: {
       variant: 'secondary',
-      className: 'bg-yellow-100 text-yellow-800',
+      className: 'bg-yellow-100 text-yellow-800 whitespace-nowrap',
       label: 'Muộn',
     },
   };
 
   const config = statusConfig[status] || {
     variant: 'outline',
-    className: '',
+    className: 'whitespace-nowrap',
     label: status,
   };
 

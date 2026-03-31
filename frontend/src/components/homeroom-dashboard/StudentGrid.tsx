@@ -7,9 +7,7 @@ import type { StudentData, HomeroomInfo } from '@/hooks/homeroom-dashboard/useHo
 
 interface StudentGridProps {
   homeroomInfo: HomeroomInfo | null;
-  students: StudentData[];
   currentPage: number;
-  studentsPerPage?: number;
   currentStudents: StudentData[];
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -27,7 +25,7 @@ export function StudentGrid({
   loading = false,
 }: StudentGridProps) {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -43,7 +41,7 @@ export function StudentGrid({
       <CardContent>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {loading
-            ? [...Array(6)].map((_, idx) => (
+            ? [...Array(12)].map((_, idx) => (
                 <Card key={idx}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">

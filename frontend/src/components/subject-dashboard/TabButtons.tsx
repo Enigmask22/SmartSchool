@@ -14,7 +14,7 @@ interface TabButtonsProps {
 
 export function TabButtons({ selectedTab, onTabChange }: TabButtonsProps) {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardContent className="p-2">
         <div className="flex flex-wrap gap-2">
           <Button

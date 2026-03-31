@@ -1,11 +1,7 @@
 // React already imported by JSX transform
-import { GraduationCap, Calendar, BookOpen } from 'lucide-react';
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { BookOpen, Calendar} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -13,94 +9,116 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/common/PageHeader';
+import { PageHeaderControls } from '@/components/common/PageHeader/PageHeaderControls';
 
 interface ScoreManagementHeaderProps {
-  teacherName: string;
   academicYear: string;
   semester: string;
   ACADEMIC_YEARS: string[];
   SEMESTERS: string[];
   onAcademicYearChange: (year: string) => void;
   onSemesterChange: (sem: string) => void;
+  loading?: boolean;
 }
 
 const ScoreManagementHeader = ({
-  teacherName,
   academicYear,
   semester,
   ACADEMIC_YEARS,
   SEMESTERS,
   onAcademicYearChange,
   onSemesterChange,
+  loading = false,
 }: ScoreManagementHeaderProps) => {
+  const description = (
+    <div className="space-y-2">
+      <div className="flex items-center space-x-3 text-sm flex-wrap gap-2">
+        <Badge variant="secondary" className="text-blue-700 bg-blue-100">
+          <Calendar className="w-3 h-3 mr-1" />
+          {academicYear}
+        </Badge>
+        <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+          <BookOpen className="w-3 h-3 mr-1" />
+          {semester}
+        </Badge>
+        {/* {subjects && subjects.length > 0 && (
+          <Badge variant="secondary" className="text-blue-700 bg-blue-100">
+            <BookOpen className="w-3 h-3 mr-1" />
+            {subjects.join(', ')}
+          </Badge>
+        )} */}
+      </div>
+    </div>
+  );
+
   return (
-    <Card className="border-l-4 border-l-primary">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center justify-center rounded-lg w-14 h-14 bg-primary/10">
-            <GraduationCap className="w-8 h-8 text-primary" />
+    <PageHeader
+      title="Quản lý điểm số"
+      description={description}
+      icon={
+        <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
+          <BookOpen className="w-8 h-8 text-white" />
+        </div>
+      }
+    >
+      {loading ? (
+        // Loading state: Labels visible + skeleton Selects  
+        <div className="flex gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">
+              Năm học
+            </label>
+            <Skeleton className="h-10 w-[140px]" />
           </div>
-          <div className="ml-3">
-            <CardTitle className="text-2xl font-bold">
-              Quản lý điểm số
-            </CardTitle>
-            <CardDescription className="text-lg">
-              Chào mừng {teacherName}
-            </CardDescription>
-            <div className="flex items-center mt-2 space-x-3">
-              <Badge variant="secondary" className="text-sm">
-                <Calendar className="w-3 h-3 mr-1" />
-                {academicYear}
-              </Badge>
-              <Badge variant="secondary" className="text-sm">
-                <BookOpen className="w-3 h-3 mr-1" />
-                {semester}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Period Filters */}
-          <div className="flex gap-3 ml-auto">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-gray-500">
-                Năm học
-              </label>
-              <Select value={academicYear} onValueChange={onAcademicYearChange}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Chọn năm học" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACADEMIC_YEARS.map((year) => (
-                    <SelectItem key={year} value={year}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-gray-500">
-                Học kỳ
-              </label>
-              <Select value={semester} onValueChange={onSemesterChange}>
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue placeholder="Chọn HK" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SEMESTERS.map((sem) => (
-                    <SelectItem key={sem} value={sem}>
-                      {sem}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">
+              Học kỳ
+            </label>
+            <Skeleton className="h-10 w-[100px]" />
           </div>
         </div>
-      </CardHeader>
-    </Card>
+      ) : (
+        // Normal state: Actual Selects
+        <PageHeaderControls spacing="md">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">
+              Năm học
+            </label>
+            <Select value={academicYear} onValueChange={onAcademicYearChange}>
+              <SelectTrigger className="w-[140px] focus-visible:outline-none">
+                <SelectValue placeholder="Chọn năm học" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACADEMIC_YEARS.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">
+              Học kỳ
+            </label>
+            <Select value={semester} onValueChange={onSemesterChange}>
+              <SelectTrigger className="w-[100px] focus-visible:outline-none">
+                <SelectValue placeholder="Chọn HK" />
+              </SelectTrigger>
+              <SelectContent>
+                {SEMESTERS.map((sem) => (
+                  <SelectItem key={sem} value={sem}>
+                    {sem}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </PageHeaderControls>
+      )}
+    </PageHeader>
   );
 };
 

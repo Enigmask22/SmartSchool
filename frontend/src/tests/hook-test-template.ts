@@ -9,8 +9,8 @@
  * 4. Run: npm run test -- src/hooks/__tests__/[HookName].test.ts
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { describe, it, vi, beforeEach, afterEach } from 'vitest';
+// import { renderHook, act, waitFor } from '@testing-library/react';
 // import { useYourHook } from '../useYourHook';
 
 /**

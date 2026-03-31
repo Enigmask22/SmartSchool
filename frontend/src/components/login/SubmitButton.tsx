@@ -2,7 +2,7 @@
  * SubmitButton - Login submit button with loading state
  */
 import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button.tsx';
+import { Button } from '@/components/ui/button';
 
 interface SubmitButtonProps {
   loading: boolean;

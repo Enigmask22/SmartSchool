@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
@@ -46,21 +46,76 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-const CameraManagement = () => {
-  const [cameras, setCameras] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [editingCamera, setEditingCamera] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [confirmState, setConfirmState] = useState({ open: false });
+interface Camera {
+  camera_id: string;
+  name: string;
+  source: string;
+  location: string;
+  description?: string;
+  enabled: boolean;
+  fps: number;
+  width?: string | null;
+  height?: string | null;
+  username?: string | null;
+  password?: string | null;
+  status?: string;
+  frame_count?: number;
+}
 
-  const openConfirm = useCallback((config) =>
+interface FormData {
+  name: string;
+  source: string;
+  location: string;
+  description: string;
+  enabled: boolean;
+  fps: number | string;
+  width: string;
+  height: string;
+  username: string;
+  password: string;
+}
+
+interface ConfirmState {
+  open: boolean;
+  title?: string;
+  description?: string;
+  onConfirm?: () => void;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  confirmText?: string;
+  cancelText?: string;
+}
+
+interface ApiError {
+  message?: string;
+  response?: {
+    data?: {
+      detail?: string;
+      message?: string;
+    };
+  };
+}
+
+interface UrlValidation {
+  valid: boolean;
+  fixedUrl?: string;
+  error?: string;
+}
+
+const CameraManagement = () => {
+  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false });
+
+  const openConfirm = useCallback((config: Partial<ConfirmState>) =>
     setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
 
   const closeConfirm = useCallback(() =>
     setConfirmState((prev) => ({ ...prev, open: false })), []);
   const [searchTerm, setSearchTerm] = useState("");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: "",
     source: "",
     location: "",
@@ -104,9 +159,10 @@ const CameraManagement = () => {
     } catch (err) {
       logger.error("Error loading cameras:", err);
       console.error("Full error when loading cameras:", err);
+      const apiError = err as ApiError;
       const errorMessage =
-        err.message ||
-        err.response?.data?.detail ||
+        apiError?.message ||
+        apiError?.response?.data?.detail ||
         "Không thể tải danh sách camera";
       setError(errorMessage);
       setCameras([]);
@@ -132,7 +188,7 @@ const CameraManagement = () => {
     setShowAddForm(true);
   };
 
-  const handleEdit = (camera) => {
+  const handleEdit = (camera: Camera) => {
     setFormData({
       name: camera.name || "",
       source: camera.source || "",
@@ -140,8 +196,8 @@ const CameraManagement = () => {
       description: camera.description || "",
       enabled: camera.enabled ?? true,
       fps: camera.fps || 60,
-      width: camera.width || "",
-      height: camera.height || "",
+      width: (camera.width || "").toString(),
+      height: (camera.height || "").toString(),
       username: camera.username || "",
       password: camera.password || "",
     });
@@ -149,7 +205,7 @@ const CameraManagement = () => {
     setShowAddForm(true);
   };
 
-  const handleDelete = (cameraId) => {
+  const handleDelete = (cameraId: string) => {
     openConfirm({
       title: "Xóa camera",
       description: "Bạn có chắc chắn muốn xóa camera này?",
@@ -167,7 +223,7 @@ const CameraManagement = () => {
     });
   };
 
-  const handleStart = async (cameraId) => {
+  const handleStart = async (cameraId: string) => {
     try {
       await api.post(`/cameras/${cameraId}/start`);
       await loadCameras();
@@ -177,7 +233,7 @@ const CameraManagement = () => {
     }
   };
 
-  const handleStop = async (cameraId) => {
+  const handleStop = async (cameraId: string) => {
     try {
       await api.post(`/cameras/${cameraId}/stop`);
       await loadCameras();
@@ -187,7 +243,7 @@ const CameraManagement = () => {
     }
   };
 
-  const validateUrl = (url) => {
+  const validateUrl = (url: string): UrlValidation => {
     // Nếu là số (webcam index), hợp lệ
     if (/^\d+$/.test(url.trim())) {
       return { valid: true };
@@ -219,7 +275,7 @@ const CameraManagement = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Validate URL
@@ -235,15 +291,16 @@ const CameraManagement = () => {
       source: urlValidation.fixedUrl || formData.source.trim(),
     };
 
-    // Convert empty strings to null for optional fields
-    if (dataToSubmit.width === "") dataToSubmit.width = null;
-    if (dataToSubmit.height === "") dataToSubmit.height = null;
-    if (dataToSubmit.username === "") dataToSubmit.username = null;
-    if (dataToSubmit.password === "") dataToSubmit.password = null;
+    // Convert empty strings to null/undefined for optional fields when submitting
+    const submitData: any = { ...dataToSubmit };
+    if (submitData.width === "") submitData.width = null;
+    if (submitData.height === "") submitData.height = null;
+    if (submitData.username === "") submitData.username = null;
+    if (submitData.password === "") submitData.password = null;
 
     try {
       setLoading(true);
-      logger.info("Submitting camera data:", dataToSubmit);
+      logger.info("Submitting camera data:", submitData);
 
       const endpoint = editingCamera
         ? `/cameras/${editingCamera.camera_id}`
@@ -252,8 +309,8 @@ const CameraManagement = () => {
       logger.info(`Calling API: ${editingCamera ? "PUT" : "POST"} ${endpoint}`);
 
       const response = editingCamera
-        ? await api.put(endpoint, dataToSubmit)
-        : await api.post(endpoint, dataToSubmit);
+        ? await api.put(endpoint, submitData)
+        : await api.post(endpoint, submitData);
 
       logger.info("API response:", response);
 
@@ -267,10 +324,11 @@ const CameraManagement = () => {
     } catch (err) {
       logger.error("Error saving camera:", err);
       console.error("Full error object:", err);
+      const apiError = err as ApiError;
       const errorMessage =
-        err.message ||
-        err.response?.data?.detail ||
-        err.response?.data?.message ||
+        apiError?.message ||
+        apiError?.response?.data?.detail ||
+        apiError?.response?.data?.message ||
         `Không thể ${editingCamera ? "cập nhật" : "tạo"} camera`;
       toast.error(errorMessage);
     } finally {
@@ -540,7 +598,7 @@ const CameraManagement = () => {
                         }
                       }
                     }}
-                    onBlur={(e) => {
+                    onBlur={() => {
                       // Khi blur, nếu trống thì set về default 60
                       if (formData.fps === "" || formData.fps === null) {
                         setFormData({ ...formData, fps: 60 });
@@ -578,7 +636,7 @@ const CameraManagement = () => {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        width: e.target.value ? parseInt(e.target.value) : "",
+                        width: e.target.value,
                       })
                     }
                     placeholder="1280"
@@ -593,7 +651,7 @@ const CameraManagement = () => {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        height: e.target.value ? parseInt(e.target.value) : "",
+                        height: e.target.value,
                       })
                     }
                     placeholder="720"
@@ -645,7 +703,7 @@ const CameraManagement = () => {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog {...confirmState} onCancel={closeConfirm} />
+      <ConfirmDialog {...confirmState} title={confirmState.title || ""} onCancel={closeConfirm} />
     </div>
   );
 };

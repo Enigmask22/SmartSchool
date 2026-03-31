@@ -26,7 +26,7 @@ export default function AIStatusCard({
   onRefresh,
 }: AIStatusCardProps) {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <AlertCircle className="w-5 h-5 text-primary" />

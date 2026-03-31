@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SimpleDatePicker } from '@/components/ui/simple-date-picker';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -57,7 +58,7 @@ const AttendanceFilters = ({
   const isHomeroomTeacher = authContext?.isHomeroomTeacher;
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 shadow-md">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Bộ lọc</CardTitle>
@@ -81,13 +82,13 @@ const AttendanceFilters = ({
             <div className="flex-1 max-w-[200px]">
               <label className="block mb-2 text-sm font-medium">Năm học</label>
               {loading ? (
-                <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+                <Skeleton className="w-full h-10 rounded-md" />
               ) : (
                 <Select
                   value={selectedAcademicYear || ''}
                   onValueChange={onAcademicYearChange}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full focus-visible:outline-none">
                     <SelectValue placeholder="Chọn năm học" />
                   </SelectTrigger>
                   <SelectContent>
@@ -105,7 +106,7 @@ const AttendanceFilters = ({
           <div className="flex-1 max-w-[160px]">
             <label className="block mb-2 text-sm font-medium">Ngày</label>
             {loading ? (
-              <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+              <Skeleton className="w-full h-10 rounded-md" />
             ) : (
               <SimpleDatePicker
                 value={selectedDate}
@@ -119,10 +120,10 @@ const AttendanceFilters = ({
           <div className="flex-1 max-w-[200px]">
             <label className="block mb-2 text-sm font-medium">Lớp</label>
             {loading ? (
-              <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+              <Skeleton className="w-full h-10 rounded-md" />
             ) : (
               <Select value={selectedClass} onValueChange={onClassChange} disabled={classesLoading}>
-                <SelectTrigger className="w-full flex items-center justify-between">
+                <SelectTrigger className="w-full flex items-center justify-between focus-visible:outline-none">
                   <SelectValue
                     placeholder={
                       classesLoading
@@ -153,10 +154,10 @@ const AttendanceFilters = ({
           <div className="flex-1 max-w-[200px]">
             <label className="block mb-2 text-sm font-medium">Trạng thái</label>
             {loading ? (
-              <div className="w-full h-10 bg-muted rounded-md animate-pulse" />
+              <Skeleton className="w-full h-10 rounded-md" />
             ) : (
               <Select value={selectedStatus} onValueChange={onStatusChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full focus-visible:outline-none">
                   <SelectValue placeholder="Tất cả trạng thái" />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,8 +173,8 @@ const AttendanceFilters = ({
           <div className="flex gap-2">
             {loading ? (
               <>
-                <div className="w-20 h-10 bg-muted rounded-md animate-pulse" />
-                <div className="w-24 h-10 bg-muted rounded-md animate-pulse" />
+                <Skeleton className="w-20 h-10 rounded-md" />
+                <Skeleton className="w-24 h-10 rounded-md" />
               </>
             ) : (
               <>

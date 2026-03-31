@@ -1,9 +1,16 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 
-const ProtectedRoute = ({ roles }) => {
-  const { user, loading, isAdmin, isHomeroomTeacher, isSubjectTeacher } = useContext(AuthContext);
+const ProtectedRoute = ({ roles }: { roles: string[] }) => {
+  const authContext = useContext(AuthContext);
+
+  // Handle case where context is not provided
+  if (!authContext) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const { user, loading, isAdmin, isHomeroomTeacher, isSubjectTeacher } = authContext;
 
   if (loading) return null;
 

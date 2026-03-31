@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Upload, Lightbulb } from 'lucide-react';
+import { Download, Upload, Lightbulb, ChevronLeft } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -42,7 +42,7 @@ const GradeTableHeader = ({
   onImportSuccess,
 }: GradeTableHeaderProps) => {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardContent className="p-5">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -52,7 +52,7 @@ const GradeTableHeader = ({
                 variant="outline"
                 className="flex items-center space-x-2"
               >
-                <span>←</span>
+                <ChevronLeft className="w-4 h-4" />
                 <span>Quay lại</span>
               </Button>
               <div className="w-px h-8 bg-border"></div>
@@ -69,10 +69,12 @@ const GradeTableHeader = ({
           </div>
 
           {/* Import/Export Buttons */}
-          {hasScoreConfig && (
-            <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-border">
+          <div className="flex flex-col gap-3 pt-3 border-t border-border">
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 onClick={onDownloadTemplate}
+                disabled={!hasScoreConfig}
+                title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi tải template' : ''}
                 className="flex items-center space-x-2"
               >
                 <Download className="w-4 h-4" />
@@ -82,6 +84,8 @@ const GradeTableHeader = ({
               <Button
                 asChild
                 variant="outline"
+                disabled={!hasScoreConfig}
+                title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi nhập điểm' : ''}
                 className="flex items-center space-x-2"
               >
                 <label className="cursor-pointer">
@@ -91,6 +95,7 @@ const GradeTableHeader = ({
                     type="file"
                     accept=".xlsx,.xls,.csv"
                     onChange={onFileUpload}
+                    disabled={!hasScoreConfig}
                     className="hidden"
                   />
                 </label>
@@ -98,6 +103,8 @@ const GradeTableHeader = ({
 
               <Button
                 onClick={onExportToExcel}
+                disabled={!hasScoreConfig}
+                title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi xuất Excel' : ''}
                 variant="outline"
                 className="flex items-center space-x-2 text-green-600 border-green-200 hover:bg-green-50"
               >
@@ -105,22 +112,24 @@ const GradeTableHeader = ({
                 <span>Xuất Excel</span>
               </Button>
 
-              <OCRGradeSheet
-                selectedClassSubject={selectedClassSubject}
-                academicYear={academicYear}
-                semester={semester}
-                onImportSuccess={onImportSuccess}
-              />
-
-              <div className="px-3 py-2 text-sm border rounded-lg text-muted-foreground bg-primary/5 border-primary/20">
-                <span className="flex items-center space-x-1 font-medium">
-                  <Lightbulb className="w-4 h-4" />
-                  <span>Hỗ trợ:</span>
-                </span>{" "}
-                Excel (.xlsx, .xls), CSV, và ảnh bảng điểm
+              <div title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi quét ảnh' : ''} className={!hasScoreConfig ? 'opacity-50' : ''}>
+                <OCRGradeSheet
+                  selectedClassSubject={selectedClassSubject}
+                  academicYear={academicYear}
+                  semester={semester}
+                  onImportSuccess={onImportSuccess}
+                  disabled={!hasScoreConfig}
+                />
               </div>
             </div>
-          )}
+
+            <div className="text-xs text-muted-foreground">
+              <span className="flex items-center space-x-1">
+                <Lightbulb className="w-3 h-3" />
+                <span>Hỗ trợ: Excel (.xlsx, .xls), CSV, ảnh bảng điểm</span>
+              </span>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

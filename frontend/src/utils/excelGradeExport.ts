@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import logger from '@/utils/logger';
+import { toast } from 'sonner';
 
 export const exportToExcel = async (
   students: any[],
@@ -225,9 +226,9 @@ export const exportToExcel = async (
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    alert('✅ Xuất Excel thành công!');
+    toast.success('Xuất Excel thành công!');
   } catch (error) {
     logger.error('Error exporting to Excel:', error);
-    alert('❌ Lỗi khi xuất Excel!');
+    toast.error('Lỗi khi xuất Excel!');
   }
 };

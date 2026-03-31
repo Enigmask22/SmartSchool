@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Save, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { X, Save, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

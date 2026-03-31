@@ -1,7 +1,7 @@
 /**
  * UsernameField - Username input field component
  */
-import { Input } from '@/components/ui/input.tsx';
+import { Input } from '@/components/ui/input';
 
 interface UsernameFieldProps {
   value: string;
