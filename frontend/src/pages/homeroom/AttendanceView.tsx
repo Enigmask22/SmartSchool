@@ -1,5 +1,5 @@
 import { useContext, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { PageHeader } from '@/components/common/PageHeader';
 import { useAttendanceAPI } from '@/hooks/attendance/useAttendanceAPI';
 import { useAttendanceFilters } from '@/hooks/attendance/useAttendanceFilters';
 import { useAttendanceEdit } from '@/hooks/attendance/useAttendanceEdit';
@@ -8,6 +8,7 @@ import AttendanceFilters from '@/components/attendance/AttendanceFilters';
 import AttendanceTable from '@/components/attendance/AttendanceTable';
 import LeaveRequestModal from '@/components/attendance/LeaveRequestModal';
 import { AuthContext } from '@/contexts/AuthContext';
+import { CalendarCheck } from 'lucide-react';
 import logger from '@/utils/logger';
 
 /**
@@ -133,26 +134,31 @@ export default function AttendanceView() {
   };
 
   return (
-    <div className="attendance-view">
+    <div className="attendance-view p-6">
       {/* Header */}
       <div className="mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold">Điểm danh</CardTitle>
-            <CardDescription>Quản lý điểm danh học sinh</CardDescription>
-            {error && (
-              <div className="p-3 mt-2 border rounded text-destructive bg-destructive/10 border-destructive/20">
-                {error}
-              </div>
-            )}
-            {successMessage && (
-              <div className="p-3 mt-2 text-green-700 bg-green-100 border border-green-400 rounded">
-                {successMessage}
-              </div>
-            )}
-          </CardHeader>
-        </Card>
+        <PageHeader
+          title="Điểm danh lớp học"
+          description="Quản lý điểm danh lớp chủ nhiệm"
+          icon={
+          <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
+            <CalendarCheck className="w-8 h-8 text-white" />
+          </div>
+          }
+        />
       </div>
+
+      {/* Messages */}
+      {error && (
+        <div className="p-3 mb-6 border rounded text-destructive bg-destructive/10 border-destructive/20">
+          {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="p-3 mb-6 text-green-700 bg-green-100 border border-green-400 rounded">
+          {successMessage}
+        </div>
+      )}
 
       {/* Statistics */}
       <AttendanceStats stats={stats} loading={loading} />

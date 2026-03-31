@@ -7,6 +7,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { BookOpen } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -109,16 +111,19 @@ const AttendanceTable = ({
 
   return (
     <>
-      <Card>
+      <Card className="shadow-md">
         <CardHeader>
           <CardTitle>
             Danh sách điểm danh {selectedDate && `- ${formatDate(selectedDate)}`}
           </CardTitle>
           <CardDescription>
-            {showFullList
-              ? `Hiển thị ${records.length} học sinh (bao gồm cả học sinh chưa điểm danh)`
-              : `Hiển thị ${records.length} bản ghi điểm danh`}
-            {selectedClass && ` - Lớp ${selectedClass}`}
+            {!selectedClass || selectedClass === 'all' ? (
+              'Vui lòng chọn lớp để xem dữ liệu điểm danh'
+            ) : showFullList ? (
+              `Hiển thị ${records.length} học sinh (bao gồm cả học sinh chưa điểm danh) - Lớp ${selectedClass}`
+            ) : (
+              `Hiển thị ${records.length} bản ghi điểm danh - Lớp ${selectedClass}`
+            )}
           </CardDescription>
         </CardHeader>
 
@@ -144,17 +149,26 @@ const AttendanceTable = ({
                   // Show skeleton rows during loading
                   Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={`skeleton-${idx}`}>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
-                      <TableCell><div className="h-4 bg-muted rounded animate-pulse" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
                     </TableRow>
                   ))
+                ) : !selectedClass || selectedClass === 'all' ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <BookOpen className="h-12 w-12 text-muted-foreground/60" />
+                        <p className="text-muted-foreground font-medium">Vui lòng chọn lớp để xem dữ liệu điểm danh</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : records.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="py-8 text-center">
@@ -288,13 +302,13 @@ const AttendanceTable = ({
       </Card>
 
       {/* Summary */}
-      <Card className="mt-6">
+      <Card className="mt-6 shadow-md">
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">
             {selectedDate === new Date().toISOString().split('T')[0]
               ? 'Dữ liệu điểm danh hôm nay'
               : `Dữ liệu điểm danh ngày ${formatDate(selectedDate)}`}
-            {selectedClass && ` - Lớp ${selectedClass}`}
+            {selectedClass && selectedClass !== 'all' && ` - Lớp ${selectedClass}`}
           </p>
         </CardContent>
       </Card>

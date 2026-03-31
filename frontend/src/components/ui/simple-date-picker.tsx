@@ -73,7 +73,6 @@ export function SimpleDatePicker({
   const handleDateClick = (day: number) => {
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
-    const newDate = new Date(year, month, day);
 
     // Convert to YYYY-MM-DD
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
@@ -174,7 +173,7 @@ export function SimpleDatePicker({
         <Button
           variant="outline"
           className={cn(
-            "justify-start text-left font-normal",
+            "h-10 justify-start text-left font-normal",
             !value && "text-muted-foreground",
             className
           )}

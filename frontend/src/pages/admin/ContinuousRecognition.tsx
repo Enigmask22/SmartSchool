@@ -6,14 +6,26 @@
  * - StatisticsPanel: Recognition statistics and system info
  * - CameraView: Camera selection and live preview
  * - RecentRecognitions: Recent recognition history
+ * 
+ * Uses 5 specialized hooks:
+ * - useRecognitionConnection: WebSocket management
+ * - useRecognitionCameraSource: Camera selection & configuration
+ * - useRecognitionCamera: Camera stream operations
+ * - useRecognitionData: Recognition results & statistics
+ * - useRecognitionControl: Recognition lifecycle & frame capture
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings } from "lucide-react";
-import { useContinuousRecognition } from "@/hooks/useContinuousRecognition";
+import { toast } from "sonner";
+import { useRecognitionConnection } from "@/hooks/continuous-recognition/useRecognitionConnection";
+import { useRecognitionCameraSource } from "@/hooks/continuous-recognition/useRecognitionCameraSource";
+import { useRecognitionCamera } from "@/hooks/continuous-recognition/useRecognitionCamera";
+import { useRecognitionData } from "@/hooks/continuous-recognition/useRecognitionData";
+import { useRecognitionControl } from "@/hooks/continuous-recognition/useRecognitionControl";
 import {
   PageHeader,
   StatisticsPanel,
@@ -27,42 +39,153 @@ const API_BASE_URL =
   import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
 export default function ContinuousRecognitionPage() {
+  const [settingsError, setSettingsError] = useState("");
+
+  // Create refs early
+  const staggerTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+
+  // Initialize recognition data hook
   const {
-    isRunning,
-    isConnected,
-    isCameraOn,
     recognizedStudents,
     recentRecognitions,
-    cooldownPeriod,
+    stats,
+    cameraStats,
     totalRecognitionsToday,
-    activeCooldowns,
+    handleWebSocketMessage,
+  } = useRecognitionData();
+
+  // Initialize connection with message handler
+  const { isConnected, wsRef, connectWebSocket } =
+    useRecognitionConnection(handleWebSocketMessage);
+
+  // Initialize camera source configuration
+  const {
     cameraSource,
     selectedCameraId,
     selectedMultiCameras,
     useMultiCamera,
-    startTime,
     availableCameras,
-    cameraPreviews,
-    cameraStats,
-    stats,
-    videoRef,
-    canvasRef,
-    toggleCamera,
-    handleStart,
-    handleStop,
     setCameraSource,
     setSelectedCameraId,
     setSelectedMultiCameras,
     setUseMultiCamera,
+  } = useRecognitionCameraSource();
+
+  // Initialize camera stream operations
+  const {
+    isCameraOn,
+    cameraPreviews,
+    videoRef,
+    canvasRef,
+    toggleCamera,
+    captureFromManagedCamera,
+  } = useRecognitionCamera(wsRef);
+
+  // Initialize recognition control
+  const {
+    isRunning,
+    startTime,
+    cooldownPeriod,
+    handleStart,
+    handleStop,
     setCooldownPeriod,
-  } = useContinuousRecognition();
+  } = useRecognitionControl(
+    isCameraOn,
+    isConnected,
+    cameraSource,
+    selectedCameraId,
+    selectedMultiCameras,
+    useMultiCamera,
+    videoRef,
+    canvasRef,
+    wsRef,
+    staggerTimeoutsRef,
+    captureFromManagedCamera
+  );
 
-  const [settingsError, setSettingsError] = useState("");
+  // Initialize connections on mount ONLY - don't reconnect on dependency changes
+  useEffect(() => {
+    console.log("📌 ContinuousRecognitionPage MOUNT");
+    let mounted = true;
 
-  // Calculate running time
-  const runningTime = startTime
-    ? Math.floor((Date.now() - startTime) / 1000)
-    : 0;
+    const loadSettings = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/ai/recognition/status`);
+        const result = await response.json();
+
+        if (result.success && result.data.cooldown_period) {
+          setCooldownPeriod(result.data.cooldown_period);
+          logger.debug("🔧 Loaded settings:", result.data);
+        }
+      } catch (error) {
+        logger.error("❌ Error loading settings:", error);
+      }
+    };
+
+    const initializeComponent = async () => {
+      try {
+        console.log("🚀 Loading settings...");
+        await loadSettings();
+        console.log("✓ Settings loaded");
+
+        if (mounted) {
+          console.log("🔌 Calling connectWebSocket()");
+          connectWebSocket();
+        }
+      } catch (error) {
+        logger.error("❌ Initialization error:", error);
+      }
+    };
+
+    initializeComponent();
+
+    return () => {
+      console.log("📌 ContinuousRecognitionPage CLEANUP");
+      mounted = false;
+
+      // Don't close WebSocket during normal cleanup - only close on page unmount
+      // The WebSocket should persist for the duration of the page
+      staggerTimeoutsRef.current.forEach((id) => clearTimeout(id));
+    };
+  }, []); // Empty array - only run once on mount
+
+  // Separate cleanup for when component actually unmounts
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        console.log("🔌 Closing WebSocket on unmount");
+        wsRef.current.close();
+      }
+    };
+  }, [wsRef]);
+
+  // Auto-start cameras when selected (managed camera mode)
+  useEffect(() => {
+    const startCamera = async (cameraId: string) => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/cameras/${cameraId}/start`,
+          { method: "POST" }
+        );
+        const result = await response.json();
+        if (result.success) {
+          logger.info(`✅ Started camera ${cameraId}`);
+        } else {
+          logger.warn(`⚠️ Camera ${cameraId} may not be connected yet`);
+        }
+      } catch (error) {
+        logger.error(`❌ Error starting camera ${cameraId}:`, error);
+      }
+    };
+
+    if (cameraSource === "managed") {
+      if (useMultiCamera && selectedMultiCameras.length > 0) {
+        selectedMultiCameras.forEach((cam) => startCamera(cam));
+      } else if (selectedCameraId) {
+        startCamera(selectedCameraId);
+      }
+    }
+  }, [cameraSource, selectedCameraId, selectedMultiCameras, useMultiCamera]);
 
   // Handle save settings
   const handleSaveSettings = async () => {
@@ -78,11 +201,11 @@ export default function ContinuousRecognitionPage() {
       const result = await response.json();
 
       if (result.success) {
-        alert(`${result.message}`);
+        toast.success(`${result.message}`);
         logger.debug("Settings updated:", result.data);
         setSettingsError("");
       } else {
-        alert(`Lỗi: ${result.message || "Không thể cập nhật cài đặt"}`);
+        toast.error(`Lỗi: ${result.message || "Không thể cập nhật cài đặt"}`);
       }
     } catch (error) {
       logger.error("Error updating settings:", error);
@@ -106,7 +229,7 @@ export default function ContinuousRecognitionPage() {
           onToggleCamera={toggleCamera}
           onToggleRecognition={isRunning ? handleStop : handleStart}
           totalRecognitionsToday={totalRecognitionsToday}
-          runningTime={runningTime}
+          runningTime={startTime ? Math.floor((Date.now() - startTime) / 1000) : 0}
         />
 
         {/* ==================== STATISTICS PANEL ==================== */}
@@ -162,12 +285,6 @@ export default function ContinuousRecognitionPage() {
                     </span>
                     <span className="font-bold text-primary">
                       {cooldownPeriod}s
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Đang chờ:</span>
-                    <span className="font-bold text-orange-600">
-                      {Object.keys(activeCooldowns).length}
                     </span>
                   </div>
                 </div>

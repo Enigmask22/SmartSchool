@@ -1,5 +1,6 @@
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useScoreManagement, ACADEMIC_YEARS, SEMESTERS } from '@/hooks/score-management/useScoreManagement';
 import { useScoreManagementAPI } from '@/hooks/score-management/useScoreManagementAPI';
 import { useScoreManagementFilters } from '@/hooks/score-management/useScoreManagementFilters';
@@ -16,7 +17,6 @@ import {
   ScoreEditModal,
   ImportPreviewModal,
   NoScoreConfigState,
-  TeacherHeaderSkeleton,
   ClassSelectorSkeleton,
   GradeTableSkeleton,
 } from '@/components/score-management';
@@ -30,10 +30,10 @@ export default function ScoreManagement() {
   const configForm = useScoreConfigForm();
   const importForm = useScoreImportForm();
 
-  // Keep old hook for needed handlers and confirm dialog
-  const { confirmState, closeConfirm, openConfirm, handleDownloadTemplate } = useScoreManagement();
-
   const [selectedClassSubject, setSelectedClassSubject] = useState<any>(null);
+
+  // Keep minimal hook for confirm dialog and template download
+  const { confirmState, closeConfirm, openConfirm, handleDownloadTemplate } = useScoreManagement(selectedClassSubject?.id);
 
   // Wrap API class select to handle filters
   const handleClassSubjectSelect = async (classSubject: any) => {
@@ -45,7 +45,7 @@ export default function ScoreManagement() {
   // Handle export
   const handleExportToExcelClick = async () => {
     if (!selectedClassSubject || !api.scoreConfig) {
-      alert('Vui lòng chọn lớp và có cấu hình điểm!');
+      toast.error('Vui lòng chọn lớp và có cấu hình điểm!');
       return;
     }
 
@@ -96,20 +96,8 @@ export default function ScoreManagement() {
     return api.calculateFinalGrade(scoreData, api.scoreConfig?.score_column_config || {});
   };
 
-  // Show initial loading
-  if (api.loading && !api.teacherInfo) {
-    return (
-      <div className="min-h-screen p-6 space-y-6 bg-gray-50">
-        <div className="mx-auto space-y-6 max-w-7xl">
-          <TeacherHeaderSkeleton />
-          <ClassSelectorSkeleton />
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (!api.teacherInfo) {
+  // Error state - only block if teacher info fails to load
+  if (!api.loading && !api.teacherInfo) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="p-8 text-center border bg-destructive/5 rounded-2xl border-destructive/20">
@@ -125,17 +113,17 @@ export default function ScoreManagement() {
   }
 
   return (
-    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
+    <div className="min-h-screen p-6 space-y-6 bg-background">
       <div className="mx-auto space-y-6 max-w-7xl">
-        {/* Header Card - Always visible */}
+        {/* Header Card - Always visible, with loading skeleton controls if needed */}
         <ScoreManagementHeader
-          teacherName={api.teacherInfo.teacher.full_name}
           academicYear={filters.academicYear}
           semester={filters.semester}
           ACADEMIC_YEARS={ACADEMIC_YEARS}
           SEMESTERS={SEMESTERS}
           onAcademicYearChange={filters.setAcademicYear}
           onSemesterChange={filters.setSemester}
+          loading={api.loading && !api.teacherInfo}
         />
 
         {/* Class Selector - Skeleton on init, content when ready */}
@@ -143,7 +131,7 @@ export default function ScoreManagement() {
           <ClassSelectorSkeleton />
         ) : !selectedClassSubject ? (
           <ClassSelector
-            assignedClasses={api.teacherInfo.assigned_classes}
+            assignedClasses={api.teacherInfo?.assigned_classes || []}
             academicYear={filters.academicYear}
             onSelect={handleClassSubjectSelect}
           />
@@ -176,7 +164,7 @@ export default function ScoreManagement() {
               }}
               onRemoveColumn={(columnName) => {
                 if (Object.keys(configForm.configForm).length <= 1) {
-                  alert('Phải có ít nhất một cột điểm!');
+                  toast.error('Phải có ít nhất một cột điểm!');
                   return;
                 }
                 openConfirm({
@@ -191,7 +179,7 @@ export default function ScoreManagement() {
               }}
               onSaveConfig={() => {
                 if (Object.keys(configForm.configForm).length === 0) {
-                  alert('Phải có ít nhất một cột điểm!');
+                  toast.error('Phải có ít nhất một cột điểm!');
                   return;
                 }
 
@@ -203,7 +191,7 @@ export default function ScoreManagement() {
                 );
 
                 if (invalidColumns.length > 0) {
-                  alert('Vui lòng điền đầy đủ thông tin cho tất cả các cột điểm.');
+                  toast.error('Vui lòng điền đầy đủ thông tin cho tất cả các cột điểm.');
                   return;
                 }
 
@@ -237,14 +225,14 @@ export default function ScoreManagement() {
                     .replace(/[^a-zA-Z0-9_]/g, '');
 
                   if (!validName) {
-                    alert(
+                    toast.error(
                       'Tên cột không hợp lệ. Chỉ được sử dụng chữ cái, số và dấu gạch dưới.'
                     );
                     return;
                   }
 
                   if (configForm.configForm[validName]) {
-                    alert('Cột điểm này đã tồn tại!');
+                    toast.error('Cột điểm này đã tồn tại!');
                     return;
                   }
 
@@ -259,7 +247,7 @@ export default function ScoreManagement() {
                   configForm.setShowAddColumnModal(false);
                   configForm.resetNewColumnForm();
                 } else {
-                  alert('Vui lòng điền đầy đủ thông tin!');
+                  toast.error('Vui lòng điền đầy đủ thông tin!');
                 }
               }}
             />

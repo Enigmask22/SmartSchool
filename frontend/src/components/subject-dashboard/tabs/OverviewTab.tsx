@@ -18,9 +18,12 @@ import type { AnalyticsData } from "@/hooks/subject-dashboard/useSubjectDashboar
 interface OverviewTabProps {
   data: AnalyticsData;
   loading?: boolean;
+  hidden?: boolean;
 }
 
-export function OverviewTab({ data, loading = false }: OverviewTabProps) {
+export function OverviewTab({ data, loading = false, hidden = false }: OverviewTabProps) {
+  if (hidden) return null;
+  
   if (!data) {
     return null;
   }
@@ -28,12 +31,32 @@ export function OverviewTab({ data, loading = false }: OverviewTabProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="p-6 bg-white shadow-lg rounded-2xl">
-          <Skeleton className="h-6 w-40 mb-4" />
+        <div className="p-6 bg-white shadow-md rounded-2xl">
+          <div className="flex items-center gap-2 mb-4">
+            <Skeleton className="h-6 w-6 rounded" />
+            <Skeleton className="h-6 w-40" />
+          </div>
           <Skeleton className="w-full h-80" />
+          <div className="mt-4 space-y-2">
+            {[...Array(4)].map((_, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-4 w-12" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="p-6 bg-white shadow-lg rounded-2xl">
-          <Skeleton className="h-6 w-40 mb-4" />
+        <div className="p-6 bg-white shadow-md rounded-2xl">
+          <div className="flex items-center gap-2 mb-4">
+            <Skeleton className="h-6 w-6 rounded" />
+            <Skeleton className="h-6 w-40" />
+          </div>
           <Skeleton className="w-full h-80" />
         </div>
       </div>
@@ -60,7 +83,7 @@ export function OverviewTab({ data, loading = false }: OverviewTabProps) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {/* Performance Groups - Pie Chart */}
-      <div className="p-6 bg-white shadow-lg rounded-2xl">
+      <div className="p-6 bg-white border-2 shadow-md rounded-2xl">
         <h3 className="flex items-center mb-4 text-xl font-bold text-gray-800">
           <Target className="w-5 h-5 mr-2" />
           Phân nhóm học lực
@@ -122,7 +145,7 @@ export function OverviewTab({ data, loading = false }: OverviewTabProps) {
       </div>
 
       {/* Score Distribution - Bar Chart */}
-      <div className="p-6 bg-white shadow-lg rounded-2xl">
+      <div className="p-6 border-2 bg-white shadow-md rounded-2xl">
         <h3 className="flex items-center mb-4 text-xl font-bold text-gray-800">
           <BarChart3 className="w-5 h-5 mr-2" />
           Phân bố điểm số

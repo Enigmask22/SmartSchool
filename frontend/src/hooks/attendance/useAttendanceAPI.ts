@@ -168,7 +168,7 @@ export const useAttendanceAPI = ({
     loadAttendanceData();
     loadStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, selectedClass, selectedStatus, showFullList, bootstrapLoading]);
+  }, [selectedDate, selectedClass, selectedStatus, showFullList]);
 
   // Load bootstrap when user changes
   useEffect(() => {
@@ -203,6 +203,7 @@ export const useAttendanceAPI = ({
     try {
       setBootstrapLoading(true);
       setClassesLoading(true);
+      setLoading(true);
 
       const params = new URLSearchParams();
       if (year) params.set('academic_year', year);
@@ -246,6 +247,7 @@ export const useAttendanceAPI = ({
       logger.error('attendance bootstrap error', e);
       setError('Lỗi tải dữ liệu khởi tạo');
     } finally {
+      setLoading(false);
       setClassesLoading(false);
       setBootstrapLoading(false);
     }

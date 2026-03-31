@@ -4,6 +4,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 export interface ScoreColumnConfig {
   [key: string]: {
@@ -65,7 +66,7 @@ export interface UseScoreManagementAPIReturn {
   students: StudentWithScore[];
   scoreConfig: ScoreConfig | null;
   fetchTeacherInfo: () => Promise<void>;
-  handleClassSubjectSelect: (classSubject: any) => Promise<void>;
+  handleClassSubjectSelect: (classSubject: any, academicYear?: string, semester?: string) => Promise<void>;
   handleSaveScore: (
     editingStudent: StudentWithScore | null,
     selectedClassSubject: any,
@@ -147,15 +148,15 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     }
   };
 
-  const handleClassSubjectSelect = async (classSubject: any) => {
+  const handleClassSubjectSelect = async (classSubject: any, academicYear?: string, semester?: string) => {
     try {
       setLoading(true);
       setError(null);
 
       const studentsResponse = await api.getStudentsByClassSubject(
         classSubject.id,
-        defaultAcademicYear || '2024-2025',
-        defaultSemester || 'HK1'
+        academicYear || defaultAcademicYear || '2024-2025',
+        semester || defaultSemester || 'HK1'
       );
 
       if (studentsResponse.success) {
@@ -402,14 +403,14 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
       const response = await api.createOrUpdateScore(scoreData);
 
       if (response.success) {
-        alert('Lưu điểm thành công!');
+        toast.success('Lưu điểm thành công!');
         onSuccess();
       } else {
-        alert('Lỗi khi lưu điểm: ' + response.message);
+        toast.error('Lỗi khi lưu điểm: ' + response.message);
       }
     } catch (err) {
       logger.error('Error saving score:', err);
-      alert('Lỗi khi lưu điểm!');
+      toast.error('Lỗi khi lưu điểm!');
     }
   };
 
@@ -431,24 +432,24 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
       const response = await api.upsertScoreConfig(configData);
 
       if (response.success) {
-        alert('✅ Lưu cấu hình cột điểm thành công!');
+        toast.success('Lưu cấu hình cột điểm thành công!');
         onSuccess(response.data);
       } else {
-        alert('❌ Lỗi khi lưu cấu hình: ' + response.message);
+        toast.error('Lỗi khi lưu cấu hình: ' + response.message);
       }
     } catch (err) {
       logger.error('Error saving config:', err);
-      alert('❌ Lỗi khi lưu cấu hình!');
+      toast.error('Lỗi khi lưu cấu hình!');
     }
   };
 
   const handleDownloadTemplate = async (classSubjectId: number): Promise<void> => {
     try {
       await api.downloadScoreTemplate(classSubjectId);
-      alert('✅ Tải template thành công!');
+      toast.success('Tải template thành công!');
     } catch (err) {
       logger.error('Error downloading template:', err);
-      alert('❌ Lỗi khi tải template!');
+      toast.error('Lỗi khi tải template!');
     }
   };
 
@@ -470,7 +471,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
         if (jsonData.length === 0) {
-          alert('❌ File không có dữ liệu!');
+          toast.error('File không có dữ liệu!');
           return;
         }
 
@@ -485,7 +486,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
         const missingColumns = requiredColumns.filter((col) => !(col in firstRow));
 
         if (missingColumns.length > 0) {
-          alert(`❌ File thiếu các cột: ${missingColumns.join(', ')}`);
+          toast.error(`File thiếu các cột: ${missingColumns.join(', ')}`);
           return;
         }
 
@@ -562,14 +563,14 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
 
         if (errors.length > 0) {
           onDataReady([], errors);
-          alert(`❌ File có ${errors.length} lỗi`);
+          toast.error(`File có ${errors.length} lỗi`);
           return;
         }
 
         onDataReady(validData, []);
       } catch (err) {
         logger.error('Error parsing file:', err);
-        alert('❌ Lỗi khi đọc file!');
+        toast.error('Lỗi khi đọc file!');
       }
     };
 
@@ -585,7 +586,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     onSuccess: () => Promise<void>
   ): Promise<void> => {
     if (importedData.length === 0) {
-      alert('Không có dữ liệu để import!');
+      toast.error('Không có dữ liệu để import!');
       return;
     }
 
@@ -602,14 +603,14 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
       const response = await api.bulkImportScores(importPayload);
 
       if (response.success) {
-        alert(`✅ ${response.message}`);
+        toast.success(`${response.message}`);
         await onSuccess();
       } else {
-        alert('❌ Lỗi khi import điểm: ' + response.message);
+        toast.error('Lỗi khi import điểm: ' + response.message);
       }
     } catch (err) {
       logger.error('Error importing grades:', err);
-      alert('❌ Lỗi khi import điểm!');
+      toast.error('Lỗi khi import điểm!');
     } finally {
       setLoading(false);
     }

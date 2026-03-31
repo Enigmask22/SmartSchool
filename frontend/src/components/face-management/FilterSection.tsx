@@ -39,7 +39,7 @@ export default function FilterSection({
   onRefresh,
 }: FilterSectionProps) {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Search className="w-5 h-5 text-primary" />
@@ -55,7 +55,7 @@ export default function FilterSection({
                 value={selectedAcademicYear || ''}
                 onValueChange={onYearChange}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full focus-visible:outline-none">
                   <SelectValue placeholder="Chọn năm học" />
                 </SelectTrigger>
                 <SelectContent>
@@ -68,16 +68,14 @@ export default function FilterSection({
               </Select>
             </div>
           )}
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Lớp
-            </label>
+          <div className="space-y-2">
+            <Label>Lớp</Label>
             <Select
               value={selectedClass}
               onValueChange={onClassChange}
               disabled={classesLoading}
             >
-              <SelectTrigger className="w-full flex items-center justify-between">
+              <SelectTrigger className="w-full flex items-center justify-between focus-visible:outline-none">
                 <SelectValue
                   placeholder={
                     classesLoading
@@ -109,8 +107,9 @@ export default function FilterSection({
             )}
           </div>
 
-          <div className="flex items-end">
-            <Button onClick={onRefresh}>
+          <div className="space-y-2">
+            <Label className="invisible">Thao tác</Label>
+            <Button onClick={onRefresh} className="w-full">
               <RefreshCw className="w-4 h-4 mr-2" />
               Làm mới dữ liệu
             </Button>

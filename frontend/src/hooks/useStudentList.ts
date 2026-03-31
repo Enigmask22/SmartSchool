@@ -4,6 +4,7 @@ import { AuthContext } from "@/contexts/AuthContext";
 import { useSystemSettings } from "@/contexts/SystemSettingsContext";
 import ExcelJS from "exceljs";
 import logger from "@/utils/logger";
+import { toast } from "sonner";
 
 // API Configuration
 const API_BASE_URL =
@@ -494,7 +495,7 @@ export const useStudentList = () => {
 
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) {
-      alert("Camera chưa sẵn sàng. Vui lòng thử lại.");
+      toast.error("Camera chưa sẵn sàng. Vui lòng thử lại.");
       return;
     }
 
@@ -502,19 +503,19 @@ export const useStudentList = () => {
     const canvas = canvasRef.current;
 
     if (video.readyState < 2) {
-      alert("Video chưa sẵn sàng. Vui lòng đợi một chút và thử lại.");
+      toast.error("Video chưa sẵn sàng. Vui lòng đợi một chút và thử lại.");
       return;
     }
 
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-      alert("Camera chưa sẵn sàng. Vui lòng thử lại.");
+      toast.error("Camera chưa sẵn sàng. Vui lòng thử lại.");
       return;
     }
 
     try {
       const context = canvas.getContext("2d");
       if (!context) {
-        alert("Canvas context not available. Please try again.");
+        toast.error("Canvas context not available. Please try again.");
         return;
       }
       canvas.width = video.videoWidth;
@@ -527,7 +528,7 @@ export const useStudentList = () => {
       setCapturedImage(imageDataUrl);
     } catch (error) {
       logger.error("Error capturing photo:", error);
-      alert("Có lỗi khi chụp ảnh. Vui lòng thử lại.");
+      toast.error("Có lỗi khi chụp ảnh. Vui lòng thử lại.");
     }
   };
 
@@ -576,7 +577,7 @@ export const useStudentList = () => {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Vui lòng chọn file ảnh (JPG, PNG, etc.)");
+      toast.error("Vui lòng chọn file ảnh (JPG, PNG, etc.)");
       return;
     }
 
@@ -624,17 +625,17 @@ export const useStudentList = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert(
+        toast.success(
           `Đăng ký khuôn mặt thành công cho ${selectedStudentForFace.full_name}!`,
         );
         closeFaceModal();
         fetchStudents();
       } else {
-        alert(`Lỗi: ${result.message}`);
+        toast.error(`Lỗi: ${result.message}`);
       }
     } catch (error) {
       logger.error("Error registering face:", error);
-      alert("Có lỗi xảy ra khi đăng ký khuôn mặt");
+      toast.error("Có lỗi xảy ra khi đăng ký khuôn mặt");
     } finally {
       setFaceRegistrationLoading(false);
     }
@@ -685,7 +686,7 @@ export const useStudentList = () => {
   const handleMultipleFileSelect = (event: any) => {
     const files = Array.from(event.target.files);
     if (files.length > 10) {
-      alert("Tối đa 10 ảnh mỗi lần");
+      toast.error("Tối đa 10 ảnh mỗi lần");
       return;
     }
 
@@ -735,7 +736,7 @@ export const useStudentList = () => {
 
       if (result.success) {
         setMultipleResults(result.data.results || []);
-        alert(
+        toast.success(
           `Đăng ký thành công ${result.data.successful_registrations}/${result.data.total_images} ảnh cho ${selectedStudentForFace.full_name}!`,
         );
 
@@ -749,11 +750,11 @@ export const useStudentList = () => {
 
         fetchStudents();
       } else {
-        alert(`Lỗi: ${result.message}`);
+        toast.error(`Lỗi: ${result.message}`);
       }
     } catch (error) {
       logger.error("Error registering multiple faces:", error);
-      alert("Có lỗi xảy ra khi đăng ký nhiều khuôn mặt");
+      toast.error("Có lỗi xảy ra khi đăng ký nhiều khuôn mặt");
     } finally {
       setFaceRegistrationLoading(false);
     }
@@ -830,7 +831,7 @@ export const useStudentList = () => {
 
   const submitEditForm = async () => {
     if (!selectedStudentForEdit || !editForm.full_name.trim()) {
-      alert("Vui lòng nhập đầy đủ thông tin bắt buộc");
+      toast.error("Vui lòng nhập đầy đủ thông tin bắt buộc");
       return;
     }
 
@@ -890,7 +891,7 @@ export const useStudentList = () => {
       );
 
       if (response.ok) {
-        alert("Cập nhật thông tin học sinh thành công!");
+        toast.success("Cập nhật thông tin học sinh thành công!");
         await fetchStudents();
         setShowEditModal(false);
         setSelectedStudentForEdit(null);
@@ -906,7 +907,7 @@ export const useStudentList = () => {
       }
     } catch (error) {
       logger.error("Error updating student:", error);
-      alert("Có lỗi xảy ra khi cập nhật thông tin học sinh");
+      toast.error("Có lỗi xảy ra khi cập nhật thông tin học sinh");
     } finally {
       setEditLoading(false);
     }
@@ -942,16 +943,16 @@ export const useStudentList = () => {
           if (response.ok) {
             const result = await response.json();
             logger.debug("Restore successful:", result);
-            alert("Khôi phục học sinh thành công!");
+            toast.success("Khôi phục học sinh thành công!");
             fetchStudents();
           } else {
             const errorData = await response.json();
             logger.error("API Error Response:", errorData);
-            alert(`Lỗi khi khôi phục: ${errorData.detail || "Unknown error"}`);
+            toast.error(`Lỗi khi khôi phục: ${errorData.detail || "Unknown error"}`);
           }
         } catch (error: any) {
           logger.error("Error restoring student:", error);
-          alert("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
+          toast.error("Có lỗi xảy ra khi khôi phục học sinh: " + error.message);
         } finally {
           setRestoreLoading(false);
         }
@@ -1383,7 +1384,7 @@ export const useStudentList = () => {
         ).length;
         const maxSubjects = type === "core_subjects" ? mandatoryCount : 4;
         if (currentSubjects.length >= maxSubjects) {
-          alert(
+          toast.error(
             `Tối đa ${maxSubjects} môn ${
               type === "core_subjects" ? "chính" : "tự chọn"
             }`,
@@ -1417,7 +1418,7 @@ export const useStudentList = () => {
       );
 
       if (response.ok) {
-        alert("Lưu môn học thành công!");
+        toast.success("Lưu môn học thành công!");
         setShowSubjectModal(false);
 
         setStudents((prevStudents) =>
@@ -1429,11 +1430,11 @@ export const useStudentList = () => {
         );
       } else {
         const errorData = await response.json();
-        alert(`Lỗi khi lưu môn học: ${errorData.detail || "Unknown error"}`);
+        toast.error(`Lỗi khi lưu môn học: ${errorData.detail || "Unknown error"}`);
       }
     } catch (error) {
       logger.error("Error saving subject selection:", error);
-      alert("Có lỗi xảy ra khi lưu môn học");
+      toast.error("Có lỗi xảy ra khi lưu môn học");
     } finally {
       setSubjectLoading(false);
     }
@@ -1454,7 +1455,7 @@ export const useStudentList = () => {
   // Export and Email functions
   const exportAllComments = async () => {
     if (!selectedClass || selectedClass === "all") {
-      alert("Vui lòng chọn lớp để tải nhận xét");
+      toast.error("Vui lòng chọn lớp để tải nhận xét");
       return;
     }
 
@@ -1463,7 +1464,7 @@ export const useStudentList = () => {
       const classId = found?.id;
 
       if (!classId) {
-        alert("Không tìm thấy thông tin lớp");
+        toast.error("Không tìm thấy thông tin lớp");
         return;
       }
 
@@ -1480,14 +1481,14 @@ export const useStudentList = () => {
       );
 
       if (!response.ok) {
-        alert("Lỗi khi lấy nhận xét từ server");
+        toast.error("Lỗi khi lấy nhận xét từ server");
         return;
       }
 
       const result = await response.json();
 
       if (!result.success || !result.data || result.data.length === 0) {
-        alert("Lớp này chưa có nhận xét nào");
+        toast.error("Lớp này chưa có nhận xét nào");
         return;
       }
 
@@ -1509,16 +1510,16 @@ export const useStudentList = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      alert("✅ Đã tải nhận xét thành công!");
+      toast.success("Đã tải nhận xét thành công!");
     } catch (error) {
       logger.error("Error exporting comments:", error);
-      alert("❌ Lỗi khi tải nhận xét: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error("Lỗi khi tải nhận xét: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
   const downloadSubjectTemplate = async () => {
     if (!selectedClass || selectedClass === "all") {
-      alert("Vui lòng chọn lớp để tải mẫu nhập môn học");
+      toast.error("Vui lòng chọn lớp để tải mẫu nhập môn học");
       return;
     }
 
@@ -1549,21 +1550,21 @@ export const useStudentList = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      alert("✅ Đã tải file mẫu thành công!");
+      toast.success("Đã tải file mẫu thành công!");
     } catch (error) {
       logger.error("Error downloading subject template:", error);
-      alert("❌ Lỗi khi tải file mẫu: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error("Lỗi khi tải file mẫu: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
   const handleSubjectImport = async () => {
     if (!subjectImportFile) {
-      alert("Vui lòng chọn file để import");
+      toast.error("Vui lòng chọn file để import");
       return;
     }
 
     if (!selectedClass || selectedClass === "all") {
-      alert("Vui lòng chọn lớp để import môn học");
+      toast.error("Vui lòng chọn lớp để import môn học");
       return;
     }
 
@@ -1593,7 +1594,7 @@ export const useStudentList = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert(
+        toast.success(
           `✅ ${result.message}\n\n` +
             `• Số học sinh đã cập nhật: ${result.total_updated}\n` +
             (result.total_errors > 0
@@ -1611,7 +1612,7 @@ export const useStudentList = () => {
       }
     } catch (error) {
       logger.error("Error importing subjects:", error);
-      alert("❌ Lỗi khi import file: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error("Lỗi khi import file: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setSubjectImportLoading(false);
     }
@@ -1619,7 +1620,7 @@ export const useStudentList = () => {
 
   const exportStudentReportCard = async () => {
     if (!selectedStudentForFeedback) {
-      alert("Không có thông tin học sinh!");
+      toast.error("Không có thông tin học sinh!");
       return;
     }
 
@@ -1637,7 +1638,7 @@ export const useStudentList = () => {
         if (response.success && response.data?.scores) {
           scores = response.data.scores;
         } else {
-          alert(
+          toast.warning(
             "⚠️ Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét.",
           );
           scores = [];
@@ -1891,11 +1892,11 @@ export const useStudentList = () => {
       link.click();
       window.URL.revokeObjectURL(url);
 
-      alert("✅ Xuất phiếu điểm thành công!");
+      toast.success("Xuất phiếu điểm thành công!");
     } catch (error) {
       logger.error("Error exporting report card:", error);
-      alert(
-        "❌ Lỗi khi xuất phiếu điểm: " + (error instanceof Error ? error.message : "Unknown error"),
+      toast.error(
+        "Lỗi khi xuất phiếu điểm: " + (error instanceof Error ? error.message : "Unknown error"),
       );
     }
   };

@@ -6,9 +6,12 @@ import type { AnalyticsData } from "@/hooks/subject-dashboard/useSubjectDashboar
 interface ComparisonTabProps {
   data: AnalyticsData;
   loading?: boolean;
+  hidden?: boolean;
 }
 
-export function ComparisonTab({ data, loading = false }: ComparisonTabProps) {
+export function ComparisonTab({ data, loading = false, hidden = false }: ComparisonTabProps) {
+  if (hidden) return null;
+  
   const classes = data?.class_comparison || [];
 
   if (loading) {
@@ -18,13 +21,35 @@ export function ComparisonTab({ data, loading = false }: ComparisonTabProps) {
           <Skeleton className="h-6 w-64 bg-teal-200" />
           <Skeleton className="h-4 w-96 mt-2 bg-teal-200" />
         </div>
-        <div className="px-6 py-4 space-y-3">
-          {[...Array(5)].map((_, idx) => (
-            <div key={idx} className="flex items-center justify-between py-2">
-              <Skeleton className="h-4 w-96" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
+                  Lớp
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
+                  Điểm trung bình
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
+                  Tỷ lệ đạt
+                </th>
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
+                  Xếp hạng
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {[...Array(5)].map((_, idx) => (
+                <tr key={idx} className="hover:bg-teal-50">
+                  <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                  <td className="px-6 py-4 text-center"><Skeleton className="h-4 w-16 mx-auto" /></td>
+                  <td className="px-6 py-4 text-center"><Skeleton className="h-4 w-16 mx-auto" /></td>
+                  <td className="px-6 py-4 text-center"><Skeleton className="h-4 w-12 mx-auto" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     );
@@ -58,14 +83,7 @@ export function ComparisonTab({ data, loading = false }: ComparisonTabProps) {
       </div>
 
       <div className="overflow-x-auto">
-        {loading ? (
-          <div className="px-6 py-4 space-y-2 bg-white">
-            {[...Array(5)].map((_, idx) => (
-              <Skeleton key={idx} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : (
-          <table className="min-w-full">
+        <table className="min-w-full">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
@@ -107,7 +125,6 @@ export function ComparisonTab({ data, loading = false }: ComparisonTabProps) {
             ))}
           </tbody>
         </table>
-        )}
       </div>
     </div>
   );

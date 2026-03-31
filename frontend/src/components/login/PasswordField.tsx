@@ -3,7 +3,7 @@
  * Provides password visibility toggle for cross-browser compatibility
  */
 import { Eye, EyeOff } from 'lucide-react';
-import { Input } from '@/components/ui/input.tsx';
+import { Input } from '@/components/ui/input';
 import { usePasswordVisibility } from '@/hooks/login/usePasswordVisibility';
 
 interface PasswordFieldProps {

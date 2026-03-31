@@ -44,43 +44,67 @@ import { Input } from "@/components/ui/input";
 import api from "@/utils/api";
 import logger from "@/utils/logger";
 
+interface ParsedDataType {
+  parsed_rows?: any[];
+  total_valid?: number;
+  total_errors?: number;
+  total_parsed?: number;
+  validation_errors?: any[];
+  ocr_errors?: any[];
+  [key: string]: any;
+}
+
+interface ApiError {
+  response?: {
+    status?: number;
+  };
+  message?: string;
+}
+
 const OCRGradeSheet = ({
   selectedClassSubject,
   academicYear,
   semester,
   onImportSuccess,
+  disabled = false,
+}: {
+  selectedClassSubject: any;
+  academicYear: string;
+  semester: string;
+  onImportSuccess: any;
+  disabled?: boolean;
 }) => {
   const [showOCRModal, setShowOCRModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
-  const [parsedData, setParsedData] = useState(null);
-  const [confirmState, setConfirmState] = useState({ open: false });
+  const [parsedData, setParsedData] = useState<ParsedDataType | null>(null);
+  const [confirmState, setConfirmState] = useState<any>({ open: false });
 
-  const openConfirm = useCallback((config) =>
+  const openConfirm = useCallback((config: any) =>
     setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
 
   const closeConfirm = useCallback(() =>
-    setConfirmState((prev) => ({ ...prev, open: false })), []);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+    setConfirmState((prev: any) => ({ ...prev, open: false })), []);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Queue management states
-  const [requestId, setRequestId] = useState(null);
-  const [ocrStatus, setOcrStatus] = useState(null); // 'queued', 'processing', 'completed', 'failed'
-  const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState("");
-  const [queuePosition, setQueuePosition] = useState(null);
+  const [_requestId, setRequestId] = useState<string | null>(null);
+  const [ocrStatus, setOcrStatus] = useState<string | null>(null); // 'queued', 'processing', 'completed', 'failed'
+  const [_progress, setProgress] = useState<number>(0);
+  const [_statusMessage, setStatusMessage] = useState<string>("");
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
 
   // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20); // 20 rows per page
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20); // 20 rows per page
 
   // Editing states - cho phép sửa điểm trực tiếp trong preview
-  const [editingRowIndex, setEditingRowIndex] = useState(null); // Index của row đang edit (trong sorted list)
-  const [editValues, setEditValues] = useState({}); // Giá trị đang edit
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null); // Index của row đang edit (trong sorted list)
+  const [editValues, setEditValues] = useState<any>({}); // Giá trị đang edit
 
   // Hàm cập nhật điểm trong parsedData
-  const handleScoreChange = (globalIndex, field, value) => {
+  const handleScoreChange = (_globalIndex: number, field: string, value: any) => {
     // Validate score value
     let normalizedValue = value.trim();
 
@@ -295,7 +319,9 @@ const OCRGradeSheet = ({
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result);
+      if (typeof reader.result === "string") {
+        setImagePreview(reader.result);
+      }
     };
     reader.readAsDataURL(file);
 
@@ -401,7 +427,8 @@ const OCRGradeSheet = ({
       logger.error("Error uploading OCR:", error);
 
       // Check if queue is full (HTTP 503)
-      if (error.response && error.response.status === 503) {
+      const apiError = error as ApiError;
+      if (apiError?.response && apiError.response.status === 503) {
         toast.warning("Hệ thống đang quá tải!", {
           description: "Hàng chờ đã đầy. Vui lòng thử lại sau vài phút.",
         });
@@ -509,8 +536,9 @@ const OCRGradeSheet = ({
       {/* OCR Button */}
       <Button
         onClick={() => setShowOCRModal(true)}
+        disabled={disabled}
         className="flex items-center space-x-2"
-        title="Upload ảnh bảng điểm viết tay để tự động nhận dạng"
+        title={disabled ? 'Vui lòng cấu hình điểm trước khi quét ảnh' : 'Upload ảnh bảng điểm viết tay để tự động nhận dạng'}
       >
         <Camera className="w-4 h-4" />
         <span>OCR - Nhập điểm từ ảnh</span>
@@ -559,7 +587,7 @@ const OCRGradeSheet = ({
                 </Card>
 
                 {/* Image Preview */}
-                {imagePreview && (
+                {imagePreview && selectedImage && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Ảnh đã chọn</CardTitle>
@@ -781,7 +809,7 @@ const OCRGradeSheet = ({
                 )}
 
                 {/* Pagination Summary */}
-                {(() => {
+                {parsedData && parsedData.parsed_rows && (() => {
                   const totalRows = parsedData.parsed_rows.length;
                   // const totalPages = Math.ceil(totalRows / pageSize);
                   const startIndex = (currentPage - 1) * pageSize;
@@ -877,7 +905,7 @@ const OCRGradeSheet = ({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {(() => {
+                          {parsedData && parsedData.parsed_rows && (() => {
                             // const totalRows = parsedData.parsed_rows.length;
                             const startIndex = (currentPage - 1) * pageSize;
                             const endIndex = startIndex + pageSize;
@@ -1106,7 +1134,7 @@ const OCRGradeSheet = ({
                 </Card>
 
                 {/* Pagination Controls */}
-                {(() => {
+                {parsedData && parsedData.parsed_rows && (() => {
                   const totalRows = parsedData.parsed_rows.length;
                   const totalPages = Math.ceil(totalRows / pageSize);
                   // const startIndex = (currentPage - 1) * pageSize;

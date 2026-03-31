@@ -15,51 +15,76 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ students, attendanceStats, loading = false }: StatsCardsProps) {
+  // Icon definitions (static, never change)
+  const statIcons = [
+    { Icon: Users, bgColor: 'bg-blue-100', iconColor: 'text-blue-600' },
+    { Icon: UserCheck, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
+    { Icon: UserX, bgColor: 'bg-red-100', iconColor: 'text-red-600' },
+    { Icon: BarChart3, bgColor: 'bg-purple-100', iconColor: 'text-purple-600' },
+  ];
+
+  const labels = [
+    'Tổng số học sinh',
+    'Số lần muộn (tháng)',
+    'Số lần vắng (tháng)',
+    'Tỷ lệ điểm danh',
+  ];
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, idx) => (
-          <Card key={idx}>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <Skeleton className="w-12 h-12 rounded-lg flex-shrink-0" />
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-20 mb-3" />
-                  <Skeleton className="h-8 w-16" />
+        {[...Array(4)].map((_, idx) => {
+          const { Icon, bgColor, iconColor } = statIcons[idx];
+          return (
+            <Card key={idx} className="shadow-md">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-4">
+                  {/* Icon - always visible, static */}
+                  <div className={`p-3 ${bgColor} rounded-lg flex-shrink-0`}>
+                    <Icon className={`w-6 h-6 ${iconColor}`} />
+                  </div>
+                  <div className="flex-1">
+                    {/* Label - static text */}
+                    <p className="text-sm font-medium text-gray-600 mb-1">
+                      {labels[idx]}
+                    </p>
+                    {/* Number skeleton - matches text-2xl height */}
+                    <Skeleton className="h-7 w-20 rounded" />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
+      <Card className="shadow-md">
         <CardContent className="p-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-start space-x-4">
             <div className="p-3 bg-blue-100 rounded-lg">
               <Users className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-600">Tổng học sinh</p>
+              <p className="text-sm font-medium text-gray-600">Tổng số học sinh</p>
               <p className="text-2xl font-bold text-gray-900">{students.length}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-md">
         <CardContent className="p-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-start space-x-4">
             <div className="p-3 bg-green-100 rounded-lg">
               <UserCheck className="w-6 h-6 text-green-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600">
-                Tổng số lần muộn (tháng)
+                Số lần muộn (tháng)
               </p>
               <p className="text-2xl font-bold text-gray-900">
                 {attendanceStats?.late_count || 0}
@@ -69,15 +94,15 @@ export function StatsCards({ students, attendanceStats, loading = false }: Stats
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-md">
         <CardContent className="p-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-start space-x-4">
             <div className="p-3 bg-red-100 rounded-lg">
               <UserX className="w-6 h-6 text-red-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600">
-                Tổng số lần vắng (tháng)
+                Số lần vắng (tháng)
               </p>
               <p className="text-2xl font-bold text-gray-900">
                 {attendanceStats?.absent_count || 0}
@@ -87,9 +112,9 @@ export function StatsCards({ students, attendanceStats, loading = false }: Stats
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="shadow-md">
         <CardContent className="p-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-start space-x-4">
             <div className="p-3 bg-purple-100 rounded-lg">
               <BarChart3 className="w-6 h-6 text-purple-600" />
             </div>

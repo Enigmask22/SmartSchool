@@ -33,6 +33,7 @@ interface StudentsTableProps {
   selectedClass: string;
   isHomeroomTeacher: boolean;
   totalPages: number;
+  totalStudents: number;
   onDeleteFace: (studentId: string, studentName: string) => Promise<boolean>;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
@@ -45,17 +46,14 @@ export default function StudentsTable({
   selectedClass,
   isHomeroomTeacher,
   totalPages,
+  totalStudents,
   onDeleteFace,
   onPageChange,
   onPageSizeChange,
 }: StudentsTableProps) {
-  // Get paginated students
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedStudents = students.slice(startIndex, endIndex);
 
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -70,7 +68,7 @@ export default function StudentsTable({
                 ` - Lớp ${selectedClass}`}
             </CardDescription>
           </div>
-          {students.length > pageSize && (
+          {totalStudents > pageSize && (
             <div className="flex items-center space-x-2">
               <label className="text-sm text-muted-foreground">
                 Số lượng/trang:
@@ -138,7 +136,7 @@ export default function StudentsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedStudents.map((student) => (
+              students.map((student) => (
                 <TableRow key={student.id}>
                   <TableCell className="text-sm font-medium text-gray-900 truncate">
                     {student.student_id}
@@ -209,11 +207,11 @@ export default function StudentsTable({
                 </span>{' '}
                 đến{' '}
                 <span className="font-semibold text-foreground">
-                  {Math.min(currentPage * pageSize, students.length)}
+                  {Math.min(currentPage * pageSize, totalStudents)}
                 </span>{' '}
                 trong tổng số{' '}
                 <span className="font-semibold text-foreground">
-                  {students.length}
+                  {totalStudents}
                 </span>{' '}
                 học sinh
               </div>

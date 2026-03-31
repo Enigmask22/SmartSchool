@@ -137,7 +137,7 @@ const Sidebar = ({
       return [
         ...baseItems,
         { label: "Học sinh lớp chủ nhiệm", icon: "students", route: HOMEROOM_ROUTES.STUDENTS },
-        { label: "Điểm danh lớp", icon: "attendance", route: HOMEROOM_ROUTES.ATTENDANCE },
+        { label: "Điểm danh lớp học", icon: "attendance", route: HOMEROOM_ROUTES.ATTENDANCE },
         { label: "Quản lý khuôn mặt", icon: "faces", route: HOMEROOM_ROUTES.FACES },
       ];
     } else if (selectedDashboardType === "subject") {
@@ -152,7 +152,7 @@ const Sidebar = ({
         return [
           ...baseItems,
           { label: "Học sinh lớp chủ nhiệm", icon: "students", route: HOMEROOM_ROUTES.STUDENTS },
-          { label: "Điểm danh lớp", icon: "attendance", route: HOMEROOM_ROUTES.ATTENDANCE },
+          { label: "Điểm danh lớp học", icon: "attendance", route: HOMEROOM_ROUTES.ATTENDANCE },
           { label: "Điểm danh tự động", icon: "continuous", route: HOMEROOM_ROUTES.CONTINUOUS },
           { label: "Quản lý khuôn mặt", icon: "faces", route: HOMEROOM_ROUTES.FACES },
         ];
@@ -288,7 +288,7 @@ const Sidebar = ({
                 w-full justify-start h-10 px-3 text-sm font-medium
                 ${
                   isActive
-                    ? "bg-blue-100 text-blue-900 border-r-2 border-blue-600"
+                    ? "bg-blue-100 text-blue-900 hover:bg-blue-200"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }
                 ${!isOpen && "justify-center px-2"}

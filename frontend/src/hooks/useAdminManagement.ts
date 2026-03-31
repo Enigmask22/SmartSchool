@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
+import { toast } from 'sonner';
 
 // Tab Configuration
 export const TAB_CONFIG = {
@@ -348,7 +349,7 @@ export function useAdminManagement() {
   // CRUD Operations
   const handleInitializeClassSubjects = useCallback(() => {
     if (!selectedClassId || !selectedAcademicYear) {
-      alert('Vui lòng chọn lớp và năm học!');
+      toast.error('Vui lòng chọn lớp và năm học!');
       return;
     }
 
@@ -381,7 +382,7 @@ export function useAdminManagement() {
         }));
 
       if (classSubjectsToCreate.length === 0) {
-        alert('Không có môn học nào để khởi tạo!');
+        toast.error('Không có môn học nào để khởi tạo!');
         return;
       }
 
@@ -418,12 +419,12 @@ export function useAdminManagement() {
         }
       }
 
-      alert(message);
+      toast.success(message);
       await loadData();
     } catch (error) {
       logger.error('Error initializing class subjects:', error);
       const errorMsg = error instanceof Error ? error.message : 'Lỗi không xác định';
-      alert('❌ Lỗi khi khởi tạo môn học: ' + errorMsg);
+      toast.error('Lỗi khi khởi tạo môn học: ' + errorMsg);
     } finally {
       setLoading(false);
     }
@@ -493,7 +494,7 @@ export function useAdminManagement() {
           setSelectedSubjects([]);
           loadData();
           loadReferenceData();
-          alert(
+          toast.success(
             `Tạo giáo viên thành công${
               selectedSubjects.length > 0 ? ` và phân công ${selectedSubjects.length} môn học!` : '!'
             }`
@@ -547,18 +548,18 @@ export function useAdminManagement() {
             setShowAddForm(false);
             setFormData({});
             loadData();
-            alert('Tạo thành công!');
+            toast.success('Tạo thành công!');
           } else {
             const errorMsg = response.message || 'Không thể tạo bản ghi';
             setError(errorMsg);
-            alert('❌ ' + errorMsg);
+            toast.error(errorMsg);
           }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         const errorMsg = 'Lỗi khi tạo: ' + errMsg;
         setError(errorMsg);
-        alert('❌ ' + errorMsg);
+        toast.error(errorMsg);
       }
     },
     [activeTab, currentConfig?.endpoint, selectedSubjects, loadData, loadReferenceData]
@@ -628,7 +629,7 @@ export function useAdminManagement() {
           setSelectedSubjects([]);
           loadData();
           loadReferenceData();
-          alert(`Cập nhật giáo viên thành công!`);
+          toast.success(`Cập nhật giáo viên thành công!`);
         } else {
           const updatePayload =
             activeTab === 'subjects'
@@ -674,18 +675,18 @@ export function useAdminManagement() {
             setEditingItem(null);
             setFormData({});
             loadData();
-            alert('Cập nhật thành công!');
+            toast.success('Cập nhật thành công!');
           } else {
             const errorMsg = response.message || 'Không thể cập nhật';
             setError(errorMsg);
-            alert('❌ ' + errorMsg);
+            toast.error(errorMsg);
           }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         const errorMsg = 'Lỗi khi cập nhật: ' + errMsg;
         setError(errorMsg);
-        alert('❌ ' + errorMsg);
+        toast.error(errorMsg);
       }
     },
     [activeTab, currentConfig?.endpoint, selectedSubjects, teacherSubjects, subjectTeachersData, loadData, loadReferenceData]
@@ -707,7 +708,7 @@ export function useAdminManagement() {
             });
             if (response.success) {
               loadData();
-              alert('Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".');
+              toast.success('Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".');
             } else {
               setError(response.message || 'Không thể xóa');
             }
@@ -738,7 +739,7 @@ export function useAdminManagement() {
             });
             if (response.success) {
               loadData();
-              alert('Khôi phục thành công!');
+              toast.success('Khôi phục thành công!');
             } else {
               setError(response.message || 'Không thể khôi phục');
             }
@@ -768,7 +769,7 @@ export function useAdminManagement() {
             });
             if (response.success) {
               loadData();
-              alert('Xóa vĩnh viễn thành công!');
+              toast.success('Xóa vĩnh viễn thành công!');
             } else {
               setError(response.message || 'Không thể xóa vĩnh viễn');
             }
@@ -833,7 +834,7 @@ export function useAdminManagement() {
 
   const handleImportTeachers = useCallback(async () => {
     if (selectedUserIds.length === 0) {
-      alert('Vui lòng chọn ít nhất một user để tạo giáo viên');
+      toast.error('Vui lòng chọn ít nhất một user để tạo giáo viên');
       return;
     }
 
@@ -877,7 +878,7 @@ export function useAdminManagement() {
         loadReferenceData();
 
         const totalSubjects = Object.values(userSubjects as Record<string, any[]>).reduce((sum, subjects) => sum + (subjects as any[]).length, 0);
-        alert(
+        toast.success(
           `Tạo thành công ${createdTeachers.length} giáo viên${
             totalSubjects > 0 ? ` và phân công ${totalSubjects} môn học!` : '!'
           }`

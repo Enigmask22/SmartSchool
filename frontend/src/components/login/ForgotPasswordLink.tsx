@@ -1,7 +1,7 @@
 /**
  * ForgotPasswordLink - Forgot password navigation button
  */
-import { Button } from '@/components/ui/button.tsx';
+import { Button } from '@/components/ui/button';
 
 interface ForgotPasswordLinkProps {
   onClick: () => void;

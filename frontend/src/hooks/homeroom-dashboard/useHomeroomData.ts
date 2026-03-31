@@ -9,7 +9,7 @@
  * - Sorting top absent/late students
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
 
@@ -111,7 +111,8 @@ interface BootstrapParams {
  * Hook Return Type
  */
 export interface UseHomeroomDataReturn {
-  loading: boolean;
+  loading: boolean;  // Alias for initialLoading - only true during first bootstrap
+  isRefetching: boolean;  // True during filter changes (don't show skeletons)
   homeroomInfo: HomeroomInfo | null;
   academicYears: string[];
   selectedAcademicYear: string;
@@ -139,7 +140,9 @@ export interface UseHomeroomDataReturn {
  * - Attendance statistics calculation
  */
 export const useHomeroomData = (): UseHomeroomDataReturn => {
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isRefetching, setIsRefetching] = useState(false);
+  const hasInitialized = useRef(false);
   const [homeroomInfo, setHomeroomInfo] = useState<HomeroomInfo | null>(null);
   const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
@@ -189,7 +192,11 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
    */
   const fetchDashboardData = useCallback(async (params: BootstrapParams = {}) => {
     try {
-      setLoading(true);
+      if (!hasInitialized.current) {
+        setInitialLoading(true);
+      } else {
+        setIsRefetching(true);
+      }
       const { ay, y, m, clsName, clsId } = params;
       const queryParams = new URLSearchParams();
       if (ay) queryParams.set('academic_year', ay);
@@ -248,7 +255,12 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
     } catch (error) {
       logger.error('Failed to fetch homeroom dashboard data:', error);
     } finally {
-      setLoading(false);
+      if (!hasInitialized.current) {
+        hasInitialized.current = true;
+        setInitialLoading(false);
+      } else {
+        setIsRefetching(false);
+      }
     }
   }, [selectedAcademicYear]);
 
@@ -260,7 +272,8 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
   }, [fetchDashboardData]);
 
   return {
-    loading,
+    loading: initialLoading,
+    isRefetching,
     homeroomInfo,
     academicYears,
     selectedAcademicYear,

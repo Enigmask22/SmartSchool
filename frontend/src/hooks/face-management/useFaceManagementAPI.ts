@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import ApiService from '@/utils/api';
 import logger from '@/utils/logger';
+import { toast } from 'sonner';
 
 export interface AIStatus {
   service_status: string;
@@ -249,16 +250,16 @@ export const useFaceManagementAPI = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert('Xóa khuôn mặt thành công!');
+        toast.success('Xóa khuôn mặt thành công!');
         // Refetch data instead of manual state update
         return true;
       } else {
-        alert(`Lỗi: ${result.message}`);
+        toast.error(`Lỗi: ${result.message}`);
         return false;
       }
     } catch (err) {
       logger.error('Error deleting face encoding:', err);
-      alert('Có lỗi xảy ra khi xóa khuôn mặt');
+      toast.error('Có lỗi xảy ra khi xóa khuôn mặt');
       return false;
     } finally {
       setUpdating(false);
@@ -275,15 +276,15 @@ export const useFaceManagementAPI = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert('Reload models thành công!');
+        toast.success('Reload models thành công!');
         return true;
       } else {
-        alert(`Lỗi: ${result.message}`);
+        toast.error(`Lỗi: ${result.message}`);
         return false;
       }
     } catch (err) {
       logger.error('Error reloading models:', err);
-      alert('Có lỗi xảy ra khi reload models');
+      toast.error('Có lỗi xảy ra khi reload models');
       return false;
     } finally {
       setUpdating(false);

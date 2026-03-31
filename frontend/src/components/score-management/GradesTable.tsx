@@ -1,5 +1,6 @@
 // React already imported by JSX transform
 import { Users, User, Star, Zap, Plus, Pencil } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface GradesTableProps {
   students: any[];
@@ -13,7 +14,7 @@ interface GradesTableProps {
   calculateFinalGrade: (scoreData: any) => string | number;
 }
 
-const GradesTable = ({
+export default function GradesTable({
   students,
   scoreConfig,
   currentPage,
@@ -23,7 +24,9 @@ const GradesTable = ({
   onEditScore,
   getDisplayColumns,
   calculateFinalGrade,
-}: GradesTableProps) => {
+}
+: GradesTableProps) 
+{
   const displayColumns = getDisplayColumns(scoreConfig?.score_column_config || {});
 
   return (
@@ -49,7 +52,7 @@ const GradesTable = ({
                 onPageSizeChange(Number(e.target.value));
                 onPageChange(1);
               }}
-              className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="min-w-16 pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -150,6 +153,23 @@ const GradesTable = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {(() => {
+              // Show empty state if no students
+              if (students.length === 0) {
+                return (
+                  <tr>
+                    <td colSpan={displayColumns.length + 7} className="px-5 py-12">
+                      <div className="text-center space-y-3">
+                        <Users className="w-12 h-12 text-gray-300 mx-auto" />
+                        <div>
+                          <p className="text-lg font-medium text-gray-600">Chưa có dữ liệu học sinh</p>
+                          <p className="text-sm text-gray-400 mt-1">Lớp này hiện chưa có học sinh</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+
               const startIndex = (currentPage - 1) * pageSize;
               const endIndex = startIndex + pageSize;
               const paginatedStudents = students.slice(startIndex, endIndex);
@@ -339,4 +359,59 @@ const GradesTable = ({
   );
 };
 
-export default GradesTable;
+export const GradeTableSkeleton = () => (
+  <div className="overflow-hidden bg-white rounded-lg shadow-md">
+    {/* Table Header - Static, no skeleton */}
+    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-3">
+          <Users className="h-5 w-5 text-gray-700" />
+          <h3 className="text-lg font-bold text-gray-800">
+            Danh sách học sinh
+          </h3>
+          {/* <span className="px-3 py-1 text-sm font-medium text-blue-800 bg-blue-100 rounded-full">
+            ? học sinh
+          </span> */}
+        </div>
+        <div className="flex items-center space-x-2">
+          <label className="text-sm text-gray-700">
+            Số lượng/trang:
+          </label>
+          <select
+            disabled
+            className="min-w-16 pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md bg-gray-50"
+          >
+            <option>10</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    {/* Table */}
+    <div className="overflow-x-auto">
+      <div className="p-6 space-y-3 w-full">
+        {/* Table header skeleton */}
+        <div className="pb-3 border-b-2 border-gray-300 flex gap-3 w-full">
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 flex-1" />
+        </div>
+
+        {/* Table rows skeleton */}
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((row) => (
+          <div key={row} className="flex gap-3 w-full">
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 flex-1" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import ApiService from '@/utils/api';
 import logger from '@/utils/logger';
+import { toast } from 'sonner';
 
 // Type definitions
 export interface AIStatus {
@@ -277,16 +278,16 @@ export const useFaceManagement = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert('Xóa khuôn mặt thành công!');
+        toast.success('Xóa khuôn mặt thành công!');
         await fetchData();
         return true;
       } else {
-        alert(`Lỗi: ${result.message}`);
+        toast.error(`Lỗi: ${result.message}`);
         return false;
       }
     } catch (error) {
       logger.error('Error deleting face encoding:', error);
-      alert('Có lỗi xảy ra khi xóa khuôn mặt');
+      toast.error('Có lỗi xảy ra khi xóa khuôn mặt');
       return false;
     }
   };
@@ -301,16 +302,16 @@ export const useFaceManagement = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert('Reload models thành công!');
+        toast.success('Reload models thành công!');
         await fetchData();
         return true;
       } else {
-        alert(`Lỗi: ${result.message}`);
+        toast.error(`Lỗi: ${result.message}`);
         return false;
       }
     } catch (error) {
       logger.error('Error reloading models:', error);
-      alert('Có lỗi xảy ra khi reload models');
+      toast.error('Có lỗi xảy ra khi reload models');
       return false;
     }
   };

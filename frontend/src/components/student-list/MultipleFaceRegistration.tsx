@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import logger from "@/utils/logger";
+import { toast } from 'sonner';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8000/api';
@@ -38,7 +39,7 @@ const MultipleFaceRegistration: React.FC<MultipleFaceRegistrationProps> = ({ stu
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
     if (selectedFiles.length > 10) {
-      alert('Tối đa 10 ảnh mỗi lần');
+      toast.error('Tối đa 10 ảnh mỗi lần');
       return;
     }
     
@@ -96,15 +97,15 @@ const MultipleFaceRegistration: React.FC<MultipleFaceRegistrationProps> = ({ stu
         // Show success message
         const successCount = result.data.successful_registrations;
         const totalCount = result.data.total_images;
-        alert(`Đăng ký thành công ${successCount}/${totalCount} ảnh cho ${student.full_name}!`);
+        toast.success(`Đăng ký thành công ${successCount}/${totalCount} ảnh cho ${student.full_name}!`);
         
         if (onSuccess) onSuccess();
       } else {
-        alert(`Lỗi: ${result.message}`);
+        toast.error(`Lỗi: ${result.message}`);
       }
     } catch (error) {
       logger.error('Error registering multiple faces:', error);
-      alert('Có lỗi xảy ra khi đăng ký nhiều khuôn mặt');
+      toast.error('Có lỗi xảy ra khi đăng ký nhiều khuôn mặt');
     } finally {
       setLoading(false);
     }

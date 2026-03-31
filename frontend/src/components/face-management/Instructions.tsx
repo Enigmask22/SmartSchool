@@ -5,7 +5,7 @@ import {
 
 export default function Instructions() {
   return (
-    <Card className="mt-6">
+    <Card className="mt-6 shadow-md">
       <CardContent className="p-6">
         <h4 className="mb-2 text-lg font-semibold text-primary">
           Hướng dẫn sử dụng

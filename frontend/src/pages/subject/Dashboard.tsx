@@ -1,5 +1,4 @@
-﻿import { useContext, useState } from "react";
-import { AuthContext } from "@/contexts/AuthContext";
+﻿import { useState } from "react";
 import {
   Header,
   StatsCards,
@@ -17,9 +16,6 @@ import {
 } from "@/hooks/subject-dashboard/useSubjectDashboard";
 
 const SubjectTeacherDashboard = () => {
-  const authContext = useContext(AuthContext);
-  const user = authContext?.user;
-  
   // UI State - Tab selection (kept in component)
   const [selectedTab, setSelectedTab] = useState("overview");
   
@@ -41,7 +37,6 @@ const SubjectTeacherDashboard = () => {
       <div className="mx-auto space-y-6 max-w-7xl">
         {/* Header with user info and filters */}
         <Header
-          userName={user?.full_name || ""}
           academicYear={academicYear}
           semester={semester}
           onAcademicYearChange={setAcademicYear}
@@ -65,7 +60,8 @@ const SubjectTeacherDashboard = () => {
         <StatsCards analytics={analytics || {
           total_classes: 0,
           total_students: 0,
-          students_with_grades: 0,
+          students_with_scores: 0,
+          students_without_scores: 0,
           is_letter_grade_subject: false,
           subjects: [],
           overview: { pass_count: 0, fail_count: 0, average_score: 0, highest_score: 0, lowest_score: 0, pass_rate: 0 },
@@ -80,14 +76,65 @@ const SubjectTeacherDashboard = () => {
         <TabButtons selectedTab={selectedTab} onTabChange={setSelectedTab} />
 
         {/* Tab Content */}
-        {analytics && (
-          <>
-            {selectedTab === "overview" && <OverviewTab data={analytics} loading={loading} />}
-            {selectedTab === "attention" && <AttentionTab data={analytics} loading={loading} />}
-            {selectedTab === "top" && <TopStudentsTab data={analytics} loading={loading} />}
-            {selectedTab === "comparison" && <ComparisonTab data={analytics} loading={loading} />}
-          </>
-        )}
+        <OverviewTab data={analytics || {
+          total_classes: 0,
+          total_students: 0,
+          students_with_scores: 0,
+          students_without_scores: 0,
+          is_letter_grade_subject: false,
+          subjects: [],
+          overview: { pass_count: 0, fail_count: 0, average_score: 0, highest_score: 0, lowest_score: 0, pass_rate: 0 },
+          performance_groups: {},
+          score_distribution: {},
+          students_need_attention: [],
+          top_students: [],
+          class_comparison: [],
+        }} loading={loading} hidden={selectedTab !== "overview"} />
+        
+        <AttentionTab data={analytics || {
+          total_classes: 0,
+          total_students: 0,
+          students_with_scores: 0,
+          students_without_scores: 0,
+          is_letter_grade_subject: false,
+          subjects: [],
+          overview: { pass_count: 0, fail_count: 0, average_score: 0, highest_score: 0, lowest_score: 0, pass_rate: 0 },
+          performance_groups: {},
+          score_distribution: {},
+          students_need_attention: [],
+          top_students: [],
+          class_comparison: [],
+        }} loading={loading} hidden={selectedTab !== "attention"} />
+        
+        <TopStudentsTab data={analytics || {
+          total_classes: 0,
+          total_students: 0,
+          students_with_scores: 0,
+          students_without_scores: 0,
+          is_letter_grade_subject: false,
+          subjects: [],
+          overview: { pass_count: 0, fail_count: 0, average_score: 0, highest_score: 0, lowest_score: 0, pass_rate: 0 },
+          performance_groups: {},
+          score_distribution: {},
+          students_need_attention: [],
+          top_students: [],
+          class_comparison: [],
+        }} loading={loading} hidden={selectedTab !== "top"} />
+        
+        <ComparisonTab data={analytics || {
+          total_classes: 0,
+          total_students: 0,
+          students_with_scores: 0,
+          students_without_scores: 0,
+          is_letter_grade_subject: false,
+          subjects: [],
+          overview: { pass_count: 0, fail_count: 0, average_score: 0, highest_score: 0, lowest_score: 0, pass_rate: 0 },
+          performance_groups: {},
+          score_distribution: {},
+          students_need_attention: [],
+          top_students: [],
+          class_comparison: [],
+        }} loading={loading} hidden={selectedTab !== "comparison"} />
       </div>
     </div>
   );

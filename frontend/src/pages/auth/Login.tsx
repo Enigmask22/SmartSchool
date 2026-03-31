@@ -15,7 +15,7 @@ import {
   CardDescription, 
   CardHeader, 
   CardTitle 
-} from '@/components/ui/card.tsx';
+} from '@/components/ui/card';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useAuthSubmit } from '@/hooks/login/useAuthSubmit';
 import {

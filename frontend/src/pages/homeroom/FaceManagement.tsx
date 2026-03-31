@@ -1,5 +1,6 @@
-import { Camera, AlertCircle } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { useEffect } from 'react';
+import { PageHeader } from '@/components/common/PageHeader';
 import { useFaceManagementAPI } from '@/hooks/face-management/useFaceManagementAPI';
 import { useFaceManagementFilters } from '@/hooks/face-management/useFaceManagementFilters';
 import {
@@ -72,47 +73,51 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
   const displayError = api.error;
 
   return (
-    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
-      {/* Header - always visible */}
-      <div className="space-y-2">
-        <h2 className="flex items-center space-x-2 text-3xl font-bold text-gray-900">
-          <Camera className="w-8 h-8 text-primary" />
-          <span>Quản lý khuôn mặt AI</span>
-        </h2>
-        <p className="text-gray-600">
-          Theo dõi và quản lý dữ liệu khuôn mặt đã đăng ký
-        </p>
-        {displayError && (
-          <div className="flex items-center p-3 mt-2 space-x-2 text-red-700 bg-red-100 border border-red-400 rounded">
-            <AlertCircle className="w-5 h-5" />
-            <span>{displayError}</span>
+    <div className="min-h-screen p-6 space-y-6">
+      {/* Header with PageHeader component */}
+      <PageHeader
+        title="Quản lý khuôn mặt AI"
+        description="Theo dõi và quản lý dữ liệu khuôn mặt đã đăng ký"
+        icon={
+          <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
+            <Camera className="w-8 h-8 text-white" />
           </div>
-        )}
-      </div>
+        }
+      />
 
-      {/* AI Status Card - Skeleton on initial load */}
-      {api.loading && !api.aiStatus ? (
-        <AIStatusCardSkeleton />
-      ) : (
-        <AIStatusCard
-          aiStatus={api.aiStatus}
-          onReloadModels={api.reloadModels}
-          onRefresh={() => api.fetchData(filters.selectedAcademicYear, filters.selectedClass)}
-        />
+      {/* Error display */}
+      {displayError && (
+        <div className="flex items-center p-4 space-x-2 text-red-700 bg-red-100 border border-red-400 rounded-lg">
+          <span>{displayError}</span>
+        </div>
       )}
 
-      {/* Filter Section - always visible (no skeleton needed) */}
-      <FilterSection
-        selectedClass={filters.selectedClass}
-        availableClasses={api.bootstrapData.availableClasses}
-        classesLoading={api.loading}
-        selectedAcademicYear={filters.selectedAcademicYear}
-        academicYears={api.bootstrapData.academicYears}
-        isHomeroomTeacher={api.isHomeroomTeacher()}
-        onClassChange={handleClassChange}
-        onYearChange={handleYearChange}
-        onRefresh={() => api.fetchData(filters.selectedAcademicYear, filters.selectedClass)}
-      />
+      {/* AI Status and Filter Section - Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* AI Status Card - Skeleton on initial load */}
+        {api.loading && !api.aiStatus ? (
+          <AIStatusCardSkeleton />
+        ) : (
+          <AIStatusCard
+            aiStatus={api.aiStatus}
+            onReloadModels={api.reloadModels}
+            onRefresh={() => api.fetchData(filters.selectedAcademicYear, filters.selectedClass)}
+          />
+        )}
+
+        {/* Filter Section - always visible (no skeleton needed) */}
+        <FilterSection
+          selectedClass={filters.selectedClass}
+          availableClasses={api.bootstrapData.availableClasses}
+          classesLoading={api.loading}
+          selectedAcademicYear={filters.selectedAcademicYear}
+          academicYears={api.bootstrapData.academicYears}
+          isHomeroomTeacher={api.isHomeroomTeacher()}
+          onClassChange={handleClassChange}
+          onYearChange={handleYearChange}
+          onRefresh={() => api.fetchData(filters.selectedAcademicYear, filters.selectedClass)}
+        />
+      </div>
 
       {/* Students Table - Skeleton on initial load */}
       {api.loading && api.students.length === 0 ? (
@@ -125,6 +130,7 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
           selectedClass={filters.selectedClass}
           isHomeroomTeacher={api.isHomeroomTeacher()}
           totalPages={totalPages}
+          totalStudents={api.students.length}
           onDeleteFace={handleDeleteFace}
           onPageChange={filters.setCurrentPage}
           onPageSizeChange={filters.setPageSize}
