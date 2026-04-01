@@ -217,7 +217,12 @@ const Sidebar = ({
         <div className="flex items-center justify-between p-4 text-white bg-blue-600">
           {isOpen && (
             <div className="flex items-center space-x-2">
-              <School className="w-6 h-6" />
+              {/* <School className="w-6 h-6" /> */}
+              <img
+                src="/logo-no-bg.png"
+                alt="Logo"
+                className="w-12 h-12 rounded-full"
+              />
               <h1 className="text-lg font-bold">SynapseS</h1>
             </div>
           )}

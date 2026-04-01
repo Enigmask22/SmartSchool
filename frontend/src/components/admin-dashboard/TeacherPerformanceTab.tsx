@@ -28,11 +28,11 @@ export function TeacherPerformanceTab({
   loading = false,
 }: TeacherPerformanceTabProps) {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <UserCheck className="w-5 h-5" />
-          <span>Hiệu Suất Giáo Viên</span>
+          <span>Hiệu suất giáo viên</span>
         </CardTitle>
         <CardDescription>
           Thống kê hiệu suất quản lý lớp của giáo viên

@@ -9,6 +9,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import { useTabCrud } from '@/hooks/admin-management/useTabCrud';
+import { useAdminForm } from '@/hooks/admin-management/useAdminForm';
+import { useAdminSearch } from '@/hooks/admin-management/useAdminSearch';
+import { useTeacherSubjectManagement } from '@/hooks/admin-management/useTeacherSubjectManagement';
+import { useScoreColumnManagement } from '@/hooks/admin-management/useScoreColumnManagement';
 import { renderFieldHeader, renderTableCell } from './tableHelpers';
 import { AdminManagementForm } from './AdminManagementForm';
 import logger from '@/utils/logger';
@@ -19,6 +25,7 @@ interface AdminTableProps {
   isLoading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  scoreColumnHook?: any;
 }
 
 export const AdminTable: React.FC<AdminTableProps> = ({
@@ -27,13 +34,34 @@ export const AdminTable: React.FC<AdminTableProps> = ({
   isLoading = false,
   error = null,
   onRetry,
+  scoreColumnHook,
 }) => {
+  // Use refactored hooks directly for independent state management
+  const search = useAdminSearch();
+  const tabCrud = useTabCrud(hook.activeTab, search.showDeleted);
+  const form = useAdminForm();
+  const teacherSubjectHook = useTeacherSubjectManagement(tabCrud.editingItem, false, hook.activeTab);
+  const scoreColumnHookLocal = useScoreColumnManagement();
+
   const renderForm = (isEdit = false, item = null) => {
-    return <AdminManagementForm hook={hook} isEdit={isEdit} item={item} />;
+    return (
+      <AdminManagementForm 
+        hook={hook} 
+        teacherSubjectHook={teacherSubjectHook}
+        scoreColumnHook={scoreColumnHookLocal}
+        isEdit={isEdit} 
+        item={item}
+        onCancel={() => {
+          tabCrud.setEditingItem(null);
+          teacherSubjectHook.setSelectedSubjects([]);
+          scoreColumnHookLocal.setScoreColumns([]);
+        }}
+      />
+    );
   };
 
   const handleEdit = (item: any) => {
-    hook.setEditingItem(item.id);
+    tabCrud.setEditingItem(item.id);
     if (hook.activeTab === 'teachers') {
       logger.debug('>>> EDIT TEACHER CLICKED');
       logger.debug('>>> Original item:', item);
@@ -42,9 +70,9 @@ export const AdminTable: React.FC<AdminTableProps> = ({
         gender: item.gender || 'Nam',
         date_of_birth: item.date_of_birth || '',
       };
-      hook.setFormData(initData);
+      form.setFormData(initData);
     } else if (hook.activeTab === 'score_settings') {
-      hook.setFormData(item);
+      form.setFormData(item);
       if (item.score_column_config) {
         const columnsArray = Object.entries(item.score_column_config as Record<string, any>).map(
           ([key, value]) => ({
@@ -54,12 +82,12 @@ export const AdminTable: React.FC<AdminTableProps> = ({
             data: (value.data as any) || null,
           })
         );
-        hook.setScoreColumns(columnsArray);
+        scoreColumnHook?.setScoreColumns(columnsArray);
       } else {
-        hook.setScoreColumns([]);
+        scoreColumnHook?.setScoreColumns([]);
       }
     } else if (hook.activeTab === 'subjects') {
-      hook.setFormData(item);
+      form.setFormData(item);
       hook.fetchSubjectScoreSettings(item.id);
       if (item.score_column_config) {
         const sc = item.score_column_config as Record<string, any>;
@@ -69,12 +97,12 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           he_so: value.he_so as number,
           data: (value.data as any) || null,
         }));
-        hook.setScoreColumns(columnsArray);
+        scoreColumnHook?.setScoreColumns(columnsArray);
       } else {
-        hook.setScoreColumns([]);
+        scoreColumnHook?.setScoreColumns([]);
       }
     } else {
-      hook.setFormData(item);
+      form.setFormData(item);
     }
 
     if (hook.activeTab === 'class_subjects' && item.subject_id) {
@@ -98,13 +126,9 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           <TableHeader>
             <TableRow>
               {hook.currentConfig?.displayFields?.map((field: string) => (
-                <TableHead key={field}>
-                  <div className="h-4 rounded animate-pulse bg-muted"></div>
-                </TableHead>
+                <TableHead key={field}>{renderFieldHeader(field)}</TableHead>
               ))}
-              <TableHead>
-                <div className="h-4 rounded animate-pulse bg-muted"></div>
-              </TableHead>
+              <TableHead>THAO TÁC</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -172,12 +196,12 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                 ))}
                 <TableCell>
                   <div className="flex space-x-2">
-                    {hook.showDeleted ? (
+                    {search.showDeleted ? (
                       <>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => hook.handleRestore(item.id)}
+                          onClick={() => tabCrud.handleRestore(item.id)}
                           className="text-green-600 border-green-200 hover:bg-green-50"
                           title="Khôi phục"
                         >
@@ -186,7 +210,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => hook.handlePermanentDelete(item.id)}
+                          onClick={() => tabCrud.handlePermanentDelete(item.id)}
                           className="text-red-600 border-red-200 hover:bg-red-50"
                           title="Xóa vĩnh viễn"
                         >
@@ -207,7 +231,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => hook.handleDelete(item.id)}
+                          onClick={() => tabCrud.handleDelete(item.id)}
                           className="text-destructive hover:bg-destructive/10"
                           title="Xóa tạm thời"
                         >
@@ -218,7 +242,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                   </div>
                 </TableCell>
               </TableRow>
-              {hook.editingItem === item.id && (
+              {tabCrud.editingItem === item.id && (
                 <TableRow>
                   <TableCell
                     colSpan={(hook.currentConfig?.displayFields?.length || 0) + 1}
@@ -238,6 +262,20 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           ))}
         </TableBody>
       </Table>
+
+      {/* Confirm Dialog for delete/restore operations */}
+      {tabCrud.confirmState.open && (
+        <ConfirmDialog
+          open={true}
+          title={tabCrud.confirmState.title || ''}
+          description={tabCrud.confirmState.description}
+          variant={tabCrud.confirmState.variant}
+          confirmText={tabCrud.confirmState.confirmText}
+          cancelText={tabCrud.confirmState.cancelText}
+          onCancel={tabCrud.closeConfirm}
+          onConfirm={tabCrud.confirmState.onConfirm || (() => {})}
+        />
+      )}
     </div>
   );
 };

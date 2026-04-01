@@ -16,10 +16,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Settings } from "lucide-react";
+import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { useRecognitionConnection } from "@/hooks/continuous-recognition/useRecognitionConnection";
 import { useRecognitionCameraSource } from "@/hooks/continuous-recognition/useRecognitionCameraSource";
@@ -214,20 +211,12 @@ export default function ContinuousRecognitionPage() {
   };
 
   return (
-    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
+    <div className="min-h-screen p-6 space-y-6">
       <div className="mx-auto space-y-6 max-w-7xl">
         {/* ==================== PAGE HEADER ==================== */}
         <PageHeader
           isConnected={isConnected}
           isRunning={isRunning}
-          isCameraOn={isCameraOn}
-          cameraSource={cameraSource}
-          selectedCameraId={selectedCameraId}
-          selectedMultiCameras={selectedMultiCameras}
-          useMultiCamera={useMultiCamera}
-          availableCameras={availableCameras}
-          onToggleCamera={toggleCamera}
-          onToggleRecognition={isRunning ? handleStop : handleStart}
           totalRecognitionsToday={totalRecognitionsToday}
           runningTime={startTime ? Math.floor((Date.now() - startTime) / 1000) : 0}
         />
@@ -239,12 +228,13 @@ export default function ContinuousRecognitionPage() {
           runningTime={stats.runningTime}
           isConnected={isConnected}
           cooldownPeriod={cooldownPeriod}
+          totalRecognitionsToday={totalRecognitionsToday}
         />
 
         {/* ==================== MAIN CONTENT ==================== */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* ================== LEFT: CAMERA VIEW ================== */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             <CameraView
               cameraSource={cameraSource}
               selectedCameraId={selectedCameraId}
@@ -266,74 +256,57 @@ export default function ContinuousRecognitionPage() {
 
           {/* ================== RIGHT PANEL ================== */}
           <div className="space-y-6">
-            {/* Today's Statistics */}
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-lg mb-4">Thống Kê Hôm Nay</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      Tổng điểm danh:
-                    </span>
-                    <span className="text-xl font-bold text-green-600">
-                      {totalRecognitionsToday}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      Thời gian chờ:
-                    </span>
-                    <span className="font-bold text-primary">
-                      {cooldownPeriod}s
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
             {/* Recent Recognitions */}
             <RecentRecognitions
               recognitions={recentRecognitions}
               maxItems={20}
+              cooldownPeriod={cooldownPeriod}
+              settingsError={settingsError}
+              onCooldownChange={setCooldownPeriod}
+              onSaveSettings={handleSaveSettings}
+              isCameraOn={isCameraOn}
+              isRunning={isRunning}
+              cameraSource={cameraSource}
+              onToggleCamera={toggleCamera}
+              onToggleRecognition={isRunning ? handleStop : handleStart}
             />
+          </div>
+        </div>
 
-            {/* Settings */}
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Cài Đặt
-                </h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block mb-2 text-sm font-medium text-foreground">
-                      Thời gian chờ (giây)
-                    </label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="300"
-                      value={cooldownPeriod}
-                      onChange={(e) =>
-                        setCooldownPeriod(parseInt(e.target.value) || 1)
-                      }
-                    />
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Thời gian chờ giữa các lần nhận diện cho cùng 1 học sinh
-                    </p>
-                  </div>
-
-                  {settingsError && (
-                    <p className="text-sm text-red-600">{settingsError}</p>
-                  )}
-
-                  <Button onClick={handleSaveSettings} className="w-full">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Lưu Cài Đặt
-                  </Button>
+        {/* ==================== UNIFIED INFO BANNER (FULL WIDTH) ==================== */}
+        <div className="p-6 bg-white border-2 shadow-md rounded-2xl hover:shadow-lg">
+          <div className="flex items-start gap-4">
+            <div className="flex items-center justify-center bg-indigo-100 w-12 h-12 rounded-xl flex-shrink-0">
+              <Info className="text-indigo-600 w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">Hướng dẫn mức độ khớp</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                InsightFace AI so sánh khuôn mặt với dữ liệu đã lưu. Điểm khớp từ <strong>★★☆☆☆</strong> (20 điểm) trở lên là đủ để nhận diện chính xác.
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
+                  <span className="text-gray-700">★★★★★ Xuất sắc (≥45)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-600"></div>
+                  <span className="text-gray-700">★★★★☆ Rất tốt (35-44)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                  <span className="text-gray-700">★★★☆☆ Tốt (25-34)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-yellow-600"></div>
+                  <span className="text-gray-700">★★☆☆☆ Khá (20-24)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-orange-600"></div>
+                  <span className="text-gray-700">★☆☆☆☆ Đạt (&lt;20)</span>
                 </div>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </div>

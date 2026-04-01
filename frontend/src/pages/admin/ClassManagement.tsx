@@ -1,14 +1,12 @@
-import { GraduationCap } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
 import { useClassManagementData } from '@/hooks/class-management/useClassManagementData';
 import { useClassManagementStudentOps } from '@/hooks/class-management/useClassManagementStudentOps';
 import { useClassManagementDialog } from '@/hooks/class-management/useClassManagementDialog';
+import Header from '@/components/class-management/Header';
 import {
-  ClassFilterCard,
   HomeroomTeacherCard,
   StudentsTableCard,
   AddStudentModal,
@@ -118,10 +116,19 @@ const ClassManagement = () => {
     });
   };
 
-  // ===== Load filters data on mount =====
+  // ===== Load filters data after academic year is set =====
   useEffect(() => {
-    dataHook.loadClasses(selectedAcademicYear, selectedGrade);
-  }, [selectedAcademicYear, selectedGrade, dataHook]);
+    if (selectedAcademicYear) {
+      dataHook.loadClasses(selectedAcademicYear, selectedGrade);
+    }
+  }, [selectedAcademicYear, selectedGrade]);
+
+  // ===== Set default academic year on first load =====
+  useEffect(() => {
+    if (dataHook.academicYears.length > 0 && !selectedAcademicYear) {
+      setSelectedAcademicYear(dataHook.academicYears[0]);
+    }
+  }, [dataHook.academicYears, selectedAcademicYear]);
 
   // ===== Load class students =====
   const loadClassStudents = useCallback(async () => {
@@ -180,7 +187,7 @@ const ClassManagement = () => {
         }));
       }
     }
-  }, [selectedClassForManagement, dataHook.classes, setStudentFormData, loadClassStudents]);
+  }, [selectedClassForManagement, setStudentFormData, loadClassStudents]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -204,38 +211,26 @@ const ClassManagement = () => {
   const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
 
   return (
-    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
-      {/* Header Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-3">
-            <GraduationCap className="w-8 h-8 text-primary" />
-            <span className="text-3xl font-bold">Quản lý học sinh</span>
-          </CardTitle>
-          <CardDescription className="text-lg">
-            Quản lý học sinh và lớp học trong hệ thống
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      {/* Class Filter */}
-      <ClassFilterCard
+    <div className="min-h-screen p-6 space-y-6">
+      {/* Header with Filters */}
+      <Header
         selectedAcademicYear={selectedAcademicYear}
         setSelectedAcademicYear={setSelectedAcademicYear}
         selectedGrade={selectedGrade}
         setSelectedGrade={setSelectedGrade}
         selectedClassForManagement={selectedClassForManagement}
         setSelectedClassForManagement={setSelectedClassForManagement}
-        showInactiveStudents={showInactiveStudents}
-        setShowInactiveStudents={setShowInactiveStudents}
         academicYears={dataHook.academicYears}
         classes={dataHook.classes}
+        loading={dataHook.academicYears.length === 0}
       />
 
       {/* Homeroom Teacher Info */}
       <HomeroomTeacherCard
         homeroomTeacher={homeroomTeacher}
         selectedClassForManagement={selectedClassForManagement}
+        loading={loadingClassData && !!selectedClassForManagement}
+        initialLoading={dataHook.academicYears.length === 0}
       />
 
       {/* Students Table */}
@@ -268,6 +263,9 @@ const ClassManagement = () => {
         handleDeleteStudent={handleDeleteStudent}
         handleRestore={handleRestore}
         handlePermanentDeleteStudent={handlePermanentDeleteStudent}
+        showInactiveStudents={showInactiveStudents}
+        setShowInactiveStudents={setShowInactiveStudents}
+        initialLoading={dataHook.academicYears.length === 0}
       />
 
       {/* Add Student Modal */}

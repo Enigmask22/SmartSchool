@@ -379,7 +379,7 @@ const CameraManagement = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 shadow-md">
       {/* Header */}
       <Card>
         <CardHeader>
@@ -422,9 +422,38 @@ const CameraManagement = () => {
 
           {/* Table */}
           {loading && cameras.length === 0 ? (
-            <div className="py-8 text-center">
-              <Loader className="w-8 h-8 mx-auto mb-2 animate-spin" />
-              <p className="text-muted-foreground">Đang tải...</p>
+            <div className="overflow-x-auto border rounded-lg">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Tên Camera</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Source/URL</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Vị trí</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Trạng thái</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">FPS</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Frame Count</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Thao tác</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...Array(5)].map((_, index) => (
+                    <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
+                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
+                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
+                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
+                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
+                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <div className="w-8 h-8 rounded animate-pulse bg-gray-200"></div>
+                          <div className="w-8 h-8 rounded animate-pulse bg-gray-200"></div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           ) : filteredCameras.length === 0 ? (
             <div className="py-8 text-center">

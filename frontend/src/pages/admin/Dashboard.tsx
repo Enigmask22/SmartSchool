@@ -30,13 +30,14 @@ export default function AdminDashboard() {
   const { activeTab, handleTabChange } = useTabState('attendance');
 
   return (
-    <div className="space-y-6 p-6 min-h-screen bg-gray-50">
+    <div className="space-y-6 p-6 min-h-screen">
       {/* Header */}
       <Header
         selectedPeriod={selectedPeriod}
         onPeriodChange={handlePeriodChange}
         onRefresh={handleRefresh}
         refreshing={refreshing}
+        loading={loading}
       />
 
       {/* Overview Cards */}
@@ -48,9 +49,9 @@ export default function AdminDashboard() {
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="attendance">Điểm Danh</TabsTrigger>
-          <TabsTrigger value="performance">Hiệu Suất Lớp</TabsTrigger>
-          <TabsTrigger value="teachers">Giáo Viên</TabsTrigger>
+          <TabsTrigger value="attendance">Điểm danh</TabsTrigger>
+          <TabsTrigger value="performance">Hiệu suất lớp</TabsTrigger>
+          <TabsTrigger value="teachers">Giáo viên</TabsTrigger>
         </TabsList>
 
         {/* Attendance Trends */}

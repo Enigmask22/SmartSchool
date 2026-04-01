@@ -6,13 +6,13 @@
 export function LoginHeader() {
   return (
     <div className="text-center">
-      <div className="flex justify-center items-center mx-auto w-16 h-16 bg-white rounded-full">
+      <div className="flex justify-center items-center mx-auto w-16 h-16 bg-blue-600 rounded-full">
         <img
-          src="/logo.png"
+          src="/logo-no-bg.png"
           alt="SynapseS Logo"
-          width={32}
-          height={32}
-          className="w-16 h-16 text-white rounded-full"
+          width={96}
+          height={96}
+          className="text-white rounded-full"
         />
         {/* <School className="w-8 h-8 text-white" /> */}
       </div>

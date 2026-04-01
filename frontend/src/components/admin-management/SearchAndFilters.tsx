@@ -8,41 +8,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAdminSearch } from '@/hooks/admin-management/useAdminSearch';
+import { useAdminFilters } from '@/hooks/admin-management/useAdminFilters';
+
 
 interface SearchAndFiltersProps {
   activeTab: string;
-  searchTerm: string;
-  onSearchChange: (value: string) => void;
-  showDeleted: boolean;
-  onShowDeletedChange: (value: boolean) => void;
-  // For class_subjects tab filters
-  selectedAcademicYear?: string;
-  onAcademicYearChange?: (value: string) => void;
-  academicYears?: string[];
-  selectedGrade?: string;
-  onGradeChange?: (value: string) => void;
-  selectedClassId?: string;
-  onClassIdChange?: (value: string) => void;
-  filteredClasses?: Array<{ id: number; class_name: string }>;
-  isClassSelectDisabled?: boolean;
+  loading?: boolean;
 }
 
 export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
   activeTab,
-  searchTerm,
-  onSearchChange,
-  showDeleted,
-  onShowDeletedChange,
-  selectedAcademicYear = '',
-  onAcademicYearChange,
-  academicYears = [],
-  selectedGrade = '',
-  onGradeChange,
-  selectedClassId = '',
-  onClassIdChange,
-  filteredClasses = [],
-  isClassSelectDisabled = false,
+  loading = false,
 }) => {
+  const search = useAdminSearch();
+  const filters = useAdminFilters();
   const shouldShowFilters =
     activeTab === 'users' ||
     activeTab === 'teachers' ||
@@ -52,6 +32,8 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
     activeTab === 'class_subjects' ||
     activeTab === 'score_settings';
 
+  const isClassSelectDisabled = !filters.selectedAcademicYear && !filters.selectedGrade;
+
   return (
     <div className="flex items-center justify-between gap-4 mt-6">
       <div className="relative flex-1 max-w-md">
@@ -59,8 +41,9 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
         <Input
           type="text"
           placeholder="Tìm kiếm..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
+          value={search.searchTerm}
+          onChange={(e) => search.setSearchTerm(e.target.value)}
+          disabled={loading}
           className="pl-12"
         />
       </div>
@@ -69,17 +52,18 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
       {activeTab === 'class_subjects' && (
         <div className="flex items-center gap-3">
           <Select
-            value={selectedAcademicYear || 'none'}
+            value={filters.selectedAcademicYear || 'none'}
             onValueChange={(value) =>
-              onAcademicYearChange?.(value === 'none' ? '' : value)
+              filters.setSelectedAcademicYear(value === 'none' ? '' : value)
             }
+            disabled={loading}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Năm học" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Năm học</SelectItem>
-              {academicYears.map((y) => (
+              {filters.academicYears.map((y) => (
                 <SelectItem key={y} value={y}>
                   {y}
                 </SelectItem>
@@ -88,8 +72,9 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
           </Select>
 
           <Select
-            value={selectedGrade || 'none'}
-            onValueChange={(value) => onGradeChange?.(value === 'none' ? '' : value)}
+            value={filters.selectedGrade || 'none'}
+            onValueChange={(value) => filters.setSelectedGrade(value === 'none' ? '' : value)}
+            disabled={loading}
           >
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Khối" />
@@ -103,18 +88,18 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
           </Select>
 
           <Select
-            value={selectedClassId || 'none'}
+            value={filters.selectedClassId || 'none'}
             onValueChange={(value) =>
-              onClassIdChange?.(value === 'none' ? '' : value)
+              filters.setSelectedClassId(value === 'none' ? '' : value)
             }
-            disabled={isClassSelectDisabled}
+            disabled={isClassSelectDisabled || loading}
           >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Lớp học" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Lớp học</SelectItem>
-              {filteredClasses.map((cls) => (
+              {filters.filteredClasses.map((cls) => (
                 <SelectItem key={cls.id} value={cls.id.toString()}>
                   {cls.class_name}
                 </SelectItem>
@@ -130,9 +115,10 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
           <input
             type="checkbox"
             id="showDeleted"
-            checked={showDeleted}
-            onChange={(e) => onShowDeletedChange(e.target.checked)}
-            className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary"
+            checked={search.showDeleted}
+            onChange={(e) => search.setShowDeleted(e.target.checked)}
+            disabled={loading}
+            className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <label htmlFor="showDeleted" className="text-sm font-medium cursor-pointer">
             Hiển thị đã xóa tạm thời

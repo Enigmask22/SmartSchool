@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
-import { useAdminManagement } from '@/hooks/useAdminManagement';
-import ConfirmDialog from '@/components/ui/confirm-dialog';
+import { Settings } from 'lucide-react';
+import { useAdminManagement } from '@/hooks/admin-management/useAdminManagement';
+import { useAdminSearch } from '@/hooks/admin-management/useAdminSearch';
+import { useAdminFilters } from '@/hooks/admin-management/useAdminFilters';
+import { useTabCrud } from '@/hooks/admin-management/useTabCrud';
+import { useAdminImport } from '@/hooks/admin-management/useAdminImport';
+import { useTeacherSubjectManagement } from '@/hooks/admin-management/useTeacherSubjectManagement';
+import { useScoreColumnManagement } from '@/hooks/admin-management/useScoreColumnManagement';
+import { PageHeader } from '@/components/common/PageHeader';
 import { AdminManagementForm } from '../../components/admin-management/AdminManagementForm';
 import { TabNavigation } from '../../components/admin-management/TabNavigation';
 import { SearchAndFilters } from '../../components/admin-management/SearchAndFilters';
@@ -19,46 +26,57 @@ import CameraManagement from '@/components/admin-management/CameraManagement';
 
 const AdminManagement = () => {
   const hook = useAdminManagement();
+  const search = useAdminSearch();
+  const filters = useAdminFilters();
+  const tabCrud = useTabCrud(hook.activeTab, search.showDeleted);
+  const importHook = useAdminImport(() => hook.loadData());
+  const teacherSubjectHook = useTeacherSubjectManagement(tabCrud.editingItem, tabCrud.showAddForm, hook.activeTab);
+  const scoreColumnHook = useScoreColumnManagement();
 
   const handleTabClick = (tabId: string) => {
     hook.setActiveTab(tabId);
   };
 
   const handleAddNew = () => {
-    hook.setShowAddForm(true);
+    tabCrud.setShowAddForm(true);
     if (hook.activeTab === 'teachers') {
       hook.setFormData({ gender: 'Nam' });
     } else if (hook.activeTab === 'score_settings' || hook.activeTab === 'subjects') {
       hook.setFormData({});
-      hook.setScoreColumns([]);
+      scoreColumnHook.setScoreColumns([]);
     } else {
       hook.setFormData({});
     }
   };
 
   const handleImportTeachers = () => {
-    hook.setShowImportModal(true);
-    hook.loadAvailableUsers();
+    importHook.setShowImportModal(true);
+    importHook.loadAvailableUsers();
   };
 
   const filteredDataMemo = useMemo(
-    () => hook.filteredData(hook.data),
-    [hook.filteredData, hook.data]
+    () => hook.filteredData(hook.data, search.searchTerm, {
+      academicYear: filters.selectedAcademicYear,
+      grade: filters.selectedGrade,
+      classId: filters.selectedClassId,
+      classes: filters.classes,
+    }),
+    [hook.filteredData, hook.data, search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId, filters.classes]
   );
 
   return (
-    <div className="min-h-screen p-6 bg-background">
-      {/* Header Section */}
-      <div className="mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-4xl font-bold text-primary">Quản lý hệ thống</CardTitle>
-            <CardDescription className="text-lg">
-              Quản lý người dùng, lớp học, môn học và cấu hình hệ thống
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+    <div className="min-h-screen p-6 bg-background space-y-6">
+      {/* Header Section with PageHeader */}
+      <PageHeader
+        title="Quản lý hệ thống"
+        description="Quản lý người dùng, lớp học, môn học và cấu hình hệ thống"
+        icon={
+          <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-purple-600 flex-shrink-0">
+            <Settings className="w-8 h-8 text-white" />
+          </div>
+        }
+      >
+      </PageHeader>
 
       {/* Tab Navigation */}
       <TabNavigation activeTab={hook.activeTab} onTabClick={handleTabClick} />
@@ -71,9 +89,9 @@ const AdminManagement = () => {
       ) : (
         <>
           {/* Main Content Card */}
-          <Card>
+          <Card className="shadow-md">
             {/* Header with Title and Action Buttons */}
-            <CardHeader className="bg-muted/50">
+            <CardHeader>
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <CardTitle className="text-2xl font-bold mb-1">
@@ -86,37 +104,35 @@ const AdminManagement = () => {
                   onAddClick={handleAddNew}
                   onImportClick={handleImportTeachers}
                   onInitializeClick={hook.handleInitializeClassSubjects}
-                  showInitializeButton={hook.activeTab === 'class_subjects' && !!hook.selectedClassId}
+                  showInitializeButton={hook.activeTab === 'class_subjects' && !!filters.selectedClassId}
                 />
               </div>
 
               {/* Search and Filters */}
               <SearchAndFilters
                 activeTab={hook.activeTab}
-                searchTerm={hook.searchTerm}
-                onSearchChange={hook.setSearchTerm}
-                showDeleted={hook.showDeleted}
-                onShowDeletedChange={hook.setShowDeleted}
-                selectedAcademicYear={hook.selectedAcademicYear}
-                onAcademicYearChange={hook.setSelectedAcademicYear}
-                academicYears={hook.academicYears}
-                selectedGrade={hook.selectedGrade}
-                onGradeChange={hook.setSelectedGrade}
-                selectedClassId={hook.selectedClassId}
-                onClassIdChange={hook.setSelectedClassId}
-                filteredClasses={hook.filteredClasses}
-                isClassSelectDisabled={!hook.selectedAcademicYear && !hook.selectedGrade}
               />
             </CardHeader>
 
             {/* Add Form Section */}
-            {hook.showAddForm && (
+            {tabCrud.showAddForm && (
               <CardContent className="border-b bg-muted/30">
                 <div className="mb-4">
                   <h3 className="mb-2 text-lg font-semibold">Thông tin mới</h3>
                   <p className="text-sm text-muted-foreground">Nhập thông tin để tạo bản ghi mới</p>
                 </div>
-                <AdminManagementForm hook={hook} isEdit={false} />
+                <AdminManagementForm 
+                  hook={hook} 
+                  teacherSubjectHook={teacherSubjectHook}
+                  scoreColumnHook={scoreColumnHook}
+                  isEdit={false}
+                  onCancel={() => {
+                    tabCrud.setShowAddForm(false);
+                    tabCrud.setEditingItem(null);
+                    teacherSubjectHook.setSelectedSubjects([]);
+                    scoreColumnHook.setScoreColumns([]);
+                  }}
+                />
               </CardContent>
             )}
 
@@ -128,35 +144,22 @@ const AdminManagement = () => {
                 isLoading={hook.loading}
                 error={hook.error}
                 onRetry={hook.loadData}
+                scoreColumnHook={scoreColumnHook}
               />
             </CardContent>
           </Card>
 
           {/* Import Teachers Modal */}
           <ImportTeachersModal
-            open={hook.showImportModal}
-            onOpenChange={hook.setShowImportModal}
-            availableUsers={hook.availableUsers}
-            selectedUserIds={hook.selectedUserIds}
-            onUserSelect={hook.handleUserSelect}
-            onImport={hook.handleImportTeachers}
-            isLoading={hook.importLoading}
+            open={importHook.showImportModal}
+            onOpenChange={importHook.setShowImportModal}
+            availableUsers={importHook.availableUsers}
+            selectedUserIds={importHook.selectedUserIds}
+            onUserSelect={importHook.handleUserSelect}
+            onImport={() => importHook.handleImportTeachers([])}
+            isLoading={importHook.importLoading}
           />
         </>
-      )}
-
-      {/* Confirm Dialog */}
-      {hook.confirmState.open && (
-        <ConfirmDialog
-          open={true}
-          title={(hook.confirmState as any).title || ''}
-          description={(hook.confirmState as any).description}
-          variant={(hook.confirmState as any).variant}
-          confirmText={(hook.confirmState as any).confirmText}
-          cancelText={(hook.confirmState as any).cancelText}
-          onCancel={hook.closeConfirm}
-          onConfirm={(hook.confirmState as any).onConfirm || (() => {})}
-        />
       )}
     </div>
   );

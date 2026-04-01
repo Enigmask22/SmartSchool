@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
+import { useState } from "react";
 import {
   Card,
   CardHeader,
@@ -19,6 +20,15 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useStudentEdit } from "@/hooks/student-list/useStudentEdit";
+import { useMultipleFaceRegistration } from "@/hooks/student-list/useMultipleFaceRegistration";
+import { useStudentSubjects } from "@/hooks/student-list/useStudentSubjects";
+import {
+  EditStudentModal,
+  FaceRegistrationModal,
+  SubjectSelectionModal,
+} from "./modals";
 
 interface Student {
   id: number;
@@ -38,12 +48,14 @@ interface StudentGridViewProps {
   searchTerm: string;
   selectedClass: string;
   restoreLoading: boolean;
-  onEdit: (student: Student) => void;
+  fetchStudents: () => void;
+  onEdit?: (student: Student) => void;
   onFeedback: (student: Student) => void;
-  onUploadMultiple: (student: Student) => void;
+  onUploadMultiple?: (student: Student) => void;
   onViewScores: (student: Student) => void;
-  onSelectSubjects: (student: Student) => void;
-  onRestore: (student: Student) => void;
+  onSelectSubjects?: (student: Student) => void;
+  onRestore?: (student: Student) => void;
+  loading?: boolean;
 }
 
 export function StudentGridView({
@@ -52,14 +64,57 @@ export function StudentGridView({
   searchTerm,
   selectedClass,
   restoreLoading,
+  fetchStudents,
   onEdit,
   onFeedback,
   onUploadMultiple,
   onViewScores,
   onSelectSubjects,
   onRestore,
+  loading = false,
 }: StudentGridViewProps) {
-  if (filteredStudents.length === 0) {
+  // Local modal state for view component
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [faceModalOpen, setFaceModalOpen] = useState(false);
+  const [subjectModalOpen, setSubjectModalOpen] = useState(false);
+  const [selectedStudentForModal, setSelectedStudentForModal] = useState<Student | null>(null);
+
+  // Initialize hooks for modal data management
+  const edit = useStudentEdit(fetchStudents, () => {}, () => {});
+  const multipleFace = useMultipleFaceRegistration(fetchStudents, selectedStudentForModal);
+  const subjects = useStudentSubjects({ setStudents: () => {} });
+
+  // Wrapper for toggleSubjectSelection to match modal's expected interface
+  const handleToggleSubject = (subjectId: string | number, type?: string) => {
+    subjects.toggleSubjectSelection(String(subjectId), type || "core_subjects");
+  };
+
+  // Handle edit button click
+  const handleEditClick = (student: Student) => {
+    setSelectedStudentForModal(student);
+    edit.handleEdit(student);
+    setEditModalOpen(true);
+    onEdit?.(student);
+  };
+
+  // Handle upload multiple click
+  const handleUploadClick = (student: Student) => {
+    setSelectedStudentForModal(student);
+    multipleFace.setSelectedStudentForMultiple(student);
+    setFaceModalOpen(true);
+    onUploadMultiple?.(student);
+  };
+
+  // Handle select subjects click
+  const handleSubjectClick = (student: Student) => {
+    setSelectedStudentForModal(student);
+    subjects.handleSubjectSelection(student);
+    setSubjectModalOpen(true);
+    onSelectSubjects?.(student);
+  };
+
+  // Show no data message only when not loading and no students
+  if (filteredStudents.length === 0 && !loading) {
     return (
       <Card className="col-span-full">
         <CardContent className="py-12 text-center">
@@ -81,8 +136,77 @@ export function StudentGridView({
     );
   }
 
+  // Show skeletons when loading
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, idx) => (
+          <Card key={idx} className="overflow-hidden">
+            {/* Header skeleton */}
+            <CardHeader className="bg-gradient-to-r from-primary/20 to-primary/10 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Skeleton className="w-16 h-16 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="w-32 h-5" />
+                    <Skeleton className="w-24 h-4" />
+                    <div className="flex gap-2">
+                      <Skeleton className="w-20 h-6 rounded-full" />
+                      <Skeleton className="w-20 h-6 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+                <Skeleton className="w-12 h-8" />
+              </div>
+            </CardHeader>
+
+            {/* Content skeleton */}
+            <CardContent className="p-4 space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons skeleton */}
+              <div className="pt-4 border-t border-border/50 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Skeleton className="h-8" />
+                  <Skeleton className="h-8" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Skeleton className="h-8" />
+                  <Skeleton className="h-8" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       {paginatedStudents.map((student) => (
         <Card
           key={student.id}
@@ -143,7 +267,7 @@ export function StudentGridView({
               {/* Edit button in top right corner */}
               {student.is_active !== false && (
                 <Button
-                  onClick={() => onEdit(student)}
+                  onClick={() => handleEditClick(student)}
                   variant="outline"
                   size="sm"
                   className="flex items-center space-x-1 text-xs text-white bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50"
@@ -200,7 +324,7 @@ export function StudentGridView({
               {student.is_active === false ? (
                 <div className="space-y-3 text-center">
                   <Button
-                    onClick={() => onRestore(student)}
+                    onClick={() => onRestore?.(student)}
                     disabled={restoreLoading}
                     size="sm"
                     className="w-full"
@@ -235,7 +359,7 @@ export function StudentGridView({
                     </Button>
 
                     <Button
-                      onClick={() => onUploadMultiple(student)}
+                      onClick={() => handleUploadClick(student)}
                       variant="outline"
                       size="sm"
                       className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
@@ -257,7 +381,7 @@ export function StudentGridView({
                     </Button>
 
                     <Button
-                      onClick={() => onSelectSubjects(student)}
+                      onClick={() => handleSubjectClick(student)}
                       variant="outline"
                       size="sm"
                       className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
@@ -272,6 +396,52 @@ export function StudentGridView({
           </CardContent>
         </Card>
       ))}
-    </div>
+      </div>
+
+      {/* Modals */}
+      <EditStudentModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        selectedStudent={edit.selectedStudentForEdit || undefined}
+        editForm={edit.editForm}
+        editLoading={edit.editLoading}
+        isHomeroomTeacher={false}
+        onFormChange={edit.handleEditFormChange}
+        onAddParentContact={edit.addParentContactRow}
+        onRemoveParentContact={edit.removeParentContactRow}
+        onUpdateParentContactField={edit.updateParentContactField}
+        onSubmit={edit.submitEditForm}
+        onClose={() => {
+          setEditModalOpen(false);
+          edit.closeEditModal();
+        }}
+      />
+
+      <FaceRegistrationModal
+        open={faceModalOpen}
+        onOpenChange={setFaceModalOpen}
+        selectedStudent={multipleFace.selectedStudentForMultiple || undefined}
+        showMultipleModal={faceModalOpen}
+        setShowMultipleModal={setFaceModalOpen}
+        selectedStudentForMultiple={multipleFace.selectedStudentForMultiple || undefined}
+        setSelectedStudentForMultiple={multipleFace.setSelectedStudentForMultiple}
+        fetchStudents={fetchStudents}
+      />
+
+      <SubjectSelectionModal
+        open={subjectModalOpen}
+        onOpenChange={setSubjectModalOpen}
+        selectedStudent={subjects.selectedStudentForSubject || undefined}
+        availableSubjects={subjects.availableSubjects}
+        selectedSubjects={(subjects.selectedSubjects as any) || { core_subjects: [], elective_subjects: [] }}
+        onToggleSubject={handleToggleSubject}
+        loading={subjects.subjectLoading}
+        onSave={subjects.saveSubjectSelection}
+        onClose={() => {
+          setSubjectModalOpen(false);
+          subjects.closeSubjectModal();
+        }}
+      />
+    </>
   );
 }

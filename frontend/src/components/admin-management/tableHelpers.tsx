@@ -28,7 +28,17 @@ export function renderFieldHeader(field: string): string {
 }
 
 export function renderTableCell(field: string, item: any, hook: any): React.ReactNode {
+  // Safety check: ensure item exists
+  if (!item) {
+    return <span className="text-gray-400">-</span>;
+  }
+
   if (field === 'subjects') {
+    // This is only used for teachers tab
+    if (!hook?.teacherSubjects) {
+      return <span className="text-xs italic text-gray-400">Chưa phân công</span>;
+    }
+    
     const teacherSubjectIds = hook.teacherSubjects[item.id] || [];
     if (teacherSubjectIds.length === 0) {
       return <span className="text-xs italic text-gray-400">Chưa phân công</span>;
@@ -36,10 +46,10 @@ export function renderTableCell(field: string, item: any, hook: any): React.Reac
     return (
       <div className="flex flex-wrap gap-1">
         {teacherSubjectIds.map((subjectId: any) => {
-          const subject = hook.subjects.find((s: any) => s.id === subjectId);
+          const subject = hook.subjects?.find((s: any) => s.id === subjectId);
           return subject ? (
             <Badge key={subjectId} variant="outline" className="text-xs text-blue-700 border-blue-200 bg-blue-50">
-              {subject.subject_code}
+              {subject.subject_code || '-'}
             </Badge>
           ) : null;
         })}

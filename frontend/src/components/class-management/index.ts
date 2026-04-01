@@ -1,4 +1,4 @@
-export { default as ClassFilterCard } from './ClassFilterCard';
+export { default as Header } from './Header';
 export { default as HomeroomTeacherCard } from './HomeroomTeacherCard';
 export { default as StudentsTableCard } from './StudentsTableCard';
 export { default as AddStudentModal } from './AddStudentModal';

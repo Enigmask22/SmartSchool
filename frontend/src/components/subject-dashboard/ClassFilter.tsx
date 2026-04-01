@@ -1,4 +1,3 @@
-import React from 'react';
 import { Users, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,13 +24,14 @@ interface ClassFilterProps {
   onClassSelect: (classId: string | null) => void;
 }
 
-export const ClassFilter: React.FC<ClassFilterProps> = ({
+export function ClassFilter({
   classList,
   selectedClass,
   loadingClasses,
   totalClasses,
   onClassSelect,
-}) => (
+} : ClassFilterProps) {
+  return (
   <div className="p-4 bg-white border shadow-md rounded-xl">
     <div className="flex flex-wrap items-center gap-4">
       <div className="flex items-center space-x-2">
@@ -79,4 +79,4 @@ export const ClassFilter: React.FC<ClassFilterProps> = ({
       )}
     </div>
   </div>
-);
+)};
