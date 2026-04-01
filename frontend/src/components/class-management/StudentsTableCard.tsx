@@ -10,13 +10,7 @@ import {
   Edit,
   Search,
 } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +57,9 @@ interface StudentsTableCardProps {
   handleDeleteStudent: (id: number) => void;
   handleRestore: (student: StudentData) => void;
   handlePermanentDeleteStudent: (id: number, name: string) => void;
+  showInactiveStudents: boolean;
+  setShowInactiveStudents: (value: boolean) => void;
+  initialLoading?: boolean;
 }
 
 const StudentsTableCard = ({
@@ -90,110 +87,238 @@ const StudentsTableCard = ({
   handleDeleteStudent,
   handleRestore,
   handlePermanentDeleteStudent,
+  showInactiveStudents,
+  setShowInactiveStudents,
+  initialLoading = false,
 }: StudentsTableCardProps) => {
+  // Show loading skeleton during initial data load or when no class selected but data loading
+  if (initialLoading || (loadingClassData && !selectedClassForManagement && !error && paginatedStudents.length === 0)) {
+    return (
+      <div className="p-6 transition-shadow duration-200 bg-white border-2 shadow-md rounded-2xl border-gray-100 hover:shadow-lg">
+        {/* Header */}
+        <div className="flex items-start gap-3 pb-4 mb-4 border-b border-gray-200">
+          <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
+            <Users className="text-blue-600 w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg text-gray-900">Danh sách học sinh</h3>
+            <p className="text-xs text-gray-500 mt-1">Đang tải dữ liệu...</p>
+          </div>
+        </div>
+
+        {/* Skeleton Table */}
+        <div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-gray-100 hover:bg-transparent">
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase">MÃ HS</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase">HỌ TÊN</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase">LỚP HIỆN TẠI</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase">TRẠNG THÁI KHUÔN MẶT</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase">HÀNH ĐỘNG</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <TableRow key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                  <TableCell>
+                    <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-28 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no class selected
   if (!selectedClassForManagement) {
-    return null;
+    return (
+      <div className="p-6 transition-shadow duration-200 bg-white border-2 shadow-md rounded-2xl border-gray-50 hover:shadow-lg">
+        {/* Header */}
+        <div className="flex items-start gap-3 pb-6 mb-6 border-b border-gray-200">
+          <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
+            <Users className="text-blue-600 w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg text-gray-900">Danh sách học sinh</h3>
+            <p className="text-xs text-gray-500 mt-1">Chọn lớp học để xem danh sách học sinh</p>
+          </div>
+        </div>
+
+        {/* Empty State */}
+        <div className="py-16 text-center">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-xl bg-blue-100">
+            <Users className="w-8 h-8 text-blue-600" />
+          </div>
+          <p className="font-medium text-gray-500 mb-1">
+            Chưa chọn lớp học
+          </p>
+          <p className="text-sm text-gray-400">
+            Vui lòng chọn một lớp học từ phần bộ lọc trên để xem danh sách học sinh
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <CardTitle className="flex items-center space-x-2 mb-2">
-              <Users className="w-5 h-5" />
-              <span>Danh sách học sinh</span>
-            </CardTitle>
-            <CardDescription>
-              {totalStudents} học sinh {searchTerm && `(tìm kiếm: "${searchTerm}")`}
-            </CardDescription>
-
-            {/* Search Bar */}
-            <div className="max-w-md mt-4">
-              <div className="relative">
-                <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Tìm kiếm theo tên, mã học sinh hoặc lớp..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="py-2 pl-10 pr-4"
-                />
-              </div>
-            </div>
+    <div className="p-6 transition-shadow duration-200 bg-white border-2 shadow-md rounded-2xl border-gray-100 hover:shadow-lg">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 pb-4 mb-4 border-b border-gray-200">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
+            <Users className="text-blue-600 w-6 h-6" />
           </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              onClick={downloadStudentTemplate}
-              className="flex items-center space-x-2"
-            >
-              <Download className="w-4 h-4" />
-              <span>Tải template</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              asChild
-              className="flex items-center space-x-2"
-            >
-              <label className="cursor-pointer">
-                <Upload className="w-4 h-4" />
-                <span>Nhập từ file</span>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
-            </Button>
-
-            <Button
-              onClick={onAddStudent}
-              className="flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Thêm học sinh</span>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={onMoveClass}
-              className="flex items-center space-x-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Chuyển lớp</span>
-            </Button>
+          <div>
+            <h3 className="font-semibold text-lg text-gray-900">Danh sách học sinh</h3>
+            <p className="text-xs text-gray-500 mt-1">{totalStudents} học sinh {searchTerm && `(tìm kiếm: "${searchTerm}")`}</p>
           </div>
         </div>
-      </CardHeader>
+        <div className="flex items-center flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={downloadStudentTemplate}
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            <Download className="w-4 h-4" />
+            <span>Tải template</span>
+          </Button>
+          <Button
+            variant="outline"
+            asChild
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            <label className="cursor-pointer">
+              <Upload className="w-4 h-4" />
+              <span>Nhập</span>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+          </Button>
+          <Button
+            onClick={onAddStudent}
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onMoveClass}
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Chuyển</span>
+          </Button>
+        </div>
+      </div>
 
-      <CardContent>
-        {loadingClassData ? (
-          <div className="py-12 text-center">
-            <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
-            <p className="mt-4 font-medium text-muted-foreground">
-              Đang tải dữ liệu...
-            </p>
+      {/* Search Bar & Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Tìm kiếm..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="py-2 pl-10 pr-4 text-sm"
+          />
+        </div>
+
+        {/* Show Inactive Students Checkbox */}
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="show-inactive"
+            checked={showInactiveStudents}
+            onChange={(e) => setShowInactiveStudents(e.target.checked)}
+            className="w-4 h-4 rounded text-blue-600 bg-background border-gray-300 focus:ring-2 focus:ring-blue-300 focus:ring-offset-0 cursor-pointer"
+          />
+          <label
+            htmlFor="show-inactive"
+            className="text-sm font-medium text-gray-700 cursor-pointer whitespace-nowrap"
+          >
+            Hiển thị học sinh đã xóa
+          </label>
+        </div>
+      </div>
+      {loadingClassData ? (
+        <div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-gray-100 hover:bg-transparent">
+                <TableHead>MÃ HS</TableHead>
+                <TableHead>HỌ TÊN</TableHead>
+                  <TableHead>LỚP HIỆN TẠI</TableHead>
+                  <TableHead>TRẠNG THÁI KHUÔN MẶT</TableHead>
+                <TableHead>HÀNH ĐỘNG</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <TableRow key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                  <TableCell>
+                    <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-28 bg-gray-200 rounded animate-pulse" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : error ? (
+        <div className="py-12 text-center">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-xl bg-red-100">
+            <AlertCircle className="w-8 h-8 text-red-600" />
           </div>
-        ) : error ? (
-          <div className="py-12 text-center">
-            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10">
-              <AlertCircle className="w-8 h-8 text-destructive" />
-            </div>
-            <p className="mb-4 font-medium text-destructive">{error}</p>
-            <Button onClick={loadClassStudents}>Thử lại</Button>
+          <p className="mb-4 font-semibold text-red-600">{error}</p>
+          <Button onClick={loadClassStudents} variant="outline">Thử lại</Button>
+        </div>
+      ) : paginatedStudents.length === 0 ? (
+        <div className="py-12 text-center">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-xl bg-gray-100">
+            <Users className="w-8 h-8 text-gray-400" />
           </div>
-        ) : paginatedStudents.length === 0 ? (
-          <div className="py-12 text-center">
-            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-muted">
-              <Users className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <p className="font-medium text-muted-foreground">
-              Chưa có học sinh nào trong lớp này
-            </p>
-          </div>
-        ) : (
+          <p className="font-medium text-gray-500">
+            Chưa có học sinh nào trong lớp này
+          </p>
+        </div>
+      ) : (
           <>
             <Table>
               <TableHeader>
@@ -434,8 +559,7 @@ const StudentsTableCard = ({
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 

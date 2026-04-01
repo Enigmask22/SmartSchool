@@ -24,10 +24,9 @@ export const useClassManagementData = () => {
   useEffect(() => {
     (async () => {
       try {
-        const response = await api.request('/academic-years');
+        const response = await api.request('/admin/classes/academic-years');
         if (response.success && response.data) {
-          const years = response.data.map((item: any) => item.academic_year);
-          setAcademicYears(years);
+          setAcademicYears(response.data);
         }
       } catch (e) {
         logger.error('Error loading academic years:', e);

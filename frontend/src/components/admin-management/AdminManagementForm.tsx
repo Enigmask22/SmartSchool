@@ -1,13 +1,16 @@
 import React from 'react';
-import { X, Save, Eye, EyeOff } from 'lucide-react';
+import { X, Save, Eye, EyeOff} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen } from 'lucide-react';
 import { SimpleDatePicker } from '../ui/simple-date-picker';
+import { useAdminForm } from '@/hooks/admin-management/useAdminForm';
 
 interface AdminManagementFormProps {
   hook: any;
+  teacherSubjectHook?: any;
+  scoreColumnHook?: any;
   isEdit?: boolean;
   item?: any;
   onSubmit?: (formData: any) => void;
@@ -16,19 +19,22 @@ interface AdminManagementFormProps {
 
 export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
   hook,
+  teacherSubjectHook,
+  scoreColumnHook,
   isEdit = false,
   item = null,
   onSubmit,
   onCancel,
 }) => {
+  const form = useAdminForm();
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (onSubmit) {
-      onSubmit(hook.formData);
+      onSubmit(form.formData);
     } else if (isEdit) {
-      hook.handleUpdate(item.id, hook.formData);
+      hook.handleUpdate(item.id, form.formData);
     } else {
-      hook.handleCreate(hook.formData);
+      hook.handleCreate(form.formData);
     }
   };
 
@@ -100,8 +106,8 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
 
             {field === 'role' ? (
               <Select
-                value={hook.formData[field] || item?.[field] || ''}
-                onValueChange={(value) => hook.handleChange(field, value)}
+                value={form.formData[field] || item?.[field] || ''}
+                onValueChange={(value) => form.handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn vai trò" />
@@ -114,16 +120,16 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'teacher_id' ? (
               <Select
-                value={(hook.formData[field] || item?.[field] || '')?.toString()}
+                value={(form.formData[field] || item?.[field] || '')?.toString()}
                 onValueChange={(value) =>
-                  hook.handleChange(field, value ? parseInt(value) : null)
+                  form.handleChange(field, value ? parseInt(value) : null)
                 }
-                disabled={hook.activeTab === 'class_subjects' && !(hook.formData as any).subject_id}
+                disabled={hook.activeTab === 'class_subjects' && !(form.formData as any).subject_id}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue
                     placeholder={
-                      hook.activeTab === 'class_subjects' && !(hook.formData as any).subject_id
+                      hook.activeTab === 'class_subjects' && !(form.formData as any).subject_id
                         ? 'Vui lòng chọn môn học trước'
                         : 'Chọn giáo viên'
                     }
@@ -146,9 +152,9 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
             ) : field === 'subject_id' ? (
               <>
                 <Select
-                  value={(hook.formData[field] || item?.[field] || '')?.toString()}
+                  value={(form.formData[field] || item?.[field] || '')?.toString()}
                   onValueChange={(value) =>
-                    hook.handleChange(field, value ? parseInt(value) : null)
+                    form.handleChange(field, value ? parseInt(value) : null)
                   }
                 >
                   <SelectTrigger className="w-full">
@@ -168,9 +174,9 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      hook.setShowColumnForm(false);
-                      hook.setEditingColumnKey(null);
-                      hook.setColumnFormData({
+                      scoreColumnHook?.setShowColumnForm(false);
+                      scoreColumnHook?.setEditingColumnKey(null);
+                      scoreColumnHook?.setColumnFormData({
                         key: '',
                         label: '',
                         he_so: 1,
@@ -186,9 +192,9 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </>
             ) : field === 'user_id' ? (
               <Select
-                value={(hook.formData[field] || item?.[field] || '')?.toString()}
+                value={(form.formData[field] || item?.[field] || '')?.toString()}
                 onValueChange={(value) =>
-                  hook.handleChange(field, value ? parseInt(value) : null)
+                  form.handleChange(field, value ? parseInt(value) : null)
                 }
               >
                 <SelectTrigger className="w-full">
@@ -204,8 +210,8 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'class_id' ? (
               <Select
-                value={(hook.formData[field] || item?.[field] || '')?.toString()}
-                onValueChange={(value) => hook.handleChange(field, parseInt(value))}
+                value={(form.formData[field] || item?.[field] || '')?.toString()}
+                onValueChange={(value) => form.handleChange(field, parseInt(value))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn lớp học" />
@@ -220,9 +226,9 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'homeroom_teacher_id' ? (
               <Select
-                value={(hook.formData[field] || item?.[field] || '')?.toString()}
+                value={(form.formData[field] || item?.[field] || '')?.toString()}
                 onValueChange={(value) =>
-                  hook.handleChange(field, value ? parseInt(value) : null)
+                  form.handleChange(field, value ? parseInt(value) : null)
                 }
               >
                 <SelectTrigger className="w-full">
@@ -239,10 +245,10 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
             ) : field === 'gender' ? (
               <Select
                 value={
-                  hook.formData[field] ||
+                  form.formData[field] ||
                   (item?.[field] && item[field] !== '-' ? item[field] : 'Nam')
                 }
-                onValueChange={(value) => hook.handleChange(field, value)}
+                onValueChange={(value) => form.handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn giới tính" />
@@ -257,17 +263,17 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               <div className="w-full">
                 <SimpleDatePicker
                   value={
-                    hook.formData[field] ||
+                    form.formData[field] ||
                     (item?.[field] && item[field] !== '-' ? item[field] : '')
                   }
-                  onChange={(date) => hook.handleChange(field, date)}
+                  onChange={(date) => form.handleChange(field, date)}
                   placeholder="Chọn ngày sinh"
                 />
               </div>
             ) : field === 'semester' ? (
               <Select
-                value={hook.formData[field] || item?.[field] || ''}
-                onValueChange={(value) => hook.handleChange(field, value)}
+                value={form.formData[field] || item?.[field] || ''}
+                onValueChange={(value) => form.handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn học kỳ" />
@@ -279,8 +285,8 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'grade' ? (
               <Select
-                value={hook.formData[field] || item?.[field] || ''}
-                onValueChange={(value) => hook.handleChange(field, value)}
+                value={form.formData[field] || item?.[field] || ''}
+                onValueChange={(value) => form.handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn khối" />
@@ -295,8 +301,8 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field.includes('description') ? (
               <textarea
-                value={hook.formData[field] || item?.[field] || ''}
-                onChange={(e) => hook.handleChange(field, e.target.value)}
+                value={form.formData[field] || item?.[field] || ''}
+                onChange={(e) => form.handleChange(field, e.target.value)}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 rows={3}
               />
@@ -304,8 +310,8 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={hook.formData[field] || item?.[field] || false}
-                  onChange={(e) => hook.handleChange(field, e.target.checked)}
+                  checked={form.formData[field] || item?.[field] || false}
+                  onChange={(e) => form.handleChange(field, e.target.checked)}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Môn này là bắt buộc</span>
@@ -323,16 +329,16 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
                       : field.includes('phone')
                       ? 'tel'
                       : field === 'password'
-                      ? hook.showPassword
+                      ? form.showPassword
                         ? 'text'
                         : 'password'
                       : 'text'
                   }
                   value={
-                    hook.formData[field] ||
+                    form.formData[field] ||
                     (item?.[field] && item[field] !== '-' ? item[field] : '')
                   }
-                  onChange={(e) => hook.handleChange(field, e.target.value)}
+                  onChange={(e) => form.handleChange(field, e.target.value)}
                   placeholder={
                     field === 'username'
                       ? 'ho_va_ten.ten_truong.ten_tinh'
@@ -356,10 +362,10 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => hook.setShowPassword(!hook.showPassword)}
+                      onClick={() => form.setShowPassword(!form.showPassword)}
                       className="h-auto p-0 text-gray-500 hover:text-gray-700"
                     >
-                      {hook.showPassword ? (
+                      {form.showPassword ? (
                         <EyeOff className="w-4 h-4" />
                       ) : (
                         <Eye className="w-4 h-4" />
@@ -369,7 +375,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={hook.handleGeneratePassword}
+                      onClick={form.handleGeneratePassword}
                       className="h-auto p-0 text-gray-500 hover:text-gray-700"
                     >
                       <span className="text-xs">Tạo</span>
@@ -389,7 +395,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
         ))}
 
       {/* Multi-select môn học cho teachers */}
-      {hook.activeTab === 'teachers' && (
+      {hook.activeTab === 'teachers' && teacherSubjectHook && (
         <div className="pt-4 mt-4 border-t border-gray-200">
           <label className="block mb-3 text-sm font-semibold text-gray-800">
             <BookOpen className="inline-block w-4 h-4 mr-1 mb-0.5" />
@@ -403,9 +409,9 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               <label key={subject.id} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={hook.selectedSubjects.includes(subject.id)}
+                  checked={teacherSubjectHook.selectedSubjects.includes(subject.id)}
                   onChange={() => {
-                    hook.setSelectedSubjects((prev: any[]) =>
+                    teacherSubjectHook.setSelectedSubjects((prev: any[]) =>
                       prev.includes(subject.id)
                         ? prev.filter((id) => id !== subject.id)
                         : [...prev, subject.id]
@@ -417,9 +423,9 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </label>
             ))}
           </div>
-          {hook.selectedSubjects.length > 0 && (
+          {teacherSubjectHook.selectedSubjects.length > 0 && (
             <p className="mt-2 text-xs text-green-600">
-              ✓ Đã chọn {hook.selectedSubjects.length} môn học
+              ✓ Đã chọn {teacherSubjectHook.selectedSubjects.length} môn học
             </p>
           )}
         </div>
@@ -430,10 +436,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
           type="button"
           variant="outline"
           onClick={() => {
-            hook.setShowAddForm(false);
-            hook.setEditingItem(null);
-            hook.setFormData({});
-            hook.setSelectedSubjects([]);
+            form.resetForm();
             if (onCancel) onCancel();
           }}
         >

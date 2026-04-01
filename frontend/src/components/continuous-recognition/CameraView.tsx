@@ -51,30 +51,34 @@ const CameraView = ({
 }: CameraViewProps) => {
   return (
     <div className="lg:col-span-2">
-      <Card>
-        <CardHeader>
+      <Card className="shadow-md rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gray-50 border-b border-gray-200 pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-2">
-              <Camera className="w-6 h-6 text-primary" />
-              <span>Camera Nhận Diện</span>
-            </CardTitle>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center bg-purple-100 w-10 h-10 rounded-xl">
+                <Camera className="w-6 h-6 text-purple-600" />
+              </div>
+              <CardTitle className="text-lg font-semibold text-gray-900">
+                Camera nhận diện
+              </CardTitle>
+            </div>
+            <div className="flex items-center gap-3">
               {/* Camera Source Selector */}
               <div className="flex items-center gap-2">
-                <Label className="text-sm">Nguồn:</Label>
+                <Label className="text-xs font-medium text-gray-600">Nguồn:</Label>
                 <Select
                   value={cameraSource}
                   onValueChange={(value) => {
                     onCameraSourceChange(value as 'webcam' | 'managed');
                   }}
                 >
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-40 focus-visible:outline-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="webcam">Webcam</SelectItem>
                     <SelectItem value="managed">
-                      Camera Quản Lý
+                      Camera quản lý
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -83,14 +87,14 @@ const CameraView = ({
               {/* Managed Camera Selector */}
               {cameraSource === "managed" && (
                 <div className="flex items-center gap-2">
-                  <Label className="text-sm">Camera:</Label>
+                  <Label className="text-xs font-medium text-gray-600">Camera:</Label>
                   <Select
                     value={selectedCameraId || ""}
                     onValueChange={(value) => {
                       onSelectedCameraChange(value);
                     }}
                   >
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="w-48 focus-visible:outline-none">
                       <SelectValue placeholder="Chọn camera" />
                     </SelectTrigger>
                     <SelectContent>
@@ -122,7 +126,7 @@ const CameraView = ({
                   />
                   <Label
                     htmlFor="multiCamera"
-                    className={`text-sm font-medium cursor-pointer ${
+                    className={`text-xs font-medium cursor-pointer ${
                       availableCameras.length < 2
                         ? "text-gray-400"
                         : "text-blue-900"
@@ -136,7 +140,7 @@ const CameraView = ({
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="relative">
             {/* Show video for webcam mode */}
             {cameraSource === "webcam" && (

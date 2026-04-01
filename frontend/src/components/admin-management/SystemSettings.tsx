@@ -27,7 +27,6 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Label } from "../ui/label";
-import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
 import api from "@/utils/api";
 
@@ -368,19 +367,220 @@ const SystemSettings = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto border-4 rounded-full animate-spin border-primary/20 border-t-primary"></div>
-          <p className="mt-4 font-medium text-muted-foreground">
-            Đang tải cấu hình...
-          </p>
+      <div className="space-y-6">
+        {/* Header */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center text-3xl font-bold text-primary">
+                  <Settings className="w-8 h-8 mr-3" />
+                  Cấu hình Học kỳ - Năm học - Thời gian điểm danh
+                </CardTitle>
+                <CardDescription className="mt-2 text-lg">
+                  Quản lý năm học, học kỳ và thời gian điểm danh
+                </CardDescription>
+              </div>
+              <Button onClick={loadSettings} variant="outline" disabled={true}>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Làm mới
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Settings Cards Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Academic Year Card */}
+          <Card className="transition-shadow hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl">
+                <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                Năm học
+              </CardTitle>
+              <CardDescription>Năm học hiện tại của hệ thống</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="academic_year">Năm học</Label>
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse"></div>
+                <p className="text-xs text-muted-foreground">
+                  Định dạng: YYYY-YYYY (VD: 2024-2025)
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted space-y-2">
+                {/* <p className="text-sm text-muted-foreground">Giá trị hiện tại:</p>
+                <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div> */}
+                <div className="h-3 w-56 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <Button disabled={true} className="w-full">
+                <Save className="w-4 h-4 mr-2" />
+                Lưu năm học
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Semester Card */}
+          <Card className="transition-shadow hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl">
+                <BookOpen className="w-5 h-5 mr-2 text-green-600" />
+                Học kỳ
+              </CardTitle>
+              <CardDescription>Học kỳ hiện tại đang diễn ra</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="semester">Học kỳ</Label>
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse"></div>
+                <p className="text-xs text-muted-foreground">
+                  Chọn học kỳ hiện tại (HK1, HK2, hoặc HK3)
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted space-y-2">
+                {/* <p className="text-sm text-muted-foreground">Giá trị hiện tại:</p>
+                <div className="h-6 w-24 bg-gray-200 rounded animate-pulse"></div> */}
+                <div className="h-3 w-56 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <Button disabled={true} className="w-full">
+                <Save className="w-4 h-4 mr-2" />
+                Lưu học kỳ
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Attendance Cutoff Time Card */}
+          <Card className="transition-shadow hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl">
+                <Clock className="w-5 h-5 mr-2 text-orange-600" />
+                Giờ điểm danh
+              </CardTitle>
+              <CardDescription>Thời gian giới hạn để điểm danh</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Giờ điểm danh (HH:MM)</Label>
+                <div className="flex items-center gap-2">
+                  <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+                  <span className="font-semibold">:</span>
+                  <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Học sinh đến sau giờ này sẽ bị tính là đi muộn
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted space-y-2">
+                {/* <p className="text-sm text-muted-foreground">Giá trị hiện tại:</p>
+                <div className="h-6 w-20 bg-gray-200 rounded animate-pulse"></div> */}
+                <div className="h-3 w-56 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <Button disabled={true} className="w-full">
+                <Save className="w-4 h-4 mr-2" />
+                Lưu giờ điểm danh
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Save All Button */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Lưu tất cả thay đổi</h3>
+                <p className="text-sm text-muted-foreground">
+                  Cập nhật tất cả các cấu hình cùng một lúc
+                </p>
+              </div>
+              <Button disabled={true} size="lg" className="px-8">
+                <div className="w-4 h-4 mr-2 border-2 border-current rounded-full animate-spin border-t-transparent"></div>
+                Đang lưu...
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Info Card */}
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 mt-0.5 text-blue-600" />
+              <div>
+                <h4 className="font-semibold text-blue-900">Lưu ý quan trọng</h4>
+                <ul className="mt-2 space-y-1 text-sm text-blue-800">
+                  <li>• Năm học nên theo định dạng YYYY-YYYY (VD: 2024-2025)</li>
+                  <li>
+                    • Học kỳ có 3 giá trị: HK1 (Học kỳ 1), HK2 (Học kỳ 2), HK3
+                    (Học kỳ hè)
+                  </li>
+                  <li>
+                    • Giờ điểm danh nên đặt theo giờ vào học chính thức của trường
+                    (VD: 07:15)
+                  </li>
+                  <li>
+                    • Các thay đổi sẽ ảnh hưởng đến toàn bộ hệ thống ngay lập tức
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Dayoffs per grade */}
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+          {[10, 11, 12].map((g) => (
+            <Card key={g} className="transition-shadow hover:shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-xl">
+                  Quản lý ngày nghỉ - Khối {g}
+                </CardTitle>
+                <CardDescription>Chọn năm, tháng và các ngày nghỉ</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Năm</Label>
+                    <div className="h-10 w-full bg-gray-200 rounded animate-pulse mt-2"></div>
+                  </div>
+                  <div>
+                    <Label>Tháng</Label>
+                    <div className="h-10 w-full bg-gray-200 rounded animate-pulse mt-2"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Chọn ngày nghỉ</Label>
+                  <div className="grid grid-cols-7 gap-2 mt-2">
+                    {Array.from({ length: 21 }, (_, i) => i + 1).map((d) => (
+                      <div
+                        key={d}
+                        className="h-9 bg-gray-200 rounded animate-pulse"
+                      ></div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap justify-between gap-2">
+                  <Button variant="outline" disabled={true}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Tải cấu hình
+                  </Button>
+                  <Button disabled={true}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Lưu ngày nghỉ khối {g}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6 space-y-6 bg-background">
+    <div className="min-h-screen space-y-6 bg-background">
       {/* Header */}
       <Card>
         <CardHeader>
@@ -449,12 +649,12 @@ const SystemSettings = () => {
             </div>
             {settings.academic_year && (
               <div className="p-3 rounded-lg bg-muted">
-                <p className="text-sm text-muted-foreground">
+                {/* <p className="text-sm text-muted-foreground">
                   Giá trị hiện tại:
                 </p>
                 <Badge variant="secondary" className="mt-1">
                   {settings.academic_year.setting_value}
-                </Badge>
+                </Badge> */}
                 <p className="mt-2 text-xs text-muted-foreground">
                   Cập nhật lần cuối:{" "}
                   {new Date(settings.academic_year.updated_at).toLocaleString(
@@ -508,7 +708,7 @@ const SystemSettings = () => {
             </div>
             {settings.semester && (
               <div className="p-3 rounded-lg bg-muted">
-                <p className="text-sm text-muted-foreground">
+                {/* <p className="text-sm text-muted-foreground">
                   Giá trị hiện tại:
                 </p>
                 <Badge
@@ -526,7 +726,7 @@ const SystemSettings = () => {
                     : settings.semester.setting_value === "HK2"
                     ? "Học kỳ 2"
                     : "Học kỳ 3"}
-                </Badge>
+                </Badge> */}
                 <p className="mt-2 text-xs text-muted-foreground">
                   Cập nhật lần cuối:{" "}
                   {new Date(settings.semester.updated_at).toLocaleString(
@@ -599,12 +799,12 @@ const SystemSettings = () => {
             </div>
             {settings.attendance_cutoff_time && (
               <div className="p-3 rounded-lg bg-muted">
-                <p className="text-sm text-muted-foreground">
+                {/* <p className="text-sm text-muted-foreground">
                   Giá trị hiện tại:
                 </p>
                 <Badge variant="secondary" className="mt-1">
                   {settings.attendance_cutoff_time.setting_value}
-                </Badge>
+                </Badge> */}
                 <p className="mt-2 text-xs text-muted-foreground">
                   Cập nhật lần cuối:{" "}
                   {new Date(

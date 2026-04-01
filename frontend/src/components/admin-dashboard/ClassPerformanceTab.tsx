@@ -27,7 +27,7 @@ export function ClassPerformanceTab({
   loading = false,
 }: ClassPerformanceTabProps) {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Award className="w-5 h-5" />

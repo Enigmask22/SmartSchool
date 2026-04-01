@@ -21,11 +21,11 @@ export function AttendanceTrendsTab({
   loading = false,
 }: AttendanceTrendsTabProps) {
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <BarChart3 className="w-5 h-5" />
-          <span>Xu Hướng Điểm Danh {selectedPeriod} Ngày Qua</span>
+          <span>Xu hướng điểm danh {selectedPeriod} ngày qua</span>
         </CardTitle>
         <CardDescription>
           Biểu đồ tỷ lệ điểm danh theo thời gian

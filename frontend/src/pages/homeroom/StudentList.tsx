@@ -1,378 +1,215 @@
-import React, { useContext } from "react";
-import { AlertCircle, Users } from "lucide-react";
+import { useEffect, useContext } from "react";
+import { AlertCircle } from "lucide-react";
 import {
   Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
   CardContent,
 } from "@/components/ui/card";
 import { AuthContext } from "@/contexts/AuthContext";
 import { useSystemSettings } from "@/contexts/SystemSettingsContext";
-import { useStudentList } from "@/hooks/useStudentList";
+import { useStudentList } from "@/hooks/student-list/useStudentList";
+import { useStudentFilters } from "@/hooks/student-list/useStudentFilters";
+import { useStudentScores } from "@/hooks/student-list/useStudentScores";
+import { useStudentFeedback } from "@/hooks/student-list/useStudentFeedback";
 import {
-  StudentListHeader,
+  StudentListPageHeader,
+  StudentListTool,
   StudentPagination,
   StudentGridView,
   StudentTableView,
-  StudentSummary,
 } from "@/components/student-list";
 import {
   ScoresModal,
   FeedbackModal,
-  SubjectSelectionModal,
-  FaceRegistrationModal,
-  EditStudentModal,
   EmailReportCardModal,
-  SubjectImportModal,
 } from "@/components/student-list/modals";
 
-const StudentListPage: React.FC = () => {
+export function StudentListPage() {
   const authContext = useContext(AuthContext);
   const isHomeroomTeacher = authContext?.isHomeroomTeacher || (() => false);
   const { academicYear, semester } = useSystemSettings();
 
-  const hook = useStudentList();
+  // Initialize filters hook - StudentList is now responsible for managing filters
+  const filters = useStudentFilters();
 
-  const {
-    // Data
-    error,
-    searchTerm,
-    setSearchTerm,
-    selectedClass,
-    setSelectedClass,
-    availableClasses,
-    classesLoading,
-    homeroomClasses,
-    academicYears,
-    selectedAcademicYear,
-    setSelectedAcademicYear,
-    selectedSemester,
-    setSelectedSemester,
-    availableSemesters,
-    showInactive,
-    setShowInactive,
-    currentPage,
-    setCurrentPage,
-    pageSize,
-    setPageSize,
-    viewMode,
-    setViewMode,
-    filteredStudents,
-    paginatedStudents,
-    totalStudents,
-    totalPages,
-    startIndex,
-    endIndex,
-    restoreLoading,
+  // Initialize student list hook with filter dependencies
+  const studentList = useStudentList({
+    searchTerm: filters.searchTerm,
+    selectedClass: filters.selectedClass,
+    selectedAcademicYear: filters.selectedAcademicYear,
+    selectedSemester: filters.selectedSemester,
+    showInactive: filters.showInactive,
+    homeroomClasses: filters.homeroomClasses,
+  });
 
-    // Multiple Face Registration Modal
-    showMultipleModal,
-    setShowMultipleModal,
-    selectedStudentForMultiple,
-    setSelectedStudentForMultiple,
+  // Initialize scores hook - needed by feedback
+  const scores = useStudentScores(academicYear, semester, filters.selectedAcademicYear, filters.selectedSemester);
 
-    // Edit Modal
-    showEditModal,
-    setShowEditModal,
-    selectedStudentForEdit,
-    editForm,
-    editLoading,
-    handleEditFormChange,
-    addParentContactRow,
-    removeParentContactRow,
-    updateParentContactField,
-    submitEditForm,
-    closeEditModal,
+  // Initialize feedback hook (depends on scores)
+  const feedback = useStudentFeedback({
+    filters,
+    scoresData: scores,
+  });
 
-    // Scores Modal
-    showScoresModal,
-    setShowScoresModal,
-    selectedStudentForScores,
-    studentScores,
-    scoresLoading,
-    hasScoreData,
-    closeScoresModal,
+  // Auto-select first class for homeroom teachers when classes load
+  useEffect(() => {
+    if (
+      isHomeroomTeacher() &&
+      filters.homeroomClasses &&
+      filters.homeroomClasses.length > 0 &&
+      (!filters.selectedClass || filters.selectedClass === "all")
+    ) {
+      filters.setSelectedClass(filters.homeroomClasses[0].class_name);
+    }
+  }, [filters.homeroomClasses, isHomeroomTeacher, filters]);
 
-    // Feedback Modal
-    showFeedbackModal,
-    setShowFeedbackModal,
-    selectedStudentForFeedback,
-    feedbackForm,
-    generatedFeedback,
-    setGeneratedFeedback,
-    feedbackLoading,
-    feedbackError,
-    feedbackSuccess,
-    smsLoading,
-    handleFeedbackFormChange,
-    generateFeedback,
-    saveComment,
-    closeFeedbackModal,
-
-    // Subject Modal
-    showSubjectModal,
-    setShowSubjectModal,
-    selectedStudentForSubject,
-    availableSubjects,
-    selectedSubjects,
-    toggleSubjectSelection,
-    saveSubjectSelection,
-    subjectLoading,
-    closeSubjectModal,
-
-    // Subject Import Modal
-    showSubjectImportModal,
-    setShowSubjectImportModal,
-    subjectImportFile,
-    setSubjectImportFile,
-    subjectImportLoading,
-    handleSubjectImport,
-
-    // Email Dialog
-    showEmailDialog,
-    setShowEmailDialog,
-    emailRecipient,
-    setEmailRecipient,
-    emailSending,
-    emailError,
-    emailSuccess,
-    handleSendEmailReportCard,
-    closeEmailDialog,
-
-    // Actions
-    fetchStudents,
-    fetchAvailableClasses,
-    handleEdit,
-    handleRestore,
-    handleViewScores,
-    handleFeedbackClick,
-    handleSubjectSelection,
-    downloadSubjectTemplate,
-    exportAllComments,
-    exportStudentReportCard,
-  } = hook;
+  // Calculate pagination from filteredStudents
+  const { totalStudents, totalPages, startIndex, endIndex } = filters.calculatePagination(studentList.filteredStudents);
 
   return (
-    <div className="min-h-screen p-6 space-y-6 bg-gray-50">
-      {/* Header Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-3">
-            <Users className="w-8 h-8 text-primary" />
-            <span className="text-3xl font-bold">Danh sách học sinh</span>
-          </CardTitle>
-          <CardDescription className="text-lg">
-            Quản lý thông tin học sinh
-          </CardDescription>
-        </CardHeader>
-        {error && (
-          <CardContent>
-            <div className="flex items-center p-4 space-x-2 border rounded-lg bg-destructive/10 border-destructive/20">
-              <AlertCircle className="w-5 h-5 text-destructive" />
-              <p className="text-destructive">{error}</p>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Header with filters and actions */}
-      <StudentListHeader
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        selectedClass={selectedClass}
-        setSelectedClass={setSelectedClass}
-        availableClasses={availableClasses}
-        classesLoading={classesLoading}
-        isHomeroomTeacher={isHomeroomTeacher()}
-        homeroomClasses={homeroomClasses}
-        academicYears={academicYears}
-        selectedAcademicYear={selectedAcademicYear}
-        setSelectedAcademicYear={(v) => {
-          setSelectedAcademicYear(v);
-          fetchAvailableClasses(v);
+    <div className="min-h-screen p-6 space-y-6">
+      {/* Page Header with Title, Badge, and Controls */}
+      <StudentListPageHeader
+        selectedClass={filters.selectedClass}
+        academicYears={filters.academicYears}
+        selectedAcademicYear={filters.selectedAcademicYear}
+        onAcademicYearChange={(year) => {
+          filters.setSelectedAcademicYear(year);
+          filters.fetchAvailableClasses(year);
         }}
-        selectedSemester={selectedSemester}
-        setSelectedSemester={setSelectedSemester}
-        availableSemesters={availableSemesters}
-        showInactive={showInactive}
-        setShowInactive={setShowInactive}
-        fetchAvailableClasses={fetchAvailableClasses}
-        onRefresh={fetchStudents}
-        onDownloadTemplate={downloadSubjectTemplate}
-        onImportSubjects={() => setShowSubjectImportModal(true)}
-        onExportComments={exportAllComments}
+        selectedSemester={filters.selectedSemester}
+        onSemesterChange={filters.setSelectedSemester}
+        availableSemesters={filters.availableSemesters}
+        loading={studentList.loading}
       />
 
-      {/* Pagination Header */}
-      {totalStudents > 0 && (
-        <StudentPagination
-          totalStudents={totalStudents}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          pageSize={pageSize}
-          setPageSize={setPageSize}
-          totalPages={totalPages}
-          viewMode={viewMode as "grid" | "list"}
-          setViewMode={setViewMode}
-          startIndex={startIndex}
-          endIndex={endIndex}
-        />
+      {/* Error Alert */}
+      {studentList.error && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center p-4 space-x-2 border rounded-lg bg-destructive/10 border-destructive/20">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              <p className="text-destructive">{studentList.error}</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
+      {/* Search and Filters */}
+      <StudentListTool
+        searchTerm={filters.searchTerm}
+        setSearchTerm={filters.setSearchTerm}
+        selectedClass={filters.selectedClass}
+        setSelectedClass={filters.setSelectedClass}
+        availableClasses={filters.availableClasses}
+        classesLoading={filters.classesLoading}
+        isHomeroomTeacher={isHomeroomTeacher?.()}
+        selectedAcademicYear={filters.selectedAcademicYear}
+        selectedSemester={filters.selectedSemester}
+        showInactive={filters.showInactive}
+        setShowInactive={filters.setShowInactive}
+        onRefresh={studentList.fetchStudents}
+        onExportComments={() => {/* to be implemented in StudentListHeader */}}
+      />
+
+      {/* Pagination and Summary */}
+      <StudentPagination
+        totalStudents={totalStudents}
+        currentPage={filters.currentPage}
+        setCurrentPage={filters.setCurrentPage}
+        pageSize={filters.pageSize}
+        setPageSize={filters.setPageSize}
+        totalPages={totalPages}
+        viewMode={filters.viewMode as "grid" | "list"}
+        setViewMode={filters.setViewMode}
+        startIndex={startIndex}
+        endIndex={endIndex}
+        activeStudents={studentList.filteredStudents.filter((s) => s.is_active !== false).length}
+        inactiveStudents={studentList.filteredStudents.filter((s) => s.is_active === false).length}
+        filteredCount={studentList.filteredStudents.length}
+        totalCount={totalStudents}
+        searchTerm={filters.searchTerm}
+        selectedClass={filters.selectedClass}
+        loading={studentList.loading}
+      />
+
       {/* Students Display - Grid or List View */}
-      {viewMode === "grid" ? (
+      {filters.viewMode === "grid" ? (
         <StudentGridView
-          paginatedStudents={paginatedStudents}
-          filteredStudents={filteredStudents}
-          searchTerm={searchTerm}
-          selectedClass={selectedClass}
-          restoreLoading={restoreLoading}
-          onEdit={handleEdit}
-          onViewScores={handleViewScores}
-          onFeedback={handleFeedbackClick}
-          onSelectSubjects={handleSubjectSelection}
-          onUploadMultiple={(student) => {
-            setSelectedStudentForMultiple(student);
-            setShowMultipleModal(true);
-          }}
-          onRestore={handleRestore}
+          paginatedStudents={studentList.filteredStudents.slice(startIndex, endIndex)}
+          filteredStudents={studentList.filteredStudents}
+          searchTerm={filters.searchTerm}
+          selectedClass={filters.selectedClass}
+          restoreLoading={false}
+          fetchStudents={studentList.fetchStudents}
+          onFeedback={feedback.handleFeedbackClick}
+          onViewScores={scores.handleViewScores}
+          loading={studentList.loading}
         />
       ) : (
         <StudentTableView
-          paginatedStudents={paginatedStudents}
-          filteredStudents={filteredStudents}
-          searchTerm={searchTerm}
-          selectedClass={selectedClass}
+          paginatedStudents={studentList.filteredStudents.slice(startIndex, endIndex)}
+          filteredStudents={studentList.filteredStudents}
+          searchTerm={filters.searchTerm}
+          selectedClass={filters.selectedClass}
           startIndex={startIndex}
-          restoreLoading={restoreLoading}
-          onEdit={handleEdit}
-          onViewScores={handleViewScores}
-          onFeedback={handleFeedbackClick}
-          onSelectSubjects={handleSubjectSelection}
-          onUploadMultiple={(student) => {
-            setSelectedStudentForMultiple(student);
-            setShowMultipleModal(true);
-          }}
-          onRestore={handleRestore}
+          restoreLoading={false}
+          fetchStudents={studentList.fetchStudents}
+          onFeedback={feedback.handleFeedbackClick}
+          onViewScores={scores.handleViewScores}
+          loading={studentList.loading}
         />
       )}
 
-      {/* Summary Footer */}
-      <StudentSummary
-        totalStudents={totalStudents}
-        activeStudents={filteredStudents.filter((s) => s.is_active !== false)
-          .length}
-        inactiveStudents={filteredStudents.filter((s) => s.is_active === false)
-          .length}
-        filteredCount={filteredStudents.length}
-        totalCount={totalStudents}
-        searchTerm={searchTerm}
-        selectedClass={selectedClass}
-      />
-
-      {/* Individual Modals */}
-      <FaceRegistrationModal
-        open={showMultipleModal}
-        onOpenChange={setShowMultipleModal}
-        selectedStudent={selectedStudentForMultiple}
-        showMultipleModal={showMultipleModal}
-        setShowMultipleModal={setShowMultipleModal}
-        selectedStudentForMultiple={selectedStudentForMultiple}
-        setSelectedStudentForMultiple={setSelectedStudentForMultiple}
-        fetchStudents={fetchStudents}
-      />
-
-      <EditStudentModal
-        open={showEditModal}
-        onOpenChange={setShowEditModal}
-        selectedStudent={selectedStudentForEdit}
-        editForm={editForm}
-        editLoading={editLoading}
-        isHomeroomTeacher={isHomeroomTeacher?.()}
-        onFormChange={handleEditFormChange}
-        onAddParentContact={addParentContactRow}
-        onRemoveParentContact={removeParentContactRow}
-        onUpdateParentContactField={updateParentContactField}
-        onSubmit={submitEditForm}
-        onClose={closeEditModal}
-      />
-
+      {/* Modals managed by page-level hooks */}
       <ScoresModal
-        open={showScoresModal}
-        onOpenChange={setShowScoresModal}
-        selectedStudent={selectedStudentForScores}
-        scores={studentScores}
-        loading={scoresLoading}
-        hasData={hasScoreData}
-        onClose={closeScoresModal}
+        open={scores.showScoresModal}
+        onOpenChange={scores.setShowScoresModal}
+        selectedStudent={scores.selectedStudentForScores}
+        scores={scores.studentScores}
+        loading={scores.scoresLoading}
+        hasData={scores.hasScoreData}
+        onClose={scores.closeScoresModal}
         academicYear={academicYear}
         semester={semester}
       />
 
       <FeedbackModal
-        open={showFeedbackModal}
-        onOpenChange={setShowFeedbackModal}
-        selectedStudent={selectedStudentForFeedback}
-        form={feedbackForm as any}
-        onFormChange={handleFeedbackFormChange}
-        loading={feedbackLoading}
-        feedbackLoading={feedbackLoading}
-        error={feedbackError}
-        success={feedbackSuccess}
-        hasScoreData={hasScoreData}
-        generatedFeedback={generatedFeedback}
-        onGeneratedFeedbackChange={setGeneratedFeedback}
-        onGenerateFeedback={generateFeedback}
-        onSaveComment={saveComment}
-        onClose={closeFeedbackModal}
-        smsLoading={smsLoading}
-        exportStudentReportCard={exportStudentReportCard}
-        openEmailDialog={() => setShowEmailDialog(true)}
+        open={feedback.showFeedbackModal}
+        onOpenChange={feedback.setShowFeedbackModal}
+        selectedStudent={feedback.selectedStudentForFeedback}
+        form={feedback.feedbackForm as any}
+        onFormChange={feedback.handleFeedbackFormChange}
+        loading={feedback.feedbackLoading}
+        feedbackLoading={feedback.feedbackLoading}
+        error={feedback.feedbackError}
+        success={feedback.feedbackSuccess}
+        hasScoreData={scores.hasScoreData}
+        generatedFeedback={feedback.generatedFeedback}
+        onGeneratedFeedbackChange={feedback.setGeneratedFeedback}
+        onGenerateFeedback={feedback.generateFeedback}
+        onSaveComment={feedback.saveComment}
+        onClose={feedback.closeFeedbackModal}
+        smsLoading={feedback.smsLoading}
+        exportStudentReportCard={studentList.exportStudentReportCard}
+        openEmailDialog={() => studentList.setShowEmailDialog(true)}
       />
 
       <EmailReportCardModal
-        open={showEmailDialog}
-        onOpenChange={setShowEmailDialog}
-        selectedStudent={selectedStudentForFeedback}
-        emailRecipient={emailRecipient}
-        emailSending={emailSending}
-        emailError={emailError}
-        emailSuccess={emailSuccess}
-        generatedFeedback={generatedFeedback}
+        open={studentList.showEmailDialog}
+        onOpenChange={studentList.setShowEmailDialog}
+        selectedStudent={feedback.selectedStudentForFeedback}
+        emailRecipient={studentList.emailRecipient}
+        emailSending={studentList.emailSending}
+        emailError={studentList.emailError}
+        emailSuccess={studentList.emailSuccess}
+        generatedFeedback={feedback.generatedFeedback}
         semester={semester}
-        selectedSemester={selectedSemester}
+        selectedSemester={filters.selectedSemester}
         academicYear={academicYear}
-        selectedAcademicYear={selectedAcademicYear}
-        onEmailRecipientChange={setEmailRecipient}
-        onSend={handleSendEmailReportCard}
-        onClose={closeEmailDialog}
-      />
-
-      <SubjectSelectionModal
-        open={showSubjectModal}
-        onOpenChange={setShowSubjectModal}
-        selectedStudent={selectedStudentForSubject}
-        availableSubjects={availableSubjects}
-        selectedSubjects={selectedSubjects as any}
-        onToggleSubject={(subjectId, type) => toggleSubjectSelection(subjectId as string, type || 'core_subjects')}
-        loading={subjectLoading}
-        onSave={saveSubjectSelection}
-        onClose={closeSubjectModal}
-      />
-
-      <SubjectImportModal
-        open={showSubjectImportModal}
-        onOpenChange={setShowSubjectImportModal}
-        selectedClass={selectedClass}
-        subjectImportFile={subjectImportFile}
-        subjectImportLoading={subjectImportLoading}
-        onFileSelect={(file) => setSubjectImportFile(file || null)}
-        onImport={handleSubjectImport}
-        onClose={() => {
-          setShowSubjectImportModal(false);
-          setSubjectImportFile(null);
-        }}
+        selectedAcademicYear={filters.selectedAcademicYear}
+        onEmailRecipientChange={studentList.setEmailRecipient}
+        onSend={studentList.handleSendEmailReportCard}
+        onClose={studentList.closeEmailDialog}
       />
     </div>
   );

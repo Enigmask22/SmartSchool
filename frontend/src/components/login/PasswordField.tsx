@@ -30,7 +30,16 @@ export function PasswordField({ value, onChange }: PasswordFieldProps) {
           onChange={onChange}
           placeholder="Nhập mật khẩu"
           className="pr-10"
+          style={{
+            // Hide default browser password toggle on Edge/IE
+            colorScheme: 'none'
+          }}
         />
+        <style>{`
+          #password::-ms-reveal {
+            display: none;
+          }
+        `}</style>
         <button
           type="button"
           onClick={toggle}
