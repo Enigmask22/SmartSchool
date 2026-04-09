@@ -11,7 +11,7 @@ export function SubjectDashboardCard({ onClick }: SubjectDashboardCardProps) {
   return (
     <Card
       onClick={onClick}
-      className="overflow-hidden cursor-pointer group hover:shadow-xl hover:scale-105 transition-all duration-300"
+      className="overflow-hidden cursor-pointer group hover:shadow-xl hover:scale-105 transition-all duration-300 border-purple-600"
     >
       <CardHeader className="bg-purple-600 text-white">
         <div className="flex justify-between items-center">
@@ -22,7 +22,7 @@ export function SubjectDashboardCard({ onClick }: SubjectDashboardCardProps) {
             <ArrowRight className="w-5 h-5 text-white" />
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold text-white">Dashboard Bộ Môn</CardTitle>
+        <CardTitle className="text-2xl font-bold text-white">Dashboard Bộ môn</CardTitle>
         <CardDescription className="text-white/80">
           Phân tích điểm số các lớp bạn dạy
         </CardDescription>
@@ -41,7 +41,7 @@ export function SubjectDashboardCard({ onClick }: SubjectDashboardCardProps) {
 
       <div className="px-6 pb-6">
         <Button className="w-full bg-purple-600 hover:bg-purple-700">
-          Chọn Dashboard Bộ Môn
+          Chọn Dashboard Bộ môn
         </Button>
       </div>
     </Card>

@@ -17,10 +17,10 @@ interface StatsCardsProps {
 export function StatsCards({ students, attendanceStats, loading = false }: StatsCardsProps) {
   // Icon definitions (static, never change)
   const statIcons = [
-    { Icon: Users, bgColor: 'bg-blue-100', iconColor: 'text-blue-600' },
-    { Icon: UserCheck, bgColor: 'bg-green-100', iconColor: 'text-green-600' },
-    { Icon: UserX, bgColor: 'bg-red-100', iconColor: 'text-red-600' },
-    { Icon: BarChart3, bgColor: 'bg-purple-100', iconColor: 'text-purple-600' },
+    { Icon: Users, bgColor: 'bg-blue-100', iconColor: 'text-blue-600', borderColor: 'border-blue-500' },
+    { Icon: UserCheck, bgColor: 'bg-green-100', iconColor: 'text-green-600', borderColor: 'border-green-500' },
+    { Icon: UserX, bgColor: 'bg-red-100', iconColor: 'text-red-600', borderColor: 'border-red-500' },
+    { Icon: BarChart3, bgColor: 'bg-purple-100', iconColor: 'text-purple-600', borderColor: 'border-purple-500' },
   ];
 
   const labels = [
@@ -37,7 +37,7 @@ export function StatsCards({ students, attendanceStats, loading = false }: Stats
           const { Icon, bgColor, iconColor } = statIcons[idx];
           return (
             <Card key={idx} className="shadow-md">
-              <CardContent className="p-6">
+              <CardContent className={`p-6 border-l-4 ${statIcons[idx].borderColor} rounded-lg`}>
                 <div className="flex items-start space-x-4">
                   {/* Icon - always visible, static */}
                   <div className={`p-3 ${bgColor} rounded-lg flex-shrink-0`}>
@@ -62,8 +62,9 @@ export function StatsCards({ students, attendanceStats, loading = false }: Stats
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {/* Card 1: Total Students */}
       <Card className="shadow-md">
-        <CardContent className="p-6">
+        <CardContent className={`p-6 border-l-4 ${statIcons[0].borderColor} rounded-lg`}>
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-blue-100 rounded-lg">
               <Users className="w-6 h-6 text-blue-600" />
@@ -76,8 +77,9 @@ export function StatsCards({ students, attendanceStats, loading = false }: Stats
         </CardContent>
       </Card>
 
+      {/* Card 2: Late Count */}
       <Card className="shadow-md">
-        <CardContent className="p-6">
+        <CardContent className={`p-6 border-l-4 ${statIcons[1].borderColor} rounded-lg`}>
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-green-100 rounded-lg">
               <UserCheck className="w-6 h-6 text-green-600" />
@@ -94,8 +96,9 @@ export function StatsCards({ students, attendanceStats, loading = false }: Stats
         </CardContent>
       </Card>
 
+      {/* Card 3: Absent Count */}
       <Card className="shadow-md">
-        <CardContent className="p-6">
+        <CardContent className={`p-6 border-l-4 ${statIcons[2].borderColor} rounded-lg`}>
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-red-100 rounded-lg">
               <UserX className="w-6 h-6 text-red-600" />
@@ -112,8 +115,9 @@ export function StatsCards({ students, attendanceStats, loading = false }: Stats
         </CardContent>
       </Card>
 
+      {/* Card 4: Attendance Rate */}
       <Card className="shadow-md">
-        <CardContent className="p-6">
+        <CardContent className={`p-6 border-l-4 ${statIcons[3].borderColor} rounded-lg`}>
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-purple-100 rounded-lg">
               <BarChart3 className="w-6 h-6 text-purple-600" />

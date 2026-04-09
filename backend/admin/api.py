@@ -183,23 +183,34 @@ async def delete_user(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Soft delete người dùng (set is_active = false)"""
+    """Soft delete người dùng (set is_active = false) and cascade to related records"""
     try:
         # Kiểm tra xem user có tồn tại không
         user_check = db.table("users").select("id, role").eq("id", user_id).execute()
         if not user_check.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
-        # Soft delete: Set is_active = false
+        user = user_check.data[0]
+        
+        # Soft delete user
         response = db.table("users").update({
             "is_active": False,
             "updated_at": datetime.now().isoformat()
         }).eq("id", user_id).execute()
         
-        if response.data:
-            return {"success": True, "message": "Xóa người dùng thành công (soft delete)"}
-        else:
+        if not response.data:
             raise HTTPException(status_code=500, detail="Lỗi khi xóa người dùng")
+        
+        # If user is a teacher, also soft delete the teacher record
+        if user.get("role") in ["teacher", "homeroom_teacher"]:
+            teacher_record = db.table("teachers").select("id").eq("user_id", user_id).execute()
+            if teacher_record.data:
+                db.table("teachers").update({
+                    "is_active": False,
+                    "updated_at": datetime.now().isoformat()
+                }).eq("user_id", user_id).execute()
+        
+        return {"success": True, "message": "Xóa người dùng thành công (soft delete)"}
         
     except HTTPException:
         raise
@@ -214,23 +225,34 @@ async def restore_user(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Khôi phục người dùng đã bị soft delete"""
+    """Khôi phục người dùng đã bị soft delete và cascade to related records"""
     try:
         # Kiểm tra xem user có tồn tại không
-        user_check = db.table("users").select("id").eq("id", user_id).execute()
+        user_check = db.table("users").select("id, role").eq("id", user_id).execute()
         if not user_check.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
-        # Restore: Set is_active = true
+        user = user_check.data[0]
+        
+        # Restore user
         response = db.table("users").update({
             "is_active": True,
             "updated_at": datetime.now().isoformat()
         }).eq("id", user_id).execute()
         
-        if response.data:
-            return {"success": True, "message": "Khôi phục người dùng thành công"}
-        else:
+        if not response.data:
             raise HTTPException(status_code=500, detail="Lỗi khi khôi phục người dùng")
+        
+        # If user is a teacher, also restore the teacher record
+        if user.get("role") in ["teacher", "homeroom_teacher"]:
+            teacher_record = db.table("teachers").select("id").eq("user_id", user_id).execute()
+            if teacher_record.data:
+                db.table("teachers").update({
+                    "is_active": True,
+                    "updated_at": datetime.now().isoformat()
+                }).eq("user_id", user_id).execute()
+        
+        return {"success": True, "message": "Khôi phục người dùng thành công"}
         
     except HTTPException:
         raise
@@ -404,23 +426,32 @@ async def delete_teacher(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Soft delete giáo viên (set is_active = false)"""
+    """Soft delete giáo viên (set is_active = false) and cascade to user record"""
     try:
         # Kiểm tra xem teacher có tồn tại không
-        teacher_check = db.table("teachers").select("id").eq("id", teacher_id).execute()
+        teacher_check = db.table("teachers").select("id, user_id").eq("id", teacher_id).execute()
         if not teacher_check.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
         
-        # Soft delete: Set is_active = false
+        teacher = teacher_check.data[0]
+        
+        # Soft delete teacher
         response = db.table("teachers").update({
             "is_active": False,
             "updated_at": datetime.now().isoformat()
         }).eq("id", teacher_id).execute()
         
-        if response.data:
-            return {"success": True, "message": "Xóa giáo viên thành công (soft delete)"}
-        else:
+        if not response.data:
             raise HTTPException(status_code=500, detail="Lỗi khi xóa giáo viên")
+        
+        # Also soft delete the corresponding user record
+        if teacher.get("user_id"):
+            db.table("users").update({
+                "is_active": False,
+                "updated_at": datetime.now().isoformat()
+            }).eq("id", teacher.get("user_id")).execute()
+        
+        return {"success": True, "message": "Xóa giáo viên thành công (soft delete)"}
         
     except HTTPException:
         raise
@@ -435,23 +466,32 @@ async def restore_teacher(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Khôi phục giáo viên đã bị soft delete"""
+    """Khôi phục giáo viên đã bị soft delete và cascade to user record"""
     try:
         # Kiểm tra xem teacher có tồn tại không
-        teacher_check = db.table("teachers").select("id").eq("id", teacher_id).execute()
+        teacher_check = db.table("teachers").select("id, user_id").eq("id", teacher_id).execute()
         if not teacher_check.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
         
-        # Restore: Set is_active = true
+        teacher = teacher_check.data[0]
+        
+        # Restore teacher
         response = db.table("teachers").update({
             "is_active": True,
             "updated_at": datetime.now().isoformat()
         }).eq("id", teacher_id).execute()
         
-        if response.data:
-            return {"success": True, "message": "Khôi phục giáo viên thành công"}
-        else:
+        if not response.data:
             raise HTTPException(status_code=500, detail="Lỗi khi khôi phục giáo viên")
+        
+        # Also restore the corresponding user record
+        if teacher.get("user_id"):
+            db.table("users").update({
+                "is_active": True,
+                "updated_at": datetime.now().isoformat()
+            }).eq("id", teacher.get("user_id")).execute()
+        
+        return {"success": True, "message": "Khôi phục giáo viên thành công"}
         
     except HTTPException:
         raise
@@ -469,9 +509,11 @@ async def permanent_delete_teacher(
     """Xóa vĩnh viễn giáo viên (hard delete với cascade)"""
     try:
         # Kiểm tra xem teacher có tồn tại không
-        teacher_check = db.table("teachers").select("id").eq("id", teacher_id).execute()
+        teacher_check = db.table("teachers").select("id, user_id").eq("id", teacher_id).execute()
         if not teacher_check.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
+        
+        teacher = teacher_check.data[0]
         
         # Set homeroom_teacher_id = null cho các lớp nếu teacher này là GVCN
         db.table("classes").update({"homeroom_teacher_id": None}).eq("homeroom_teacher_id", teacher_id).execute()
@@ -479,10 +521,14 @@ async def permanent_delete_teacher(
         # Xóa vĩnh viễn teacher record
         response = db.table("teachers").delete().eq("id", teacher_id).execute()
         
-        if response.data:
-            return {"success": True, "message": "Xóa vĩnh viễn giáo viên thành công"}
-        else:
+        if not response.data:
             raise HTTPException(status_code=500, detail="Lỗi khi xóa vĩnh viễn giáo viên")
+        
+        # CASCADE: Also delete the corresponding user record
+        if teacher.get("user_id"):
+            db.table("users").delete().eq("id", teacher.get("user_id")).execute()
+        
+        return {"success": True, "message": "Xóa vĩnh viễn giáo viên thành công"}
         
     except HTTPException:
         raise

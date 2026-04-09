@@ -79,21 +79,21 @@ export function Login() {
 
   return (
     <div 
-      className="relative flex justify-center items-center p-4 min-h-screen bg-cover bg-center bg-no-repeat"
+      className="relative flex justify-center items-center min-h-screen bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: 'url(/background_login.png)',
+        backgroundImage: 'url(/background_login.jpg)',
       }}
     >
       {/* Background overlay */}
       <div className="absolute inset-0 bg-black/40"></div>
       
-      <div className="relative z-10 space-y-8 w-full max-w-md">
+      <div className="relative z-10 space-y-4 w-full max-w-md">
         {/* Header section */}
         <LoginHeader />
 
         {/* Login form card */}
         <Card>
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>Đăng nhập</CardTitle>
             <CardDescription>
               Nhập thông tin tài khoản để tiếp tục

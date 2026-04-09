@@ -16,7 +16,7 @@ export function LoginHeader() {
         />
         {/* <School className="w-8 h-8 text-white" /> */}
       </div>
-      <h1 className="mt-6 text-3xl font-bold text-white">
+      <h1 className="mt-3 text-3xl font-bold text-white">
         SynapseS
       </h1>
       <p className="mt-2 text-sm text-white/90">

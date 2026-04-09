@@ -79,7 +79,9 @@ export function DashboardSelector() {
   // This component only renders if multiple roles or both exist
 
   return (
-    <div className="flex justify-center items-center p-6 min-h-screen bg-gray-50">
+    <div className="flex justify-center items-center p-6 min-h-screen"
+      style={{ backgroundImage: 'url(/background_login.jpg)' }}
+      >
       <div className="w-full max-w-4xl">
         {/* Header */}
         <DashboardHeader />

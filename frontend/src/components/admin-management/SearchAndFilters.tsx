@@ -15,22 +15,24 @@ import { useAdminFilters } from '@/hooks/admin-management/useAdminFilters';
 interface SearchAndFiltersProps {
   activeTab: string;
   loading?: boolean;
+  search: ReturnType<typeof useAdminSearch>;
+  filters: ReturnType<typeof useAdminFilters>;
 }
 
 export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
   activeTab,
   loading = false,
+  search,
+  filters,
 }) => {
-  const search = useAdminSearch();
-  const filters = useAdminFilters();
   const shouldShowFilters =
     activeTab === 'users' ||
     activeTab === 'teachers' ||
     activeTab === 'subjects' ||
     activeTab === 'classes' ||
-    activeTab === 'subject_teachers' ||
-    activeTab === 'class_subjects' ||
-    activeTab === 'score_settings';
+    // activeTab === 'subject_teachers' ||
+    activeTab === 'class_subjects';
+    // activeTab === 'score_settings';
 
   const isClassSelectDisabled = !filters.selectedAcademicYear && !filters.selectedGrade;
 

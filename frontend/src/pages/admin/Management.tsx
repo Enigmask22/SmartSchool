@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import { useAdminManagement } from '@/hooks/admin-management/useAdminManagement';
 import { useAdminSearch } from '@/hooks/admin-management/useAdminSearch';
@@ -13,6 +13,7 @@ import { TabNavigation } from '../../components/admin-management/TabNavigation';
 import { SearchAndFilters } from '../../components/admin-management/SearchAndFilters';
 import { ActionButtons } from '../../components/admin-management/ActionButtons';
 import { AdminTable } from '../../components/admin-management/AdminTable';
+import { AdminPagination } from '../../components/admin-management/AdminPagination';
 import { ImportTeachersModal } from '../../components/admin-management/ImportTeachersModal';
 import {
   Card,
@@ -33,8 +34,17 @@ const AdminManagement = () => {
   const teacherSubjectHook = useTeacherSubjectManagement(tabCrud.editingItem, tabCrud.showAddForm, hook.activeTab);
   const scoreColumnHook = useScoreColumnManagement();
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const handleTabClick = (tabId: string) => {
     hook.setActiveTab(tabId);
+    // Reset form and search states when switching tabs
+    tabCrud.setShowAddForm(false);
+    tabCrud.setEditingItem(null);
+    search.setSearchTerm('');
+    search.setShowDeleted(false);
   };
 
   const handleAddNew = () => {
@@ -55,14 +65,67 @@ const AdminManagement = () => {
   };
 
   const filteredDataMemo = useMemo(
-    () => hook.filteredData(hook.data, search.searchTerm, {
-      academicYear: filters.selectedAcademicYear,
-      grade: filters.selectedGrade,
-      classId: filters.selectedClassId,
-      classes: filters.classes,
-    }),
-    [hook.filteredData, hook.data, search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId, filters.classes]
+    () => {
+      const allFiltered = hook.filteredData(hook.data, search.searchTerm, {
+        academicYear: filters.selectedAcademicYear,
+        grade: filters.selectedGrade,
+        classId: filters.selectedClassId,
+        classes: filters.classes,
+      });
+
+      // Additional filter for deleted items
+      let result;
+      if (search.showDeleted) {
+        // Show only deleted items
+        result = allFiltered.filter((item: any) => item.is_active === false);
+      } else {
+        // Show only active items
+        result = allFiltered.filter((item: any) => item.is_active !== false);
+      }
+
+      // Remove duplicates by ID and sort by ID
+      const uniqueMap = new Map<number, any>();
+      result.forEach((item: any) => {
+        if (item.id && !uniqueMap.has(item.id)) {
+          uniqueMap.set(item.id, item);
+        }
+      });
+      const dedupedSorted = Array.from(uniqueMap.values()).sort((a: any, b: any) => a.id - b.id);
+
+      // Debug logging
+      // console.log(`[Management] filteredDataMemo for tab ${hook.activeTab}:`, {
+      //   totalData: hook.data.length,
+      //   afterFilter: result.length,
+      //   afterDedup: dedupedSorted.length,
+      //   ids: dedupedSorted.map((item: any) => item.id),
+      //   data: dedupedSorted,
+      // });
+
+      return dedupedSorted;
+    },
+    [hook.filteredData, hook.data, search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId, filters.classes, search.showDeleted]
   );
+
+  // Pagination calculations
+  const totalItems = filteredDataMemo.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedData = filteredDataMemo.slice(startIndex, endIndex);
+
+  // Debug pagination
+  // console.log(`[Management] Pagination - Page ${currentPage}:`, {
+  //   totalItems,
+  //   pageSize,
+  //   startIndex,
+  //   endIndex,
+  //   paginatedDataIds: paginatedData.map((item: any) => item.id),
+  // });
+
+  // Reset to page 1 when filtered data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId]);
 
   return (
     <div className="min-h-screen p-6 bg-background space-y-6">
@@ -111,12 +174,14 @@ const AdminManagement = () => {
               {/* Search and Filters */}
               <SearchAndFilters
                 activeTab={hook.activeTab}
+                search={search}
+                filters={filters}
               />
             </CardHeader>
 
             {/* Add Form Section */}
             {tabCrud.showAddForm && (
-              <CardContent className="border-b bg-muted/30">
+              <CardContent className="border-y bg-muted/30 py-6 mb-3">
                 <div className="mb-4">
                   <h3 className="mb-2 text-lg font-semibold">Thông tin mới</h3>
                   <p className="text-sm text-muted-foreground">Nhập thông tin để tạo bản ghi mới</p>
@@ -140,14 +205,30 @@ const AdminManagement = () => {
             <CardContent>
               <AdminTable
                 hook={hook}
-                filteredData={filteredDataMemo}
+                filteredData={paginatedData}
                 isLoading={hook.loading}
                 error={hook.error}
                 onRetry={hook.loadData}
                 scoreColumnHook={scoreColumnHook}
+                searchTerm={search.searchTerm}
+                search={search}
               />
             </CardContent>
           </Card>
+
+          {/* Pagination */}
+          <AdminPagination
+            totalItems={totalItems}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            pageSize={pageSize}
+            setPageSize={setPageSize}
+            totalPages={totalPages}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            loading={hook.loading}
+            searchTerm={search.searchTerm}
+          />
 
           {/* Import Teachers Modal */}
           <ImportTeachersModal

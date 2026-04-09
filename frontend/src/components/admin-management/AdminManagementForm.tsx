@@ -36,6 +36,9 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
     } else {
       hook.handleCreate(form.formData);
     }
+    // Close form after submission
+    form.resetForm();
+    if (onCancel) onCancel();
   };
 
   return (
@@ -106,7 +109,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
 
             {field === 'role' ? (
               <Select
-                value={form.formData[field] || item?.[field] || ''}
+                value={form.formData[field] ?? item?.[field] ?? ''}
                 onValueChange={(value) => form.handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
@@ -120,7 +123,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'teacher_id' ? (
               <Select
-                value={(form.formData[field] || item?.[field] || '')?.toString()}
+                value={(form.formData[field] ?? item?.[field] ?? '')?.toString()}
                 onValueChange={(value) =>
                   form.handleChange(field, value ? parseInt(value) : null)
                 }
@@ -152,7 +155,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
             ) : field === 'subject_id' ? (
               <>
                 <Select
-                  value={(form.formData[field] || item?.[field] || '')?.toString()}
+                  value={(form.formData[field] ?? item?.[field] ?? '')?.toString()}
                   onValueChange={(value) =>
                     form.handleChange(field, value ? parseInt(value) : null)
                   }
@@ -192,7 +195,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </>
             ) : field === 'user_id' ? (
               <Select
-                value={(form.formData[field] || item?.[field] || '')?.toString()}
+                value={(form.formData[field] ?? item?.[field] ?? '')?.toString()}
                 onValueChange={(value) =>
                   form.handleChange(field, value ? parseInt(value) : null)
                 }
@@ -210,7 +213,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'class_id' ? (
               <Select
-                value={(form.formData[field] || item?.[field] || '')?.toString()}
+                value={(form.formData[field] ?? item?.[field] ?? '')?.toString()}
                 onValueChange={(value) => form.handleChange(field, parseInt(value))}
               >
                 <SelectTrigger className="w-full">
@@ -226,7 +229,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'homeroom_teacher_id' ? (
               <Select
-                value={(form.formData[field] || item?.[field] || '')?.toString()}
+                value={(form.formData[field] ?? item?.[field] ?? '')?.toString()}
                 onValueChange={(value) =>
                   form.handleChange(field, value ? parseInt(value) : null)
                 }
@@ -245,7 +248,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
             ) : field === 'gender' ? (
               <Select
                 value={
-                  form.formData[field] ||
+                  form.formData[field] ??
                   (item?.[field] && item[field] !== '-' ? item[field] : 'Nam')
                 }
                 onValueChange={(value) => form.handleChange(field, value)}
@@ -263,7 +266,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               <div className="w-full">
                 <SimpleDatePicker
                   value={
-                    form.formData[field] ||
+                    form.formData[field] ??
                     (item?.[field] && item[field] !== '-' ? item[field] : '')
                   }
                   onChange={(date) => form.handleChange(field, date)}
@@ -272,7 +275,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </div>
             ) : field === 'semester' ? (
               <Select
-                value={form.formData[field] || item?.[field] || ''}
+                value={form.formData[field] ?? item?.[field] ?? ''}
                 onValueChange={(value) => form.handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
@@ -285,7 +288,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field === 'grade' ? (
               <Select
-                value={form.formData[field] || item?.[field] || ''}
+                value={form.formData[field] ?? item?.[field] ?? ''}
                 onValueChange={(value) => form.handleChange(field, value)}
               >
                 <SelectTrigger className="w-full">
@@ -301,7 +304,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </Select>
             ) : field.includes('description') ? (
               <textarea
-                value={form.formData[field] || item?.[field] || ''}
+                value={form.formData[field] ?? item?.[field] ?? ''}
                 onChange={(e) => form.handleChange(field, e.target.value)}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 rows={3}
@@ -310,7 +313,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={form.formData[field] || item?.[field] || false}
+                  checked={form.formData[field] ?? item?.[field] ?? false}
                   onChange={(e) => form.handleChange(field, e.target.checked)}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
@@ -335,13 +338,13 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
                       : 'text'
                   }
                   value={
-                    form.formData[field] ||
+                    form.formData[field] ??
                     (item?.[field] && item[field] !== '-' ? item[field] : '')
                   }
                   onChange={(e) => form.handleChange(field, e.target.value)}
                   placeholder={
                     field === 'username'
-                      ? 'ho_va_ten.ten_truong.ten_tinh'
+                      ? 'ho_va_ten'
                       : field === 'phone'
                       ? 'Nhập số điện thoại'
                       : field === 'teacher_code'
@@ -385,12 +388,12 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
               </div>
             )}
 
-            {field === 'username' && (
+            {/* {field === 'username' && (
               <p className="mt-1 text-xs text-gray-500">
                 Tùy chọn. Format: tên.school.province (VD:
                 nguyen_thi_lan.chuyen_le_quy_don.tphcm)
               </p>
-            )}
+            )} */}
           </div>
         ))}
 
@@ -435,6 +438,7 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
         <Button
           type="button"
           variant="outline"
+          className="text-red-600 border-red-600 hover:text-red-700 hover:border-red-700 hover:bg-red-50"
           onClick={() => {
             form.resetForm();
             if (onCancel) onCancel();

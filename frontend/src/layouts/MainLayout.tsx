@@ -33,7 +33,8 @@ const MainLayout = () => {
   // Handle loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50"
+      style={{backgroundImage: 'url(/background-login.jpg)'}}>
         <div className="w-12 h-12 border-b-2 border-indigo-600 rounded-full animate-spin"></div>
       </div>
     );
