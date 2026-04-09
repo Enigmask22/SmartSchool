@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { usePersonalInfoData } from "@/hooks/profile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, User } from "lucide-react";
+import { PageHeader } from "@/components/common/PageHeader";
 import { PersonalInfoSection } from "@/components/profile/PersonalInfoSection";
 import { PasswordSection } from "@/components/profile/PasswordSection";
 import { TeachingInfoSection } from "@/components/profile/TeachingInfoSection";
@@ -32,17 +33,19 @@ const PersonalInfo = () => {
   // Initial data load error
   if (!personalInfo.loading && !personalInfo.personalData && !personalInfo.userData) {
     return (
-      <div className="space-y-6">
-        {/* Header - show even on error */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Thông tin cá nhân
-          </h1>
-          <p className="mt-1 text-gray-600">
-            Quản lý thông tin cá nhân và tài khoản
-          </p>
-        </div>
+      <div className="min-h-screen p-6 bg-background space-y-6">
+        {/* Header */}
+        <PageHeader
+          title="Thông tin cá nhân"
+          description="Quản lý thông tin cá nhân và tài khoản"
+          icon={
+            <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-blue-600 flex-shrink-0">
+              <User className="w-8 h-8 text-white" />
+            </div>
+          }
+        />
 
+        {/* Error Alert */}
         <Alert className="border-red-200 bg-red-50">
           <AlertCircle className="w-4 h-4 text-red-600" />
           <AlertDescription className="text-red-800">
@@ -54,16 +57,17 @@ const PersonalInfo = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header - Always visible, static section */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Thông tin cá nhân
-        </h1>
-        <p className="mt-1 text-gray-600">
-          Quản lý thông tin cá nhân và tài khoản
-        </p>
-      </div>
+    <div className="min-h-screen p-6 bg-background space-y-6">
+      {/* Header */}
+      <PageHeader
+        title="Thông tin cá nhân"
+        description="Quản lý thông tin cá nhân và tài khoản"
+        icon={
+          <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-blue-600 flex-shrink-0">
+            <User className="w-8 h-8 text-white" />
+          </div>
+        }
+      />
 
       {/* Success/Error Messages */}
       {(personalInfo.successMessage || pageSuccess) && (

@@ -22,7 +22,7 @@ export function UsernameField({ value, onChange }: UsernameFieldProps) {
         required
         value={value}
         onChange={onChange}
-        placeholder="ho_va_ten.ten_truong.ten_tinh"
+        placeholder="nguyen_van_an"
       />
     </div>
   );

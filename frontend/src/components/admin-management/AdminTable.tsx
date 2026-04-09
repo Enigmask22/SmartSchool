@@ -26,6 +26,8 @@ interface AdminTableProps {
   error?: string | null;
   onRetry?: () => void;
   scoreColumnHook?: any;
+  searchTerm?: string;
+  search?: ReturnType<typeof useAdminSearch>;
 }
 
 export const AdminTable: React.FC<AdminTableProps> = ({
@@ -35,21 +37,23 @@ export const AdminTable: React.FC<AdminTableProps> = ({
   error = null,
   onRetry,
   scoreColumnHook,
+  searchTerm = '',
+  search,
 }) => {
-  // Use refactored hooks directly for independent state management
-  const search = useAdminSearch();
-  const tabCrud = useTabCrud(hook.activeTab, search.showDeleted);
+  // Use search from props or fallback to hook
+  const searchState = search || useAdminSearch();
+  const tabCrud = useTabCrud(hook.activeTab, searchState.showDeleted);
   const form = useAdminForm();
   const teacherSubjectHook = useTeacherSubjectManagement(tabCrud.editingItem, false, hook.activeTab);
   const scoreColumnHookLocal = useScoreColumnManagement();
 
   const renderForm = (isEdit = false, item = null) => {
     return (
-      <AdminManagementForm 
-        hook={hook} 
+      <AdminManagementForm
+        hook={hook}
         teacherSubjectHook={teacherSubjectHook}
         scoreColumnHook={scoreColumnHookLocal}
-        isEdit={isEdit} 
+        isEdit={isEdit}
         item={item}
         onCancel={() => {
           tabCrud.setEditingItem(null);
@@ -61,6 +65,14 @@ export const AdminTable: React.FC<AdminTableProps> = ({
   };
 
   const handleEdit = (item: any) => {
+    // Toggle: if already editing this item, close the form
+    if (tabCrud.editingItem === item.id) {
+      tabCrud.setEditingItem(null);
+      teacherSubjectHook.setSelectedSubjects([]);
+      scoreColumnHookLocal.setScoreColumns([]);
+      return;
+    }
+
     tabCrud.setEditingItem(item.id);
     if (hook.activeTab === 'teachers') {
       logger.debug('>>> EDIT TEACHER CLICKED');
@@ -126,20 +138,24 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           <TableHeader>
             <TableRow>
               {hook.currentConfig?.displayFields?.map((field: string) => (
-                <TableHead key={field}>{renderFieldHeader(field)}</TableHead>
+                <TableHead key={field} className="text-center relative py-3">
+                  {renderFieldHeader(field)}
+                  <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                </TableHead>
               ))}
-              <TableHead>THAO TÁC</TableHead>
+              <TableHead className="text-center relative py-3">TÙY CHỌN</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {[...Array(5)].map((_, index) => (
               <TableRow key={index}>
                 {hook.currentConfig?.displayFields?.map((field: string) => (
-                  <TableCell key={field}>
+                  <TableCell key={field} className="relative">
                     <div className="h-4 rounded animate-pulse bg-muted"></div>
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                   </TableCell>
                 ))}
-                <TableCell>
+                <TableCell className="relative flex justify-center">
                   <div className="flex space-x-2">
                     <div className="w-8 h-8 rounded animate-pulse bg-muted"></div>
                     <div className="w-8 h-8 rounded animate-pulse bg-muted"></div>
@@ -182,9 +198,12 @@ export const AdminTable: React.FC<AdminTableProps> = ({
         <TableHeader>
           <TableRow>
             {hook.currentConfig?.displayFields?.map((field: string) => (
-              <TableHead key={field}>{renderFieldHeader(field)}</TableHead>
+              <TableHead key={field} className="text-center relative py-3">
+                {renderFieldHeader(field)}
+                <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+              </TableHead>
             ))}
-            <TableHead>THAO TÁC</TableHead>
+            <TableHead className="text-center">TÙY CHỌN</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -192,11 +211,14 @@ export const AdminTable: React.FC<AdminTableProps> = ({
             <React.Fragment key={item.id}>
               <TableRow className={index % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
                 {hook.currentConfig?.displayFields?.map((field: string) => (
-                  <TableCell key={field}>{renderTableCell(field, item, hook)}</TableCell>
+                  <TableCell key={field} className="relative">
+                    {renderTableCell(field, item, hook, searchTerm)}
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                  </TableCell>
                 ))}
                 <TableCell>
-                  <div className="flex space-x-2">
-                    {search.showDeleted ? (
+                  <div className="flex space-x-2 justify-center">
+                    {searchState.showDeleted ? (
                       <>
                         <Button
                           variant="outline"
@@ -273,7 +295,7 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           confirmText={tabCrud.confirmState.confirmText}
           cancelText={tabCrud.confirmState.cancelText}
           onCancel={tabCrud.closeConfirm}
-          onConfirm={tabCrud.confirmState.onConfirm || (() => {})}
+          onConfirm={tabCrud.confirmState.onConfirm || (() => { })}
         />
       )}
     </div>

@@ -11,7 +11,7 @@ export function HomeroomDashboardCard({ onClick }: HomeroomDashboardCardProps) {
   return (
     <Card
       onClick={onClick}
-      className="overflow-hidden cursor-pointer group hover:shadow-xl hover:scale-105 transition-all duration-300"
+      className="overflow-hidden cursor-pointer group hover:shadow-xl hover:scale-105 transition-all duration-300 border-primary"
     >
       <CardHeader className="bg-primary text-primary-foreground">
         <div className="flex justify-between items-center">
@@ -22,7 +22,7 @@ export function HomeroomDashboardCard({ onClick }: HomeroomDashboardCardProps) {
             <ArrowRight className="w-5 h-5 text-primary-foreground" />
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold text-primary-foreground">Dashboard Chủ Nhiệm</CardTitle>
+        <CardTitle className="text-2xl font-bold text-primary-foreground">Dashboard Chủ nhiệm</CardTitle>
         <CardDescription className="text-primary-foreground/80">
           Quản lý lớp chủ nhiệm của bạn
         </CardDescription>
@@ -41,7 +41,7 @@ export function HomeroomDashboardCard({ onClick }: HomeroomDashboardCardProps) {
 
       <div className="px-6 pb-6">
         <Button className="w-full">
-          Chọn Dashboard Chủ Nhiệm
+          Chọn Dashboard Chủ nhiệm
         </Button>
       </div>
     </Card>

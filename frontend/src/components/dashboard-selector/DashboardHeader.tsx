@@ -3,12 +3,12 @@ import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/c
 
 export function DashboardHeader() {
   return (
-    <Card className="mb-8">
+    <Card className="mb-6">
       <CardContent className="p-8 text-center">
-        <div className="inline-flex justify-center items-center mb-6 w-20 h-20 bg-primary rounded-full shadow-lg">
+        <div className="inline-flex justify-center items-center mb-6 mr-3 w-16 h-16 bg-primary rounded-full shadow-lg">
           <GraduationCap className="w-10 h-10 text-primary-foreground" />
         </div>
-        <CardTitle className="mb-3 text-4xl font-bold text-primary">
+        <CardTitle className="inline-flex mb-3 text-4xl font-bold text-primary">
           Chọn Dashboard
         </CardTitle>
         <CardDescription className="text-lg">

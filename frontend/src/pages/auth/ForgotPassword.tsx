@@ -175,13 +175,13 @@ export function ForgotPassword() {
     <div
       className="flex justify-center items-center p-4 min-h-screen bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: 'url(/background_login.png)',
+        backgroundImage: 'url(/background_login.jpg)',
       }}
     >
       {/* Background overlay */}
       <div className="absolute inset-0 bg-black/40"></div>
 
-      <div className="relative z-10 space-y-8 w-full max-w-md">
+      <div className="relative z-10 space-y-4 w-full max-w-md">
         {/* Header */}
         <ForgotPasswordHeader />
 

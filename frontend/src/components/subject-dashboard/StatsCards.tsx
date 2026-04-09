@@ -16,7 +16,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-blue-500">
+        <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-2xl border-l-blue-500">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">Tổng số lớp dạy</p>
@@ -29,7 +29,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
           </div>
         </div>
 
-        <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-slate-500">
+        <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-2xl border-l-slate-500">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">Tổng số học sinh</p>
@@ -42,7 +42,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
           </div>
         </div>
 
-        <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-emerald-500">
+        <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-2xl border-l-emerald-500">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">Điểm trung bình</p>
@@ -55,7 +55,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
           </div>
         </div>
 
-        <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-amber-500">
+        <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-2xl border-l-amber-500">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-600">Tỷ lệ đạt</p>
@@ -73,7 +73,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-blue-500 hover:shadow-lg">
+      <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-xl border-l-blue-500 hover:shadow-lg">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Tổng số lớp dạy</p>
@@ -88,7 +88,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
         </div>
       </div>
 
-      <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-slate-500 hover:shadow-lg">
+      <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-xl border-l-slate-500 hover:shadow-lg">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Tổng số học sinh</p>
@@ -105,7 +105,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
         </div>
       </div>
 
-      <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-emerald-500 hover:shadow-lg">
+      <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-xl border-l-emerald-500 hover:shadow-lg">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">
@@ -128,7 +128,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
         </div>
       </div>
 
-      <div className="p-6 transition-shadow duration-200 bg-white border-l-4 shadow-md rounded-2xl border-amber-500 hover:shadow-lg">
+      <div className="p-6 transition-shadow duration-200 bg-white border-[1px] border-gray-200 border-l-4 shadow-md rounded-2xl border-l-amber-500 hover:shadow-lg">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Tỷ lệ đạt</p>

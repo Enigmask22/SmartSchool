@@ -17,7 +17,7 @@ export function Step1Form({
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold">Quên mật khẩu?</h2>
-        <p className="mt-2 text-sm">
+        <p className="mt-2 text-sm text-gray-600">
           Nhập username đăng nhập và email nhận OTP để đặt lại mật khẩu
         </p>
       </div>
@@ -36,7 +36,7 @@ export function Step1Form({
               value={formData.username}
               onChange={onInputChange}
               className="block px-3 py-2 w-full placeholder-gray-400 rounded-md border border-gray-300 appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="ho_va_ten.ten_truong.ten_tinh"
+              placeholder="nguyen_van_an"
             />
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
+import { toast } from 'sonner';
 import { TAB_CONFIG } from './useTabCrud';
 
 export function useAdminManagement() {
@@ -73,7 +74,7 @@ export function useAdminManagement() {
           }));
         }
 
-        items = items.filter((item) => item && item.is_active !== false);
+        // Note: Don't filter out inactive items here - let the UI layer handle visibility based on showDeleted flag
         setData(items);
       } else {
         setError(response.message || 'Không thể tải dữ liệu');
@@ -228,7 +229,7 @@ export function useAdminManagement() {
   // CRUD Operations
   const handleInitializeClassSubjects = useCallback(() => {
     if (!selectedClassId || !selectedAcademicYear) {
-      alert('Vui lòng chọn lớp và năm học!');
+      toast.error('Vui lòng chọn lớp và năm học!');
       return;
     }
 
@@ -261,7 +262,7 @@ export function useAdminManagement() {
         }));
 
       if (classSubjectsToCreate.length === 0) {
-        alert('Không có môn học nào để khởi tạo!');
+        toast.error('Không có môn học nào để khởi tạo!');
         return;
       }
 
@@ -296,14 +297,15 @@ export function useAdminManagement() {
         if (errors.length > 0 && errors.length <= 5) {
           message += `\n\nChi tiết lỗi:\n${errors.join('\n')}`;
         }
+        toast.warning(message);
+      } else {
+        toast.success(message);
       }
-
-      alert(message);
       await loadData();
     } catch (error) {
       logger.error('Error initializing class subjects:', error);
       const errorMsg = error instanceof Error ? error.message : 'Lỗi không xác định';
-      alert('❌ Lỗi khi khởi tạo môn học: ' + errorMsg);
+      toast.error('Lỗi khi khởi tạo môn học: ' + errorMsg);
     } finally {
       setLoading(false);
     }
@@ -373,7 +375,7 @@ export function useAdminManagement() {
           setSelectedSubjects([]);
           loadData();
           loadReferenceData();
-          alert(
+          toast.success(
             `Tạo giáo viên thành công${
               selectedSubjects.length > 0 ? ` và phân công ${selectedSubjects.length} môn học!` : '!'
             }`
@@ -427,18 +429,18 @@ export function useAdminManagement() {
             setShowAddForm(false);
             setFormData({});
             loadData();
-            alert('Tạo thành công!');
+            toast.success('Tạo thành công!');
           } else {
             const errorMsg = response.message || 'Không thể tạo bản ghi';
             setError(errorMsg);
-            alert('❌ ' + errorMsg);
+            toast.error(errorMsg);
           }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         const errorMsg = 'Lỗi khi tạo: ' + errMsg;
         setError(errorMsg);
-        alert('❌ ' + errorMsg);
+        toast.error(errorMsg);
       }
     },
     [activeTab, currentConfig?.endpoint, selectedSubjects, loadData, loadReferenceData]
@@ -508,7 +510,7 @@ export function useAdminManagement() {
           setSelectedSubjects([]);
           loadData();
           loadReferenceData();
-          alert(`Cập nhật giáo viên thành công!`);
+          toast.success('Cập nhật giáo viên thành công!');
         } else {
           const updatePayload =
             activeTab === 'subjects'
@@ -554,18 +556,18 @@ export function useAdminManagement() {
             setEditingItem(null);
             setFormData({});
             loadData();
-            alert('Cập nhật thành công!');
+            toast.success('Cập nhật thành công!');
           } else {
             const errorMsg = response.message || 'Không thể cập nhật';
             setError(errorMsg);
-            alert('❌ ' + errorMsg);
+            toast.error(errorMsg);
           }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         const errorMsg = 'Lỗi khi cập nhật: ' + errMsg;
         setError(errorMsg);
-        alert('❌ ' + errorMsg);
+        toast.error(errorMsg);
       }
     },
     [activeTab, currentConfig?.endpoint, selectedSubjects, teacherSubjects, subjectTeachersData, loadData, loadReferenceData]

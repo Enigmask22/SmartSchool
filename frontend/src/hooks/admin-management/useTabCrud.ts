@@ -6,19 +6,19 @@ export const TAB_CONFIG = {
   users: {
     title: 'Quản lý người dùng',
     fields: ['email', 'username', 'full_name', 'password', 'role'],
-    displayFields: ['id', 'email', 'username', 'full_name', 'role', 'is_active'],
+    displayFields: ['id', 'email', 'username', 'full_name', 'role'], //is_active 
     endpoint: '/admin/users',
   },
   teachers: {
     title: 'Quản lý giáo viên',
     fields: ['teacher_code', 'full_name', 'email', 'phone', 'date_of_birth', 'gender'],
-    displayFields: ['id', 'teacher_code', 'full_name', 'email', 'phone', 'date_of_birth', 'gender', 'subjects', 'is_active'],
+    displayFields: ['id', 'teacher_code', 'full_name', 'email', 'phone', 'date_of_birth', 'gender', 'subjects'], //is_active
     endpoint: '/admin/teachers',
   },
   subjects: {
     title: 'Quản lý môn học',
     fields: ['subject_code', 'subject_name', 'description', 'is_mandatory'],
-    displayFields: ['id', 'subject_code', 'subject_name', 'description', 'is_mandatory', 'score_column_config', 'is_active'],
+    displayFields: ['id', 'subject_code', 'subject_name', 'description', 'is_mandatory', 'score_column_config'], //is_active
     endpoint: '/admin/subjects',
   },
   classes: {
@@ -27,24 +27,24 @@ export const TAB_CONFIG = {
     displayFields: ['id', 'class_name', 'grade', 'homeroom_teacher', 'room_number', 'academic_year', 'total_students'],
     endpoint: '/admin/classes',
   },
-  subject_teachers: {
-    title: 'Quản lý giáo viên - môn học',
-    fields: ['teacher_id', 'subject_id'],
-    displayFields: ['id', 'teacher_name', 'subject_name', 'is_active'],
-    endpoint: '/admin/subject-teachers',
-  },
+  // subject_teachers: {
+  //   title: 'Quản lý giáo viên - môn học',
+  //   fields: ['teacher_id', 'subject_id'],
+  //   displayFields: ['id', 'teacher_name', 'subject_name', 'is_active'],
+  //   endpoint: '/admin/subject-teachers',
+  // },
   class_subjects: {
-    title: 'Quản lý lớp - môn học',
+    title: 'Quản lý phân công giảng dạy',
     fields: ['class_id', 'subject_id', 'teacher_id', 'academic_year', 'semester'],
-    displayFields: ['id', 'class_name', 'subject_name', 'teacher_name', 'academic_year', 'semester', 'is_active'],
+    displayFields: ['id', 'class_name', 'subject_name', 'teacher_name', 'academic_year', 'semester'], //is_active
     endpoint: '/admin/class-subjects',
   },
-  score_settings: {
-    title: 'Cấu hình cột điểm',
-    fields: ['subject_id', 'score_column_config'],
-    displayFields: ['id', 'subject_name', 'score_column_config', 'is_active'],
-    endpoint: '/score-settings',
-  },
+  // score_settings: {
+  //   title: 'Cấu hình cột điểm',
+  //   fields: ['subject_id', 'score_column_config'],
+  //   displayFields: ['id', 'subject_name', 'score_column_config', 'is_active'],
+  //   endpoint: '/score-settings',
+  // },
 };
 
 export function useTabCrud(activeTab: string, showDeleted: boolean) {

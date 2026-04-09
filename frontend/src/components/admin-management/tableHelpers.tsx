@@ -1,5 +1,42 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip } from '@/components/ui/tooltip';
+
+// Helper function to highlight search term in text
+function highlightText(text: string, searchTerm: string): React.ReactNode {
+  if (!searchTerm || !text) {
+    return text;
+  }
+
+  const searchLower = searchTerm.toLowerCase();
+  const textLower = String(text).toLowerCase();
+  
+  if (!textLower.includes(searchLower)) {
+    return text;
+  }
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let currentIndex = 0;
+
+  while ((currentIndex = textLower.indexOf(searchLower, lastIndex)) !== -1) {
+    if (currentIndex > lastIndex) {
+      parts.push(String(text).substring(lastIndex, currentIndex));
+    }
+    parts.push(
+      <span key={`${currentIndex}-highlight`} className="bg-yellow-200">
+        {String(text).substring(currentIndex, currentIndex + searchLower.length)}
+      </span>
+    );
+    lastIndex = currentIndex + searchLower.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(String(text).substring(lastIndex));
+  }
+
+  return parts.length > 0 ? <>{parts}</> : text;
+}
 
 export function renderFieldHeader(field: string): string {
   const headerMap: Record<string, string> = {
@@ -21,13 +58,14 @@ export function renderFieldHeader(field: string): string {
     semester: 'HỌC KỲ',
     date_of_birth: 'NGÀY SINH',
     gender: 'GIỚI TÍNH',
-    phone: 'SDT',
+    phone: 'SĐT',
     score_column_config: 'CẤU HÌNH CỘT ĐIỂM',
+    teacher_code: 'MÃ SỐ GIÁO VIÊN',
   };
   return headerMap[field] || field.replace(/_/g, ' ').toUpperCase();
 }
 
-export function renderTableCell(field: string, item: any, hook: any): React.ReactNode {
+export function renderTableCell(field: string, item: any, hook: any, searchTerm: string = ''): React.ReactNode {
   // Safety check: ensure item exists
   if (!item) {
     return <span className="text-gray-400">-</span>;
@@ -44,11 +82,11 @@ export function renderTableCell(field: string, item: any, hook: any): React.Reac
       return <span className="text-xs italic text-gray-400">Chưa phân công</span>;
     }
     return (
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-nowrap gap-1 overflow-x-auto">
         {teacherSubjectIds.map((subjectId: any) => {
           const subject = hook.subjects?.find((s: any) => s.id === subjectId);
           return subject ? (
-            <Badge key={subjectId} variant="outline" className="text-xs text-blue-700 border-blue-200 bg-blue-50">
+            <Badge key={subjectId} className="text-xs text-blue-700 bg-blue-50 border-blue-200 border whitespace-nowrap flex-shrink-0 min-w-[70px] h-7 flex items-center justify-center">
               {subject.subject_code || '-'}
             </Badge>
           ) : null;
@@ -66,8 +104,7 @@ export function renderTableCell(field: string, item: any, hook: any): React.Reac
   if (field === 'gender') {
     return item[field] && item[field] !== '-' ? (
       <Badge
-        variant="outline"
-        className={`text-xs ${
+        className={`text-xs whitespace-nowrap min-w-[60px] h-7 flex items-center justify-center border ${
           item[field] === 'Nam'
             ? 'bg-blue-50 text-blue-700 border-blue-200'
             : item[field] === 'Nữ'
@@ -84,34 +121,37 @@ export function renderTableCell(field: string, item: any, hook: any): React.Reac
 
   if (field === 'is_mandatory') {
     return item[field] ? (
-      <Badge variant="outline" className="text-xs text-purple-800 bg-purple-100 border-purple-200">
-        Môn chính
+      <Badge className="text-xs text-purple-800 bg-purple-100 border-purple-200 border whitespace-nowrap min-w-[70px] h-7 flex items-center justify-center">
+        Bắt buộc
       </Badge>
     ) : (
-      <Badge variant="outline" className="text-xs text-gray-800 bg-gray-100 border-gray-200">
-        Môn tự chọn
+      <Badge className="text-xs text-gray-800 bg-gray-100 border-gray-200 border whitespace-nowrap min-w-[70px] h-7 flex items-center justify-center">
+        Tự chọn
       </Badge>
     );
   }
 
   if (typeof item[field] === 'boolean') {
     return item[field] ? (
-      <Badge className="bg-green-100 text-green-800">Có</Badge>
+      <Badge className="bg-green-100 text-green-800 border-green-200 border whitespace-nowrap min-w-[50px] h-7 flex items-center justify-center text-xs">
+        Có
+      </Badge>
     ) : (
-      <Badge variant="destructive">Không</Badge>
+      <Badge className="bg-red-100 text-red-800 border-red-200 border whitespace-nowrap min-w-[50px] h-7 flex items-center justify-center text-xs">
+        Không
+      </Badge>
     );
   }
 
   if (field === 'role') {
     const roleMap: Record<string, string> = {
       admin: 'Quản trị viên',
-      homeroom_teacher: 'Giáo viên chủ nhiệm',
+      homeroom_teacher: 'GVCN',
       teacher: 'Giáo viên',
     };
     return (
       <Badge
-        variant="outline"
-        className={`text-xs ${
+        className={`text-xs whitespace-nowrap min-w-[85px] h-7 flex items-center justify-center border ${
           item[field] === 'admin'
             ? 'bg-purple-50 text-purple-700 border-purple-200'
             : item[field] === 'homeroom_teacher'
@@ -126,9 +166,9 @@ export function renderTableCell(field: string, item: any, hook: any): React.Reac
 
   if (field === 'score_column_config') {
     return item[field] && typeof item[field] === 'object' ? (
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto">
         {Object.entries(item[field]).map(([key, value]: any) => (
-          <Badge key={key} variant="outline" className="text-xs text-purple-700 border-purple-200 bg-purple-50">
+          <Badge key={key} className="text-xs text-purple-700 bg-purple-50 border-purple-200 border whitespace-nowrap flex-shrink-0 h-7 flex items-center justify-center">
             {value.label} (HS: {value.he_so})
           </Badge>
         ))}
@@ -138,5 +178,25 @@ export function renderTableCell(field: string, item: any, hook: any): React.Reac
     );
   }
 
-  return item[field] ?? '-';
+  // For text fields that might be long (email, username, descriptions, etc.)
+  const longTextFields = ['email', 'username', 'full_name', 'description', 'teacher_code', 'subject_name', 'class_name', 'phone'];
+  if (longTextFields.includes(field) && item[field]) {
+    const highlighted = highlightText(String(item[field]), searchTerm);
+    return renderTruncatedCell(highlighted, 'max-w-[150px]', String(item[field]));
+  }
+
+  return item[field] ? highlightText(String(item[field]), searchTerm) : '-';
+}
+
+// Helper function to truncate long text with styled tooltip
+export function renderTruncatedCell(content: React.ReactNode, maxWidth: string = 'max-w-[180px]', fullText: string = ''): React.ReactNode {
+  if (!content || content === '-') return '-';
+  
+  return (
+    <Tooltip content={fullText || String(content)} side="top">
+      <span className={`block ${maxWidth} truncate cursor-help`}>
+        {content}
+      </span>
+    </Tooltip>
+  );
 }
