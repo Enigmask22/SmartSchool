@@ -33,6 +33,16 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
         # Extract parent_contacts để insert riêng vào bảng parent_info
         parent_contacts = student_data.pop("parent_contacts", None)
         
+        # Get class_info if class_id is provided (for homeroom_students_history)
+        class_info = None
+        if student_data.get("class_id"):
+            class_resp = db.table("classes").select("id, class_name, grade, homeroom_teacher_id").eq("id", student_data["class_id"]).execute()
+            if class_resp.data:
+                class_info = class_resp.data[0]
+        
+        # Remove class_id (not a column in students table)
+        student_data.pop("class_id", None)
+        
         if student_data.get("date_of_birth"):
             dob_val = student_data["date_of_birth"]
             student_data["date_of_birth"] = dob_val.isoformat() if hasattr(dob_val, "isoformat") else dob_val
@@ -61,6 +71,14 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
                 if parent_records:
                     db.table("parent_info").insert(parent_records).execute()
             
+            # Insert vào homeroom_students_history nếu có class_id
+            if class_info:
+                db.table("homeroom_students_history").insert({
+                    "teacher_id": class_info.get("homeroom_teacher_id"),
+                    "class_id": class_info["id"],
+                    "student_id": student_id
+                }).execute()
+            
             # Fetch lại student với parent_info để trả về
             student_data = response.data[0]
             parent_info = db.table("parent_info").select("*").eq("student_id", student_id).execute()
@@ -77,7 +95,7 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating student: {str(e)}")
+        logger.error(f"Error creating student: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/")
@@ -159,6 +177,26 @@ async def get_subjects_for_students(db=Depends(get_db)):
     except Exception as e:
         logger.error(f"ERROR: Error getting subjects: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.get("/by-prefix/{prefix}")
+async def get_students_by_prefix(
+    prefix: str,
+    db=Depends(get_db)
+):
+    """Lấy danh sách học sinh có student_id bắt đầu với prefix - để generate student ID"""
+    try:
+        # Query all students then filter by prefix (client-side filtering via LIKE)
+        # Fetch ALL students and filter by prefix starting with the given prefix
+        response = db.table("students").select("student_id, id, full_name").execute()
+        students_data = response.data or []
+        
+        # Filter students with student_id starting with prefix
+        filtered_students = [s for s in students_data if s.get("student_id", "").startswith(prefix)]
+        
+        return {"success": True, "data": filtered_students}
+    except Exception as e:
+        logger.error(f"Error getting students by prefix: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy danh sách học sinh theo prefix: {str(e)}")
 
 @router.get("/{student_id}")
 async def get_student(student_id: int, db=Depends(get_db)):

@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
 import { toast } from 'sonner';
@@ -55,6 +56,13 @@ export interface ImportedGradeRow {
   ngay_sinh: string;
   gioi_tinh: string;
   dia_chi: string;
+  ten_phu_huynh?: string;
+  sdt_phu_huynh?: string;
+  ten_bo?: string;
+  sdt_bo?: string;
+  ten_me?: string;
+  sdt_me?: string;
+  parent_contacts?: any;
   [key: string]: any;
 }
 
@@ -72,7 +80,21 @@ const INITIAL_FORM_DATA: StudentFormData = {
   gender: 'Nam',
 };
 
-export const useClassManagementStudentOps = () => {
+export const useClassManagementStudentOps = (academicYear?: string, classId?: number | null) => {
+  // Academic Year State
+  const [storedAcademicYear, setStoredAcademicYear] = useState<string | undefined>(academicYear);
+  const [storedClassId, setStoredClassId] = useState<number | null | undefined>(classId);
+
+  // Update storedAcademicYear when academicYear parameter changes
+  useEffect(() => {
+    setStoredAcademicYear(academicYear);
+  }, [academicYear]);
+
+  // Update storedClassId when classId parameter changes
+  useEffect(() => {
+    setStoredClassId(classId);
+  }, [classId]);
+
   // Add Student Form State
   const [studentFormData, setStudentFormData] = useState<StudentFormData>(INITIAL_FORM_DATA);
   const [studentFormErrors, setStudentFormErrors] = useState<Record<string, string | null>>({});
@@ -86,6 +108,7 @@ export const useClassManagementStudentOps = () => {
   const [importedData, setImportedData] = useState<ImportedGradeRow[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importLoading, setImportLoading] = useState(false);
+  const [importBackendError, setImportBackendError] = useState<string>('');
 
   // Restore loading
   const [restoreLoading, setRestoreLoading] = useState(false);
@@ -188,44 +211,63 @@ export const useClassManagementStudentOps = () => {
   };
 
   // =============== ID Generation ===============
-  const generateStudentId = useCallback(async (grade: string) => {
-    if (!grade) return Date.now().toString();
+  const generateStudentId = useCallback(
+    async (grade: string, academicYear: string) => {
+      if (!grade || !academicYear) {
+        logger.error('Grade and academic year are required for ID generation');
+        throw new Error('Grade and academic year are required');
+      }
 
-    try {
-      const response = await api.request(`/students/by-grade/${grade}`);
-      if (response.success && response.data) {
-        const currentYear = new Date().getFullYear();
-        let yearPrefix;
-        if (grade === '10') yearPrefix = currentYear.toString().slice(-2);
-        else if (grade === '11') yearPrefix = (currentYear - 1).toString().slice(-2);
-        else if (grade === '12') yearPrefix = (currentYear - 2).toString().slice(-2);
-        else yearPrefix = currentYear.toString().slice(-2);
-
-        const students = response.data.map((s: any) => parseInt(s.student_id));
-        let nextId = parseInt(yearPrefix + '0001');
-        if (students.length > 0) {
-          const maxId = Math.max(...students);
-          nextId = maxId + 1;
+      try {
+        // Extract end year from academic year (e.g., "2024-2025" → "2025")
+        if (!academicYear.includes('-')) {
+          throw new Error('Invalid academic year format. Expected "XXXX-YYYY"');
         }
 
-        return nextId.toString();
-      }
-    } catch (error) {
-      logger.error('Error generating student ID:', error);
-      const currentYear = new Date().getFullYear();
-      let yearPrefix;
-      if (grade === '10') yearPrefix = currentYear.toString().slice(-2);
-      else if (grade === '11') yearPrefix = (currentYear - 1).toString().slice(-2);
-      else if (grade === '12') yearPrefix = (currentYear - 2).toString().slice(-2);
-      else yearPrefix = currentYear.toString().slice(-2);
+        const endYear = academicYear.split('-')[1]; // "2025"
+        const endYearInt = parseInt(endYear);
 
-      return yearPrefix + Date.now().toString().slice(-4);
-    }
-  }, []);
+        // Calculate year prefix based on grade
+        let yearForPrefix: number;
+        if (grade === '10') {
+          yearForPrefix = endYearInt;  // Grade 10: "25"
+        } else if (grade === '11') {
+          yearForPrefix = endYearInt - 1;  // Grade 11: "24"
+        } else if (grade === '12') {
+          yearForPrefix = endYearInt - 2;  // Grade 12: "23"
+        } else {
+          throw new Error('Invalid grade. Must be 10, 11, or 12');
+        }
+
+        const yearPrefix = yearForPrefix.toString().slice(-2);
+
+        // Fetch all students with this year prefix
+        const response = await api.request(`/students/by-prefix/${yearPrefix}`);
+        if (response.success && response.data) {
+          const students = response.data.map((s: any) => parseInt(s.student_id));
+          let nextId = parseInt(yearPrefix + '0001');
+          if (students.length > 0) {
+            const maxId = Math.max(...students);
+            nextId = maxId + 1;
+          }
+
+          return nextId.toString();
+        }
+
+        // Fallback: return first ID for prefix if query returns no students
+        return yearPrefix + '0001';
+      } catch (error) {
+        logger.error('Error generating student ID:', error);
+        throw error;  // Re-throw to caller
+      }
+    },
+    []
+  );
 
   // =============== Student CRUD Operations ===============
   const handleSubmitStudentForm = async (
     onSuccess: () => void,
+    academicYear: string = '',
   ) => {
     if (!validateStudentForm()) {
       return;
@@ -233,7 +275,7 @@ export const useClassManagementStudentOps = () => {
 
     setStudentFormLoading(true);
     try {
-      const studentId = await generateStudentId(studentFormData.grade);
+      const studentId = await generateStudentId(studentFormData.grade, academicYear);
 
       const studentData = {
         student_id: studentId,
@@ -300,22 +342,25 @@ export const useClassManagementStudentOps = () => {
     }
   };
 
-  const handleDeleteStudent = (studentId: number, onOpenConfirm: (config: any) => void) => {
+  const handleDeleteStudent = (studentId: number, onOpenConfirm: (config: any) => void, onCloseConfirm?: () => void, onSuccess?: () => void) => {
     onOpenConfirm({
       title: 'Vô hiệu học sinh',
       description: 'Bạn có chắc muốn vô hiệu hóa học sinh này?',
       confirmText: 'Vô hiệu hóa',
       onConfirm: async () => {
         try {
-          const response = await api.request(`/students/${studentId}/deactivate`, {
-            method: 'PUT',
+          const response = await api.request(`/students/${studentId}`, {
+            method: 'DELETE',
           });
           if (response.success) {
             toast.success('Vô hiệu hóa học sinh thành công!');
+            onSuccess?.();
+            onCloseConfirm?.();
           }
         } catch (error) {
           logger.error('Error deactivating student:', error);
           toast.error('Lỗi khi vô hiệu hóa học sinh!');
+          onCloseConfirm?.();
         }
       },
     });
@@ -325,6 +370,8 @@ export const useClassManagementStudentOps = () => {
     studentId: number,
     studentName: string,
     onOpenConfirm: (config: any) => void,
+    onCloseConfirm?: () => void,
+    onSuccess?: () => void,
   ) => {
     onOpenConfirm({
       title: 'Xóa học sinh',
@@ -336,10 +383,13 @@ export const useClassManagementStudentOps = () => {
           const response = await api.request(`/students/${studentId}`, { method: 'DELETE' });
           if (response.success) {
             toast.success('Xóa học sinh thành công!');
+            onSuccess?.();
+            onCloseConfirm?.();
           }
         } catch (error) {
           logger.error('Error deleting student:', error);
           toast.error('Lỗi khi xóa học sinh!');
+          onCloseConfirm?.();
         }
       },
     });
@@ -348,8 +398,8 @@ export const useClassManagementStudentOps = () => {
   const handleRestore = async (student: StudentData, onSuccess?: () => void) => {
     setRestoreLoading(true);
     try {
-      const response = await api.request(`/students/${student.id}/activate`, {
-        method: 'PUT',
+      const response = await api.request(`/students/${student.id}/restore`, {
+        method: 'POST',
       });
       if (response.success) {
         toast.success('Khôi phục học sinh thành công!');
@@ -364,56 +414,165 @@ export const useClassManagementStudentOps = () => {
   };
 
   // =============== Import/Export ===============
-  const downloadStudentTemplate = () => {
-    const headers = [
-      'Họ và tên',
-      'Email',
-      'Số điện thoại',
-      'Lớp học',
-      'Khối',
-      'Ngày sinh',
-      'Giới tính',
-      'Địa chỉ',
-    ];
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, 'student_template.xlsx');
+  const downloadStudentTemplate = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Template');
+
+      const headers = [
+        'Họ và tên',
+        'Email',
+        'Số điện thoại',
+        'Lớp học',
+        'Khối',
+        'Ngày sinh',
+        'Giới tính',
+        'Địa chỉ',
+      ];
+
+      // Define borders
+      const borders = {
+        top: { style: 'thin' as const, color: { argb: 'FF000000' } },
+        left: { style: 'thin' as const, color: { argb: 'FF000000' } },
+        bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
+        right: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      };
+
+      // Add header row
+      const headerRow = worksheet.addRow(headers);
+      headerRow.font = { bold: true, color: { argb: 'FF000000' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      headerRow.height = 25;
+
+      // Apply borders to header row
+      headerRow.eachCell((cell) => {
+        cell.border = borders;
+      });
+
+      // Add 10 empty rows
+      for (let i = 0; i < 10; i++) {
+        const row = worksheet.addRow(Array(headers.length).fill(''));
+        row.height = 20;
+        row.alignment = { horizontal: 'left', vertical: 'middle' };
+        row.eachCell((cell) => {
+          cell.border = borders;
+        });
+      }
+
+      // Set column widths
+      worksheet.columns = [
+        { width: 20 }, // Họ và tên
+        { width: 25 }, // Email
+        { width: 15 }, // Số điện thoại
+        { width: 15 }, // Lớp học
+        { width: 10 }, // Khối
+        { width: 15 }, // Ngày sinh
+        { width: 12 }, // Giới tính
+        { width: 25 }, // Địa chỉ
+      ];
+
+      // Generate and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'student_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Tải template thành công!');
+    } catch (error) {
+      logger.error('Error downloading template:', error);
+      toast.error('Lỗi khi tải template!');
+    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const fileName = file.name.toLowerCase();
+    const isCSV = fileName.endsWith('.csv');
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const parsedData = XLSX.utils.sheet_to_json(sheet, {
-          defval: '',
-        }) as any[];
+        let parsedData: any[] = [];
+
+        if (isCSV) {
+          // Handle CSV files
+          const csvText = e.target?.result as string;
+          const lines = csvText.split('\n');
+          const headers = lines[0].split(',').map(h => h.trim());
+          
+          for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const values = lines[i].split(',').map(v => v.trim());
+            const row: Record<string, string> = {};
+            headers.forEach((header, idx) => {
+              row[header] = values[idx] || '';
+            });
+            parsedData.push(row);
+          }
+        } else {
+          // Handle Excel files (.xlsx, .xls)
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          parsedData = XLSX.utils.sheet_to_json(sheet, {
+            defval: '',
+          }) as any[];
+        }
+
+        if (parsedData.length === 0) {
+          toast.error('File không chứa dữ liệu');
+          return;
+        }
 
         const errors: string[] = [];
         const validData: ImportedGradeRow[] = [];
+        let rowNum = 1; // Start from row 1 (after header)
 
         for (let i = 0; i < parsedData.length; i++) {
           const row = parsedData[i];
+          
+          // Skip completely empty rows
+          const isEmptyRow = Object.values(row).every(
+            (val) => !val || val === '' || (typeof val === 'string' && val.trim() === '')
+          );
+          if (isEmptyRow) {
+            continue;
+          }
+
+          rowNum++;
+
           const mapped: ImportedGradeRow = {
-            ho_va_ten: row.ho_va_ten || row['Họ và tên'] || '',
+            ho_va_ten: row.ho_va_ten || row['Họ và tên'] || row['Họ tên'] || '',
             email: row.email || row['Email'] || '',
-            so_dien_thoai: row.so_dien_thoai || row['Số điện thoại'] || '',
-            lop_hoc: row.lop_hoc || row['Lớp học'] || '',
+            so_dien_thoai: row.so_dien_thoai || row['Số điện thoại'] || row['SĐT'] || '',
+            lop_hoc: row.lop_hoc || row['Lớp học'] || row['Lớp'] || '',
             khoi: row.khoi || row['Khối'] || '',
-            ngay_sinh: row.ngay_sinh || row['Ngày sinh'] || '',
+            ngay_sinh: row.ngay_sinh || row['Ngày sinh'] || row['Ngày sinh'] || '',
             gioi_tinh: row.gioi_tinh || row['Giới tính'] || '',
-            dia_chi: row.dia_chi || row['Địa chỉ'] || '',
+            dia_chi: row.dia_chi || row['Địa chỉ'] || row['Địa chỉ'] || '',
+            ten_phu_huynh: row.ten_phu_huynh || row['Tên phụ huynh'] || '',
+            sdt_phu_huynh: row.sdt_phu_huynh || row['SĐT phụ huynh'] || '',
+            ten_bo: row.ten_bo || row['Tên bố'] || '',
+            sdt_bo: row.sdt_bo || row['SĐT bố'] || '',
+            ten_me: row.ten_me || row['Tên mẹ'] || '',
+            sdt_me: row.sdt_me || row['SĐT mẹ'] || '',
+            parent_contacts: row.parent_contacts || undefined,
           };
 
-          if (!mapped.ho_va_ten || !mapped.lop_hoc) {
-            errors.push(`Hàng ${i + 1}: Thiếu họ tên hoặc lớp học`);
+          if (!mapped.ho_va_ten) {
+            errors.push(`Hàng ${rowNum}: Thiếu họ và tên (bắt buộc)`);
           } else {
             validData.push(mapped);
           }
@@ -421,18 +580,30 @@ export const useClassManagementStudentOps = () => {
 
         setImportedData(validData);
         setImportErrors(errors);
-        if (validData.length > 0 && errors.length === 0) {
-          toast.success(`Đã tải ${validData.length} học sinh`);
-        } else if (errors.length > 0) {
-          toast.error(`${errors.length} lỗi được tìm thấy`);
-        }
+        // if (validData.length > 0 && errors.length === 0) {
+        //   toast.success(`✅ Đã tải ${validData.length} học sinh`);
+        // } else if (validData.length > 0 && errors.length > 0) {
+        //   toast.warning(`⚠️ Tải ${validData.length} học sinh, ${errors.length} lỗi ở các hàng trống`);
+        // } else if (errors.length > 0) {
+        //   toast.error(`❌ ${errors.length} lỗi được tìm thấy`);
+        // }
       } catch (error) {
         logger.error('Error parsing file:', error);
-        toast.error('Lỗi khi đọc file!');
+        const errorMsg = error instanceof Error ? error.message : 'Không xác định';
+        toast.error(`❌ Lỗi khi đọc file: ${errorMsg}`);
       }
     };
 
-    reader.readAsArrayBuffer(file);
+    reader.onerror = () => {
+      logger.error('Error reading file');
+      toast.error('❌ Lỗi khi đọc file');
+    };
+
+    if (isCSV) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
     event.target.value = '';
   };
 
@@ -442,23 +613,176 @@ export const useClassManagementStudentOps = () => {
       return;
     }
 
+    // Helper function to convert Excel date serial to YYYY-MM-DD format
+    const excelDateToString = (excelDate: string | number): string => {
+      if (!excelDate) return '';
+      
+      const num = typeof excelDate === 'string' ? parseFloat(excelDate) : excelDate;
+      if (isNaN(num)) return String(excelDate); // Return as-is if not a number
+      
+      // Excel date serial (days since Jan 1, 1900, but with a leap year bug)
+      // JavaScript uses milliseconds since Jan 1, 1970
+      // Excel serial 1 = Jan 1, 1900
+      // Excel serial 44562 = Jan 1, 2022
+      const excelEpoch = new Date(1900, 0, 1);
+      const jsDate = new Date(excelEpoch.getTime() + num * 86400000); // 86400000 ms in a day
+      
+      // Format as YYYY-MM-DD
+      const year = jsDate.getFullYear();
+      const month = String(jsDate.getMonth() + 1).padStart(2, '0');
+      const day = String(jsDate.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     setImportLoading(true);
+    setImportBackendError('');
     try {
-      const response = await api.post('/students/bulk-create', {
-        students: importedData,
-      });
+      // Validate and format data before sending
+      const validationErrors: string[] = [];
+      const formattedStudents: Record<string, any>[] = [];
+
+      for (let i = 0; i < importedData.length; i++) {
+        const student = importedData[i];
+        const rowNum = i + 2; // +2 because Excel is 1-indexed and row 1 is header
+
+        // Validate required fields - convert to string first
+        const hoVaTen = String(student.ho_va_ten || '').trim();
+        const lopHoc = String(student.lop_hoc || '').trim();
+        const khoi = String(student.khoi || '').trim();
+
+        if (!hoVaTen) {
+          validationErrors.push(`Hàng ${rowNum}: Thiếu họ và tên`);
+          continue;
+        }
+        if (!lopHoc) {
+          validationErrors.push(`Hàng ${rowNum}: Thiếu lớp học`);
+          continue;
+        }
+        if (!khoi) {
+          validationErrors.push(`Hàng ${rowNum}: Thiếu khối`);
+          continue;
+        }
+
+        // Validate khoi is 10, 11, or 12
+        if (!['10', '11', '12'].includes(khoi)) {
+          validationErrors.push(`Hàng ${rowNum}: Khối không hợp lệ (phải là 10, 11 hoặc 12)`);
+          continue;
+        }
+
+        // Format the student record with proper null handling
+        const formatted: Record<string, any> = {
+          ho_va_ten: hoVaTen,
+          lop_hoc: lopHoc,
+          khoi: khoi,
+          gioi_tinh: String(student.gioi_tinh || 'Nam').trim() || 'Nam',
+        };
+
+        // Add optional fields only if they have values
+        const email = String(student.email || '').trim();
+        if (email) {
+          formatted.email = email;
+        }
+
+        const sodt = String(student.so_dien_thoai || '').trim();
+        if (sodt) {
+          formatted.so_dien_thoai = sodt;
+        }
+
+        // Convert Excel date to proper format
+        const ngaysinh = excelDateToString(student.ngay_sinh || '');
+        if (ngaysinh) {
+          formatted.ngay_sinh = ngaysinh;
+        }
+
+        const diachi = String(student.dia_chi || '').trim();
+        if (diachi) {
+          formatted.dia_chi = diachi;
+        }
+
+        const tenph = String(student.ten_phu_huynh || '').trim();
+        if (tenph) {
+          formatted.ten_phu_huynh = tenph;
+        }
+
+        const sdtph = String(student.sdt_phu_huynh || '').trim();
+        if (sdtph) {
+          formatted.sdt_phu_huynh = sdtph;
+        }
+
+        const tenbo = String(student.ten_bo || '').trim();
+        if (tenbo) {
+          formatted.ten_bo = tenbo;
+        }
+
+        const sdtbo = String(student.sdt_bo || '').trim();
+        if (sdtbo) {
+          formatted.sdt_bo = sdtbo;
+        }
+
+        const tenme = String(student.ten_me || '').trim();
+        if (tenme) {
+          formatted.ten_me = tenme;
+        }
+
+        const sdtme = String(student.sdt_me || '').trim();
+        if (sdtme) {
+          formatted.sdt_me = sdtme;
+        }
+
+        if (student.parent_contacts) {
+          formatted.parent_contacts = student.parent_contacts;
+        }
+
+        formattedStudents.push(formatted);
+      }
+
+      // Check for validation errors
+      if (validationErrors.length > 0) {
+        setImportBackendError(validationErrors.join('\n'));
+        toast.error(`Có ${validationErrors.length} lỗi validation trước khi gửi`);
+        setImportLoading(false);
+        return;
+      }
+
+      if (formattedStudents.length === 0) {
+        setImportBackendError('Không có học sinh hợp lệ để import');
+        setImportLoading(false);
+        return;
+      }
+
+      const payload: any = {
+        students: formattedStudents,
+        academic_year: storedAcademicYear,
+      };
+      
+      // Include class_id if available (for homeroom_students_history)
+      if (storedClassId) {
+        payload.class_id = storedClassId;
+      }
+
+      logger.debug('Bulk import payload:', payload);
+
+      const response = await api.post('/admin/students/bulk-import', payload);
 
       if (response.success) {
         toast.success(`${response.data?.success_count || 0} học sinh được thêm`);
         setImportedData([]);
         setImportErrors([]);
-        onSuccess?.();
+        setImportBackendError('');
+        if (typeof onSuccess === 'function') {
+          onSuccess();
+        }
       } else {
-        toast.error('Lỗi khi import học sinh!');
+        const errorMsg = response.message || 'Lỗi khi import học sinh!';
+        logger.error('Import response error:', response);
+        setImportBackendError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
       logger.error('Error importing students:', error);
-      toast.error('Lỗi khi import học sinh!');
+      const errorMsg = error instanceof Error ? error.message : 'Lỗi khi import học sinh!';
+      setImportBackendError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setImportLoading(false);
     }
@@ -507,6 +831,7 @@ export const useClassManagementStudentOps = () => {
     importErrors,
     setImportErrors,
     importLoading,
+    importBackendError,
     downloadStudentTemplate,
     handleFileUpload,
     handleConfirmImport,

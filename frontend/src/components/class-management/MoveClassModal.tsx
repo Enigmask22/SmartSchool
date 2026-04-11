@@ -34,12 +34,13 @@ interface MoveClassModalProps {
   onOpenChange: (open: boolean) => void;
   moveYear: string | null;
   setMoveYear: (value: string) => void;
-  moveClasses: ClassData[];
+  moveGrade: string | null;
+  setMoveGrade: (value: string) => void;
   moveTargetClassId: string | null;
   setMoveTargetClassId: (value: string) => void;
   moveLoading: boolean;
   academicYears: string[];
-  classes: ClassData[];
+  moveYearClasses: ClassData[];
   selectedStudentIds: number[];
   onConfirm: () => void;
 }
@@ -49,12 +50,13 @@ const MoveClassModal = ({
   onOpenChange,
   moveYear,
   setMoveYear,
-  moveClasses,
+  moveGrade,
+  setMoveGrade,
   moveTargetClassId,
   setMoveTargetClassId,
   moveLoading,
   academicYears,
-  classes,
+  moveYearClasses,
   selectedStudentIds,
   onConfirm,
 }: MoveClassModalProps) => {
@@ -75,8 +77,9 @@ const MoveClassModal = ({
             <Select
               value={moveYear || 'none'}
               onValueChange={(value) => {
-                const y = value === 'none' ? '' : value;
-                setMoveYear(y);
+                const selectedYear = value === 'none' ? '' : value;
+                setMoveYear(selectedYear);
+                setMoveGrade('');
                 setMoveTargetClassId('');
               }}
             >
@@ -85,11 +88,43 @@ const MoveClassModal = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Chọn năm học</SelectItem>
-                {academicYears.map((y) => (
-                  <SelectItem key={y} value={y}>
-                    {y}
+                {academicYears.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Khối</Label>
+            <Select
+              value={moveGrade || 'none'}
+              onValueChange={(value) => {
+                const selectedGrade = value === 'none' ? '' : value;
+                setMoveGrade(selectedGrade);
+                setMoveTargetClassId('');
+              }}
+              disabled={!moveYear}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Chọn khối" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Chọn khối</SelectItem>
+                {Array.from(
+                  new Set(
+                    moveYearClasses
+                      .map((c) => String(c.grade))
+                  )
+                )
+                  .sort()
+                  .map((grade) => (
+                    <SelectItem key={grade} value={grade}>
+                      Khối {grade}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -98,20 +133,27 @@ const MoveClassModal = ({
             <Label>Lớp đích</Label>
             <Select
               value={moveTargetClassId || 'none'}
-              onValueChange={(value) =>
-                setMoveTargetClassId(value === 'none' ? '' : value)
-              }
+              onValueChange={(value) => {
+                setMoveTargetClassId(value === 'none' ? '' : value);
+              }}
+              disabled={!moveYear || !moveGrade}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Chọn lớp" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Chọn lớp</SelectItem>
-                {(moveClasses.length ? moveClasses : classes).map((cls) => (
-                  <SelectItem key={cls.id} value={String(cls.id)}>
-                    {cls.class_name} ({cls.academic_year})
-                  </SelectItem>
-                ))}
+                {moveYearClasses
+                  .filter(
+                    (c) =>
+                      String(c.academic_year) === moveYear &&
+                      String(c.grade) === moveGrade
+                  )
+                  .map((cls) => (
+                    <SelectItem key={cls.id} value={String(cls.id)}>
+                      {cls.class_name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
