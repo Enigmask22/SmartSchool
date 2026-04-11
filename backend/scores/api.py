@@ -1673,6 +1673,46 @@ async def download_score_template(
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         worksheet = workbook.add_worksheet('Bảng điểm')
         
+        # Tính toán kích thước cột để fit vào A4
+        # A4 width: Portrait = 8.5 inches, Landscape = 11 inches
+        # Margins: 0.5 inches mỗi bên
+        # Usable width: Portrait = 7.5 inches, Landscape = 10 inches
+        # Character unit = ~0.12 inches, so:
+        # Portrait capacity: ~62 units, Landscape capacity: ~83 units
+        
+        id_width = 10  # Mã HS
+        name_width = 22  # Họ và tên
+        base_width = id_width + name_width  # Base columns width
+        
+        num_score_columns = len(score_columns)
+        
+        # Determine orientation based on total columns needed
+        # If too many columns, use landscape
+        portrait_capacity = 62
+        landscape_capacity = 83
+        
+        estimated_width = base_width + (num_score_columns * 12)  # Initial estimate with 12-unit score columns
+        
+        is_landscape = estimated_width > portrait_capacity
+        available_width = landscape_capacity if is_landscape else portrait_capacity
+        
+        # Calculate actual score column width to fit in page
+        remaining_width = available_width - base_width
+        score_column_width = max(8, int(remaining_width / max(num_score_columns, 1)))  # Minimum 8 units
+        
+        # Set page setup
+        worksheet.set_paper(9)  # A4
+        worksheet.set_portrait() if not is_landscape else worksheet.set_landscape()
+        worksheet.set_margins(
+            left=0.5,
+            right=0.5,
+            top=0.5,
+            bottom=0.5
+        )
+        
+        # Fit to page width
+        worksheet.fit_to_pages(1, 0)  # Fit width to 1 page, unlimited pages height
+        
         # Định dạng - Toàn bộ trắng để dễ OCR
         header_format = workbook.add_format({
             'bold': True,
@@ -1680,20 +1720,25 @@ async def download_score_template(
             'font_color': 'black',
             'border': 1,
             'align': 'center',
-            'valign': 'vcenter'
+            'valign': 'vcenter',
+            'text_wrap': True
         })
         
         cell_format = workbook.add_format({
             'border': 1,
             'align': 'center',
             'valign': 'vcenter',
-            'bg_color': 'white'
+            'bg_color': 'white',
+            'text_wrap': True
         })
         
         # Header - Dynamic based on score settings
         headers = ['id', 'ho_va_ten'] + score_columns
         for col, header in enumerate(headers):
             worksheet.write(0, col, header, header_format)
+        
+        # Set header row height
+        worksheet.set_row(0, 30)
         
         # Dữ liệu học sinh (chỉ những học sinh có học môn này)
         for row, student in enumerate(filtered_students, start=1):
@@ -1702,14 +1747,17 @@ async def download_score_template(
             # Empty cells for all score columns
             for col_idx in range(len(score_columns)):
                 worksheet.write(row, col_idx + 2, '', cell_format)
+            
+            # Set data row height (2x normal - approximately 30 for data rows)
+            worksheet.set_row(row, 30)
         
-        # Điều chỉnh độ rộng cột
-        worksheet.set_column('A:A', 12)  # id
-        worksheet.set_column('B:B', 25)  # họ và tên
-        # Set width for all score columns dynamically
+        # Điều chỉnh độ rộng cột để fit vào A4
+        worksheet.set_column('A:A', id_width)  # Mã HS
+        worksheet.set_column('B:B', name_width)  # Họ và tên
+        # Set dynamic width for all score columns
         if score_columns:
             last_col_letter = chr(ord('C') + len(score_columns) - 1)
-            worksheet.set_column(f'C:{last_col_letter}', 15)
+            worksheet.set_column(f'C:{last_col_letter}', score_column_width)
         
         workbook.close()
         output.seek(0)
