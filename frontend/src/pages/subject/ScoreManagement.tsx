@@ -20,7 +20,7 @@ import {
   ClassSelectorSkeleton,
   ScoreTableSkeleton,
 } from '@/components/score-management';
-import { exportToExcel } from '@/utils/excelGradeExport';
+import { exportToExcel } from '@/utils/excelScoreExport';
 import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 
 export default function ScoreManagement() {
@@ -45,7 +45,7 @@ export default function ScoreManagement() {
   const handleClassSubjectSelect = async (classSubject: any) => {
     setSelectedClassSubject(classSubject);
     filters.resetPagination();
-    await api.handleClassSubjectSelect(classSubject);
+    await api.handleClassSubjectSelect(classSubject, filters.academicYear, filters.semester);
   };
 
   // Handle export
@@ -85,7 +85,7 @@ export default function ScoreManagement() {
       filters.semester,
       importForm.importedData,
       async () => {
-        await api.handleClassSubjectSelect(selectedClassSubject);
+        await api.handleClassSubjectSelect(selectedClassSubject, filters.academicYear, filters.semester);
         importForm.resetImportForm();
       }
     );
@@ -143,7 +143,7 @@ export default function ScoreManagement() {
           />
         ) : (
           <div className="space-y-6">
-            {/* Grade Table Header */}
+            {/* Score Table Header */}
             <ScoreTableHeader
               selectedClassSubject={selectedClassSubject}
               academicYear={filters.academicYear}
@@ -209,7 +209,7 @@ export default function ScoreManagement() {
                   () => {
                     configForm.setShowConfigEditor(false);
                     // Force reload
-                    api.handleClassSubjectSelect(selectedClassSubject);
+                    api.handleClassSubjectSelect(selectedClassSubject, filters.academicYear, filters.semester);
                   }
                 );
               }}
@@ -264,6 +264,7 @@ export default function ScoreManagement() {
             ) : api.scoreConfig ? (
               <ScoreTable
                 students={paginatedStudents}
+                totalStudents={api.students.length}
                 scoreConfig={api.scoreConfig}
                 currentPage={filters.currentPage}
                 pageSize={filters.pageSize}
@@ -290,7 +291,7 @@ export default function ScoreManagement() {
           </div>
         )}
 
-        {/* Grade Edit Modal */}
+        {/* Score Edit Modal */}
         <ScoreEditModal
           open={!!editForm.editingStudent}
           onOpenChange={() => editForm.resetForm()}
@@ -306,7 +307,7 @@ export default function ScoreManagement() {
               filters.semester,
               editForm.scoreForm,
               () => {
-                api.handleClassSubjectSelect(selectedClassSubject);
+                api.handleClassSubjectSelect(selectedClassSubject, filters.academicYear, filters.semester);
                 editForm.resetForm();
               }
             );
