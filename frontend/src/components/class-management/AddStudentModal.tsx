@@ -424,7 +424,10 @@ const AddStudentModal = ({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={() => {
+                onOpenChange(false);
+                onClose();
+              }}
             >
               Hủy
             </Button>

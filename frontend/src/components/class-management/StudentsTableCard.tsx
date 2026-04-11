@@ -9,6 +9,7 @@ import {
   Trash2,
   Edit,
   Search,
+  ChevronLeft,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { StudentData } from '@/hooks/class-management/useClassManagement';
+import { highlightText } from '@/components/admin-management/tableHelpers';
 
 interface StudentsTableCardProps {
   selectedClassForManagement: string | null;
@@ -54,8 +56,9 @@ interface StudentsTableCardProps {
   onMoveClass: () => void;
   loadClassStudents: () => void;
   handleEditStudent: (student: StudentData) => void;
+  onEditStudent?: (student: StudentData) => void; // For opening modal in parent
   handleDeleteStudent: (id: number) => void;
-  handleRestore: (student: StudentData) => void;
+  handleRestore: (student: StudentData, onSuccess?: () => void) => Promise<void>;
   handlePermanentDeleteStudent: (id: number, name: string) => void;
   showInactiveStudents: boolean;
   setShowInactiveStudents: (value: boolean) => void;
@@ -84,6 +87,7 @@ const StudentsTableCard = ({
   onMoveClass,
   loadClassStudents,
   handleEditStudent,
+  onEditStudent,
   handleDeleteStudent,
   handleRestore,
   handlePermanentDeleteStudent,
@@ -250,7 +254,7 @@ const StudentsTableCard = ({
         </div>
 
         {/* Show Inactive Students Checkbox */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
           <input
             type="checkbox"
             id="show-inactive"
@@ -270,7 +274,7 @@ const StudentsTableCard = ({
         <div>
           <Table>
             <TableHeader>
-              <TableRow className="border-b border-gray-100 hover:bg-transparent">
+              <TableRow className="text-center border-b border-gray-100 hover:bg-transparent">
                 <TableHead>MÃ HS</TableHead>
                 <TableHead>HỌ TÊN</TableHead>
                   <TableHead>LỚP HIỆN TẠI</TableHead>
@@ -320,82 +324,122 @@ const StudentsTableCard = ({
         </div>
       ) : (
           <>
-            <Table>
+            <Table className="border-[1px] border-gray-200">
               <TableHeader>
-                <TableRow>
-                  <TableHead>MÃ HS</TableHead>
-                  <TableHead>HỌ TÊN</TableHead>
-                  <TableHead>LỚP HIỆN TẠI</TableHead>
-                  <TableHead>TRẠNG THÁI KHUÔN MẶT</TableHead>
-                  <TableHead>HÀNH ĐỘNG</TableHead>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="text-center py-3 w-12">
+                    <input
+                      type="checkbox"
+                      checked={
+                        paginatedStudents.length > 0 &&
+                        paginatedStudents.every((s) =>
+                          selectedStudentIds.includes(s.id),
+                        )
+                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedStudentIds([
+                            ...selectedStudentIds,
+                            ...paginatedStudents
+                              .filter((s) => !selectedStudentIds.includes(s.id))
+                              .map((s) => s.id),
+                          ]);
+                        } else {
+                          setSelectedStudentIds(
+                            selectedStudentIds.filter(
+                              (id) =>
+                                !paginatedStudents.find((s) => s.id === id),
+                            ),
+                          );
+                        }
+                      }}
+                      className="cursor-pointer w-4 h-4"
+                    />
+                  </TableHead>
+                  <TableHead className="text-center text-md font-semibold text-gray-600 uppercase relative py-3">
+                    MÃ SỐ
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                  </TableHead>
+                  <TableHead className="text-center text-md  font-semibold text-gray-600 uppercase relative py-3">
+                    HỌ TÊN
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                  </TableHead>
+                  <TableHead className="text-center text-md  font-semibold text-gray-600 uppercase relative py-3">
+                    LỚP HIỆN TẠI
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                  </TableHead>
+                  <TableHead className="text-center text-md  font-semibold text-gray-600 uppercase relative py-3">
+                    TRẠNG THÁI KHUÔN MẶT
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                  </TableHead>
+                  <TableHead className="text-center text-md  font-semibold text-gray-600 uppercase">TÙY CHỌN</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">
+                {paginatedStudents.map((student, index) => (
+                  <TableRow key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                    <TableCell className="text-center w-12">
                       <input
                         type="checkbox"
-                        className="mr-2"
                         checked={selectedStudentIds.includes(student.id)}
                         onChange={(e) => {
-                          setSelectedStudentIds(
-                            e.target.checked
-                              ? [...selectedStudentIds, student.id]
-                              : selectedStudentIds.filter(
-                                  (id) => id !== student.id,
-                                ),
-                          );
+                          if (e.target.checked) {
+                            if (!selectedStudentIds.includes(student.id)) {
+                              setSelectedStudentIds([
+                                ...selectedStudentIds,
+                                student.id,
+                              ]);
+                            }
+                          } else {
+                            setSelectedStudentIds(
+                              selectedStudentIds.filter((id) => id !== student.id),
+                            );
+                          }
                         }}
+                        className="cursor-pointer w-4 h-4"
                       />
-                      {student.student_id}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary">
-                          <span className="text-sm font-bold text-primary-foreground">
-                            {student.full_name?.charAt(0) || '?'}
-                          </span>
-                        </div>
-                        <span>{student.full_name}</span>
-                      </div>
+                    <TableCell className="text-center font-medium text-sm relative">
+                      {highlightText(String(student.student_id), searchTerm)}
+                      <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                     </TableCell>
-                    <TableCell>{student.class_name}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-sm relative">
+                      {highlightText(student.full_name, searchTerm)}
+                      <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                    </TableCell>
+                    <TableCell className="text-center text-sm relative">
+                      {highlightText(student.class_name, searchTerm)}
+                      <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                    </TableCell>
+                    <TableCell className="text-center text-sm relative">
                       {student.face_samples_count &&
                       student.face_samples_count > 0 ? (
-                        <Badge
-                          variant="default"
-                          className="text-green-800 bg-green-100"
-                        >
-                          ✓ Đã đăng ký
+                        <Badge className="bg-green-50 text-green-700 text-center border-green-200 border min-w-[70px]">
+                          {student.face_samples_count} mẫu
                         </Badge>
                       ) : (
-                        <Badge variant="destructive">✗ Chưa đăng ký</Badge>
+                        <Badge className="bg-red-50 text-red-700 text-center border-gray-200 border min-w-[70px]">
+                          Chưa có
+                        </Badge>
                       )}
+                      <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex space-x-2 justify-center">
                         {student.is_active === false ? (
                           <>
                             <Button
-                              onClick={() => handleRestore(student)}
+                              onClick={() => handleRestore(student, loadClassStudents)}
                               disabled={restoreLoading}
                               variant="outline"
                               size="sm"
-                              className="flex items-center space-x-1 text-green-600 hover:text-green-600 hover:bg-green-50 hover:border-green-200"
+                              className="text-green-600 border-green-200 hover:bg-green-50"
                               title="Khôi phục"
                             >
                               {restoreLoading ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  <span>Khôi phục...</span>
-                                </>
+                                <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
-                                <>
-                                  <RefreshCw className="w-3 h-3" />
-                                  <span>Khôi phục</span>
-                                </>
+                                <RefreshCw className="w-4 h-4" />
                               )}
                             </Button>
                             <Button
@@ -407,34 +451,34 @@ const StudentsTableCard = ({
                               }
                               variant="outline"
                               size="sm"
-                              className="flex items-center space-x-1 text-red-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200"
+                              className="text-red-600 border-red-200 hover:bg-red-50"
                               title="Xóa vĩnh viễn"
                             >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Xóa vĩnh viễn</span>
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </>
                         ) : (
                           <>
                             <Button
-                              onClick={() => handleEditStudent(student)}
+                              onClick={() => {
+                                handleEditStudent(student);
+                                onEditStudent?.(student);
+                              }}
                               variant="outline"
                               size="sm"
-                              className="flex items-center space-x-1"
+                              className="text-primary hover:bg-primary/10 border-primary/20"
                               title="Chỉnh sửa"
                             >
-                              <Edit className="w-3 h-3" />
-                              <span>Sửa</span>
+                              <Edit className="w-4 h-4" />
                             </Button>
                             <Button
                               onClick={() => handleDeleteStudent(student.id)}
                               variant="outline"
                               size="sm"
-                              className="flex items-center space-x-1 text-destructive hover:text-destructive hover:bg-destructive/5 hover:border-destructive/50"
+                              className="text-destructive hover:bg-destructive/10 border-destructive/20"
                               title="Xóa tạm thời"
                             >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Xóa</span>
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </>
                         )}
@@ -497,7 +541,7 @@ const StudentsTableCard = ({
                       }
                       disabled={currentPage === 1}
                     >
-                      ← Trước
+                      <ChevronLeft className="inline-block w-4 h-4" /> Trước
                     </Button>
 
                     <div className="flex items-center space-x-1">
@@ -551,7 +595,7 @@ const StudentsTableCard = ({
                       }
                       disabled={currentPage === totalPages}
                     >
-                      Sau →
+                      Sau <ChevronLeft className="inline-block w-4 h-4 rotate-180" />
                     </Button>
                   </div>
                 </div>
