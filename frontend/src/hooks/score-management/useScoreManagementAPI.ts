@@ -157,18 +157,18 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
 
   const handleClassSubjectSelect = async (classSubject: any, academicYear?: string, semester?: string) => {
     try {
-      console.log('\n' + '='.repeat(80));
-      console.log('🟡 [handleClassSubjectSelect] CALLED with:', { classSubject, academicYear, semester });
-      console.log('='.repeat(80));
+      //console.log('\n' + '='.repeat(80));
+      //console.log('🟡 [handleClassSubjectSelect] CALLED with:', { classSubject, academicYear, semester });
+      //console.log('='.repeat(80));
       setLoading(true);
       setError(null);
-      console.log('[handleClassSubjectSelect] About to call api.getStudentsByClassSubject...');
+      //console.log('[handleClassSubjectSelect] About to call api.getStudentsByClassSubject...');
       const studentsResponse = await api.getStudentsByClassSubject(
         classSubject.id,
         academicYear || defaultAcademicYear || '2024-2025',
         semester || defaultSemester || 'HK1'
       );
-      console.log('[handleClassSubjectSelect] API Response received:', studentsResponse);
+      //console.log('[handleClassSubjectSelect] API Response received:', studentsResponse);
 
       if (studentsResponse.success) {
         const sortedStudents = (studentsResponse.data.students || []).sort(
@@ -290,6 +290,14 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
   ): number | string => {
     const flatColumns = flattenScoreColumns(scoreColumnConfig);
 
+    // Check if all required score columns are available
+    // If any score column is missing, return '-'
+    const allColumnsPresent = flatColumns.every(
+      (column) => gradeData[column.key]?.Diem != null
+    );
+
+    if (!allColumnsPresent) return '-';
+
     let txScores: number[] = [];
     let giuaKiScore: number | null = null;
     let giuaKiWeight = 0;
@@ -300,7 +308,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     let hasAnyGrade = false;
 
     flatColumns.forEach((column) => {
-      if (gradeData[column.key]?.Diem) {
+      if (gradeData[column.key]?.Diem != null) {
         hasAnyGrade = true;
         const diemValue = gradeData[column.key].Diem;
         const isLetter =
@@ -314,7 +322,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     if (!hasAnyGrade) return 0;
 
     flatColumns.forEach((column) => {
-      if (gradeData[column.key]?.Diem) {
+      if (gradeData[column.key]?.Diem != null) {
         const diemValue = gradeData[column.key].Diem;
 
         let score: number;

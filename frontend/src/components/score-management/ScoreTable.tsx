@@ -1,9 +1,10 @@
 // React already imported by JSX transform
-import { Users, User, Star, Zap, Plus, Pencil } from 'lucide-react';
+import { Users, User, Plus, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface ScoreTableProps {
   students: any[];
+  totalStudents: number;
   scoreConfig: any;
   currentPage: number;
   pageSize: number;
@@ -16,6 +17,7 @@ interface ScoreTableProps {
 
 export default function ScoreTable({
   students,
+  totalStudents,
   scoreConfig,
   currentPage,
   pageSize,
@@ -31,20 +33,20 @@ export default function ScoreTable({
 
   return (
     <div className="overflow-hidden bg-white rounded-lg shadow-md">
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-5 border-b border-gray-200 bg-muted/30">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
             <Users className="w-5 h-5 text-gray-700" />
-            <h3 className="text-lg font-bold text-gray-800">
+            <h3 className="text-lg font-bold text-gray-900">
               Danh sách học sinh
             </h3>
-            <span className="px-3 py-1 text-sm font-medium text-blue-800 bg-blue-100 rounded-full">
-              {students.length} học sinh
+            <span className="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-full">
+              {totalStudents} học sinh
             </span>
           </div>
           <div className="flex items-center space-x-2">
             <label className="text-sm text-gray-700">
-              Số lượng/trang:
+              Số lượng dòng/trang:
             </label>
             <select
               value={pageSize}
@@ -67,12 +69,12 @@ export default function ScoreTable({
         <table className="min-w-full">
           <thead>
             {/* First header row: Parent columns */}
-            <tr className="bg-gray-50">
+            <tr className="bg-muted/50">
               <th
-                className="px-5 py-3 text-left border-b-2 border-gray-300"
+                className="px-5 py-4 text-left border-b-2 border-gray-300"
                 rowSpan={2}
               >
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
+                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center space-x-1.5">
                   <User className="w-4 h-4" />
                   <span>Học sinh</span>
                 </span>
@@ -83,7 +85,7 @@ export default function ScoreTable({
                     <th
                       key={column.key}
                       colSpan={column.children.length}
-                      className="px-3 py-3 text-center border-b-2 border-gray-300 border-x bg-gray-50"
+                      className="px-4 py-4 text-center border-b-2 border-gray-300 border-x bg-muted/50"
                     >
                       <div className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
                         {column.label}
@@ -98,9 +100,9 @@ export default function ScoreTable({
                     <th
                       key={column.key}
                       rowSpan={2}
-                      className="px-5 py-3 text-center border-b-2 border-gray-300"
+                      className="px-5 py-4 text-center border-b-2 border-gray-300 border-r-[1px]"
                     >
-                      <div className="text-xs font-semibold tracking-wider text-gray-600 uppercase">
+                      <div className="text-xs font-semibold tracking-wider text-gray-700 uppercase">
                         {column.label}
                       </div>
                       <div className="text-xs text-blue-600 normal-case font-normal mt-0.5">
@@ -111,32 +113,30 @@ export default function ScoreTable({
                 }
               })}
               <th
-                className="px-5 py-3 text-left border-b-2 border-gray-300"
+                className="px-5 py-4 text-left border-b-2 border-gray-300 border-r-[1px]"
                 rowSpan={2}
               >
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
-                  <Star className="w-4 h-4" />
-                  <span>Điểm TB</span>
+                <span className="text-xs text-center font-semibold text-gray-700 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span>ĐIỂM TỔNG KẾT</span>
                 </span>
               </th>
               <th
-                className="px-5 py-3 text-left border-b-2 border-gray-300"
+                className="px-5 py-4 text-left border-b-2 border-gray-300"
                 rowSpan={2}
               >
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center space-x-1.5">
-                  <Zap className="w-4 h-4" />
-                  <span>Thao tác</span>
+                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span>Tùy chọn</span>
                 </span>
               </th>
             </tr>
             {/* Second header row: Child columns */}
-            <tr className="bg-gray-50">
+            <tr className="bg-muted/50">
               {displayColumns.map((column: any) => {
                 if (column.hasChildren) {
                   return column.children.map((child: any) => (
                     <th
                       key={child.key}
-                      className="px-3 py-2 text-center border-b-2 border-gray-300 border-x bg-gray-50"
+                      className="px-3 py-3 text-center border-b-2 border-gray-300 border-x bg-muted/50"
                     >
                       <div className="text-xs font-medium text-gray-700">
                         {child.label}
@@ -154,7 +154,7 @@ export default function ScoreTable({
           <tbody className="bg-white divide-y divide-gray-200">
             {(() => {
               // Show empty state if no students
-              if (students.length === 0) {
+              if (totalStudents === 0) {
                 return (
                   <tr>
                     <td colSpan={displayColumns.length + 7} className="px-5 py-12">
@@ -171,86 +171,90 @@ export default function ScoreTable({
               }
 
               const startIndex = (currentPage - 1) * pageSize;
-              const endIndex = startIndex + pageSize;
-              const paginatedStudents = students.slice(startIndex, endIndex);
 
-              return paginatedStudents.map((studentData: any, index: number) => (
+              return students.map((studentData: any, index: number) => (
                 <tr
                   key={studentData.student.id}
-                  className="transition-colors hover:bg-gray-50"
+                  className={`transition-colors ${
+                    index % 2 === 0 ? 'bg-background' : 'bg-muted/30'
+                  } hover:bg-gray-100`}
                 >
-                  <td className="px-5 py-3">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="flex items-center justify-center text-sm font-bold text-white bg-blue-600 rounded-lg w-9 h-9">
-                        {startIndex + index + 1}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {studentData.student.full_name}
+                  <td className="px-5 py-4 relative">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center text-xs font-bold text-white bg-indigo-600 rounded px-2 py-1 min-w-[32px]">
+                          {startIndex + index + 1}
                         </div>
-                        <div className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded inline-block mt-0.5">
+                        <div className="text-xs text-gray-600 bg-gray-100 px-2.5 py-1 rounded border border-gray-200 min-w-[60px] text-center">
                           {studentData.student.student_id}
                         </div>
                       </div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {studentData.student.full_name}
+                      </div>
                     </div>
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                   </td>
                   {displayColumns.map((column: any) => {
                     if (column.hasChildren) {
                       return column.children.map((child: any) => (
-                        <td key={child.key} className="px-3 py-3 text-center">
+                        <td key={child.key} className="px-3 py-4 text-center relative">
                           {studentData.score?.score_data?.[child.key]?.Diem ? (
-                            <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
+                            <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium border border-green-200 min-w-[50px] inline-block">
                               {
                                 studentData.score.score_data[child.key].Diem
                               }
                             </span>
                           ) : (
-                            <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm">
+                            <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm border border-gray-200 min-w-[50px] inline-block">
                               -
                             </span>
                           )}
+                          <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                         </td>
                       ));
                     } else {
                       return (
-                        <td key={column.key} className="px-5 py-3 text-center">
+                        <td key={column.key} className="px-5 py-4 text-center relative">
                           {studentData.score?.score_data?.[column.key]?.Diem ? (
-                            <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium">
+                            <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium border border-green-200 min-w-[50px] inline-block">
                               {
                                 studentData.score.score_data[column.key].Diem
                               }
                             </span>
                           ) : (
-                            <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm">
+                            <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm border border-gray-200 min-w-[50px] inline-block">
                               -
                             </span>
                           )}
+                          <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                         </td>
                       );
                     }
                   })}
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-4 relative text-center">
                     {studentData.score?.score_data ? (
-                      <span className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-bold">
+                      <span className="bg-blue-50 text-blue-700 text-center px-3 py-1.5 rounded-md text-sm font-bold border border-blue-200 min-w-[60px] inline-block">
                         {calculateFinalScore(studentData.score.score_data)}
                       </span>
                     ) : (
-                      <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm">
+                      <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm border border-gray-200 min-w-[50px] inline-block">
                         -
                       </span>
                     )}
+                    <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-4">
                     <button
                       onClick={() => onEditScore(studentData)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium text-sm"
+                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors font-medium text-sm"
                     >
                       {studentData.score ? (
                         <Pencil className="w-4 h-4" />
                       ) : (
                         <Plus className="w-4 h-4" />
                       )}
-                      <span>{studentData.score ? 'Sửa' : 'Nhập điểm'}</span>
+                      <span>{studentData.score ? 'Sửa' : 'Thêm'}</span>
                     </button>
                   </td>
                 </tr>
@@ -262,7 +266,6 @@ export default function ScoreTable({
 
       {/* Pagination Controls */}
       {(() => {
-        const totalStudents = students.length;
         const totalPages = Math.ceil(totalStudents / pageSize);
         const startIndex = (currentPage - 1) * pageSize;
         const endIndex = startIndex + pageSize;
@@ -270,7 +273,7 @@ export default function ScoreTable({
         if (totalPages <= 1) return null;
 
         return (
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="px-6 py-5 border-t border-gray-200 bg-muted/20">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-gray-700">
                 Hiển thị{" "}
@@ -294,7 +297,7 @@ export default function ScoreTable({
                   disabled={currentPage === 1}
                   className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  ← Trước
+                  <ChevronLeft className="inline-block w-4 h-4" /> Trước
                 </button>
 
                 <div className="flex items-center space-x-1">
@@ -331,7 +334,7 @@ export default function ScoreTable({
                         onClick={() => onPageChange(pageNum)}
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                           currentPage === pageNum
-                            ? "bg-blue-600 text-white"
+                            ? "bg-blue-600 text-white border border-blue-600"
                             : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
                         }`}
                       >
@@ -348,7 +351,7 @@ export default function ScoreTable({
                   disabled={currentPage === totalPages}
                   className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  Sau →
+                  Sau <ChevronRight className="inline-block w-4 h-4" />
                 </button>
               </div>
             </div>
