@@ -199,3 +199,7 @@ yarn-error.log
 # Others
 # ==========================================
 ai_services/train_test
+instruction_md
+latex
+build_wheel
+.cursor
