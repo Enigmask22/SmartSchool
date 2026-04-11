@@ -414,11 +414,12 @@ class ApiService {
     });
   }
 
-  async moveStudentsClass(studentIds, targetClassId) {
+  async moveStudentsClass(studentIds, currentClassId, targetClassId) {
     return this.request(`/admin/students/move-class`, {
       method: "POST",
       body: JSON.stringify({
         student_ids: studentIds,
+        current_class_id: currentClassId,
         target_class_id: targetClassId,
       }),
     });

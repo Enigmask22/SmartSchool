@@ -4,7 +4,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import logger from '@/utils/logger';
 
 // Helper function to highlight search term in text
-function highlightText(text: string, searchTerm: string): React.ReactNode {
+export function highlightText(text: string, searchTerm: string): React.ReactNode {
   if (!searchTerm || !text) {
     return text;
   }

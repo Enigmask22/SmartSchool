@@ -2176,6 +2176,7 @@ async def permanent_delete_student_admin(
 @router.post("/students/bulk-import")
 async def bulk_import_students(
     import_data: BulkStudentImport,
+    admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
     """Nhập học sinh hàng loạt từ file Excel/CSV"""
@@ -2218,8 +2219,8 @@ async def bulk_import_students(
                     final_class_name = student_record.lop_hoc
                     final_grade = student_record.khoi
                 
-                # Generate student ID (dùng final_grade)
-                student_id = generate_student_id(final_grade, db)
+                # Generate student ID (dùng final_grade và academic_year)
+                student_id = generate_student_id(final_grade, db, import_data.academic_year)
                 
                 # Check if student ID already exists
                 existing = db.table("students").select("student_id").eq("student_id", student_id).execute()
@@ -2585,40 +2586,98 @@ async def move_students_class(
 ):
     """Chuyển lớp cho nhiều học sinh và ghi lịch sử vào homeroom_students_history.
 
-    Body: { "student_ids": [int], "target_class_id": int }
+    Body: { 
+        "student_ids": [int], 
+        "current_class_id": int,
+        "target_class_id": int 
+    }
+    
+    Logic:
+    - If same academic year: UPDATE the existing homeroom_students_history record
+    - If different academic year: KEEP old record, CREATE new record
+    - Constraint: In same academic year, cannot move student if already in a different class
     """
     try:
         student_ids = payload.get("student_ids") or []
+        current_class_id = payload.get("current_class_id")
         target_class_id = payload.get("target_class_id")
 
         if not isinstance(student_ids, list) or len(student_ids) == 0:
             raise HTTPException(status_code=400, detail="Danh sách student_ids không hợp lệ")
+        if not current_class_id:
+            raise HTTPException(status_code=400, detail="Thiếu current_class_id")
         if not target_class_id:
             raise HTTPException(status_code=400, detail="Thiếu target_class_id")
+        if current_class_id == target_class_id:
+            raise HTTPException(status_code=400, detail="Lớp đích phải khác lớp hiện tại")
 
-        # Lấy thông tin lớp đích
-        class_resp = db.table("classes").select("id, class_name, grade, homeroom_teacher_id").eq("id", target_class_id).execute()
-        if not class_resp.data:
+        # Lấy thông tin lớp hiện tại và lớp đích
+        current_class_resp = db.table("classes").select("id, class_name, grade, academic_year, homeroom_teacher_id").eq("id", current_class_id).execute()
+        if not current_class_resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp hiện tại")
+        current_class = current_class_resp.data[0]
+
+        target_class_resp = db.table("classes").select("id, class_name, grade, academic_year, homeroom_teacher_id").eq("id", target_class_id).execute()
+        if not target_class_resp.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp đích")
-        target_class = class_resp.data[0]
+        target_class = target_class_resp.data[0]
 
-        # Cập nhật students
+        current_academic_year = current_class.get("academic_year")
+        target_academic_year = target_class.get("academic_year")
+        same_academic_year = current_academic_year == target_academic_year
+
+        # === CONSTRAINT CHECK for same academic year ===
+        if same_academic_year:
+            # Kiểm tra xem có học sinh nào đã ở trong class khác trong cùng năm học được chọn
+            for student_id in student_ids:
+                existing = db.table("homeroom_students_history").select("id, class_id").eq("student_id", student_id).execute()
+                if existing.data:
+                    for record in existing.data:
+                        # Lấy thông tin class của record đó
+                        existing_class_resp = db.table("classes").select("id, academic_year").eq("id", record["class_id"]).execute()
+                        if existing_class_resp.data:
+                            existing_class_academic_year = existing_class_resp.data[0].get("academic_year")
+                            # Nếu class đó cùng năm học nhưng khác lớp → lỗi
+                            if (existing_class_academic_year == target_academic_year and 
+                                record["class_id"] != current_class_id):
+                                raise HTTPException(
+                                    status_code=400, 
+                                    detail=f"Học sinh ID {student_id} đã có trong một lớp khác trong năm học {target_academic_year}. Vui lòng kiểm tra lại."
+                                )
+
+        # Cập nhật students table
         db.table("students").update({
             "class_name": target_class["class_name"],
             "grade": str(target_class["grade"]),
             "updated_at": datetime.now().isoformat()
         }).in_("id", student_ids).execute()
 
-        # Ghi lịch sử
-        history_rows = [{
-            "teacher_id": target_class.get("homeroom_teacher_id"),
-            "class_id": target_class["id"],
-            "student_id": sid
-        } for sid in student_ids]
-        if history_rows:
-            db.table("homeroom_students_history").insert(history_rows).execute()
+        # Xử lý homeroom_students_history
+        if same_academic_year:
+            # Cùng năm học: UPDATE record cũ
+            db.table("homeroom_students_history").update({
+                "teacher_id": target_class.get("homeroom_teacher_id"),
+                "class_id": target_class["id"],
+                "updated_at": datetime.now().isoformat()
+            }).eq("class_id", current_class_id).in_("student_id", student_ids).execute()
+        else:
+            # Năm học khác: GIỮ record cũ, TẠO record mới
+            new_history_rows = [{
+                "teacher_id": target_class.get("homeroom_teacher_id"),
+                "class_id": target_class["id"],
+                "student_id": sid
+            } for sid in student_ids]
+            if new_history_rows:
+                db.table("homeroom_students_history").insert(new_history_rows).execute()
 
-        return {"success": True, "message": "Chuyển lớp thành công", "data": {"updated_count": len(student_ids)}}
+        return {
+            "success": True, 
+            "message": f"Chuyển lớp thành công ({len(student_ids)} học sinh)",
+            "data": {
+                "updated_count": len(student_ids),
+                "same_academic_year": same_academic_year
+            }
+        }
     except HTTPException:
         raise
     except Exception as e:

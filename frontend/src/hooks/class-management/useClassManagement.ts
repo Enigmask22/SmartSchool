@@ -220,30 +220,40 @@ export const useClassManagement = () => {
   }, [selectedClassForManagement, showInactiveStudents, classes]);
 
   // === Student ID Generation ===
-  const generateStudentId = useCallback(async (grade: string) => {
+  const generateStudentId = useCallback(async (grade: string, academicYear: string) => {
     try {
-      const currentYear = new Date().getFullYear();
-      let yearPrefix;
-
-      if (grade === '10') {
-        yearPrefix = currentYear.toString().slice(-2);
-      } else if (grade === '11') {
-        yearPrefix = (currentYear - 1).toString().slice(-2);
-      } else if (grade === '12') {
-        yearPrefix = (currentYear - 2).toString().slice(-2);
-      } else {
-        throw new Error('Khối học không hợp lệ');
+      if (!grade || !academicYear) {
+        throw new Error('Grade and academic year are required');
       }
 
-      const response = await api.request(`/admin/students/by-grade?grade=${grade}`);
+      // Extract end year from academic year (e.g., "2024-2025" → "2025")
+      if (!academicYear.includes('-')) {
+        throw new Error('Invalid academic year format. Expected "XXXX-YYYY"');
+      }
+
+      const endYear = academicYear.split('-')[1]; // "2025"
+      const endYearInt = parseInt(endYear);
+
+      // Calculate year prefix based on grade
+      let yearForPrefix: number;
+      if (grade === '10') {
+        yearForPrefix = endYearInt;  // Grade 10: "25"
+      } else if (grade === '11') {
+        yearForPrefix = endYearInt - 1;  // Grade 11: "24"
+      } else if (grade === '12') {
+        yearForPrefix = endYearInt - 2;  // Grade 12: "23"
+      } else {
+        throw new Error('Invalid grade. Must be 10, 11, or 12');
+      }
+
+      const yearPrefix = yearForPrefix.toString().slice(-2);
+
+      // Fetch all students with this year prefix (not just by grade)
+      const response = await api.request(`/admin/students/by-prefix/${yearPrefix}`);
       if (response.success) {
         const students = response.data || [];
 
         const filteredStudents = students
-          .filter(
-            (student: StudentData) =>
-              student.student_id && student.student_id.startsWith(yearPrefix),
-          )
           .map((student: StudentData) => parseInt(student.student_id))
           .filter((id: number) => !isNaN(id))
           .sort((a: number, b: number) => a - b);
@@ -256,18 +266,12 @@ export const useClassManagement = () => {
 
         return nextId.toString();
       }
+
+      // Fallback: return first ID for prefix if query returns no students
+      return yearPrefix + '0001';
     } catch (error) {
       logger.error('Error generating student ID:', error);
-      const currentYear = new Date().getFullYear();
-      let yearPrefix;
-      if (grade === '10') yearPrefix = currentYear.toString().slice(-2);
-      else if (grade === '11')
-        yearPrefix = (currentYear - 1).toString().slice(-2);
-      else if (grade === '12')
-        yearPrefix = (currentYear - 2).toString().slice(-2);
-      else yearPrefix = currentYear.toString().slice(-2);
-
-      return yearPrefix + Date.now().toString().slice(-4);
+      throw error;  // Re-throw to caller
     }
   }, []);
 
@@ -389,7 +393,7 @@ export const useClassManagement = () => {
 
     setStudentFormLoading(true);
     try {
-      const studentId = await generateStudentId(studentFormData.grade);
+      const studentId = await generateStudentId(studentFormData.grade, selectedAcademicYear);
 
       const studentData = {
         student_id: studentId,

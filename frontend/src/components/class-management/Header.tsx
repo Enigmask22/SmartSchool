@@ -14,10 +14,7 @@ interface HeaderProps {
   setSelectedAcademicYear: (value: string) => void;
   selectedGrade: string | null;
   setSelectedGrade: (value: string) => void;
-  selectedClassForManagement: string | null;
-  setSelectedClassForManagement: (value: string) => void;
   academicYears: string[];
-  classes: Array<{ id: number; class_name: string; academic_year?: string }>;
   loading?: boolean;
 }
 
@@ -26,10 +23,7 @@ const Header = ({
   setSelectedAcademicYear,
   selectedGrade,
   setSelectedGrade,
-  selectedClassForManagement,
-  setSelectedClassForManagement,
   academicYears,
-  classes,
   loading = false,
 }: HeaderProps) => {
   // Build controls section
@@ -63,44 +57,17 @@ const Header = ({
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-gray-500">Khối</label>
         <Select
-          value={selectedGrade || 'none'}
-          onValueChange={(value) =>
-            setSelectedGrade(value === 'none' ? '' : value)
-          }
+          value={selectedGrade || '10'}
+          onValueChange={setSelectedGrade}
           disabled={loading}
         >
           <SelectTrigger className="w-full sm:w-[120px]">
-            <SelectValue placeholder="Khối" />
+            <SelectValue placeholder="Chọn khối" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">Tất cả khối</SelectItem>
             <SelectItem value="10">Khối 10</SelectItem>
             <SelectItem value="11">Khối 11</SelectItem>
             <SelectItem value="12">Khối 12</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Class Selection */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-gray-500">Lớp học</label>
-        <Select
-          value={selectedClassForManagement || 'none'}
-          onValueChange={(value) =>
-            setSelectedClassForManagement(value === 'none' ? '' : value)
-          }
-          disabled={loading}
-        >
-          <SelectTrigger className="w-full sm:w-[160px]">
-            <SelectValue placeholder="Chọn lớp" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Chọn lớp học</SelectItem>
-            {classes.map((cls) => (
-              <SelectItem key={cls.id} value={String(cls.id)}>
-                {cls.class_name}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
       </div>

@@ -192,7 +192,12 @@ export const exportToExcel = async (
       if (studentData.score?.score_data) {
         const avgScore = calculateFinalScore(studentData.score.score_data);
         row.getCell(cellCount).value = avgScore;
-        row.getCell(cellCount).font = { bold: true };
+        
+        // Only bold if it's an actual score, not a dash (incomplete data)
+        if (avgScore !== '-') {
+          row.getCell(cellCount).font = { bold: true };
+        }
+        
         row.getCell(cellCount).alignment = {
           horizontal: 'center',
           vertical: 'middle',
