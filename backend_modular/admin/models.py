@@ -42,20 +42,22 @@ class TeacherUpdate(BaseModel):
 class SubjectCreate(BaseModel):
     subject_code: str
     subject_name: str
-    grade_level: Optional[int] = None
+    description: Optional[str] = None
+    is_mandatory: Optional[bool] = False
     is_active: Optional[bool] = True
 
 class SubjectUpdate(BaseModel):
     subject_code: Optional[str] = None
     subject_name: Optional[str] = None
     description: Optional[str] = None
-    grade_level: Optional[int] = None
+    is_mandatory: Optional[bool] = None
     is_active: Optional[bool] = None
 
 class ClassCreate(BaseModel):
     class_name: str
     grade: int
     homeroom_teacher_id: Optional[int] = None
+    room_number: Optional[str] = None
     academic_year: str
     is_active: Optional[bool] = True
 
@@ -70,19 +72,17 @@ class ClassUpdate(BaseModel):
 class SubjectTeacherCreate(BaseModel):
     teacher_id: int
     subject_id: int
-    academic_year: Optional[str] = "2025-2026"  # Năm học mặc định
     is_active: Optional[bool] = True
 
 class SubjectTeacherUpdate(BaseModel):
     teacher_id: Optional[int] = None
     subject_id: Optional[int] = None
-    academic_year: Optional[str] = None
     is_active: Optional[bool] = None
 
 class ClassSubjectCreate(BaseModel):
     class_id: int
     subject_id: int
-    teacher_id: int
+    teacher_id: Optional[int] = None
     academic_year: str
     semester: str
     is_active: Optional[bool] = True
@@ -102,10 +102,10 @@ class StudentCreate(BaseModel):
     gender: str
     class_name: str
     grade: str
+    class_id: Optional[int] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    parent_name: Optional[str] = None
-    parent_phone: Optional[str] = None
+    parent_contacts: Optional[list] = None
     address: Optional[str] = None
     is_active: Optional[bool] = True
 
@@ -118,8 +118,7 @@ class StudentUpdate(BaseModel):
     grade: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    parent_name: Optional[str] = None
-    parent_phone: Optional[str] = None
+    parent_contacts: Optional[list] = None
     address: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -132,11 +131,18 @@ class StudentImportRecord(BaseModel):
     ngay_sinh: Optional[str] = None
     ten_phu_huynh: Optional[str] = None
     sdt_phu_huynh: Optional[str] = None
+    ten_bo: Optional[str] = None
+    sdt_bo: Optional[str] = None
+    ten_me: Optional[str] = None
+    sdt_me: Optional[str] = None
+    parent_contacts: Optional[list] = None
     dia_chi: Optional[str] = None
     gioi_tinh: str = "Nam"
 
 class BulkStudentImport(BaseModel):
     students: List[StudentImportRecord]
+    academic_year: Optional[str] = None
+    class_id: Optional[int] = None
 
 class ResponseModel(BaseModel):
     success: bool

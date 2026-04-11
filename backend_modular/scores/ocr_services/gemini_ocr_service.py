@@ -1,0 +1,447 @@
+"""
+Service xử lý OCR cho bảng điểm viết tay sử dụng Google Gemini Vision API
+"""
+
+import os
+import json
+from typing import List, Dict, Optional
+import google.generativeai as genai
+from PIL import Image
+import re
+
+from core.logger import setup_logger
+
+logger = setup_logger("gemini_ocr")
+
+
+class GeminiOCRService:
+    """
+    Service để phân tích bảng điểm viết tay sử dụng Gemini Vision API
+    
+    Ưu điểm:
+    - Độ chính xác cao: 95-98% với chữ viết tay
+    - Context understanding tốt
+    - API đơn giản, dễ sử dụng
+    - Không cần GPU (cloud-based)
+    
+    Nhược điểm:
+    - Cần API key
+    - Phụ thuộc vào kết nối mạng
+    - Chi phí API calls
+    """
+    
+    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-2.0-flash"):
+        """
+        Khởi tạo Gemini OCR Service
+        
+        Args:
+            api_key: API key cho Google AI Studio
+            model_name: Tên model Gemini để sử dụng
+        """
+        self.api_key = api_key or self._load_api_key()
+        self.model_name = model_name
+        self.model = None
+        
+        if not self.api_key:
+            raise ValueError("API key không được tìm thấy. Vui lòng cấu hình GEMINI_API_KEY.")
+        
+        self._initialize_model()
+        logger.info(f"✅ GeminiOCRService initialized successfully with {self.model_name}")
+    
+    def _load_api_key(self) -> Optional[str]:
+        """
+        Tải API key từ biến môi trường
+        
+        Returns:
+            API key nếu tìm thấy, None nếu không
+        """
+        # Thử lấy từ biến môi trường
+        api_key = os.getenv('GEMINI_API_KEY')
+        if api_key:
+            return api_key
+        
+        # Fallback API key (chỉ dùng cho development)
+        return 'AIzaSyAJLXNgLaKPxTv_rn_iERKxgiUhMPvLlMw'
+    
+    def _initialize_model(self):
+        """
+        Khởi tạo model Gemini với Vision capability
+        """
+        try:
+            # Cấu hình API key
+            genai.configure(api_key=self.api_key)
+            
+            # Khởi tạo model với vision capability
+            self.model = genai.GenerativeModel(self.model_name)
+            
+            # Cấu hình generation
+            self.generation_config = genai.types.GenerationConfig(
+                candidate_count=1,
+                max_output_tokens=7200,
+                temperature=0.1,  # Low temperature for accuracy
+            )
+            
+            logger.info(f"✅ Đã kết nối thành công với {self.model_name}")
+            
+        except Exception as e:
+            logger.error(f"❌ ERROR: Lỗi khi khởi tạo Gemini model: {e}")
+            raise
+    
+    def _create_ocr_prompt(self) -> str:
+        """
+        Tạo prompt chi tiết cho Gemini để đọc bảng điểm
+        
+        Returns:
+            Prompt đã được định dạng
+        """
+        prompt = """
+Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là đọc bảng điểm học sinh từ ảnh và trích xuất dữ liệu chính xác.
+
+**YÊU CẦU QUAN TRỌNG:**
+
+1. **Cấu trúc bảng điểm:**
+   - Header có thể gồm các cột: id, ho_va_ten, Diem_tx1, Diem_tx2, Diem_tx3, Diem_tx4, Diem_thi_giua_ki, Diem_thi_cuoi_ki
+   - HOẶC: id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki (format cũ)
+   - QUAN TRỌNG: Đọc chính xác tên cột từ header của ảnh, không tự ý thay đổi
+   - Mỗi dòng là thông tin của một học sinh
+
+2. **Quy tắc đọc dữ liệu:**
+   - **ID học sinh**: Thường có dạng 6 số như 250001, 250002,... 
+   - **Họ và tên**: Tên đầy đủ của học sinh (chữ tiếng Việt có dấu)
+   - **Điểm số - có 3 loại:**
+     * **Điểm số (numeric)**: Số thập phân từ 0 đến 10, bước nhảy 0.25
+       - Ví dụ: 0, 0.25, 0.5, 0.75, 1.0, ..., 9.75, 10
+       - Giáo viên có thể viết 0.5 hoặc 0,5 (dấu chấm hoặc phẩy đều được)
+       - Chuẩn hóa tất cả về dạng số thập phân với dấu chấm
+     * **Điểm chữ Đ (Đạt)**: Viết là "Đ", "D", "Dat", "ĐẠT" - Chuẩn hóa thành chuỗi "Đ"
+     * **Điểm chữ KĐ (Không Đạt)**: Viết là "KĐ", "KD", "Khong Dat", "KHÔNG ĐẠT" - Chuẩn hóa thành chuỗi "KĐ"
+
+3. **Xử lý lỗi OCR thường gặp:**
+   - Số 1 có thể bị nhầm với chữ I, l
+   - Số 0 có thể bị nhầm với chữ O
+   - Số 5 có thể bị nhầm với chữ S
+   - Số 7 có thể bị nhầm với dấu /
+   - Chữ "Đ" có thể bị nhầm với "D" hoặc "O"
+   - Hãy sửa các lỗi này khi đọc điểm số
+
+4. **Format output (BẮT BUỘC):**
+   Trả về JSON với cấu trúc sau (ví dụ với nested columns):
+   ```json
+   {
+     "success": true,
+     "headers": ["id", "ho_va_ten", "Diem_tx1", "Diem_tx2", "Diem_tx3", "Diem_tx4", "Diem_thi_giua_ki", "Diem_thi_cuoi_ki"],
+     "rows": [
+       {
+         "student_id": "250001",
+         "ho_va_ten": "Nguyễn Văn A",
+         "Diem_tx1": 8.5,
+         "Diem_tx2": 9.0,
+         "Diem_tx3": "Đ",
+         "Diem_tx4": 7.5,
+         "Diem_thi_giua_ki": 8.0,
+         "Diem_thi_cuoi_ki": 9.0
+       }
+     ],
+     "total_rows": 1,
+     "errors": []
+   }
+   ```
+
+5. **Xử lý trường hợp đặc biệt:**
+   - Nếu ô điểm để trống, bỏ qua trường đó (không có trong JSON)
+   - Nếu không đọc được ID học sinh, ghi vào errors
+   - Nếu điểm số không hợp lệ (< 0 hoặc > 10 cho điểm số, hoặc không phải Đ/KĐ cho điểm chữ), ghi vào errors
+   - Key của JSON phải CHÍNH XÁC theo tên cột trong header (viết hoa, viết thường, dấu gạch dưới)
+
+**CHỈ TRẢ VỀ JSON, KHÔNG THÊM BẤT KỲ VÁN BẢN NÀO KHÁC.**
+
+Bây giờ hãy đọc bảng điểm trong ảnh và trả về dữ liệu theo format trên.
+"""
+        return prompt.strip()
+    
+    def parse_score_sheet(self, image_path: str) -> Dict:
+        """
+        Phân tích toàn bộ bảng điểm sử dụng Gemini Vision API
+        
+        Args:
+            image_path: Đường dẫn đến file ảnh bảng điểm
+        
+        Returns: {
+            'success': bool,
+            'headers': List[str],
+            'rows': List[Dict],
+            'errors': List[str],
+            'total_rows': int
+        }
+        """
+        try:
+            logger.debug(f"Processing score sheet: {image_path}")
+            
+            # Bước 1: Mở và validate ảnh
+            if not os.path.exists(image_path):
+                return {
+                    'success': False,
+                    'headers': [],
+                    'rows': [],
+                    'errors': [f'File không tồn tại: {image_path}'],
+                    'total_rows': 0
+                }
+            
+            # Bước 2: Đọc ảnh
+            try:
+                image = Image.open(image_path)
+            except Exception as e:
+                return {
+                    'success': False,
+                    'headers': [],
+                    'rows': [],
+                    'errors': [f'Không thể đọc file ảnh: {str(e)}'],
+                    'total_rows': 0
+                }
+            
+            # Bước 3: Tạo prompt
+            prompt = self._create_ocr_prompt()
+            
+            # Bước 4: Gửi request đến Gemini
+            response = self.model.generate_content(
+                [prompt, image],
+                generation_config=self.generation_config
+            )
+            
+            if not response or not response.text:
+                return {
+                    'success': False,
+                    'headers': [],
+                    'rows': [],
+                    'errors': ['Không nhận được phản hồi từ Gemini API'],
+                    'total_rows': 0
+                }
+            
+            # Bước 5: Parse JSON response
+            parsed_data = self._parse_gemini_response(response.text)
+            
+            # Bước 6: Validate và chuẩn hóa dữ liệu
+            validated_data = self._validate_and_normalize(parsed_data)
+            
+            logger.debug(f"Parsed {validated_data.get('total_rows', 0)} rows")
+            return validated_data
+            
+        except Exception as e:
+            logger.error(f"❌ Error parsing score sheet: {str(e)}", exc_info=True)
+            return {
+                'success': False,
+                'headers': [],
+                'rows': [],
+                'errors': [f"Lỗi xử lý: {str(e)}"],
+                'total_rows': 0
+            }
+    
+    def _parse_gemini_response(self, response_text: str) -> Dict:
+        """
+        Parse JSON response từ Gemini
+        
+        Args:
+            response_text: Text response từ Gemini API
+            
+        Returns:
+            Parsed data dictionary
+        """
+        try:
+            # Remove markdown code blocks nếu có
+            response_text = response_text.strip()
+            
+            # Remove ```json và ``` nếu có
+            if response_text.startswith('```json'):
+                response_text = response_text[7:]
+            elif response_text.startswith('```'):
+                response_text = response_text[3:]
+            
+            if response_text.endswith('```'):
+                response_text = response_text[:-3]
+            
+            response_text = response_text.strip()
+            
+            # Parse JSON
+            data = json.loads(response_text)
+            
+            logger.debug(f"Parsed Gemini response: {data.get('total_rows', 0)} rows")
+            return data
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            logger.debug(f"Response text: {response_text[:500]}...")  # Log first 500 chars
+            return {
+                'success': False,
+                'headers': [],
+                'rows': [],
+                'errors': [f'Không thể parse JSON từ Gemini: {str(e)}'],
+                'total_rows': 0
+            }
+    
+    def _validate_and_normalize(self, data: Dict) -> Dict:
+        """
+        Validate và chuẩn hóa dữ liệu từ Gemini
+        
+        Args:
+            data: Raw data từ Gemini
+            
+        Returns:
+            Validated và normalized data
+        """
+        errors = data.get('errors', [])
+        rows = data.get('rows', [])
+        headers = data.get('headers', [])
+        validated_rows = []
+        
+        # Lấy tất cả score columns (trừ id và ho_va_ten)
+        score_columns = [col for col in headers if col not in ['id', 'ho_va_ten', 'student_id']]
+        
+        for idx, row in enumerate(rows, start=1):
+            try:
+                validated_row = {}
+                
+                # Validate student_id
+                student_id = row.get('student_id', '').strip()
+                if not student_id:
+                    errors.append(f"Row {idx}: Thiếu student_id")
+                    continue
+                
+                # Chuẩn hóa student_id
+                student_id = self._normalize_student_id(student_id)
+                if not student_id:
+                    errors.append(f"Row {idx}: student_id không hợp lệ")
+                    continue
+                
+                validated_row['student_id'] = student_id
+                
+                # Validate ho_va_ten (optional)
+                if 'ho_va_ten' in row:
+                    validated_row['ho_va_ten'] = row['ho_va_ten'].strip()
+                
+                # Validate và normalize TẤT CẢ các cột điểm (dynamic)
+                for score_col in score_columns:
+                    if score_col in row:
+                        score = self._normalize_score(row[score_col])
+                        if score is not None:
+                            validated_row[score_col] = score
+                        else:
+                            errors.append(f"Row {idx}: {score_col} không hợp lệ ({row[score_col]})")
+                
+                # Phải có ít nhất student_id
+                if validated_row.get('student_id'):
+                    validated_rows.append(validated_row)
+                
+            except Exception as e:
+                errors.append(f"Row {idx}: Lỗi validate - {str(e)}")
+                logger.error(f"❌ Error validating row {idx}: {e}")
+        
+        success = len(validated_rows) > 0
+        
+        return {
+            'success': success,
+            'headers': headers if headers else ['id', 'ho_va_ten'],
+            'rows': validated_rows,
+            'errors': errors,
+            'total_rows': len(validated_rows)
+        }
+    
+    def _normalize_student_id(self, student_id: str) -> Optional[str]:
+        """
+        Chuẩn hóa student_id
+        
+        Args:
+            student_id: Raw student ID
+            
+        Returns:
+            Normalized student ID (format: 250001, 250002, ...)
+        """
+        student_id = student_id.strip().upper()
+        
+        # Pattern: 6 số
+        match = re.search(r'(\d{6})', student_id)
+        if match:
+            return match.group(1)
+        
+        # Pattern: chỉ số (001, 002, 1, 2, ...)
+        match = re.search(r'(\d+)', student_id)
+        if match:
+            num = match.group(1)
+            if len(num) <= 4:
+                return f"{num.zfill(6)}"
+        
+        return None
+    
+    def _normalize_score(self, score):
+        """
+        Chuẩn hóa điểm số - hỗ trợ cả điểm số (float) và điểm chữ (Đ, KĐ)
+        
+        Args:
+            score: Raw score (có thể là int, float, hoặc string)
+            
+        Returns:
+            - float: Điểm số (0-10, bước 0.25)
+            - str: Điểm chữ ("Đ" hoặc "KĐ")
+            - None: Không hợp lệ
+        """
+        try:
+            # Nếu là string, check xem có phải điểm chữ không
+            if isinstance(score, str):
+                score_str = score.strip().upper()
+                
+                # Điểm chữ "Đ" (Đạt)
+                if score_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
+                    return 'Đ'
+                
+                # Điểm chữ "KĐ" (Không Đạt)
+                if score_str in ['KĐ', 'KD', 'KHONG DAT', 'KHÔNG ĐẠT', 'KHONGDAT']:
+                    return 'KĐ'
+                
+                # Nếu không phải điểm chữ, thử convert sang số
+                # Replace comma with dot
+                score = score.replace(',', '.')
+                score = float(score)
+            elif isinstance(score, (int, float)):
+                score = float(score)
+            else:
+                return None
+            
+            # Validate range
+            if not (0 <= score <= 10):
+                logger.warning(f"⚠️ Score {score} out of range 0-10")
+                return None
+            
+            # Round to nearest 0.25
+            score = round(score * 4) / 4
+            score = min(10.0, max(0.0, score))
+            
+            return score
+            
+        except (ValueError, TypeError) as e:
+            logger.error(f"❌ Error normalizing score '{score}': {e}")
+            return None
+    
+    def export_to_excel_format(self, parsed_data: Dict) -> List[Dict]:
+        """
+        Convert parsed data sang format phù hợp với bulk import
+        
+        Args:
+            parsed_data: Data từ parse_score_sheet()
+            
+        Returns: 
+            List[{student_id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki, diem_thi_cuoi_ki}]
+        """
+        if not parsed_data.get('success'):
+            return []
+        
+        excel_data = []
+        for row in parsed_data.get('rows', []):
+            excel_row = {
+                'student_id': row.get('student_id'),
+                'ho_va_ten': row.get('ho_va_ten', ''),
+                'diem_thuong_xuyen': row.get('diem_thuong_xuyen'),
+                'diem_thi_giua_ki': row.get('diem_thi_giua_ki'),
+                'diem_thi_cuoi_ki': row.get('diem_thi_cuoi_ki')
+            }
+            excel_data.append(excel_row)
+        
+        return excel_data

@@ -5,9 +5,10 @@ import {
   Clock,
   BookOpen,
   Save,
-  RefreshCw,
+  Download,
   AlertCircle,
   CheckCircle,
+  RefreshCw
 } from "lucide-react";
 import {
   Card,
@@ -18,10 +19,17 @@ import {
 } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription } from "./ui/alert";
-import api from "../services/api";
+import api from "@/services/api";
 
 const SystemSettings = () => {
   const [settings, setSettings] = useState({});
@@ -34,6 +42,8 @@ const SystemSettings = () => {
     semester: "",
     attendance_cutoff_time: "",
   });
+  const [cutoffHour, setCutoffHour] = useState("00");
+  const [cutoffMinute, setCutoffMinute] = useState("00");
 
   // Load settings
   useEffect(() => {
@@ -64,6 +74,13 @@ const SystemSettings = () => {
           attendance_cutoff_time:
             settingsMap.attendance_cutoff_time?.setting_value || "",
         });
+
+        // Sync hour/minute state from loaded value
+        const timeVal =
+          settingsMap.attendance_cutoff_time?.setting_value || "00:00";
+        const [h, m] = timeVal.split(":");
+        setCutoffHour(h?.padStart(2, "0") || "00");
+        setCutoffMinute(m?.padStart(2, "0") || "00");
       } else {
         setError(response.message || "Không thể tải cấu hình");
       }
@@ -141,6 +158,192 @@ const SystemSettings = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Whenever hour/minute changes, update combined time string
+  useEffect(() => {
+    const next = `${cutoffHour}:${cutoffMinute}`;
+    setFormData((prev) => ({ ...prev, attendance_cutoff_time: next }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cutoffHour, cutoffMinute]);
+
+  const hours = Array.from({ length: 24 }, (_, i) => `${i}`.padStart(2, "0"));
+  const minutes = Array.from({ length: 60 }, (_, i) => `${i}`.padStart(2, "0"));
+
+  // ===== Dayoffs per grade (10/11/12) =====
+  const grades = [10, 11, 12];
+  const currentYear = new Date().getFullYear();
+  const [dayoffYear, setDayoffYear] = useState({
+    10: currentYear,
+    11: currentYear,
+    12: currentYear,
+  });
+  const [dayoffMonth, setDayoffMonth] = useState({
+    10: new Date().getMonth() + 1,
+    11: new Date().getMonth() + 1,
+    12: new Date().getMonth() + 1,
+  });
+  const [dayoffDays, setDayoffDays] = useState({
+    10: new Set(),
+    11: new Set(),
+    12: new Set(),
+  });
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const loadDayoffConfig = async (g) => {
+    try {
+      const y = dayoffYear[g];
+      const m = dayoffMonth[g];
+      const resp = await api.request(
+        `/admin/dayoffs?year=${y}&month=${m}&grade=${g}`
+      );
+      if (resp.success && resp.data && resp.data.length > 0) {
+        const list = resp.data[0].dayoffs_list || [];
+        setDayoffDays((prev) => ({ ...prev, [g]: new Set(list) }));
+      } else {
+        setDayoffDays((prev) => ({ ...prev, [g]: new Set() }));
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const saveDayoffConfig = async (g) => {
+    try {
+      setSaving(true);
+      const y = dayoffYear[g];
+      const m = dayoffMonth[g];
+      const list = Array.from(dayoffDays[g]).sort((a, b) => a - b);
+      const resp = await api.request(`/admin/dayoffs`, {
+        method: "POST",
+        body: JSON.stringify({
+          year: y,
+          month: m,
+          grade: g,
+          dayoffs_list: list,
+        }),
+      });
+      if (resp.success) setSuccess(`Lưu ngày nghỉ khối ${g} thành công`);
+      else setError(resp.message || `Không thể lưu ngày nghỉ khối ${g}`);
+    } catch (e) {
+      setError(`Lỗi khi lưu ngày nghỉ khối ${g}: ${e.message}`);
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSuccess(null), 2500);
+    }
+  };
+
+  // Auto-load dayoff config for all grades when component mounts
+  useEffect(() => {
+    // Load config for all grades (10, 11, 12) after initial render
+    // Small delay to ensure state (dayoffYear, dayoffMonth) is initialized
+    const timer = setTimeout(() => {
+      grades.forEach((g) => {
+        loadDayoffConfig(g);
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  const renderDayoffSection = (g) => {
+    const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
+    const selected = dayoffDays[g] || new Set();
+    const toggleDay = (d) => {
+      setDayoffDays((prev) => {
+        const setCopy = new Set(prev[g] || []);
+        if (setCopy.has(d)) setCopy.delete(d);
+        else setCopy.add(d);
+        return { ...prev, [g]: setCopy };
+      });
+    };
+    return (
+      <Card className="transition-shadow hover:shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-xl">
+            Quản lý ngày nghỉ - Khối {g}
+          </CardTitle>
+          <CardDescription>Chọn năm, tháng và các ngày nghỉ</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Năm</Label>
+              <Select
+                value={String(dayoffYear[g])}
+                onValueChange={(v) => {
+                  setDayoffYear((p) => ({ ...p, [g]: parseInt(v, 10) }));
+                  setTimeout(() => loadDayoffConfig(g), 0);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tháng</Label>
+              <Select
+                value={String(dayoffMonth[g])}
+                onValueChange={(v) => {
+                  setDayoffMonth((p) => ({ ...p, [g]: parseInt(v, 10) }));
+                  setTimeout(() => loadDayoffConfig(g), 0);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((m) => (
+                    <SelectItem key={m} value={String(m)}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Chọn ngày nghỉ</Label>
+            <div className="grid grid-cols-7 gap-2 mt-2">
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                <Button
+                  key={d}
+                  type="button"
+                  variant={selected.has(d) ? "default" : "outline"}
+                  className={`h-9 ${
+                    selected.has(d) ? "bg-primary text-primary-foreground" : ""
+                  }`}
+                  onClick={() => toggleDay(d)}
+                >
+                  {d}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-between gap-2">
+            <Button variant="outline" onClick={() => loadDayoffConfig(g)}>
+              <Download className="w-4 h-4 mr-2" />
+              Tải cấu hình
+            </Button>
+            <Button onClick={() => saveDayoffConfig(g)} disabled={saving}>
+              <Save className="w-4 h-4 mr-2" />
+              Lưu ngày nghỉ khối {g}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   if (loading) {
@@ -266,17 +469,19 @@ const SystemSettings = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="semester">Học kỳ</Label>
-              <select
-                id="semester"
-                value={formData.semester}
-                onChange={(e) => handleChange("semester", e.target.value)}
-                className="flex w-full h-10 px-3 py-2 text-lg font-semibold border rounded-md border-input bg-background ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              <Select
+                value={formData.semester || ""}
+                onValueChange={(v) => handleChange("semester", v)}
               >
-                <option value="">Chọn học kỳ</option>
-                <option value="HK1">Học kỳ 1</option>
-                <option value="HK2">Học kỳ 2</option>
-                <option value="HK3">Học kỳ 3</option>
-              </select>
+                <SelectTrigger id="semester" className="text-lg font-semibold">
+                  <SelectValue placeholder="Chọn học kỳ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="HK1">Học kỳ 1</SelectItem>
+                  <SelectItem value="HK2">Học kỳ 2</SelectItem>
+                  <SelectItem value="HK3">Học kỳ 3</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground">
                 Chọn học kỳ hiện tại (HK1, HK2, hoặc HK3)
               </p>
@@ -334,18 +539,40 @@ const SystemSettings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="attendance_cutoff_time">
-                Giờ điểm danh (HH:MM)
-              </Label>
-              <Input
-                id="attendance_cutoff_time"
-                type="time"
-                value={formData.attendance_cutoff_time}
-                onChange={(e) =>
-                  handleChange("attendance_cutoff_time", e.target.value)
-                }
-                className="text-lg font-semibold"
-              />
+              <Label>Giờ điểm danh (HH:MM)</Label>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={cutoffHour}
+                  onValueChange={(v) => setCutoffHour(v)}
+                >
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {hours.map((h) => (
+                      <SelectItem key={h} value={h}>
+                        {h}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="font-semibold">:</span>
+                <Select
+                  value={cutoffMinute}
+                  onValueChange={(v) => setCutoffMinute(v)}
+                >
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {minutes.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Học sinh đến sau giờ này sẽ bị tính là đi muộn
               </p>
@@ -439,6 +666,13 @@ const SystemSettings = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dayoffs per grade */}
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+        {grades.map((g) => (
+          <div key={g}>{renderDayoffSection(g)}</div>
+        ))}
+      </div>
     </div>
   );
 };
