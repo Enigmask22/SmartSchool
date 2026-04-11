@@ -1,37 +1,69 @@
 """
-Feedback Services - Tích hợp với Gemini AI
+Feedback Services - Tích hợp AI (Gemini / OpenRouter)
+Chọn provider qua biến môi trường FEEDBACK_PROVIDER (gemini | openrouter)
 """
 
 import os
 from typing import List, Dict
 from core.logger import setup_logger
-from .gemini_service import get_gemini_service
 
 logger = setup_logger("feedback_service")
 
-class FeedbackService:
-    """Service tạo feedback bằng Gemini AI"""
-    
-    def __init__(self):
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        self.use_ai = True  # Flag để bật/tắt AI generation
-        
-        # Kiểm tra xem Gemini service có khả dụng không
+
+def _create_ai_service():
+    """
+    Factory function: khởi tạo AI feedback service dựa trên FEEDBACK_PROVIDER.
+
+    Returns:
+        Tuple[service_instance | None, str] - (service, provider_name)
+    """
+    provider = os.getenv("FEEDBACK_PROVIDER", "gemini").lower().strip()
+
+    if provider == "openrouter":
         try:
-            self.gemini_service = get_gemini_service()
-            logger.info("✅ Gemini AI service initialized successfully")
+            from .openrouter_service import OpenRouterFeedbackService
+            service = OpenRouterFeedbackService()
+            logger.info("✅ OpenRouter AI feedback service initialized")
+            return service, "openrouter"
         except Exception as e:
-            logger.error(f"⚠️ Cannot initialize Gemini service: {str(e)}")
-            logger.warning("📝 Falling back to template-based feedback")
+            logger.error(f"⚠️ Cannot initialize OpenRouter service: {e}")
+            # Fallback sang Gemini
+            logger.warning("🔄 Fallback sang Gemini service...")
+            provider = "gemini"
+
+    # Default: Gemini
+    if provider == "gemini":
+        try:
+            from .gemini_service import get_gemini_service
+            service = get_gemini_service()
+            logger.info("✅ Gemini AI feedback service initialized")
+            return service, "gemini"
+        except Exception as e:
+            logger.error(f"⚠️ Cannot initialize Gemini service: {e}")
+
+    return None, "none"
+
+
+class FeedbackService:
+    """Service tạo feedback bằng AI (Gemini hoặc OpenRouter)"""
+
+    def __init__(self):
+        self.use_ai = True
+        self.provider_name = "none"
+
+        self.ai_service, self.provider_name = _create_ai_service()
+        if self.ai_service is None:
+            logger.warning("📝 No AI service available – falling back to template-based feedback")
             self.use_ai = False
         
     async def generate_feedback(
         self,
         student_name: str,
         score: float,
-        score_trend: str,
         attendance_rate: int,
         subject: str = None,
+        top_subjects: List[str] = None,
+        weak_subjects: List[str] = None,
         notes: str = ""
     ) -> str:
         """
@@ -49,18 +81,18 @@ class FeedbackService:
             Nhận xét được tạo bởi AI hoặc template
         """
         try:
-            # Sử dụng Gemini AI nếu có
+            # Sử dụng AI service nếu có
             if self.use_ai:
                 try:
-                    feedback = await self.gemini_service.generate_student_feedback(
+                    feedback = await self.ai_service.generate_student_feedback(
                         student_name=student_name,
                         score=score,
-                        score_trend=score_trend,
                         attendance_rate=attendance_rate,
-                        subject=subject,
-                        notes=notes
+                        top_subjects=top_subjects,
+                        weak_subjects=weak_subjects,
+                        notes=(notes or "").strip(),
                     )
-                    logger.info(f"🤖 AI-generated feedback for {student_name}")
+                    logger.info(f"🤖 [{self.provider_name}] AI-generated feedback for {student_name}")
                     return feedback
                 except Exception as ai_error:
                     logger.error(f"❌ AI generation failed: {str(ai_error)}")
@@ -82,11 +114,11 @@ class FeedbackService:
             else:
                 feedback_parts.append(f"Em {student_name} cần cố gắng hơn nữa{subject_text} với điểm trung bình hiện tại là {score}.")
             
-            # Xu hướng
-            if score_trend == "tăng":
-                feedback_parts.append("Điểm số có xu hướng tăng dần, thể hiện sự tiến bộ đáng khen.")
-            elif score_trend == "giảm":
-                feedback_parts.append("Cần chú ý vì điểm số đang có xu hướng giảm.")
+            # Tổng hợp môn mạnh/yếu
+            if top_subjects:
+                feedback_parts.append(f"Các môn nổi bật: {', '.join(top_subjects[:3])}.")
+            if weak_subjects:
+                feedback_parts.append(f"Cần cải thiện ở các môn: {', '.join(weak_subjects[:3])}.")
             
             # Chuyên cần
             if attendance_rate >= 90:
@@ -115,11 +147,11 @@ class FeedbackService:
             Dictionary chứa kết quả và danh sách feedbacks
         """
         try:
-            # Sử dụng Gemini AI batch generation nếu có
+            # Sử dụng AI batch generation nếu có
             if self.use_ai:
                 try:
-                    result = await self.gemini_service.generate_batch_feedback(students_data)
-                    logger.info(f"🤖 AI batch generation: {result['success_count']}/{len(students_data)} successful")
+                    result = await self.ai_service.generate_batch_feedback(students_data)
+                    logger.info(f"🤖 [{self.provider_name}] AI batch: {result['success_count']}/{len(students_data)} successful")
                     return result
                 except Exception as ai_error:
                     logger.error(f"❌ AI batch generation failed: {str(ai_error)}")
@@ -138,10 +170,11 @@ class FeedbackService:
                     feedback_text = await self.generate_feedback(
                         student_name=student["name"],
                         score=student["score"],
-                        score_trend=student["trend"],
                         attendance_rate=student["attendance"],
                         subject=student.get("subject"),
-                        notes=student.get("notes", "")
+                        top_subjects=student.get("top_subjects"),
+                        weak_subjects=student.get("weak_subjects"),
+                        notes=student.get("notes", ""),
                     )
                     
                     feedbacks.append({

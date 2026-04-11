@@ -15,6 +15,13 @@ onnx>=1.16.0
 scikit-learn>=1.4.0
 numpy>=1.26.0
 pandas>=2.1.0
+# Faiss for fast similarity search
+# Note: faiss-gpu không có trên PyPI cho Windows
+# - Trên Windows: Dùng faiss-cpu (vẫn rất nhanh: 50-200ms cho 1000-2000 students)
+# - Để dùng GPU trên Windows: Cài qua Conda (xem FAISS_WINDOWS_SETUP.md)
+faiss-cpu>=1.7.4
+# faiss-gpu>=1.7.4  # Chỉ dùng được trên Linux/macOS hoặc qua Conda trên Windows
+optuna>=3.0.0
 
 # Cryptography packages
 python-jose[cryptography]>=3.3.0
@@ -43,15 +50,17 @@ python-dateutil>=2.8.2
 typing-extensions>=4.9.0
 websockets>=12.0
 google-generativeai>=0.8.3
+openai>=1.0.0
 schedule>=1.2.2
 setuptools>=69.0.0
 wheel>=0.42.0
 
 #XLSX
 xlsxwriter>=3.1.0
+openpyxl>=3.1.0
 
 # ============================================
-# OCR for Handwriting Grade Sheet
+# OCR for Handwriting Score Sheet
 # ============================================
 # Option 1: Gemini Vision API (already included in google-generativeai)
 # Option 2: Qwen2.5-VL-3B (local model - RECOMMENDED for GPU users)

@@ -6,7 +6,7 @@ Module Auth - Backend Modular
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, status, Form
+from fastapi import APIRouter, HTTPException, Depends, status, Form, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
@@ -21,13 +21,11 @@ from auth.services import (
 from core.database import get_db, get_school_db
 from core.logger import setup_logger
 from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+from core.dependencies import get_current_user, get_current_user_from_refresh_token
 
 logger = setup_logger("auth_api")
 
 router = APIRouter()
-
-# JWT Bearer token
-security = HTTPBearer()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Tạo JWT access token"""
@@ -53,75 +51,8 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Lấy user hiện tại từ JWT token"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        token_type: str = payload.get("type")
-        
-        if username is None:
-            raise credentials_exception
-            
-        if token_type != "access":
-            raise credentials_exception
-            
-    except JWTError:
-        raise credentials_exception
-    
-    db = get_school_db(username)
-    
-    user_response = db.table("users").select("*").or_(
-        f"username.eq.{username},email.eq.{username}"
-    ).execute()
-    
-    if not user_response.data:
-        raise credentials_exception
-    
-    return user_response.data[0]
-
-async def get_current_user_from_refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Lấy user hiện tại từ refresh token"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate refresh token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        token_type: str = payload.get("type")
-        
-        if username is None:
-            raise credentials_exception
-            
-        if token_type != "refresh":
-            raise credentials_exception
-            
-    except JWTError:
-        raise credentials_exception
-    
-    db = get_school_db(username)
-    
-    user_response = db.table("users").select("*").or_(
-        f"username.eq.{username},email.eq.{username}"
-    ).execute()
-    
-    if not user_response.data:
-        raise credentials_exception
-    
-    return user_response.data[0]
+# get_current_user và get_current_user_from_refresh_token 
+# đã được di chuyển vào core.dependencies để tuân thủ kiến trúc Modular Monolithic
 
 @router.post("/register")
 async def register(user: UserCreate):
@@ -260,7 +191,7 @@ async def login(user_credentials: UserLogin):
         )
 
 @router.get("/me")
-async def get_current_user_info(current_user=Depends(get_current_user)):
+async def get_current_user_info(request: Request, current_user=Depends(get_current_user)):
     """Lấy thông tin user hiện tại"""
     return {
         "success": True,
@@ -269,7 +200,7 @@ async def get_current_user_info(current_user=Depends(get_current_user)):
     }
 
 @router.post("/refresh")
-async def refresh_token(current_user=Depends(get_current_user_from_refresh_token)):
+async def refresh_token(request: Request, current_user=Depends(get_current_user_from_refresh_token)):
     """Refresh access token sử dụng refresh token"""
     try:
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -299,7 +230,7 @@ async def refresh_token(current_user=Depends(get_current_user_from_refresh_token
         )
 
 @router.post("/logout")
-async def logout(current_user=Depends(get_current_user)):
+async def logout(request: Request, current_user=Depends(get_current_user)):
     """Đăng xuất user"""
     return {
         "success": True,
@@ -308,6 +239,7 @@ async def logout(current_user=Depends(get_current_user)):
 
 @router.put("/change-password")
 async def change_password(
+    request: Request,
     current_password: str = Form(...),
     new_password: str = Form(...),
     current_user=Depends(get_current_user)

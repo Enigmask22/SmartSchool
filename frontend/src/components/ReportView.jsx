@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import ApiService from '../services/api';
-import logger from "../utils/logger";
+import ApiService from '@/services/api';
+import logger from "@/utils/logger";
 
 const ReportView = ({ isOpen, onClose }) => {
   const [stats, setStats] = useState({
@@ -121,7 +121,7 @@ const ReportView = ({ isOpen, onClose }) => {
           new Date(record.date) >= weekAgo
         );
         break;
-      case 'month':
+      default:
         const monthAgo = new Date();
         monthAgo.setMonth(monthAgo.getMonth() - 1);
         filtered = filtered.filter(record => 

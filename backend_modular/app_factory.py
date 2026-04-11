@@ -23,11 +23,17 @@ from admin.api import router as admin_router
 from users.api import router as users_router
 from students.api import router as students_router
 from attendance.api import router as attendance_router
-from grades.api import router as grades_router
+from scores.api import router as scores_router
 from homeroom.api import router as homeroom_router
+from homeroom.subject_import import router as homeroom_subject_router
 from feedback.api import router as feedback_router
-from school_config.api import router as school_config_router
 from ai_services.api import router as ai_router
+from score_settings.api import router as score_settings_router
+from camera_manager.api import router as camera_router
+import threading
+import datetime
+import schedule
+from core.database import db as core_db
 
 logger = setup_logger(level=LOG_LEVEL)
 
@@ -136,11 +142,13 @@ def create_app() -> FastAPI:
     app.include_router(users_router, prefix="/api/users", tags=["Users"])
     app.include_router(students_router, prefix="/api/students", tags=["Students"])
     app.include_router(attendance_router, prefix="/api/attendance", tags=["Attendance"])
-    app.include_router(grades_router, prefix="/api/grades", tags=["Grades"])
+    app.include_router(scores_router, prefix="/api/scores", tags=["Scores"])
     app.include_router(homeroom_router, prefix="/api/homeroom", tags=["Homeroom"])
+    app.include_router(homeroom_subject_router, prefix="/api", tags=["Homeroom Subject Import"])
     app.include_router(feedback_router, prefix="/api/feedback", tags=["AI Feedback"])
-    app.include_router(school_config_router, prefix="/api/school-days-config", tags=["School Config"])
     app.include_router(ai_router, prefix="/api/ai", tags=["AI Services"])
+    app.include_router(score_settings_router, prefix="/api/score-settings", tags=["Score Settings"])
+    app.include_router(camera_router, prefix="/api/cameras", tags=["Camera Management"])
     
     # Startup event
     @app.on_event("startup")
@@ -155,7 +163,7 @@ def create_app() -> FastAPI:
             
             # Cleanup old files on startup
             from auth.services import OTPService
-            from grades.services import cleanup_old_grade_sheets
+            from scores.services import cleanup_old_score_sheets
             
             # Cleanup expired OTPs
             otp_service = OTPService()
@@ -163,22 +171,137 @@ def create_app() -> FastAPI:
             if otp_deleted > 0:
                 logger.info(f"🧹 Cleaned up {otp_deleted} expired OTPs")
             
-            # Cleanup old grade sheets (older than 24 hours)
-            sheets_deleted = cleanup_old_grade_sheets(max_age_hours=24)
+            # Cleanup old score sheets (older than 24 hours)
+            sheets_deleted = cleanup_old_score_sheets(max_age_hours=24)
             if sheets_deleted > 0:
-                logger.info(f"🧹 Cleaned up {sheets_deleted} old grade sheets")
+                logger.info(f"🧹 Cleaned up {sheets_deleted} old score sheets")
+            
+            # Load cameras from database (if any)
+            try:
+                from camera_manager.services import camera_manager
+                from camera_manager.db_service import CameraDBService
+                from core.database import db as core_db
+                
+                # Load cameras từ database (cần dùng .client để lấy Supabase Client)
+                db_cameras = await CameraDBService.get_all_cameras(core_db.client, enabled_only=False)
+                if db_cameras:
+                    loaded_count = 0
+                    for db_camera in db_cameras:
+                        try:
+                            config = CameraDBService.dict_to_config(db_camera)
+                            # Chỉ load nếu enabled
+                            if config.enabled:
+                                camera_manager.add_camera(config, frame_callback=None)
+                                loaded_count += 1
+                        except Exception as e:
+                            logger.warning(f"⚠️ Không thể load camera {db_camera.get('camera_id')}: {e}")
+                    
+                    if loaded_count > 0:
+                        logger.info(f"📹 Đã load {loaded_count}/{len(db_cameras)} cameras từ database")
+            except Exception as e:
+                logger.warning(f"⚠️ Không thể load cameras từ database (có thể bảng chưa tồn tại): {e}")
             
         except Exception as e:
             logger.error(f"❌ Failed to initialize database: {str(e)}")
             raise
         
         logger.info("🚀 Application startup complete!")
+
+        # ================= Daily scheduler for auto-absence =================
+        def run_daily_auto_absence():
+            try:
+                client = core_db.client
+                today = datetime.date.today()
+                y = today.year
+                m = today.month
+                d = today.day
+                for grade in [10, 11, 12]:
+                    # Check dayoff config
+                    cfg = (
+                        client.table("dayoff")
+                        .select("dayoffs_list")
+                        .eq("year", y)
+                        .eq("month", m)
+                        .eq("grade", grade)
+                        .execute()
+                    )
+                    if cfg.data and cfg.data[0].get("dayoffs_list"):
+                        try:
+                            if d in (cfg.data[0]["dayoffs_list"] or []):
+                                logger.info(f"Skip auto-absence for grade {grade} - dayoff {today}")
+                                continue
+                        except Exception:
+                            pass
+                    # Fetch students by grade (support both numeric and string)
+                    students_resp = (
+                        client.table("students")
+                        .select("id, grade, is_active")
+                        .or_(f"grade.eq.{grade},grade.eq.{str(grade)}")
+                        .eq("is_active", True)
+                        .execute()
+                    )
+                    student_ids = [s["id"] for s in (students_resp.data or [])]
+                    if not student_ids:
+                        continue
+                    # Existing attendance for today
+                    attend_resp = (
+                        client.table("attendance")
+                        .select("student_id")
+                        .eq("date", today.isoformat())
+                        .in_("student_id", student_ids)
+                        .execute()
+                    )
+                    existing_ids = {r["student_id"] for r in (attend_resp.data or [])}
+                    missing = [sid for sid in student_ids if sid not in existing_ids]
+                    rows = [
+                        {
+                            "student_id": sid,
+                            "date": today.isoformat(),
+                            "status": "absent",
+                            "method": "auto",
+                            "created_at": datetime.datetime.now().isoformat(),
+                        }
+                        for sid in missing
+                    ]
+                    if rows:
+                        client.table("attendance").insert(rows).execute()
+                        logger.info(f"Auto-absence inserted: grade {grade} - {len(rows)} records on {today}")
+            except Exception as e:
+                logger.error(f"Auto-absence scheduler error: {str(e)}")
+
+        # Schedule at 00:05 server time
+        try:
+            schedule.clear()
+            schedule.every().day.at("18:24").do(run_daily_auto_absence)
+
+            def scheduler_loop():
+                while True:
+                    schedule.run_pending()
+                    time.sleep(60)
+
+            t = threading.Thread(target=scheduler_loop, daemon=True)
+            t.start()
+            logger.info("✅ Daily auto-absence scheduler started (00:05)")
+        except Exception as e:
+            logger.error(f"Failed to start scheduler: {str(e)}")
     
     # Shutdown event
     @app.on_event("shutdown")
     async def shutdown_event():
-        """Cleanup khi tắt server"""
+        """Cleanup khi tắt server - non-blocking để tránh đơ khi reload"""
+        import asyncio
         logger.info("Shutting down Smart School System API - Modular Edition...")
+        
+        # Cleanup cameras trong background để không block shutdown
+        try:
+            from camera_manager.services import camera_manager
+            
+            # Chạy cleanup trong executor để không block event loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, camera_manager.cleanup)
+            logger.info("✅ All cameras cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up cameras: {e}")
     
     # Health check endpoint
     @app.get("/health")

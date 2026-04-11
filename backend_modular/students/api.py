@@ -11,7 +11,7 @@ import aiofiles
 from students.models import StudentCreate, StudentUpdate, ResponseModel, ListResponse
 from core.database import get_db
 from core.logger import setup_logger
-from auth.api import get_current_user
+from core.dependencies import get_current_user
 
 logger = setup_logger("students_api")
 router = APIRouter()
@@ -30,19 +30,46 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
         
         student_data = student.dict()
         
+        # Extract parent_contacts để insert riêng vào bảng parent_info
+        parent_contacts = student_data.pop("parent_contacts", None)
+        
         if student_data.get("date_of_birth"):
-            student_data["date_of_birth"] = student_data["date_of_birth"].isoformat()
+            dob_val = student_data["date_of_birth"]
+            student_data["date_of_birth"] = dob_val.isoformat() if hasattr(dob_val, "isoformat") else dob_val
         
         student_data["created_at"] = datetime.now().isoformat()
         student_data["updated_at"] = datetime.now().isoformat()
         
+        # Insert student
         response = db.table("students").insert(student_data).execute()
         
         if response.data:
+            student_id = response.data[0]["id"]
+            
+            # Insert parent_contacts vào bảng parent_info
+            if parent_contacts and isinstance(parent_contacts, list):
+                parent_records = []
+                for contact in parent_contacts:
+                    if isinstance(contact, dict) and (contact.get("name") or contact.get("phone")):
+                        parent_records.append({
+                            "student_id": student_id,
+                            "relation": contact.get("relation", "parent"),
+                            "name": contact.get("name"),
+                            "phone": contact.get("phone")
+                        })
+                
+                if parent_records:
+                    db.table("parent_info").insert(parent_records).execute()
+            
+            # Fetch lại student với parent_info để trả về
+            student_data = response.data[0]
+            parent_info = db.table("parent_info").select("*").eq("student_id", student_id).execute()
+            student_data["parent_contacts"] = parent_info.data if parent_info.data else []
+            
             return {
                 "success": True,
                 "message": "Tạo học sinh thành công",
-                "data": response.data[0]
+                "data": student_data
             }
         else:
             raise HTTPException(status_code=500, detail="Lỗi tạo học sinh")
@@ -91,9 +118,24 @@ async def get_students(
         offset = (page - 1) * page_size
         response = query.range(offset, offset + page_size - 1).execute()
         
+        # Fetch ALL parent_info in ONE query (performance optimization)
+        students_data = response.data or []
+        if students_data:
+            student_ids = [s["id"] for s in students_data]
+            parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
+            parent_info_map = {}
+            for pi in (parent_info_resp.data or []):
+                sid = pi["student_id"]
+                if sid not in parent_info_map:
+                    parent_info_map[sid] = []
+                parent_info_map[sid].append(pi)
+            
+            for student in students_data:
+                student["parent_contacts"] = parent_info_map.get(student["id"], [])
+        
         return ListResponse(
             success=True,
-            data=response.data or [],
+            data=students_data,
             total=total,
             page=page,
             page_size=page_size
@@ -127,10 +169,16 @@ async def get_student(student_id: int, db=Depends(get_db)):
         if not response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
+        student_data = response.data[0]
+        
+        # Fetch parent_info
+        parent_info = db.table("parent_info").select("*").eq("student_id", student_id).execute()
+        student_data["parent_contacts"] = parent_info.data if parent_info.data else []
+        
         return {
             "success": True,
             "message": "Lấy thông tin học sinh thành công",
-            "data": response.data[0]
+            "data": student_data
         }
         
     except HTTPException:
@@ -148,25 +196,64 @@ async def update_student(
     """Cập nhật thông tin học sinh"""
     try:
         update_data = {}
+        parent_contacts = None
+        # Các trường cho phép set null (xóa giá trị)
+        nullable_fields = {"received_email"}
+        
         for field, value in student.dict(exclude_unset=True).items():
-            if value is not None:
+            if field == "parent_contacts":
+                parent_contacts = value
+            elif field in nullable_fields:
+                # Cho phép clear các trường này bằng cách set null
+                update_data[field] = None if (value is None or value == "") else value
+            elif value is not None:
                 if field == "date_of_birth" and value:
-                    update_data[field] = value.isoformat()
+                    update_data[field] = value.isoformat() if hasattr(value, "isoformat") else value
                 else:
                     update_data[field] = value
         
-        if not update_data:
+        if not update_data and parent_contacts is None:
             raise HTTPException(status_code=400, detail="Không có dữ liệu để cập nhật")
         
-        update_data["updated_at"] = datetime.now().isoformat()
+        # Update student data
+        if update_data:
+            update_data["updated_at"] = datetime.now().isoformat()
+            response = db.table("students").update(update_data).eq("id", student_id).execute()
+            
+            if not response.data:
+                raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
-        response = db.table("students").update(update_data).eq("id", student_id).execute()
+        # Update parent_info
+        if parent_contacts is not None:
+            # Xóa parent_info cũ
+            db.table("parent_info").delete().eq("student_id", student_id).execute()
+            
+            # Insert parent_info mới
+            if isinstance(parent_contacts, list) and parent_contacts:
+                parent_records = []
+                for contact in parent_contacts:
+                    if isinstance(contact, dict) and (contact.get("name") or contact.get("phone")):
+                        parent_records.append({
+                            "student_id": student_id,
+                            "relation": contact.get("relation", "parent"),
+                            "name": contact.get("name"),
+                            "phone": contact.get("phone")
+                        })
+                
+                if parent_records:
+                    db.table("parent_info").insert(parent_records).execute()
         
-        if response.data:
+        # Fetch student với parent_info để trả về
+        student_response = db.table("students").select("*").eq("id", student_id).execute()
+        if student_response.data:
+            student_data = student_response.data[0]
+            parent_info = db.table("parent_info").select("*").eq("student_id", student_id).execute()
+            student_data["parent_contacts"] = parent_info.data if parent_info.data else []
+            
             return {
                 "success": True,
                 "message": "Cập nhật học sinh thành công",
-                "data": response.data[0]
+                "data": student_data
             }
         else:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
@@ -261,7 +348,7 @@ async def permanent_delete_student(
         
         # Xóa các bản ghi liên quan
         db.table("attendance").delete().eq("student_id", student_id).execute()
-        db.table("grades").delete().eq("student_id", student_id).execute()
+        db.table("scores").delete().eq("student_id", student_id).execute()
         
         # Xóa vĩnh viễn student record
         response = db.table("students").delete().eq("id", student_id).execute()
@@ -370,9 +457,10 @@ async def get_student_stats(db=Depends(get_db)):
         active_response = db.table("students").select("count", count="exact").eq("is_active", True).execute()
         active_students = active_response.count if active_response.count else 0
         
-        # Students with InsightFace encoding
-        encoded_response = db.table("students").select("count", count="exact").not_.is_("insightface_encoding", "null").execute()
-        encoded_students = encoded_response.count if encoded_response.count else 0
+        # Students with InsightFace encoding (check từ face_embeddings table)
+        embeddings_response = db.table("face_embeddings").select("student_id").execute()
+        unique_students_with_embeddings = set(emb['student_id'] for emb in embeddings_response.data) if embeddings_response.data else set()
+        encoded_students = len(unique_students_with_embeddings)
         
         stats = {
             "total_students": total_students,

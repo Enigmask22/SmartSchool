@@ -10,7 +10,8 @@ from attendance.models import AttendanceCreate, AttendanceUpdate, AttendanceStat
 from attendance.services import get_vietnam_time_string, get_vietnam_date_string
 from core.database import get_db
 from core.logger import setup_logger
-from auth.api import get_current_user
+from core.dependencies import get_current_user
+from core.system_settings import get_attendance_cutoff_time
 
 logger = setup_logger("attendance_api")
 router = APIRouter()
@@ -21,9 +22,18 @@ async def check_in_attendance(
     attendance: AttendanceCreate,
     db=Depends(get_db)
 ):
-    """Điểm danh vào cho học sinh"""
+    """Điểm danh vào cho học sinh
+    
+    Note: Stored procedure process_attendance_checkin tự động đọc attendance_cutoff_time 
+    từ system_settings để xác định status (Dung gio/Tre). Không cần pass cutoff_time 
+    vào stored procedure.
+    """
     try:
         current_vietnam_time = get_vietnam_time_string()
+        
+        # Log cutoff time được sử dụng (để debug/monitoring)
+        cutoff_time = get_attendance_cutoff_time()
+        logger.debug(f"Using attendance_cutoff_time from settings: {cutoff_time}")
         
         function_result = db.rpc('process_attendance_checkin', {
             'p_student_id': attendance.student_id,
@@ -79,6 +89,69 @@ async def check_in_attendance(
         raise
     except Exception as e:
         logger.error(f"Error in check-in: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+@router.post("/manual")
+async def create_manual_attendance_record(
+    attendance: AttendanceCreate,
+    db=Depends(get_db)
+):
+    """Tạo bản ghi điểm danh thủ công KHÔNG cập nhật giờ vào/ra.
+
+    Dùng khi giáo viên chỉ muốn cập nhật trạng thái/ghi chú mà không muốn ảnh hưởng check_in/check_out.
+    """
+    try:
+        today = get_vietnam_date_string()
+        now_time = get_vietnam_time_string()
+
+        # Upsert theo (student_id, date): nếu đã tồn tại thì chỉ UPDATE status/notes
+        existing = (
+            db.table("attendance")
+            .select("id, status, notes")
+            .eq("student_id", attendance.student_id)
+            .eq("date", today)
+            .limit(1)
+            .execute()
+        )
+
+        if existing.data:
+            att_id = existing.data[0]["id"]
+            response = (
+                db.table("attendance")
+                .update(
+                    {
+                        "status": attendance.status or existing.data[0].get("status", "absent"),
+                        "notes": attendance.notes,
+                        "method": "manual",
+                        "updated_at": now_time,
+                    }
+                )
+                .eq("id", att_id)
+                .execute()
+            )
+            return {
+                "success": True,
+                "message": "Cập nhật trạng thái điểm danh thành công",
+                "data": response.data[0] if response.data else None,
+            }
+        else:
+            payload = {
+                "student_id": attendance.student_id,
+                "date": today,
+                "status": attendance.status or "absent",
+                "notes": attendance.notes,
+                "method": "manual",
+                "created_at": now_time,
+                "updated_at": now_time,
+            }
+            response = db.table("attendance").insert(payload).execute()
+            return {
+                "success": True,
+                "message": "Tạo bản ghi điểm danh thủ công thành công",
+                "data": response.data[0] if response.data else None,
+            }
+    except Exception as e:
+        logger.error(f"Error creating manual attendance: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/")

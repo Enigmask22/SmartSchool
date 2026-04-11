@@ -1,9 +1,9 @@
 // API Service để giao tiếp với backend
 // Sử dụng environment variable hoặc fallback về localhost
-import logger from "../utils/logger";
+import logger from "@/utils/logger";
 
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
 class ApiService {
   constructor() {
@@ -193,6 +193,31 @@ class ApiService {
     }
   }
 
+  // Generic HTTP methods for convenience
+  async get(endpoint) {
+    return this.request(endpoint, { method: "GET" });
+  }
+
+  async post(endpoint, data = null) {
+    const options = { method: "POST" };
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    return this.request(endpoint, options);
+  }
+
+  async put(endpoint, data = null) {
+    const options = { method: "PUT" };
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    return this.request(endpoint, options);
+  }
+
+  async delete(endpoint) {
+    return this.request(endpoint, { method: "DELETE" });
+  }
+
   // Authentication
   async login(username, password) {
     return this.request("/auth/login", {
@@ -339,6 +364,16 @@ class ApiService {
     });
   }
 
+  async createManualAttendance(attendanceData) {
+    return this.request("/attendance/manual", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(attendanceData),
+    });
+  }
+
   async getStudent(id) {
     return this.request(`/students/${id}`);
   }
@@ -360,6 +395,16 @@ class ApiService {
   async deleteStudent(id) {
     return this.request(`/students/${id}`, {
       method: "DELETE",
+    });
+  }
+
+  async moveStudentsClass(studentIds, targetClassId) {
+    return this.request(`/admin/students/move-class`, {
+      method: "POST",
+      body: JSON.stringify({
+        student_ids: studentIds,
+        target_class_id: targetClassId,
+      }),
     });
   }
 
@@ -429,7 +474,63 @@ class ApiService {
       `/attendance/${attendanceId}/status?${params.toString()}`,
       {
         method: "PATCH",
-      }
+      },
+    );
+  }
+
+  // ===============================================
+  // LEAVE REQUEST - Đơn xin nghỉ học
+  // ===============================================
+
+  /**
+   * Upload ảnh đơn xin nghỉ học cho học sinh
+   * @param {number} studentId - ID học sinh (students.id)
+   * @param {File} imageFile - File ảnh đơn xin nghỉ
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async uploadLeaveRequestImage(studentId, imageFile, targetDate) {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const params = new URLSearchParams();
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/leave-request/${studentId}?${params.toString()}`,
+      {
+        method: "POST",
+        headers: {}, // Để browser tự set Content-Type với boundary
+        body: formData,
+      },
+    );
+  }
+
+  /**
+   * Lấy thông tin ảnh đơn xin nghỉ cho học sinh theo ngày
+   * @param {number} studentId - ID học sinh
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async getLeaveRequestImage(studentId, targetDate) {
+    const params = new URLSearchParams();
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/leave-request/${studentId}?${params.toString()}`,
+    );
+  }
+
+  /**
+   * Xóa ảnh đơn xin nghỉ
+   * @param {number} studentId - ID học sinh
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async deleteLeaveRequestImage(studentId, targetDate) {
+    const params = new URLSearchParams();
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/leave-request/${studentId}?${params.toString()}`,
+      { method: "DELETE" },
     );
   }
 
@@ -445,7 +546,7 @@ class ApiService {
 
     const queryString = params.toString();
     return this.request(
-      `/attendance/full-list${queryString ? "?" + queryString : ""}`
+      `/attendance/full-list${queryString ? "?" + queryString : ""}`,
     );
   }
 
@@ -516,7 +617,7 @@ class ApiService {
       {
         method: "POST",
         body: JSON.stringify(configs),
-      }
+      },
     );
   }
 
@@ -526,7 +627,7 @@ class ApiService {
       `/school-days-config/apply-temporary/${grade}${queryParams}`,
       {
         method: "POST",
-      }
+      },
     );
   }
 
@@ -548,15 +649,20 @@ class ApiService {
     });
   }
 
+  /**
+   * Batch generate feedback comments via AI.
+   * Payload must match BE: { students: [ { student_name, score, attendance_rate, top_subjects, weak_subjects, subject, notes } ] }
+   * Recommend: always provide all fields for each student.
+   */
   async getBatchFeedback(studentsData) {
-    return this.request("/feedback/batch", {
+    return this.request("/feedback/generate-batch-feedback", {
       method: "POST",
       body: JSON.stringify({ students: studentsData }),
     });
   }
 
-  // Grades Management
-  async getGrades(filters = {}) {
+  // Scores Management
+  async getScores(filters = {}) {
     const queryParams = new URLSearchParams();
     Object.keys(filters).forEach((key) => {
       if (
@@ -569,25 +675,25 @@ class ApiService {
     });
 
     const queryString = queryParams.toString();
-    return this.request(`/grades/${queryString ? "?" + queryString : ""}`);
+    return this.request(`/scores/${queryString ? "?" + queryString : ""}`);
   }
 
-  async updateGrade(gradeId, gradeData) {
-    return this.request(`/grades/${gradeId}`, {
+  async updateScore(scoreId, scoreData) {
+    return this.request(`/scores/${scoreId}`, {
       method: "PUT",
-      body: JSON.stringify(gradeData),
+      body: JSON.stringify(scoreData),
     });
   }
 
-  async createGrade(gradeData) {
-    return this.request("/grades/", {
+  async createScore(scoreData) {
+    return this.request("/scores/", {
       method: "POST",
-      body: JSON.stringify(gradeData),
+      body: JSON.stringify(scoreData),
     });
   }
 
   async getSubjects() {
-    return this.request("/grades/subjects");
+    return this.request("/scores/subjects");
   }
 
   async getSubjectsForSelection() {
@@ -608,45 +714,45 @@ class ApiService {
 
     const queryString = queryParams.toString();
     return this.request(
-      `/grades/class-subjects${queryString ? "?" + queryString : ""}`
+      `/scores/class-subjects${queryString ? "?" + queryString : ""}`,
     );
   }
 
-  async getGradeConfig(teacherId, subjectId, academicYear, semester) {
+  async getScoreConfig(teacherId, subjectId, academicYear, semester) {
     return this.request(
-      `/grades/config/${teacherId}/${subjectId}/${academicYear}/${semester}`
+      `/scores/config/${teacherId}/${subjectId}/${academicYear}/${semester}`,
     );
   }
 
-  async updateGradeConfig(
+  async updateScoreConfig(
     teacherId,
     subjectId,
     academicYear,
     semester,
-    config
+    config,
   ) {
     return this.request(
-      `/grades/config/${teacherId}/${subjectId}/${academicYear}/${semester}`,
+      `/scores/config/${teacherId}/${subjectId}/${academicYear}/${semester}`,
       {
         method: "PUT",
         body: JSON.stringify(config),
-      }
+      },
     );
   }
 
   async getStudentsByClassSubject(
     classSubjectId,
     academicYear = "2024-2025",
-    semester = "HK1"
+    semester = "HK1",
   ) {
     return this.request(
-      `/grades/teacher/students/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`
+      `/scores/teacher/students/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
-  // Teacher-specific Grades Management API
+  // Teacher-specific Scores Management API
   async getTeacherInfo(academicYear = null, semester = null) {
-    let url = "/grades/teacher/info";
+    let url = "/scores/teacher/info";
     const params = new URLSearchParams();
     if (academicYear) params.append("academic_year", academicYear);
     if (semester) params.append("semester", semester);
@@ -654,62 +760,85 @@ class ApiService {
     return this.request(url);
   }
 
-  async createGradeConfig(config) {
-    return this.request("/grades/config", {
+  async createScoreConfig(config) {
+    return this.request("/scores/config", {
       method: "POST",
       body: JSON.stringify(config),
     });
   }
 
-  async updateGradeConfigById(configId, config) {
-    return this.request(`/grades/config/${configId}`, {
+  async updateScoreConfigById(configId, config) {
+    return this.request(`/scores/config/${configId}`, {
       method: "PUT",
       body: JSON.stringify(config),
     });
   }
 
-  async createOrUpdateGrade(gradeData) {
-    return this.request("/grades/grade", {
+  async createOrUpdateScore(scoreData) {
+    return this.request("/scores/score", {
       method: "POST",
-      body: JSON.stringify(gradeData),
+      body: JSON.stringify(scoreData),
     });
   }
 
-  async getGradeConfigBySubject(subjectId, academicYear, semester) {
+  async getScoreConfigBySubject(subjectId, academicYear, semester) {
+    // Sử dụng score-settings
+    return this.request(`/score-settings/subject/${subjectId}`);
+  }
+
+  // Score Settings management (for admin integration in Subjects tab)
+  async createScoreSettings(payload) {
+    return this.request(`/score-settings`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateScoreSettings(subjectId, payload) {
+    return this.request(`/score-settings/${subjectId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Backward compatibility aliases (for grade_settings -> score_settings migration)
+  async createGradeSettings(payload) {
+    return this.createScoreSettings(payload);
+  }
+
+  async updateGradeSettings(subjectId, payload) {
+    return this.updateScoreSettings(subjectId, payload);
+  }
+
+  async getStudentScore(studentId, classSubjectId, academicYear, semester) {
     return this.request(
-      `/grades/config/${subjectId}?academic_year=${academicYear}&semester=${semester}`
+      `/scores/score/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
-  async getStudentGrade(studentId, classSubjectId, academicYear, semester) {
-    return this.request(
-      `/grades/grade/${studentId}/${classSubjectId}?academic_year=${academicYear}&semester=${semester}`
-    );
-  }
-
-  async getStudentGrades(
+  async getStudentScores(
     studentId,
     academicYear = "2024-2025",
-    semester = "HK1"
+    semester = "HK1",
   ) {
     return this.request(
-      `/grades/student/${studentId}?academic_year=${academicYear}&semester=${semester}`
+      `/scores/student/${studentId}?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
-  // Upsert grade config - create if not exists, update if exists
-  async upsertGradeConfig(configId, config) {
+  // Upsert score config - create if not exists, update if exists
+  async upsertScoreConfig(configId, config) {
     // Use backend upsert endpoint that handles both create and update automatically
-    return this.request("/grades/config/upsert", {
+    return this.request("/scores/config/upsert", {
       method: "POST",
       body: JSON.stringify(config),
     });
   }
 
-  // Download grade template
-  async downloadGradeTemplate(classSubjectId) {
+  // Download score template
+  async downloadScoreTemplate(classSubjectId) {
     const accessToken = localStorage.getItem("access_token");
-    const url = `${this.baseURL}/grades/template/download/${classSubjectId}`;
+    const url = `${this.baseURL}/scores/template/download/${classSubjectId}`;
 
     try {
       const response = await fetch(url, {
@@ -728,7 +857,7 @@ class ApiService {
       let filename = "template_diem.xlsx";
       if (contentDisposition) {
         const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(
-          contentDisposition
+          contentDisposition,
         );
         if (matches != null && matches[1]) {
           filename = matches[1].replace(/['"]/g, "");
@@ -756,9 +885,9 @@ class ApiService {
     }
   }
 
-  // Bulk import grades
-  async bulkImportGrades(importData) {
-    return this.request("/grades/bulk-import", {
+  // Bulk import scores
+  async bulkImportScores(importData) {
+    return this.request("/scores/bulk-import", {
       method: "POST",
       body: JSON.stringify(importData),
     });
@@ -767,7 +896,7 @@ class ApiService {
   // Teacher Classes List (for dropdown filter)
   async getTeacherClasses(academicYear = "2024-2025", semester = "HK1") {
     return this.request(
-      `/grades/teacher/classes?academic_year=${academicYear}&semester=${semester}`
+      `/scores/teacher/classes?academic_year=${academicYear}&semester=${semester}`,
     );
   }
 
@@ -775,9 +904,9 @@ class ApiService {
   async getTeacherDashboardAnalytics(
     academicYear = "2024-2025",
     semester = "HK1",
-    classId = null
+    classId = null,
   ) {
-    let url = `/grades/teacher/dashboard/analytics?academic_year=${academicYear}&semester=${semester}`;
+    let url = `/scores/teacher/dashboard/analytics?academic_year=${academicYear}&semester=${semester}`;
     if (classId) {
       url += `&class_id=${classId}`;
     }
@@ -786,12 +915,12 @@ class ApiService {
 
   // Get available academic years and semesters for teacher (from class_subjects)
   async getTeacherAvailablePeriods() {
-    return this.request("/grades/teacher/available-periods");
+    return this.request("/scores/teacher/available-periods");
   }
 
   // Get available academic years and semesters for teacher (from grades)
   async getTeacherAvailablePeriodsGrades() {
-    return this.request("/grades/teacher/available-periods-grades");
+    return this.request("/scores/teacher/available-periods-scores");
   }
 
   // ===============================================
@@ -854,18 +983,18 @@ class ApiService {
 
   // Personal Info
   async getPersonalInfo() {
-    return this.request("/grades/teacher/personal-info");
+    return this.request("/scores/teacher/personal-info");
   }
 
   async updateTeacherProfile(profileData) {
-    return this.request("/grades/teacher/profile", {
+    return this.request("/scores/teacher/profile", {
       method: "PUT",
       body: JSON.stringify(profileData),
     });
   }
 
-  async getTeacherClasses() {
-    return this.request("/grades/teacher/subject-classes");
+  async getTeacherSubjectClasses() {
+    return this.request("/scores/teacher/subject-classes");
   }
 
   // Subjects Management
@@ -906,8 +1035,11 @@ class ApiService {
   }
 
   // Classes Management
-  async getClassesAdmin() {
-    return this.request("/admin/classes");
+  async getClassesAdmin(academicYear) {
+    const qs = academicYear
+      ? `?academic_year=${encodeURIComponent(academicYear)}`
+      : "";
+    return this.request(`/admin/classes${qs}`);
   }
 
   async createClass(classData) {
@@ -966,7 +1098,7 @@ class ApiService {
       `/admin/subject-teachers/${subjectTeacherId}/permanent`,
       {
         method: "DELETE",
-      }
+      },
     );
   }
 
@@ -1106,6 +1238,21 @@ class ApiService {
   }
 
   // ===============================================
+  // EMAIL REPORT CARD API
+  // ===============================================
+
+  /**
+   * Gửi phiếu điểm qua email cho phụ huynh
+   * @param {Object} reportData - Dữ liệu phiếu điểm
+   */
+  async sendEmailReportCard(reportData) {
+    return this.request("/feedback/send-email-report-card", {
+      method: "POST",
+      body: JSON.stringify(reportData),
+    });
+  }
+
+  // ===============================================
   // BULK STUDENT IMPORT APIs
   // ===============================================
 
@@ -1120,18 +1267,18 @@ class ApiService {
   }
 
   // ===============================================
-  // OCR GRADE SHEET APIs
+  // OCR SCORE SHEET APIs
   // ===============================================
 
   /**
    * Upload và parse ảnh bảng điểm viết tay sử dụng OCR (Async với Queue)
    */
-  async parseGradeSheetOCR(formData) {
+  async parseScoreSheetOCR(formData) {
     try {
       const token = localStorage.getItem("access_token");
 
       const response = await fetch(
-        `${this.baseURL}/grades/ocr/parse-grade-sheet`,
+        `${this.baseURL}/scores/ocr/parse-score-sheet`,
         {
           method: "POST",
           headers: {
@@ -1139,7 +1286,7 @@ class ApiService {
             // Không set Content-Type để browser tự động set với boundary cho multipart/form-data
           },
           body: formData,
-        }
+        },
       );
 
       if (!response.ok) {
@@ -1157,7 +1304,7 @@ class ApiService {
 
       return await response.json();
     } catch (error) {
-      logger.error("Error parsing OCR grade sheet:", error);
+      logger.error("Error parsing OCR score sheet:", error);
       throw error;
     }
   }
@@ -1166,7 +1313,7 @@ class ApiService {
    * Kiểm tra status của OCR request
    */
   async getOCRStatus(requestId) {
-    return this.request(`/grades/ocr/status/${requestId}`, {
+    return this.request(`/scores/ocr/status/${requestId}`, {
       method: "GET",
     });
   }
@@ -1175,7 +1322,7 @@ class ApiService {
    * Lấy thống kê queue
    */
   async getOCRQueueStats() {
-    return this.request("/grades/ocr/queue-stats", {
+    return this.request("/scores/ocr/queue-stats", {
       method: "GET",
     });
   }
@@ -1188,7 +1335,7 @@ class ApiService {
       const token = localStorage.getItem("access_token");
 
       const response = await fetch(
-        `${this.baseURL}/grades/ocr/export-parsed-to-excel`,
+        `${this.baseURL}/scores/ocr/export-parsed-to-excel`,
         {
           method: "POST",
           headers: {
@@ -1196,7 +1343,7 @@ class ApiService {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(data),
-        }
+        },
       );
 
       if (!response.ok) {
