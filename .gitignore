@@ -201,3 +201,7 @@ yarn-error.log
 ai_services/train_test
 local doc/
 testing plan/
+instruction_md
+latex
+build_wheel
+.cursor
