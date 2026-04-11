@@ -258,7 +258,7 @@ export default function ScoreManagement() {
               }}
             />
 
-            {/* Grade Table or Skeleton */}
+            {/* Score Table or Skeleton */}
             {api.loading && api.students.length === 0 ? (
               <ScoreTableSkeleton />
             ) : api.scoreConfig ? (

@@ -7,6 +7,9 @@ FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 # Set working directory
 WORKDIR /app
 
+# Dùng bash với pipefail để fail sớm khi một command trong pipeline lỗi
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -87,6 +90,7 @@ COPY homeroom/ ./homeroom/
 COPY score_settings/ ./score_settings/
 COPY students/ ./students/
 COPY users/ ./users/
+COPY camera_manager/ ./camera_manager/
 
 # Copy environment file (if exists) - optional for local testing
 # In Hugging Face Spaces, use Space secrets instead
@@ -94,8 +98,15 @@ COPY users/ ./users/
 # Note: COPY doesn't support || operator, so we skip this
 # Environment variables should be set via HF Spaces secrets or passed at runtime
 
-# Tạo thư mục cần thiết
-RUN mkdir -p uploads logs temp_otp ai_models
+# Tạo thư mục cần thiết cho runtime
+RUN mkdir -p \
+    uploads \
+    uploads/students \
+    uploads/score_sheets \
+    logs \
+    temp_otp \
+    ai_models \
+    /data/.cache/huggingface
 
 # Set environment variables
 ENV INSIGHTFACE_HOME=/app/ai_models
@@ -103,6 +114,12 @@ ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
 ENV PORT=7860
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Hugging Face cache config (giảm download lặp lại khi bật persistent storage)
+ENV HF_HOME=/data/.cache/huggingface
+ENV HUGGINGFACE_HUB_CACHE=/data/.cache/huggingface/hub
+ENV TRANSFORMERS_CACHE=/data/.cache/huggingface/transformers
 
 # GPU Configuration for Qwen OCR
 ENV CUDA_VISIBLE_DEVICES=0
@@ -128,7 +145,7 @@ RUN echo "🔍 Setting up InsightFace environment..." && \
 
 # Create non-root user cho security
 RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
+    chown -R app:app /app /data
 USER app
 
 # Expose port 7860 (Hugging Face Spaces default)
