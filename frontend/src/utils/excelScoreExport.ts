@@ -35,16 +35,24 @@ export const exportToExcel = async (
 
     const displayColumns = getDisplayColumns(scoreConfig?.score_column_config || {});
 
-    let totalGradeColumns = 0;
+    let totalScoreColumns = 0;
     displayColumns.forEach((col: any) => {
-      if (col.hasChildren) {
-        totalGradeColumns += col.children.length;
+      if (col.hasChildren && col.children && col.children.length > 0) {
+        totalScoreColumns += col.children.length;
       } else {
-        totalGradeColumns += 1;
+        totalScoreColumns += 1;
       }
     });
 
-    const totalColumns = 3 + totalGradeColumns + 1;
+    const totalColumns = 3 + totalScoreColumns + 1;
+
+    // Define borders for all cells
+    const borders = {
+      top: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      left: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
+      right: { style: 'thin' as const, color: { argb: 'FF000000' } },
+    };
 
     // --- HEADER SECTION ---
     let titleRow = worksheet.addRow([]);
@@ -53,6 +61,7 @@ export const exportToExcel = async (
     titleCell.value = selectedClassSubject.classes.class_name;
     titleCell.font = { size: 18, bold: true };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleCell.border = borders;
     worksheet.mergeCells(1, 1, 1, totalColumns);
 
     let subtitleRow = worksheet.addRow([]);
@@ -61,6 +70,7 @@ export const exportToExcel = async (
     subtitleCell.value = selectedClassSubject.subjects.subject_name;
     subtitleCell.font = { size: 14, bold: true, color: { argb: 'FF1F4788' } };
     subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    subtitleCell.border = borders;
     worksheet.mergeCells(2, 1, 2, totalColumns);
 
     let infoRow = worksheet.addRow([]);
@@ -69,6 +79,7 @@ export const exportToExcel = async (
     infoCell.value = `Năm học: ${academicYear} | Học kỳ: ${semester}`;
     infoCell.font = { size: 11, italic: true };
     infoCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    infoCell.border = borders;
     worksheet.mergeCells(3, 1, 3, totalColumns);
 
     worksheet.addRow([]);
@@ -76,49 +87,53 @@ export const exportToExcel = async (
     // --- COLUMN HEADERS ---
     const headerRow1 = worksheet.addRow([]);
     headerRow1.height = 25;
-    headerRow1.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow1.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1F4788' },
-    };
+    headerRow1.font = { bold: true };
     headerRow1.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Student name column
     headerRow1.getCell(1).value = 'STT';
+    headerRow1.getCell(1).border = borders;
     worksheet.getColumn(1).width = 7;
     headerRow1.getCell(2).value = 'Mã HS';
+    headerRow1.getCell(2).border = borders;
     worksheet.getColumn(2).width = 12;
     headerRow1.getCell(3).value = 'Họ và tên';
+    headerRow1.getCell(3).border = borders;
     worksheet.getColumn(3).width = 20;
 
     let colCount = 3;
 
-    // Add grade column headers
+    // Add score column headers
     displayColumns.forEach((column: any) => {
-      colCount++;
-      if (column.hasChildren) {
-        headerRow1.getCell(colCount).value = column.label;
-        headerRow1.getCell(colCount).alignment = {
-          horizontal: 'center',
-          vertical: 'middle',
-          wrapText: true,
-        };
-        worksheet.getColumn(colCount).width = 15;
+      if (column.hasChildren && column.children && column.children.length > 0) {
+        column.children.forEach((child: any) => {
+          colCount++;
+          headerRow1.getCell(colCount).value = child.label || column.label;
+          headerRow1.getCell(colCount).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+            wrapText: true,
+          };
+          headerRow1.getCell(colCount).border = borders;
+          worksheet.getColumn(colCount).width = 12;
+        });
       } else {
+        colCount++;
         headerRow1.getCell(colCount).value = column.label;
         headerRow1.getCell(colCount).alignment = {
           horizontal: 'center',
           vertical: 'middle',
           wrapText: true,
         };
+        headerRow1.getCell(colCount).border = borders;
         worksheet.getColumn(colCount).width = 12;
       }
     });
 
-    // Average grade column
+    // Average score column
     colCount++;
     headerRow1.getCell(colCount).value = 'Điểm TB';
+    headerRow1.getCell(colCount).border = borders;
     worksheet.getColumn(colCount).width = 10;
 
     // --- DATA ROWS ---
@@ -133,58 +148,46 @@ export const exportToExcel = async (
         horizontal: 'center',
         vertical: 'middle',
       };
+      row.getCell(1).border = borders;
 
       // Student ID
       row.getCell(2).value = studentData.student.student_id;
       row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+      row.getCell(2).border = borders;
 
       // Student name
       row.getCell(3).value = studentData.student.full_name;
       row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
+      row.getCell(3).border = borders;
 
       let cellCount = 3;
 
-      // Grade data
+      // Score data
       displayColumns.forEach((column: any) => {
-        cellCount++;
-
-        if (column.hasChildren) {
-          column.children.forEach((child: any, childIndex: number) => {
-            if (childIndex > 0) cellCount++;
+        if (column.hasChildren && column.children && column.children.length > 0) {
+          column.children.forEach((child: any) => {
+            cellCount++;
             const scoreValue = studentData.score?.score_data?.[child.key]?.Diem;
             row.getCell(cellCount).value = scoreValue || '';
             row.getCell(cellCount).alignment = {
               horizontal: 'center',
               vertical: 'middle',
             };
-
-            if (scoreValue) {
-              row.getCell(cellCount).fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFCCE5FF' },
-              };
-            }
+            row.getCell(cellCount).border = borders;
           });
         } else {
+          cellCount++;
           const scoreValue = studentData.score?.score_data?.[column.key]?.Diem;
           row.getCell(cellCount).value = scoreValue || '';
           row.getCell(cellCount).alignment = {
             horizontal: 'center',
             vertical: 'middle',
           };
-
-          if (scoreValue) {
-            row.getCell(cellCount).fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFCCE5FF' },
-            };
-          }
+          row.getCell(cellCount).border = borders;
         }
       });
 
-      // Average grade
+      // Average score
       cellCount++;
       if (studentData.score?.score_data) {
         const avgScore = calculateFinalScore(studentData.score.score_data);
@@ -194,21 +197,9 @@ export const exportToExcel = async (
           horizontal: 'center',
           vertical: 'middle',
         };
-
-        const color =
-          typeof avgScore === 'string'
-            ? avgScore === 'Đ'
-              ? 'FF92D050'
-              : 'FFFF0000'
-            : avgScore >= 5
-            ? 'FF92D050'
-            : 'FFFF0000';
-
-        row.getCell(cellCount).fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: color },
-        };
+        row.getCell(cellCount).border = borders;
+      } else {
+        row.getCell(cellCount).border = borders;
       }
     });
 

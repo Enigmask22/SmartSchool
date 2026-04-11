@@ -1,5 +1,6 @@
 // React already imported by JSX transform
-import { Clipboard, AlertCircle, FileText } from 'lucide-react';
+import { Clipboard, AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,16 @@ const ImportPreviewModal = ({
   onCancel,
   flattenScoreColumns,
 }: ImportPreviewModalProps) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleConfirmClick = async () => {
+    setIsLoading(true);
+    try {
+      await onConfirmImport();
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
@@ -135,26 +146,43 @@ const ImportPreviewModal = ({
 
         <DialogFooter className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            <span className="font-semibold">{importedData.length}</span> bản ghi
-            sẽ được cập nhật
-            {importErrors.length > 0 && (
-              <span className="ml-2 text-destructive">
-                •{" "}
-                <span className="font-semibold">{importErrors.length}</span> lỗi
-              </span>
+            {isLoading ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Đang cập nhật điểm...</span>
+              </div>
+            ) : (
+              <>
+                <span className="font-semibold">{importedData.length}</span> bản
+                ghi sẽ được cập nhật
+                {importErrors.length > 0 && (
+                  <span className="ml-2 text-destructive">
+                    •{" "}
+                    <span className="font-semibold">{importErrors.length}</span> lỗi
+                  </span>
+                )}
+              </>
             )}
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline" onClick={onCancel}>
+            <Button variant="outline" onClick={onCancel} disabled={isLoading}>
               Hủy
             </Button>
             <Button
-              onClick={onConfirmImport}
+              onClick={handleConfirmClick}
               disabled={
-                importedData.length === 0 || importErrors.length > 0
+                importedData.length === 0 || importErrors.length > 0 || isLoading
               }
+              className="hover:bg-primary/90 transition-colors"
             >
-              Cập nhật điểm
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                "Cập nhật điểm"
+              )}
             </Button>
           </div>
         </DialogFooter>
