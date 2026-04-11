@@ -58,10 +58,11 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
 async def register(user: UserCreate):
     """Đăng ký user mới"""
     try:
-        if hasattr(user, 'username') and user.username:
-            db = get_school_db(user.username)
-        else:
-            db = get_db()
+        # Multi-database routing disabled - using single database
+        # if hasattr(user, 'username') and user.username:
+        #     db = get_school_db(user.username)
+        # else:
+        db = get_db()
         
         existing_email = db.table("users").select("id").eq("email", user.email).execute()
         
@@ -125,7 +126,9 @@ async def register(user: UserCreate):
 async def login(user_credentials: UserLogin):
     """Đăng nhập user"""
     try:
-        db = get_school_db(user_credentials.username)
+        # Multi-database routing disabled - using single database
+        # db = get_school_db(user_credentials.username)
+        db = get_db()
         
         user_response = db.table("users").select("*").or_(
             f"username.eq.{user_credentials.username},email.eq.{user_credentials.username}"
@@ -246,8 +249,10 @@ async def change_password(
 ):
     """Đổi password"""
     try:
-        username = current_user.get("username") or current_user.get("email")
-        db = get_school_db(username)
+        # Multi-database routing disabled - using single database
+        # username = current_user.get("username") or current_user.get("email")
+        # db = get_school_db(username)
+        db = get_db()
         
         user_response = db.table("users").select("*").eq("id", current_user["id"]).execute()
         
@@ -296,7 +301,9 @@ async def change_password(
 async def forgot_password(request: ForgotPasswordRequest):
     """Gửi OTP qua email để đặt lại mật khẩu"""
     try:
-        db = get_school_db(request.username)
+        # Multi-database routing disabled - using single database
+        # db = get_school_db(request.username)
+        db = get_db()
         
         user_response = db.table("users").select("id, email, full_name, username").eq("username", request.username).execute()
         
@@ -391,7 +398,9 @@ async def verify_otp_endpoint(request: VerifyOTPRequest):
 async def reset_password(request: ResetPasswordRequest):
     """Đặt lại mật khẩu mới"""
     try:
-        db = get_school_db(request.username)
+        # Multi-database routing disabled - using single database
+        # db = get_school_db(request.username)
+        db = get_db()
         
         if request.new_password != request.confirm_password:
             raise HTTPException(

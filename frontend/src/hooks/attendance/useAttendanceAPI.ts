@@ -1,6 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
 import ApiService from '@/utils/api';
 import { AuthContext } from '@/contexts/AuthContext';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
+import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 import logger from '@/utils/logger';
 
 /**
@@ -67,6 +69,8 @@ interface UseAttendanceAPIReturn {
   classes: string[];
   homeroomClasses: Array<{ id: string; class_name: string }>;
   academicYears: string[];
+  selectedAcademicYear: string;
+  apiSelectedClass: { id?: string; class_name: string } | null;
 
   // Loading states
   loading: boolean;
@@ -83,6 +87,7 @@ interface UseAttendanceAPIReturn {
     year?: string;
     date?: string;
     className?: string;
+    classId?: string;
   }) => Promise<void>;
   loadAttendanceData: () => Promise<void>;
   loadStats: () => Promise<void>;
@@ -141,6 +146,7 @@ export const useAttendanceAPI = ({
   const authContext = useContext(AuthContext);
   const user = authContext?.user;
   const isHomeroomTeacher = authContext?.isHomeroomTeacher;
+  const { settings } = useSystemSettings();
 
   // Data states
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -149,8 +155,8 @@ export const useAttendanceAPI = ({
   const [homeroomClasses, setHomeroomClasses] = useState<
     Array<{ id: string; class_name: string }>
   >([]);
-  const [academicYears, setAcademicYears] = useState<string[]>([]);
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
+  const [apiSelectedClass, setApiSelectedClass] = useState<{ id?: string; class_name: string } | null>(null);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(settings.academic_year || "2024-2025");
 
   // Loading states
   const [loading, setLoading] = useState(true);
@@ -195,10 +201,12 @@ export const useAttendanceAPI = ({
     year,
     date,
     className,
+    classId,
   }: {
     year?: string;
     date?: string;
     className?: string;
+    classId?: string;
   } = {}): Promise<void> => {
     try {
       setBootstrapLoading(true);
@@ -209,6 +217,7 @@ export const useAttendanceAPI = ({
       if (year) params.set('academic_year', year);
       if (date) params.set('target_date', date);
       if (className) params.set('class_name', className);
+      if (classId) params.set('class_id', classId);
 
       const url = `/homeroom/attendance/bootstrap${
         params.toString() ? `?${params.toString()}` : ''
@@ -219,14 +228,15 @@ export const useAttendanceAPI = ({
       if (resp.success && resp.data) {
         const data = resp.data as BootstrapData;
         const {
-          academic_years,
           year: resolvedYear,
           classes: cls,
+          selected_class,
           records,
           stats: bootstrapStats,
         } = data;
 
-        if (Array.isArray(academic_years)) setAcademicYears(academic_years);
+        console.log('Bootstrap data:', data);
+
         if (!selectedAcademicYear && resolvedYear)
           setSelectedAcademicYear(resolvedYear);
 
@@ -236,6 +246,14 @@ export const useAttendanceAPI = ({
           .filter(Boolean)
           .sort();
         setClasses(classNames);
+
+        // Set the selected class from API response
+        if (selected_class) {
+          setApiSelectedClass(selected_class);
+        } else if (Array.isArray(cls) && cls.length > 0) {
+          // Fallback to first class if not provided
+          setApiSelectedClass({ id: cls[0].id, class_name: cls[0].class_name });
+        }
 
         setAttendanceRecords(records || []);
         setStats(bootstrapStats || null);
@@ -263,7 +281,7 @@ export const useAttendanceAPI = ({
     setSuccessMessage(null);
 
     try {
-      if (isHomeroomTeacher?.() && (!selectedClass || selectedClass === 'all')) {
+      if (isHomeroomTeacher?.() && !apiSelectedClass?.id) {
         setAttendanceRecords([]);
         setStats({
           total_students: 0,
@@ -280,11 +298,9 @@ export const useAttendanceAPI = ({
 
         if (
           isHomeroomTeacher?.() &&
-          selectedClass &&
-          selectedClass !== 'all'
+          apiSelectedClass?.id
         ) {
-          const found = homeroomClasses.find((c) => c.class_name === selectedClass);
-          const classId = found?.id;
+          const classId = apiSelectedClass.id;
 
           response = await ApiService.request(
             `/homeroom/attendance/records?target_date=${selectedDate}${
@@ -493,7 +509,9 @@ export const useAttendanceAPI = ({
     stats,
     classes,
     homeroomClasses,
-    academicYears,
+    academicYears: ACADEMIC_YEAR_OPTIONS,
+    selectedAcademicYear,
+    apiSelectedClass,
 
     // Loading states
     loading,

@@ -767,7 +767,7 @@ class ApiService {
   }
 
   // Teacher-specific Scores Management API
-  async getTeacherInfo(academicYear = null, semester = null) {
+  async getTeacherInfo(academicYear?: string | null, semester?: string | null) {
     let url = "/scores/teacher/info";
     const params = new URLSearchParams();
     if (academicYear) params.append("academic_year", academicYear);

@@ -168,8 +168,9 @@ class SchoolDatabaseManager:
         Returns:
             Supabase Client instance
         """
-        # Parse username để lấy school_key
-        school_key = self._get_school_key_from_username(username)
+        # Parse username để lấy school_key (multi-database disabled - single database mode)
+        # school_key = self._get_school_key_from_username(username)
+        school_key = self._default_school  # Always use default school
         
         # Kiểm tra cache
         if school_key in self._clients:
@@ -223,8 +224,9 @@ class SchoolDatabaseManager:
             raise
     
     def get_school_info(self, username: str) -> Dict:
-        """Lấy thông tin school từ username"""
-        school_key = self._get_school_key_from_username(username)
+        """Lấy thông tin school từ username (multi-database disabled)"""
+        # school_key = self._get_school_key_from_username(username)
+        school_key = self._default_school  # Always use default school
         return self._school_configs.get(school_key, {})
     
     def list_schools(self) -> Dict:

@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "@/contexts/AuthContext";
-import { useSystemSettings } from "@/contexts/SystemSettingsContext";
+import { useSystemSettings } from "@/contexts/useSystemSettings";
 import api from "@/utils/api";
 import logger from "@/utils/logger";
 
@@ -80,10 +80,9 @@ export const useSubjectDashboard = () => {
   if (!authContext) {
     throw new Error('useSubjectDashboard must be used within AuthProvider');
   }
-  const {
-    academicYear: defaultAcademicYear,
-    semester: defaultSemester,
-  } = useSystemSettings();
+  const { settings } = useSystemSettings();
+  const defaultAcademicYear = settings.academic_year || "2024-2025";
+  const defaultSemester = settings.semester || "HK1";
 
   // State - Data Loading
   const [loading, setLoading] = useState(true);

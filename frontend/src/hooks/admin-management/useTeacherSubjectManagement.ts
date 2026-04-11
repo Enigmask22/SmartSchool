@@ -5,20 +5,33 @@ import logger from '@/utils/logger';
 /**
  * Hook for managing teacher subject selection and loaded subject data
  * Used in the teachers tab to track which subjects are selected for a teacher
+ * @param editingItem - The ID of the teacher being edited (null when adding)
+ * @param showAddForm - Whether the add form is open
+ * @param activeTab - Current active tab (should be 'teachers')
+ * @param currentTeacherSubjects - Map of current teacher->subjects from parent hook (optional, for pre-populating)
  */
 export function useTeacherSubjectManagement(
   editingItem: any,
   showAddForm: boolean,
-  activeTab: string
+  activeTab: string,
+  currentTeacherSubjects?: Record<string, any>
 ) {
   const [selectedSubjects, setSelectedSubjects] = useState<any[]>([]);
   const [teacherSubjects, setTeacherSubjects] = useState<Record<string, any>>({});
   const [subjectTeachersData, setSubjectTeachersData] = useState<any[]>([]);
 
+  // Update teacherSubjects when passed from parent (for editing mode)
+  useEffect(() => {
+    if (currentTeacherSubjects) {
+      setTeacherSubjects(currentTeacherSubjects);
+    }
+  }, [currentTeacherSubjects]);
+
   // Load teacher subjects when editing or adding
   useEffect(() => {
     if (activeTab === 'teachers') {
       if (editingItem) {
+        // Use passed teacherSubjects to get current subjects for this teacher
         const teacherSubjectIds = teacherSubjects[editingItem] || [];
         setSelectedSubjects(teacherSubjectIds);
       } else if (showAddForm) {

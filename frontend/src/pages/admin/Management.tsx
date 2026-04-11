@@ -7,6 +7,7 @@ import { useTabCrud } from '@/hooks/admin-management/useTabCrud';
 import { useAdminImport } from '@/hooks/admin-management/useAdminImport';
 import { useTeacherSubjectManagement } from '@/hooks/admin-management/useTeacherSubjectManagement';
 import { useScoreColumnManagement } from '@/hooks/admin-management/useScoreColumnManagement';
+import { useClassSelection } from '@/hooks/admin-management/useClassSelection';
 import { PageHeader } from '@/components/common/PageHeader';
 import { AdminManagementForm } from '../../components/admin-management/AdminManagementForm';
 import { TabNavigation } from '../../components/admin-management/TabNavigation';
@@ -22,6 +23,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import SystemSettings from '@/components/admin-management/SystemSettings';
 import CameraManagement from '@/components/admin-management/CameraManagement';
 
@@ -29,18 +37,32 @@ const AdminManagement = () => {
   const hook = useAdminManagement();
   const search = useAdminSearch();
   const filters = useAdminFilters();
-  const tabCrud = useTabCrud(hook.activeTab, search.showDeleted);
+  const tabCrud = useTabCrud(hook.activeTab);
   const importHook = useAdminImport(() => hook.loadData());
-  const teacherSubjectHook = useTeacherSubjectManagement(tabCrud.editingItem, tabCrud.showAddForm, hook.activeTab);
+  // Pass hook.teacherSubjects so editing mode can pre-populate current subjects
+  const teacherSubjectHook = useTeacherSubjectManagement(
+    tabCrud.editingItem,
+    tabCrud.showAddForm,
+    hook.activeTab,
+    hook.teacherSubjects
+  );
   const scoreColumnHook = useScoreColumnManagement();
+  const classSelectionHook = useClassSelection(
+    tabCrud.editingItem,
+    tabCrud.showAddForm,
+    hook.activeTab
+  );
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  // Create form dialog state
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const handleTabClick = (tabId: string) => {
     hook.setActiveTab(tabId);
     // Reset form and search states when switching tabs
+    setIsCreateDialogOpen(false);
     tabCrud.setShowAddForm(false);
     tabCrud.setEditingItem(null);
     search.setSearchTerm('');
@@ -48,12 +70,15 @@ const AdminManagement = () => {
   };
 
   const handleAddNew = () => {
-    tabCrud.setShowAddForm(true);
+    setIsCreateDialogOpen(true);
     if (hook.activeTab === 'teachers') {
       hook.setFormData({ gender: 'Nam' });
     } else if (hook.activeTab === 'score_settings' || hook.activeTab === 'subjects') {
       hook.setFormData({});
       scoreColumnHook.setScoreColumns([]);
+    } else if (hook.activeTab === 'class_subjects') {
+      hook.setFormData({});
+      classSelectionHook.setSelectedClasses([]);
     } else {
       hook.setFormData({});
     }
@@ -127,6 +152,16 @@ const AdminManagement = () => {
     setCurrentPage(1);
   }, [search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId]);
 
+  // Load academic years only for class_subjects tab
+  // NOTE: Classes are loaded by loadReferenceData() in useAdminManagement
+  // to avoid duplicate API calls to GET /api/admin/classes
+  useEffect(() => {
+    if (hook.activeTab === 'class_subjects') {
+      filters.loadAcademicYears();
+    }
+  }, [hook.activeTab]); // Only activeTab - filters object is recreated each render
+
+
   return (
     <div className="min-h-screen p-6 bg-background space-y-6">
       {/* Header Section with PageHeader */}
@@ -179,42 +214,49 @@ const AdminManagement = () => {
               />
             </CardHeader>
 
-            {/* Add Form Section */}
-            {tabCrud.showAddForm && (
-              <CardContent className="border-y bg-muted/30 py-6 mb-3">
-                <div className="mb-4">
-                  <h3 className="mb-2 text-lg font-semibold">Thông tin mới</h3>
-                  <p className="text-sm text-muted-foreground">Nhập thông tin để tạo bản ghi mới</p>
-                </div>
-                <AdminManagementForm 
-                  hook={hook} 
-                  teacherSubjectHook={teacherSubjectHook}
-                  scoreColumnHook={scoreColumnHook}
-                  isEdit={false}
-                  onCancel={() => {
-                    tabCrud.setShowAddForm(false);
-                    tabCrud.setEditingItem(null);
-                    teacherSubjectHook.setSelectedSubjects([]);
-                    scoreColumnHook.setScoreColumns([]);
-                  }}
-                />
-              </CardContent>
-            )}
-
             {/* Data Table */}
             <CardContent>
               <AdminTable
                 hook={hook}
+                tabCrud={tabCrud}
                 filteredData={paginatedData}
                 isLoading={hook.loading}
                 error={hook.error}
                 onRetry={hook.loadData}
                 scoreColumnHook={scoreColumnHook}
+                classSelectionHook={classSelectionHook}
                 searchTerm={search.searchTerm}
                 search={search}
               />
             </CardContent>
           </Card>
+
+          {/* Create Form Dialog */}
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Thêm mới</DialogTitle>
+                <DialogDescription>
+                  Nhập thông tin để tạo bản ghi mới trong hệ thống
+                </DialogDescription>
+              </DialogHeader>
+              <AdminManagementForm
+                hook={hook}
+                teacherSubjectHook={teacherSubjectHook}
+                scoreColumnHook={scoreColumnHook}
+                classSelectionHook={classSelectionHook}
+                isEdit={false}
+                onCancel={() => {
+                  setIsCreateDialogOpen(false);
+                  tabCrud.setShowAddForm(false);
+                  tabCrud.setEditingItem(null);
+                  teacherSubjectHook.setSelectedSubjects([]);
+                  scoreColumnHook.setScoreColumns([]);
+                  classSelectionHook.setSelectedClasses([]);
+                }}
+              />
+            </DialogContent>
+          </Dialog>
 
           {/* Pagination */}
           <AdminPagination

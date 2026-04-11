@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
-import { useSystemSettings } from '@/contexts/SystemSettingsContext';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
 
 export const useStudentFilters = () => {
   const authContext = useContext(AuthContext);
   const isHomeroomTeacher = authContext?.isHomeroomTeacher;
-  const { academicYear } = useSystemSettings();
+  const { settings } = useSystemSettings();
+  const academicYear = settings.academic_year || "2024-2025";
 
   // Search and class filter
   const [searchTerm, setSearchTerm] = useState('');

@@ -12,6 +12,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
+import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 
 /**
  * Student Data Structure
@@ -114,20 +116,21 @@ export interface UseHomeroomDataReturn {
   loading: boolean;  // Alias for initialLoading - only true during first bootstrap
   isRefetching: boolean;  // True during filter changes (don't show skeletons)
   homeroomInfo: HomeroomInfo | null;
-  academicYears: string[];
+  academicYears: string[];  // Constant list of available academic years for dropdown
   selectedAcademicYear: string;
-  teacherClasses: ClassInfo[];
-  selectedClass: string | null;
-  selectedClassId: number | null;
+  teacherClasses: ClassInfo[];  // Now read-only, auto-selects based on academic year
+  selectedClass: string | null;  // Read-only, set by API response
+  selectedClassId: number | null;  // Read-only, set by API response
+  selectedYear: number;
+  selectedMonth: number;
   students: StudentData[];
   topAbsent: TopAbsentLateStudent[];
   topLate: TopAbsentLateStudent[];
   attendanceStats: AttendanceStats | null;
   // Methods
-  fetchDashboardData: (params: BootstrapParams) => Promise<void>;
   setSelectedAcademicYear: (year: string) => void;
-  setSelectedClass: (classname: string | null) => void;
-  setSelectedClassId: (id: number | null) => void;
+  setSelectedYear: (year: number) => void;
+  setSelectedMonth: (month: number) => void;
 }
 
 /**
@@ -140,12 +143,16 @@ export interface UseHomeroomDataReturn {
  * - Attendance statistics calculation
  */
 export const useHomeroomData = (): UseHomeroomDataReturn => {
+  const { settings } = useSystemSettings();
   const [initialLoading, setInitialLoading] = useState(true);
   const [isRefetching, setIsRefetching] = useState(false);
   const hasInitialized = useRef(false);
+  const previousYearRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);  // Track if a fetch is already in progress
   const [homeroomInfo, setHomeroomInfo] = useState<HomeroomInfo | null>(null);
-  const [academicYears, setAcademicYears] = useState<string[]>([]);
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(settings.academic_year || "2024-2025");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [teacherClasses, setTeacherClasses] = useState<ClassInfo[]>([]);
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
@@ -190,16 +197,27 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
   /**
    * Fetch homeroom dashboard data from API
    */
+  /**
+   * Fetch homeroom dashboard data from API
+   * Refactored to not depend on component state to avoid stale closures
+   */
   const fetchDashboardData = useCallback(async (params: BootstrapParams = {}) => {
+    isFetchingRef.current = true;  // Mark that fetch is in progress
+    
+    const { ay, y, m, clsName, clsId } = params;
+    
+    // Use provided academic_year or current selectedAcademicYear from state
+    const academicYearParam = ay || selectedAcademicYear;
+    
     try {
       if (!hasInitialized.current) {
         setInitialLoading(true);
       } else {
         setIsRefetching(true);
       }
-      const { ay, y, m, clsName, clsId } = params;
+      
       const queryParams = new URLSearchParams();
-      if (ay) queryParams.set('academic_year', ay);
+      if (academicYearParam) queryParams.set('academic_year', academicYearParam);
       if (y) queryParams.set('year', String(y));
       if (m) queryParams.set('month', String(m));
       if (clsName) queryParams.set('class_name', clsName);
@@ -213,7 +231,6 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
 
       if (resp.success && resp.data) {
         const {
-          academic_years,
           classes,
           selected_class,
           students: studentRows,
@@ -221,12 +238,6 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
           top_late,
           homeroom_info,
         } = resp.data;
-
-        // Set academic years
-        if (Array.isArray(academic_years)) setAcademicYears(academic_years);
-        if (!selectedAcademicYear && resp.data.year) {
-          setSelectedAcademicYear(resp.data.default_year || selectedAcademicYear);
-        }
 
         // Process and set classes
         const uniqueClasses = Array.from(
@@ -237,6 +248,7 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
         // Set default selected class if not specified
         const sName = selected_class?.class_name || uniqueClasses[0]?.class_name || null;
         const sId = selected_class?.id || uniqueClasses[0]?.id || null;
+       
         setSelectedClass(sName);
         setSelectedClassId(sId);
         setHomeroomInfo(homeroom_info || null);
@@ -255,6 +267,8 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
     } catch (error) {
       logger.error('Failed to fetch homeroom dashboard data:', error);
     } finally {
+      isFetchingRef.current = false;  // Mark that fetch is complete
+      
       if (!hasInitialized.current) {
         hasInitialized.current = true;
         setInitialLoading(false);
@@ -265,28 +279,67 @@ export const useHomeroomData = (): UseHomeroomDataReturn => {
   }, [selectedAcademicYear]);
 
   /**
-   * Auto-fetch on mount
+   * Trigger bootstrap fetch when academic year changes
+   * Only trigger when selectedAcademicYear actually changes (via ref comparison)
+   * Do NOT include fetchDashboardData in dependency to avoid circular updates
    */
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (previousYearRef.current !== selectedAcademicYear) {
+      previousYearRef.current = selectedAcademicYear;
+      
+      // Prevent duplicate fetches if one is already in progress
+      if (isFetchingRef.current) {
+         return;
+      }
+      
+      // IMPORTANT: Clear the old selectedClassId when year changes
+      // Otherwise we'll pass the old class_id to the API which belongs to the previous year
+      setSelectedClass(null);
+      setSelectedClassId(null);
+      
+      // Now fetch with the new year - don't pass class_id so API will auto-select first class
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      fetchDashboardData();
+    }
+  }, [selectedAcademicYear]);
+
+  /**
+   * Trigger refetch when month or year changes (for monthly statistics)
+   */
+  useEffect(() => {
+    if (hasInitialized.current && selectedClassId) {
+      // Prevent duplicate fetches if one is already in progress
+      if (isFetchingRef.current) {
+        return;
+      }
+      
+      // Fetch monthly data for the selected class with new month/year
+      fetchDashboardData({
+        ay: selectedAcademicYear,
+        y: selectedYear,
+        m: selectedMonth,
+        clsId: selectedClassId,
+      });
+    }
+  }, [selectedYear, selectedMonth]);
 
   return {
     loading: initialLoading,
     isRefetching,
     homeroomInfo,
-    academicYears,
+    academicYears: ACADEMIC_YEAR_OPTIONS,  // Constant list from utils/constants
     selectedAcademicYear,
     teacherClasses,
     selectedClass,
     selectedClassId,
+    selectedYear,
+    selectedMonth,
     students,
     topAbsent,
     topLate,
     attendanceStats,
-    fetchDashboardData,
     setSelectedAcademicYear,
-    setSelectedClass,
-    setSelectedClassId,
+    setSelectedYear,
+    setSelectedMonth,
   };
 };

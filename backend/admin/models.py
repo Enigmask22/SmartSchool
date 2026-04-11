@@ -87,6 +87,15 @@ class ClassSubjectCreate(BaseModel):
     semester: str
     is_active: Optional[bool] = True
 
+class ClassSubjectBulkCreate(BaseModel):
+    """Bulk create class-subject assignments for multiple classes at once"""
+    class_ids: List[int]  # Multiple classes
+    subject_id: int
+    teacher_id: Optional[int] = None
+    academic_year: str
+    semester: str
+    is_active: Optional[bool] = True
+
 class ClassSubjectUpdate(BaseModel):
     class_id: Optional[int] = None
     subject_id: Optional[int] = None
@@ -94,6 +103,15 @@ class ClassSubjectUpdate(BaseModel):
     academic_year: Optional[str] = None
     semester: Optional[str] = None
     is_active: Optional[bool] = None
+
+class ClassSubjectBulkUpdate(BaseModel):
+    """Bulk update for class assignments - allows changing which classes are assigned"""
+    record_ids: List[int]  # Array of class_subject record IDs in the group
+    teacher_id: int
+    subject_id: int
+    academic_year: str
+    semester: str
+    selected_class_ids: List[int]  # New set of class IDs to assign
 
 class StudentCreate(BaseModel):
     student_id: str

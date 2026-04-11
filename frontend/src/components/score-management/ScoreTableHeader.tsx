@@ -1,11 +1,10 @@
-import React from 'react';
 import { Download, Upload, Lightbulb, ChevronLeft } from 'lucide-react';
 import {
   Card,
   CardContent,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import OCRGradeSheet from '@/components/score-management/OCRGradeSheet';
+import OCRScoreSheet from '@/components/score-management/OCRScoreSheet';
 
 interface ClassSubject {
   id: string;
@@ -18,7 +17,7 @@ interface ClassSubject {
   };
 }
 
-interface GradeTableHeaderProps {
+interface ScoreTableHeaderProps {
   selectedClassSubject: ClassSubject;
   academicYear: string;
   semester: string;
@@ -30,7 +29,7 @@ interface GradeTableHeaderProps {
   onImportSuccess: () => void;
 }
 
-const GradeTableHeader = ({
+function ScoreTableHeader({
   selectedClassSubject,
   academicYear,
   semester,
@@ -40,7 +39,7 @@ const GradeTableHeader = ({
   onFileUpload,
   onExportToExcel,
   onImportSuccess,
-}: GradeTableHeaderProps) => {
+}: ScoreTableHeaderProps) {
   return (
     <Card className="shadow-md">
       <CardContent className="p-5">
@@ -113,7 +112,7 @@ const GradeTableHeader = ({
               </Button>
 
               <div title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi quét ảnh' : ''} className={!hasScoreConfig ? 'opacity-50' : ''}>
-                <OCRGradeSheet
+                <OCRScoreSheet
                   selectedClassSubject={selectedClassSubject}
                   academicYear={academicYear}
                   semester={semester}
@@ -136,4 +135,4 @@ const GradeTableHeader = ({
   );
 };
 
-export default GradeTableHeader;
+export default ScoreTableHeader;

@@ -93,10 +93,14 @@ const Sidebar = ({
     }
   }, [user]);
 
-  // Check if user has both roles
+  // Check if user has both roles (skip for admin routes)
   useEffect(() => {
+    // Skip role checking on admin routes - it's not needed and wastes API calls
+    if (location.pathname.startsWith('/admin')) {
+      return;
+    }
     checkBothRoles();
-  }, [user, checkBothRoles]);
+  }, [user, checkBothRoles, location.pathname]);
 
   // Icon mapping
   const getIcon = (iconName) => {

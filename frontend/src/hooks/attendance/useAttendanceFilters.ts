@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
 
 /**
  * useAttendanceFilters - Filter State Management Hook
@@ -41,13 +42,15 @@ interface UseAttendanceFiltersReturn {
 }
 
 export const useAttendanceFilters = (): UseAttendanceFiltersReturn => {
+  const { settings } = useSystemSettings();
+  
   // Initialize filter states
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(settings.academic_year || "2024-2025");
   const [showFullList, setShowFullList] = useState(true);
 
   /**
@@ -97,7 +100,7 @@ export const useAttendanceFilters = (): UseAttendanceFiltersReturn => {
     setSelectedDate(new Date().toISOString().split('T')[0]);
     setSelectedClass('all');
     setSelectedStatus('all');
-    setSelectedAcademicYear('');
+    setSelectedAcademicYear(settings.academic_year || "2024-2025");
     setShowFullList(true);
   };
 

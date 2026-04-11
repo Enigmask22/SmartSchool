@@ -14,7 +14,7 @@ from typing import Optional
 
 # Import core
 from core.logger import setup_logger
-from core.database import init_db, get_school_db
+from core.database import init_db  # get_school_db removed - single database mode
 from core.config import LOG_LEVEL, ENV, SECRET_KEY, ALGORITHM
 
 # Import routers từ các modules
@@ -105,29 +105,26 @@ def create_app() -> FastAPI:
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
             
-            try:
-                # Decode JWT để lấy username
-                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-                username = payload.get("sub")
+            # try:
+                # Decode JWT token (multi-database routing disabled)
+                # username parsing disabled - single database mode
+                # payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                # username = payload.get("sub")
                 
-                if username:
-                    # Lưu username vào request.state
-                    request.state.username = username
+                # Multi-school database routing disabled - using single database
+                # if username:
+                #     request.state.username = username
+                #     db_client = get_school_db(username)  # DISABLED
+                #     request.state.db = db_client
+                # logger.debug(f"✅ Middleware set database for user: {username}")
                     
-                    # Get database client cho school này (CACHED by school_db_manager)
-                    # Chỉ gọi 1 lần mỗi request, sau đó endpoints dùng request.state.db
-                    db_client = get_school_db(username)
-                    request.state.db = db_client
-                    
-                    logger.debug(f"✅ Middleware set database for user: {username}")
-                    
-            except jwt.JWTError as e:
-                logger.debug(f"JWT decode failed: {str(e)}")
-                # Không raise error, để endpoint tự xử lý authentication
-                pass
-            except Exception as e:
-                logger.error(f"Error in school_database_middleware: {str(e)}")
-                pass
+            # except jwt.JWTError as e:
+            #     logger.debug(f"JWT decode failed: {str(e)}")
+            #     # Không raise error, để endpoint tự xử lý authentication
+            #     pass
+            # except Exception as e:
+            #     logger.error(f"Error in school_database_middleware: {str(e)}")
+            #     pass
         
         response = await call_next(request)
         return response

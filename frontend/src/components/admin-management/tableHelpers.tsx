@@ -1,6 +1,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip } from '@/components/ui/tooltip';
+import logger from '@/utils/logger';
 
 // Helper function to highlight search term in text
 function highlightText(text: string, searchTerm: string): React.ReactNode {
@@ -44,6 +45,7 @@ export function renderFieldHeader(field: string): string {
     full_name: 'HỌ TÊN',
     is_active: 'TRẠNG THÁI',
     subjects: 'MÔN HỌC PHỤ TRÁCH',
+    classes: 'LỚP HỌC',
     subject_code: 'MÃ MÔN HỌC',
     subject_name: 'TÊN MÔN HỌC',
     description: 'MÔ TẢ',
@@ -71,25 +73,60 @@ export function renderTableCell(field: string, item: any, hook: any, searchTerm:
     return <span className="text-gray-400">-</span>;
   }
 
+  if (field === 'classes') {
+    // This is used for class_subjects tab - display classes as badges
+    if (!item.class_names || !Array.isArray(item.class_names) || item.class_names.length === 0) {
+      return <span className="text-xs italic text-gray-400">Chưa phân công lớp</span>;
+    }
+
+    return (
+      <div className="flex flex-col gap-1">
+        {item.class_names.map((className: string, idx: number) => (
+          <Badge key={idx} className="text-xs text-blue-700 bg-blue-50 border-blue-200 border whitespace-nowrap min-w-[60px] h-7 flex items-center justify-center">
+            {className}
+          </Badge>
+        ))}
+      </div>
+    );
+  }
+
   if (field === 'subjects') {
     // This is only used for teachers tab
-    if (!hook?.teacherSubjects) {
+    // Debug logging to understand data structure
+    logger.debug('[renderTableCell] subjects field:', {
+      teacherId: item.id,
+      hook_teacherSubjects: hook?.teacherSubjects,
+      hook_subjects: hook?.subjects?.length,
+    });
+
+    if (!hook?.teacherSubjects || typeof hook.teacherSubjects !== 'object') {
       return <span className="text-xs italic text-gray-400">Chưa phân công</span>;
     }
     
     const teacherSubjectIds = hook.teacherSubjects[item.id] || [];
-    if (teacherSubjectIds.length === 0) {
+    if (!Array.isArray(teacherSubjectIds) || teacherSubjectIds.length === 0) {
       return <span className="text-xs italic text-gray-400">Chưa phân công</span>;
     }
+
+    // Ensure hook.subjects exists and is an array
+    if (!Array.isArray(hook.subjects)) {
+      logger.warn('[renderTableCell] hook.subjects is not an array:', hook.subjects);
+      return <span className="text-xs italic text-gray-400">Dữ liệu môn học chưa tải</span>;
+    }
+
     return (
-      <div className="flex flex-nowrap gap-1 overflow-x-auto">
+      <div className="flex flex-col gap-1">
         {teacherSubjectIds.map((subjectId: any) => {
-          const subject = hook.subjects?.find((s: any) => s.id === subjectId);
-          return subject ? (
-            <Badge key={subjectId} className="text-xs text-blue-700 bg-blue-50 border-blue-200 border whitespace-nowrap flex-shrink-0 min-w-[70px] h-7 flex items-center justify-center">
+          const subject = hook.subjects.find((s: any) => s.id === subjectId);
+          if (!subject) {
+            logger.warn(`[renderTableCell] Subject ID ${subjectId} not found in subjects array`);
+            return null;
+          }
+          return (
+            <Badge key={subjectId} className="text-xs text-blue-700 bg-blue-50 border-blue-200 border whitespace-nowrap min-w-[70px] h-7 flex items-center justify-center">
               {subject.subject_code || '-'}
             </Badge>
-          ) : null;
+          );
         })}
       </div>
     );

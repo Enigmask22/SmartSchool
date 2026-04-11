@@ -2,7 +2,7 @@
 import { Users, User, Star, Zap, Plus, Pencil } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-interface GradesTableProps {
+interface ScoreTableProps {
   students: any[];
   scoreConfig: any;
   currentPage: number;
@@ -11,10 +11,10 @@ interface GradesTableProps {
   onPageSizeChange: (size: number) => void;
   onEditScore: (studentData: any) => void;
   getDisplayColumns: (config: Record<string, any>) => any[];
-  calculateFinalGrade: (scoreData: any) => string | number;
+  calculateFinalScore: (scoreData: any) => string | number;
 }
 
-export default function GradesTable({
+export default function ScoreTable({
   students,
   scoreConfig,
   currentPage,
@@ -23,9 +23,9 @@ export default function GradesTable({
   onPageSizeChange,
   onEditScore,
   getDisplayColumns,
-  calculateFinalGrade,
+  calculateFinalScore,
 }
-: GradesTableProps) 
+: ScoreTableProps) 
 {
   const displayColumns = getDisplayColumns(scoreConfig?.score_column_config || {});
 
@@ -232,7 +232,7 @@ export default function GradesTable({
                   <td className="px-5 py-3">
                     {studentData.score?.score_data ? (
                       <span className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-bold">
-                        {calculateFinalGrade(studentData.score.score_data)}
+                        {calculateFinalScore(studentData.score.score_data)}
                       </span>
                     ) : (
                       <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm">
@@ -359,7 +359,7 @@ export default function GradesTable({
   );
 };
 
-export const GradeTableSkeleton = () => (
+export const ScoreTableSkeleton = () => (
   <div className="overflow-hidden bg-white rounded-lg shadow-md">
     {/* Table Header - Static, no skeleton */}
     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">

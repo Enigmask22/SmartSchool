@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { useSystemSettings } from '@/contexts/SystemSettingsContext';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
 import { AuthContext } from '@/contexts/AuthContext';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
@@ -65,7 +65,7 @@ export interface UseScoreManagementAPIReturn {
   teacherInfo: TeacherInfo | null;
   students: StudentWithScore[];
   scoreConfig: ScoreConfig | null;
-  fetchTeacherInfo: () => Promise<void>;
+  fetchTeacherInfo: (academicYear?: string, semester?: string) => Promise<void>;
   handleClassSubjectSelect: (classSubject: any, academicYear?: string, semester?: string) => Promise<void>;
   handleSaveScore: (
     editingStudent: StudentWithScore | null,
@@ -98,7 +98,7 @@ export interface UseScoreManagementAPIReturn {
   getDisplayColumns: (scoreColumnConfig: ScoreColumnConfig) => DisplayColumn[];
   flattenScoreColumns: (config: ScoreColumnConfig) => FlatColumn[];
   getSortedColumnNames: (scoreColumnConfig: ScoreColumnConfig) => string[];
-  calculateFinalGrade: (
+  calculateFinalScore: (
     gradeData: Record<string, { Diem: number | string }>,
     scoreColumnConfig: ScoreColumnConfig
   ) => number | string;
@@ -121,7 +121,9 @@ export interface UseScoreManagementAPIReturn {
 export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
   const authContext = useContext(AuthContext);
   const user = authContext?.user;
-  const { academicYear: defaultAcademicYear, semester: defaultSemester } = useSystemSettings();
+  const { settings } = useSystemSettings();
+  const defaultAcademicYear = settings.academic_year || "2024-2025";
+  const defaultSemester = settings.semester || "HK1";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,15 +131,20 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
   const [students, setStudents] = useState<StudentWithScore[]>([]);
   const [scoreConfig, setScoreConfig] = useState<ScoreConfig | null>(null);
 
-  const fetchTeacherInfo = async () => {
+  const fetchTeacherInfo = async (academicYear?: string, semester?: string) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.getTeacherInfo();
+      const year = academicYear || defaultAcademicYear || "2024-2025";
+      const sem = semester || defaultSemester || "HK1";
+      //logger.debug('[useScoreManagementAPI] fetchTeacherInfo with params:', { year, sem });
+      const response = await api.getTeacherInfo(year, sem);
+      //logger.debug('[useScoreManagementAPI] fetchTeacherInfo response:', response);
       if (response.success) {
+        //logger.debug('[useScoreManagementAPI] assigned_classes:', response.data?.assigned_classes);
         setTeacherInfo(response.data);
       } else {
-        logger.error('Failed to fetch teacher info:', response.message);
+        //logger.error('Failed to fetch teacher info:', response.message);
         setError('Không thể tải thông tin giáo viên');
       }
     } catch (err) {
@@ -152,7 +159,6 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     try {
       setLoading(true);
       setError(null);
-
       const studentsResponse = await api.getStudentsByClassSubject(
         classSubject.id,
         academicYear || defaultAcademicYear || '2024-2025',
@@ -272,7 +278,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     });
   };
 
-  const calculateFinalGrade = (
+  const calculateFinalScore = (
     gradeData: Record<string, { Diem: number | string }>,
     scoreColumnConfig: ScoreColumnConfig
   ): number | string => {
@@ -619,7 +625,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
   // Initial fetch
   useEffect(() => {
     if (user) {
-      fetchTeacherInfo();
+      fetchTeacherInfo(settings.academic_year, settings.semester);
     }
   }, [user]);
 
@@ -639,7 +645,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     getDisplayColumns,
     flattenScoreColumns,
     getSortedColumnNames,
-    calculateFinalGrade,
+    calculateFinalScore,
     initializeScoreForm,
   };
 };

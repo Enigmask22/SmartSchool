@@ -1,22 +1,7 @@
-/**
- * HomeroomDashboard.tsx - Homeroom Dashboard Page
- * 
- * Refactored following Rule-of-Refactor:
- * - UI State: Filters, date, modal state (kept in component)
- * - Reusable Logic: usePagination (pagination for any array)
- * - Domain Logic: useHomeroomData (API calls and data transformation)
- * 
- * Features:
- * - Multi-filter interface (academic year, class, month, year)
- * - Student attendance statistics
- * - Top absent/late students
- * - Paginated student grid
- * - All students modal with full list
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { ChartNoAxesCombined } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import { useHomeroomData } from '@/hooks/homeroom-dashboard/useHomeroomData';
 import { usePagination } from '@/hooks/usePagination';
 import {
@@ -43,17 +28,16 @@ export default function HomeroomDashboard() {
     homeroomInfo,
     academicYears,
     selectedAcademicYear,
-    teacherClasses,
     selectedClass,
-    selectedClassId,
+    selectedYear,
+    selectedMonth,
     students,
     topAbsent,
     topLate,
     attendanceStats,
-    fetchDashboardData,
     setSelectedAcademicYear,
-    setSelectedClass,
-    setSelectedClassId,
+    setSelectedYear,
+    setSelectedMonth,
   } = useHomeroomData();
 
   // ============ Reusable Pagination Hook ============
@@ -68,8 +52,6 @@ export default function HomeroomDashboard() {
   // const [selectedDate, setSelectedDate] = useState(
   //   new Date().toISOString().split('T')[0]
   // );
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [showAllStudents, setShowAllStudents] = useState(false);
 
   /**
@@ -86,54 +68,16 @@ export default function HomeroomDashboard() {
         }
       }
     }
-  }, [selectedAcademicYear]);
+  }, [selectedAcademicYear, setSelectedYear]);
 
   /**
-   * Handle academic year change - batch all updates together
-   * This prevents multiple fetch calls by syncing everything in one event handler
-   * Keeps month unchanged - only updates academic year and lets year sync via useEffect
+   * Handle academic year change
    */
   const handleAcademicYearChange = useCallback(
     (academicYear: string) => {
-      // All updates happen synchronously in the event handler = React batches them
       setSelectedAcademicYear(academicYear);
-      // Note: selectedYear will be extracted by useEffect watching selectedAcademicYear
-      // selectedMonth is kept as-is (doesn't reset)
-      // Don't reset selectedClass - the hook will update it when classes are fetched
     },
     [setSelectedAcademicYear]
-  );
-
-  /**
-   * Refetch dashboard data when filters change (class, month, year)
-   */
-  useEffect(() => {
-    if (selectedClass !== null && selectedClassId !== null) {
-      fetchDashboardData({
-        ay: selectedAcademicYear,
-        y: selectedYear,
-        m: selectedMonth,
-        clsName: selectedClass,
-        clsId: selectedClassId,
-      });
-    }
-  }, [
-    selectedYear,
-    selectedMonth,
-    selectedClass,
-    selectedClassId,
-    fetchDashboardData,
-  ]);
-
-  /**
-   * Handle class selection
-   */
-  const handleClassChange = useCallback(
-    (className: string, classId: number) => {
-      setSelectedClass(className);
-      setSelectedClassId(classId);
-    },
-    [setSelectedClass, setSelectedClassId]
   );
 
   // Render dashboard
@@ -142,7 +86,7 @@ export default function HomeroomDashboard() {
       {/* Header with filters */}
       <PageHeader
         title="Tổng quan lớp chủ nhiệm"
-        description={selectedClass ? `Lớp ${selectedClass}` : 'Đang tải...'}
+        description={selectedClass ? <Badge variant="secondary">{`Lớp ${selectedClass}`}</Badge> : 'Chưa được phân công chủ nhiệm'}
         icon={
           <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
             <ChartNoAxesCombined className="w-8 h-8 text-white" />
@@ -151,13 +95,10 @@ export default function HomeroomDashboard() {
       >
         <HeaderFilters
           selectedAcademicYear={selectedAcademicYear}
-          selectedClass={selectedClass}
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
           academicYears={academicYears}
-          teacherClasses={teacherClasses}
           onAcademicYearChange={handleAcademicYearChange}
-          onClassChange={handleClassChange}
           onMonthChange={setSelectedMonth}
           onYearChange={setSelectedYear}
           loading={loading}

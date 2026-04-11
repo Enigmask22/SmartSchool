@@ -1,11 +1,23 @@
 import { Camera } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useContext } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
+import { PageHeaderControls } from '@/components/common/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useFaceManagementAPI } from '@/hooks/face-management/useFaceManagementAPI';
 import { useFaceManagementFilters } from '@/hooks/face-management/useFaceManagementFilters';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
+import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
+import { AuthContext } from '@/contexts/AuthContext';
 import {
   AIStatusCard,
-  FilterSection,
   StudentsTable,
   Instructions,
 } from '@/components/face-management';
@@ -19,11 +31,12 @@ interface FaceManagementProps {
 }
 
 export default function FaceManagement({ isHomeroom: _isHomeroom = false }: FaceManagementProps) {
+  const authContext = useContext(AuthContext);
+  const isHomeroomTeacher = authContext?.isHomeroomTeacher;
+  const { settings } = useSystemSettings();
+
   const api = useFaceManagementAPI();
-  const filters = useFaceManagementFilters(
-    api.bootstrapData.resolvedClass,
-    api.bootstrapData.resolvedYear
-  );
+  const filters = useFaceManagementFilters();
 
   // Sync filters with bootstrap data updates
   useEffect(() => {
@@ -35,21 +48,17 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
     }
   }, [api.bootstrapData.resolvedYear, api.bootstrapData.resolvedClass]);
 
-  // Handle class change
-  const handleClassChange = async (value: string) => {
-    filters.setSelectedClass(value);
-    await api.faceBootstrap({
-      year: filters.selectedAcademicYear,
-      className: value,
-    });
-    await api.fetchStudentsData(value, filters.selectedAcademicYear, api.bootstrapData.homeroomClasses);
-  };
+  // Initialize academic year with settings default on mount
+  useEffect(() => {
+    if (settings.academic_year && !filters.selectedAcademicYear) {
+      filters.setSelectedAcademicYear(settings.academic_year);
+    }
+  }, [settings.academic_year, filters]);
 
   // Handle year change
   const handleYearChange = async (value: string) => {
     filters.setSelectedAcademicYear(value);
     await api.faceBootstrap({ year: value });
-    await api.fetchStudentsData(filters.selectedClass, value, api.bootstrapData.homeroomClasses);
   };
 
   // Handle delete face encoding
@@ -77,13 +86,50 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
       {/* Header with PageHeader component */}
       <PageHeader
         title="Quản lý khuôn mặt AI"
-        description="Theo dõi và quản lý dữ liệu khuôn mặt đã đăng ký"
+        description={
+          isHomeroomTeacher?.() && api.bootstrapData.resolvedClass && api.bootstrapData.resolvedClass !== 'all' ? (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{api.bootstrapData.resolvedYear}</Badge>
+              <Badge variant="secondary">{`Lớp ${api.bootstrapData.resolvedClass}`}</Badge>
+            </div>
+          ) : isHomeroomTeacher?.() ? (
+            'Chưa được phân công chủ nhiệm'
+          ) : (
+            'Cho phép quản lý khuôn mặt AI cho tất cả lớp'
+          )
+        }
         icon={
           <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
             <Camera className="w-8 h-8 text-white" />
           </div>
         }
-      />
+      >
+        {/* Academic Year Selector for homeroom teachers */}
+        <PageHeaderControls spacing="lg">
+          {api.loading ? (
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-700 whitespace-nowrap flex-shrink-0">Năm học</span>
+              <Skeleton className="min-w-[120px] h-10 rounded-md" />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-700 whitespace-nowrap flex-shrink-0">Năm học</span>
+              <Select value={filters.selectedAcademicYear || settings.academic_year || ''} onValueChange={handleYearChange} disabled={api.loading}>
+                <SelectTrigger className="min-w-[120px] focus-visible:outline-none">
+                  <SelectValue placeholder="Chọn năm học" />
+                </SelectTrigger>
+                <SelectContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {ACADEMIC_YEAR_OPTIONS.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </PageHeaderControls>
+      </PageHeader>
 
       {/* Error display */}
       {displayError && (
@@ -92,32 +138,16 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
         </div>
       )}
 
-      {/* AI Status and Filter Section - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* AI Status Card - Skeleton on initial load */}
-        {api.loading && !api.aiStatus ? (
-          <AIStatusCardSkeleton />
-        ) : (
-          <AIStatusCard
-            aiStatus={api.aiStatus}
-            onReloadModels={api.reloadModels}
-            onRefresh={() => api.fetchData(filters.selectedAcademicYear, filters.selectedClass)}
-          />
-        )}
-
-        {/* Filter Section - always visible (no skeleton needed) */}
-        <FilterSection
-          selectedClass={filters.selectedClass}
-          availableClasses={api.bootstrapData.availableClasses}
-          classesLoading={api.loading}
-          selectedAcademicYear={filters.selectedAcademicYear}
-          academicYears={api.bootstrapData.academicYears}
-          isHomeroomTeacher={api.isHomeroomTeacher()}
-          onClassChange={handleClassChange}
-          onYearChange={handleYearChange}
+      {/* AI Status Card */}
+      {api.loading && !api.aiStatus ? (
+        <AIStatusCardSkeleton />
+      ) : (
+        <AIStatusCard
+          aiStatus={api.aiStatus}
+          onReloadModels={api.reloadModels}
           onRefresh={() => api.fetchData(filters.selectedAcademicYear, filters.selectedClass)}
         />
-      </div>
+      )}
 
       {/* Students Table - Skeleton on initial load */}
       {api.loading && api.students.length === 0 ? (

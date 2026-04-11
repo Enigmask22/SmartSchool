@@ -4,9 +4,58 @@ import logger from '@/utils/logger';
 import { toast } from 'sonner';
 import { TAB_CONFIG } from './useTabCrud';
 
+// Helper function to group class_subjects by (subject, teacher, year, semester)
+const groupClassSubjects = (items: any[]): any[] => {
+  const groupedMap = new Map<string, any>();
+  
+  items.forEach((item) => {
+    // Create a composite key for grouping
+    const key = `${item.subject_id}_${item.teacher_id}_${item.academic_year}_${item.semester}`;
+    
+    if (!groupedMap.has(key)) {
+      // Create new grouped record
+      groupedMap.set(key, {
+        id: item.id, // Will be replaced with array
+        recordIds: [item.id], // Array of individual record IDs for operations
+        class_ids: [item.class_id],
+        class_names: [item.class_name],
+        subject_id: item.subject_id,
+        subject_name: item.subject_name,
+        subject_code: item.subject_code,
+        teacher_id: item.teacher_id,
+        teacher_name: item.teacher_name,
+        teacher_code: item.teacher_code,
+        academic_year: item.academic_year,
+        semester: item.semester,
+        is_active: item.is_active,
+        grade: item.grade,
+      });
+    } else {
+      // Add to existing grouped record
+      const grouped = groupedMap.get(key);
+      if (!grouped.class_ids.includes(item.class_id)) {
+        grouped.class_ids.push(item.class_id);
+        grouped.class_names.push(item.class_name);
+        grouped.recordIds.push(item.id);
+      }
+    }
+  });
+  
+  return Array.from(groupedMap.values());
+};
+
 export function useAdminManagement() {
-  // Tab Management
-  const [activeTab, setActiveTab] = useState('users');
+  // Tab Management - restore from localStorage on mount
+  const [activeTab, setActiveTabState] = useState(() => {
+    const saved = localStorage.getItem('adminManagement_activeTab');
+    return saved || 'users';
+  });
+
+  // Wrapper to persist tab selection
+  const setActiveTab = (tab: string) => {
+    localStorage.setItem('adminManagement_activeTab', tab);
+    setActiveTabState(tab);
+  };
 
   // Main Data Management
   const [data, setData] = useState<any[]>([]);
@@ -25,6 +74,7 @@ export function useAdminManagement() {
   const [users, setUsers] = useState<any[]>([]);
   const [filteredTeachers, setFilteredTeachers] = useState<any[]>([]);
   const [subjectTeachersData, setSubjectTeachersData] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<string[]>([]);
 
   // Kept internal for CRUD operations (handleCreate, handleUpdate)
   const [selectedSubjects, setSelectedSubjects] = useState<any[]>([]);
@@ -74,6 +124,11 @@ export function useAdminManagement() {
           }));
         }
 
+        // Group class_subjects by (subject, teacher, year, semester)
+        if (activeTab === 'class_subjects') {
+          items = groupClassSubjects(items);
+        }
+
         // Note: Don't filter out inactive items here - let the UI layer handle visibility based on showDeleted flag
         setData(items);
       } else {
@@ -88,59 +143,129 @@ export function useAdminManagement() {
 
   const loadReferenceData = useCallback(async () => {
     try {
-      const [teachersRes, homeroomTeachersRes, subjectsRes, classesRes, usersRes, subjectTeachersRes] = await Promise.all([
-        api.request('/admin/teachers'),
-        api.request('/admin/teachers/homeroom'),
-        api.request('/admin/subjects'),
-        api.request('/admin/classes'),
-        api.request('/admin/users'),
-        api.request('/admin/subject-teachers'),
-      ]);
+      // Load only data needed for the active tab to optimize API calls
+      if (activeTab === 'teachers') {
+        // Teachers tab needs: teachers, subjects, subject_teachers
+        const [teachersRes, subjectsRes, subjectTeachersRes] = await Promise.all([
+          api.request('/admin/teachers'),
+          api.request('/admin/subjects'),
+          api.request('/admin/subject-teachers'),
+        ]);
 
-      if (teachersRes.success) setTeachers(teachersRes.data || []);
-      if (homeroomTeachersRes.success) setHomeroomTeachers(homeroomTeachersRes.data || []);
-      if (subjectsRes.success) {
-        // Ensure all subjects have required fields with safe defaults
-        const subjectsData = (subjectsRes.data || [])
-          .filter((s) => s !== null && s !== undefined)
-          .map((s) => ({
-            id: s.id || null,
-            subject_code: s.subject_code || '-',
-            subject_name: s.subject_name || '-',
-            description: s.description || '-',
-            is_mandatory: s.is_mandatory ?? false,
-            is_active: s.is_active ?? true,
-            ...s,
-          }));
-        setSubjects(subjectsData);
-      }
-      if (classesRes.success) setClasses(classesRes.data || []);
-      if (usersRes.success) setUsers(usersRes.data || []);
-      if (subjectTeachersRes.success) {
-        setSubjectTeachersData(subjectTeachersRes.data || []);
+        if (teachersRes.success) {
+          const activeTeachers = (teachersRes.data || []).filter((t: any) => t.is_active !== false);
+          setTeachers(activeTeachers);
+        }
 
-        const teacherSubjectsMap = {};
-        (subjectTeachersRes.data || []).forEach((st) => {
-          if (st.is_active !== false) {
-            if (!teacherSubjectsMap[st.teacher_id]) {
-              teacherSubjectsMap[st.teacher_id] = [];
+        if (subjectsRes.success) {
+          const subjectsData = (subjectsRes.data || [])
+            .filter((s) => s !== null && s !== undefined && s.is_active !== false)
+            .map((s) => ({
+              id: s.id || null,
+              subject_code: s.subject_code || '-',
+              subject_name: s.subject_name || '-',
+              description: s.description || '-',
+              is_mandatory: s.is_mandatory ?? false,
+              is_active: s.is_active ?? true,
+              ...s,
+            }));
+          setSubjects(subjectsData);
+        }
+
+        if (subjectTeachersRes.success) {
+          setSubjectTeachersData(subjectTeachersRes.data || []);
+
+          const teacherSubjectsMap = {};
+          (subjectTeachersRes.data || []).forEach((st) => {
+            if (st.is_active !== false) {
+              if (!teacherSubjectsMap[st.teacher_id]) {
+                teacherSubjectsMap[st.teacher_id] = [];
+              }
+              teacherSubjectsMap[st.teacher_id].push(st.subject_id);
             }
-            teacherSubjectsMap[st.teacher_id].push(st.subject_id);
-          }
-        });
-        setTeacherSubjects(teacherSubjectsMap);
+          });
+          setTeacherSubjects(teacherSubjectsMap);
+        }
+      } else if (activeTab === 'class_subjects') {
+        // Class subjects tab needs: teachers, subjects, classes, subject_teachers
+        const [teachersRes, subjectsRes, classesRes, subjectTeachersRes] = await Promise.all([
+          api.request('/admin/teachers'),
+          api.request('/admin/subjects'),
+          api.request('/admin/classes'),
+          api.request('/admin/subject-teachers'),
+        ]);
+
+        // Filter to only active items
+        if (teachersRes.success) {
+          const activeTeachers = (teachersRes.data || []).filter((t: any) => t.is_active !== false);
+          setTeachers(activeTeachers);
+        }
+        if (subjectsRes.success) {
+          const activeSubjects = (subjectsRes.data || [])
+            .filter((s) => s !== null && s !== undefined && s.is_active !== false);
+          setSubjects(activeSubjects);
+        }
+        if (classesRes.success) {
+          const activeClasses = (classesRes.data || []).filter((c: any) => c.is_active !== false);
+          setClasses(activeClasses);
+        }
+        if (subjectTeachersRes.success) setSubjectTeachersData(subjectTeachersRes.data || []);
+      } else if (activeTab === 'subjects') {
+        // Subjects tab needs: subjects, teachers
+        const [subjectsRes, teachersRes] = await Promise.all([
+          api.request('/admin/subjects'),
+          api.request('/admin/teachers'),
+        ]);
+
+        if (subjectsRes.success) {
+          const subjectsData = (subjectsRes.data || [])
+            .filter((s) => s !== null && s !== undefined && s.is_active !== false)
+            .map((s) => ({
+              id: s.id || null,
+              subject_code: s.subject_code || '-',
+              subject_name: s.subject_name || '-',
+              description: s.description || '-',
+              is_mandatory: s.is_mandatory ?? false,
+              is_active: s.is_active ?? true,
+              ...s,
+            }));
+          setSubjects(subjectsData);
+        }
+        if (teachersRes.success) {
+          const activeTeachers = (teachersRes.data || []).filter((t: any) => t.is_active !== false);
+          setTeachers(activeTeachers);
+        }
+
+        if (teachersRes.success) setTeachers(teachersRes.data || []);
+      } else if (activeTab === 'classes') {
+        // Classes tab needs: classes, teachers, homeroom_teachers
+        const [classesRes, teachersRes, homeroomTeachersRes] = await Promise.all([
+          api.request('/admin/classes'),
+          api.request('/admin/teachers'),
+          api.request('/admin/teachers/homeroom'),
+        ]);
+
+        if (classesRes.success) setClasses(classesRes.data || []);
+        if (teachersRes.success) setTeachers(teachersRes.data || []);
+        if (homeroomTeachersRes.success) setHomeroomTeachers(homeroomTeachersRes.data || []);
+      } else if (activeTab === 'users') {
+        // Users tab needs: users only
+        const usersRes = await api.request('/admin/users');
+        if (usersRes.success) setUsers(usersRes.data || []);
       }
     } catch (err) {
       logger.error('Error loading reference data:', err);
     }
-  }, []);
+  }, [activeTab]);
 
   // Load data when tab changes
   useEffect(() => {
     const loadAllData = async () => {
-      await loadData();
-      if (activeTab === 'teachers' || activeTab === 'class_subjects' || activeTab === 'subject_teachers') {
-        await loadReferenceData();
+      if (activeTab === 'teachers' || activeTab === 'class_subjects' || activeTab === 'subject_teachers' || activeTab === 'classes' || activeTab === 'subjects') {
+        // Load main data and reference data in parallel for better performance
+        await Promise.all([loadData(), loadReferenceData()]);
+      } else {
+        await loadData();
       }
     };
     loadAllData();
@@ -180,7 +305,8 @@ export function useAdminManagement() {
 
           if (yearsRes.success) {
             const years = yearsRes.data || [];
-            // Academic years list is passed via useAdminFilters
+            // Set academic years for the form dropdown
+            setAcademicYears(years);
 
             let toSelect = '';
             if (defaultYearRes.success && years.includes(defaultYearRes.data)) {
@@ -195,6 +321,7 @@ export function useAdminManagement() {
         }
       })();
     } else {
+      setAcademicYears([]);
       setSelectedAcademicYear('');
       setSelectedClassId('');
     }
@@ -328,6 +455,9 @@ export function useAdminManagement() {
             'subject_specialization',
           ];
           const cleanData = {};
+          // Extract selected subjects from form data
+          const submittedSubjects = data._selectedSubjects || [];
+          delete (data as any)._selectedSubjects; // Remove from cleanData
 
           allowedFields.forEach((field) => {
             if (field in data && data[field] !== undefined && data[field] !== null && data[field] !== '') {
@@ -338,7 +468,7 @@ export function useAdminManagement() {
           logger.debug('Clean data to send:', cleanData);
 
           if (!(cleanData as any).full_name) {
-            setError('Vui lòng nhập họ tên giáo viên');
+            toast.error('Vui lòng nhập họ tên giáo viên');
             return;
           }
 
@@ -348,15 +478,15 @@ export function useAdminManagement() {
           });
 
           if (!teacherResponse.success) {
-            setError(teacherResponse.message || 'Không thể tạo giáo viên');
+            toast.error(teacherResponse.message || 'Không thể tạo giáo viên');
             return;
           }
 
           const newTeacher = teacherResponse.data;
           const newTeacherId = newTeacher.id;
 
-          if (selectedSubjects.length > 0) {
-            const subjectTeacherPromises = selectedSubjects.map((subjectId) =>
+          if (submittedSubjects.length > 0) {
+            const subjectTeacherPromises = submittedSubjects.map((subjectId) =>
               api.request('/admin/subject-teachers', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -380,6 +510,39 @@ export function useAdminManagement() {
               selectedSubjects.length > 0 ? ` và phân công ${selectedSubjects.length} môn học!` : '!'
             }`
           );
+        } else if (activeTab === 'class_subjects' && data._selectedClasses) {
+          // Bulk create for class_subjects
+          const selectedClasses = data._selectedClasses || [];
+
+          if (selectedClasses.length === 0) {
+            toast.error('Vui lòng chọn ít nhất một lớp học');
+            return;
+          }
+
+          const bulkCreatePayload = {
+            teacher_id: data.teacher_id,
+            subject_id: data.subject_id,
+            class_ids: selectedClasses,
+            academic_year: data.academic_year,
+            semester: data.semester,
+            is_active: true,
+          };
+
+          const bulkResponse = await api.request('/admin/class-subjects/bulk', {
+            method: 'POST',
+            body: JSON.stringify(bulkCreatePayload),
+          });
+
+          if (bulkResponse.success) {
+            setShowAddForm(false);
+            setFormData({});
+            loadData();
+            loadReferenceData();
+            toast.success(bulkResponse.message || 'Phân công thành công!');
+          } else {
+            const errorMsg = bulkResponse.message || 'Không thể tạo phân công';
+            toast.error(errorMsg);
+          }
         } else {
           const payload =
             activeTab === 'subjects'
@@ -432,14 +595,12 @@ export function useAdminManagement() {
             toast.success('Tạo thành công!');
           } else {
             const errorMsg = response.message || 'Không thể tạo bản ghi';
-            setError(errorMsg);
             toast.error(errorMsg);
           }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         const errorMsg = 'Lỗi khi tạo: ' + errMsg;
-        setError(errorMsg);
         toast.error(errorMsg);
       }
     },
@@ -469,14 +630,18 @@ export function useAdminManagement() {
           });
 
           if (!teacherResponse.success) {
-            setError(teacherResponse.message || 'Không thể cập nhật giáo viên');
+            toast.error(teacherResponse.message || 'Không thể cập nhật giáo viên');
             return;
           }
 
+          // Extract selected subjects from form data
+          const submittedSubjects = data._selectedSubjects || [];
+          delete (data as any)._selectedSubjects; // Remove from cleanData
+          
           const currentSubjectIds = teacherSubjects[id] || [];
 
-          const subjectsToAdd = selectedSubjects.filter((sid) => !currentSubjectIds.includes(sid));
-          const subjectsToRemove = currentSubjectIds.filter((sid) => !selectedSubjects.includes(sid));
+          const subjectsToAdd = submittedSubjects.filter((sid) => !currentSubjectIds.includes(sid));
+          const subjectsToRemove = currentSubjectIds.filter((sid) => !submittedSubjects.includes(sid));
 
           if (subjectsToAdd.length > 0) {
             const addPromises = subjectsToAdd.map((subjectId) =>
@@ -511,6 +676,34 @@ export function useAdminManagement() {
           loadData();
           loadReferenceData();
           toast.success('Cập nhật giáo viên thành công!');
+        } else if (activeTab === 'class_subjects' && data._selectedClasses) {
+          // Bulk update for class_subjects (changing class assignments)
+          const recordIds = data._recordIds || [id];  // If not provided, use single id
+          const selectedClasses = data._selectedClasses || [];
+
+          const bulkUpdatePayload = {
+            record_ids: recordIds,
+            teacher_id: data.teacher_id,
+            subject_id: data.subject_id,
+            academic_year: data.academic_year,
+            semester: data.semester,
+            selected_class_ids: selectedClasses,
+          };
+
+          const bulkResponse = await api.request('/admin/class-subjects/bulk-update', {
+            method: 'PUT',
+            body: JSON.stringify(bulkUpdatePayload),
+          });
+
+          if (bulkResponse.success) {
+            setEditingItem(null);
+            setFormData({});
+            loadData();
+            loadReferenceData();
+            toast.success(bulkResponse.message || 'Cập nhật phân công thành công!');
+          } else {
+            toast.error(bulkResponse.message || 'Không thể cập nhật phân công');
+          }
         } else {
           const updatePayload =
             activeTab === 'subjects'
@@ -559,14 +752,12 @@ export function useAdminManagement() {
             toast.success('Cập nhật thành công!');
           } else {
             const errorMsg = response.message || 'Không thể cập nhật';
-            setError(errorMsg);
             toast.error(errorMsg);
           }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         const errorMsg = 'Lỗi khi cập nhật: ' + errMsg;
-        setError(errorMsg);
         toast.error(errorMsg);
       }
     },
@@ -627,6 +818,8 @@ export function useAdminManagement() {
     filteredTeachers,
     setFilteredTeachers,
     subjectTeachersData,
+    teacherSubjects,
+    academicYears,
     currentConfig,
     // Data Loading
     loadData,
