@@ -63,14 +63,15 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     
-    # Lấy database client (có thể từ middleware hoặc từ get_school_db)
+    # Lấy database client (single database mode - multi-school disabled)
     db: Client
     if hasattr(request.state, 'db') and request.state.db:
         # Database đã được set bởi middleware
         db = request.state.db
     else:
-        # Fallback: lấy database từ username
-        db = get_school_db(username)
+        # Fallback: sử dụng default database (multi-DB disabled)
+        # db = get_school_db(username)
+        db = get_db(request)
     
     # Query user từ database
     user_response = db.table("users").select("*").or_(
@@ -121,12 +122,14 @@ async def get_current_user_from_refresh_token(
     except JWTError:
         raise credentials_exception
     
-    # Lấy database client
+    # Lấy database client (single database mode - multi-school disabled)
     db: Client
     if hasattr(request.state, 'db') and request.state.db:
         db = request.state.db
     else:
-        db = get_school_db(username)
+        # Fallback: sử dụng default database (multi-DB disabled)
+        # db = get_school_db(username)
+        db = get_db(request)
     
     user_response = db.table("users").select("*").or_(
         f"username.eq.{username},email.eq.{username}"

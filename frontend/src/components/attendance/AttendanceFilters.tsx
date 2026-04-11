@@ -20,15 +20,12 @@ import {
 interface AttendanceFiltersProps {
   loading?: boolean;
   selectedDate: string;
-  selectedClass: string;
   selectedStatus: string;
   selectedAcademicYear: string;
   showFullList: boolean;
-  classes: string[];
   academicYears: string[];
   classesLoading: boolean;
   onDateChange: (date: string) => void;
-  onClassChange: (className: string) => void;
   onStatusChange: (status: string) => void;
   onAcademicYearChange: (year: string) => void;
   onViewModeChange: (showFull: boolean) => void;
@@ -39,15 +36,11 @@ interface AttendanceFiltersProps {
 const AttendanceFilters = ({
   loading,
   selectedDate,
-  selectedClass,
   selectedStatus,
   selectedAcademicYear,
   showFullList,
-  classes,
   academicYears,
-  classesLoading,
   onDateChange,
-  onClassChange,
   onStatusChange,
   onAcademicYearChange,
   onViewModeChange,
@@ -114,40 +107,6 @@ const AttendanceFilters = ({
                 placeholder="Chọn ngày"
                 className="w-full"
               />
-            )}
-          </div>
-
-          <div className="flex-1 max-w-[200px]">
-            <label className="block mb-2 text-sm font-medium">Lớp</label>
-            {loading ? (
-              <Skeleton className="w-full h-10 rounded-md" />
-            ) : (
-              <Select value={selectedClass} onValueChange={onClassChange} disabled={classesLoading}>
-                <SelectTrigger className="w-full flex items-center justify-between focus-visible:outline-none">
-                  <SelectValue
-                    placeholder={
-                      classesLoading
-                        ? 'Đang tải lớp…'
-                        : isHomeroomTeacher?.()
-                        ? 'Chọn lớp chủ nhiệm'
-                        : 'Tất cả lớp'
-                    }
-                  />
-                  {classesLoading && (
-                    <span className="ml-2 inline-block w-3 h-3 border-2 border-transparent border-b-muted-foreground rounded-full animate-spin" />
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    {isHomeroomTeacher?.() ? 'Chọn lớp chủ nhiệm' : 'Tất cả lớp'}
-                  </SelectItem>
-                  {classes.map((className) => (
-                    <SelectItem key={className} value={className}>
-                      {className}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             )}
           </div>
 

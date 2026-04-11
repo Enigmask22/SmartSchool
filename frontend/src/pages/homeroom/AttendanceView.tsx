@@ -1,5 +1,6 @@
 import { useContext, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import { useAttendanceAPI } from '@/hooks/attendance/useAttendanceAPI';
 import { useAttendanceFilters } from '@/hooks/attendance/useAttendanceFilters';
 import { useAttendanceEdit } from '@/hooks/attendance/useAttendanceEdit';
@@ -46,7 +47,6 @@ export default function AttendanceView() {
     selectedAcademicYear,
     showFullList,
     handleDateChange,
-    handleClassChange,
     handleStatusChange,
     handleAcademicYearChange,
     handleViewModeChange,
@@ -63,8 +63,8 @@ export default function AttendanceView() {
   const {
     attendanceRecords,
     stats,
-    classes,
     academicYears,
+    apiSelectedClass,
     loading,
     classesLoading,
     updating,
@@ -73,6 +73,10 @@ export default function AttendanceView() {
     attendanceBootstrap,
     updateRecord: apiUpdateRecord,
   } = api;
+
+  // For homeroom teachers, use the selected class and its ID from the hook
+  const displayClass = isHomeroomTeacher?.() && apiSelectedClass?.class_name ? apiSelectedClass.class_name : "";
+  const displayClassId = isHomeroomTeacher?.() && apiSelectedClass?.id ? apiSelectedClass.id : undefined;
 
   // Edit form state management
   const edit = useAttendanceEdit();
@@ -139,7 +143,16 @@ export default function AttendanceView() {
       <div className="mb-8">
         <PageHeader
           title="Điểm danh lớp học"
-          description="Quản lý điểm danh lớp chủ nhiệm"
+          description={
+            displayClass ? (
+              <div className="flex gap-2">
+                <Badge variant="secondary">{selectedAcademicYear}</Badge>
+                <Badge variant="secondary">{`Lớp ${displayClass}`}</Badge>
+              </div>
+            ) : (
+              'Chưa được phân công chủ nhiệm'
+            )
+          }
           icon={
           <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
             <CalendarCheck className="w-8 h-8 text-white" />
@@ -167,27 +180,27 @@ export default function AttendanceView() {
       <AttendanceFilters
         loading={loading}
         selectedDate={selectedDate}
-        selectedClass={selectedClass}
         selectedStatus={selectedStatus}
         selectedAcademicYear={selectedAcademicYear}
         showFullList={showFullList}
-        classes={classes}
         academicYears={academicYears}
         classesLoading={classesLoading}
         onDateChange={handleDateChange}
-        onClassChange={handleClassChange}
         onStatusChange={handleStatusChange}
         onAcademicYearChange={(year) => {
           handleAcademicYearChange(year);
-          attendanceBootstrap({ year, date: selectedDate });
+          const bootstrapParams: any = { year, date: selectedDate };
+          if (displayClassId) bootstrapParams.classId = displayClassId;
+          attendanceBootstrap(bootstrapParams);
         }}
         onViewModeChange={handleViewModeChange}
         onSearchClick={() => {
-          attendanceBootstrap({
+          const bootstrapParams: any = {
             year: selectedAcademicYear,
             date: selectedDate,
-            className: selectedClass && selectedClass !== 'all' ? selectedClass : undefined,
-          });
+          };
+          if (displayClassId) bootstrapParams.classId = displayClassId;
+          attendanceBootstrap(bootstrapParams);
         }}
         onResetClick={resetFilters}
       />
@@ -199,7 +212,7 @@ export default function AttendanceView() {
         totalPages={totalPages}
         loading={loading}
         selectedDate={selectedDate}
-        selectedClass={selectedClass}
+        selectedClass={displayClass}
         showFullList={showFullList}
         page={page}
         pageSize={pageSize}

@@ -10,7 +10,7 @@ export const exportToExcel = async (
   semester: string,
   getDisplayColumns: (config: Record<string, any>) => any[],
   // _flattenScoreColumns: (config: Record<string, any>) => any[],
-  calculateFinalGrade: (scoreData: any) => string | number
+  calculateFinalScore: (scoreData: any) => string | number
 ) => {
   try {
     const workbook = new ExcelJS.Workbook();
@@ -187,8 +187,8 @@ export const exportToExcel = async (
       // Average grade
       cellCount++;
       if (studentData.score?.score_data) {
-        const avgGrade = calculateFinalGrade(studentData.score.score_data);
-        row.getCell(cellCount).value = avgGrade;
+        const avgScore = calculateFinalScore(studentData.score.score_data);
+        row.getCell(cellCount).value = avgScore;
         row.getCell(cellCount).font = { bold: true };
         row.getCell(cellCount).alignment = {
           horizontal: 'center',
@@ -196,11 +196,11 @@ export const exportToExcel = async (
         };
 
         const color =
-          typeof avgGrade === 'string'
-            ? avgGrade === 'Đ'
+          typeof avgScore === 'string'
+            ? avgScore === 'Đ'
               ? 'FF92D050'
               : 'FFFF0000'
-            : avgGrade >= 5
+            : avgScore >= 5
             ? 'FF92D050'
             : 'FFFF0000';
 

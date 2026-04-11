@@ -47,8 +47,20 @@ export default function FilterSection({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {isHomeroomTeacher && (
+        {isHomeroomTeacher ? (
+          // For homeroom teachers: simplified view with only refresh button
+          <div className="flex gap-2">
+            <Button onClick={onRefresh} className="flex-shrink-0">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Làm mới dữ liệu
+            </Button>
+            <p className="text-sm text-muted-foreground flex items-center">
+              Dữ liệu sẽ tự động cập nhật theo lớp chủ nhiệm của bạn
+            </p>
+          </div>
+        ) : (
+          // For other users: full filter controls
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Năm học</Label>
               <Select
@@ -67,54 +79,50 @@ export default function FilterSection({
                 </SelectContent>
               </Select>
             </div>
-          )}
-          <div className="space-y-2">
-            <Label>Lớp</Label>
-            <Select
-              value={selectedClass}
-              onValueChange={onClassChange}
-              disabled={classesLoading}
-            >
-              <SelectTrigger className="w-full flex items-center justify-between focus-visible:outline-none">
-                <SelectValue
-                  placeholder={
-                    classesLoading
-                      ? 'Đang tải lớp…'
-                      : isHomeroomTeacher
-                      ? 'Chọn lớp chủ nhiệm'
-                      : 'Tất cả lớp'
-                  }
-                />
-                {classesLoading && (
-                  <span className="ml-2 inline-block w-3 h-3 border-2 border-transparent border-b-muted-foreground rounded-full animate-spin" />
-                )}
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  {isHomeroomTeacher ? 'Chọn lớp chủ nhiệm' : 'Tất cả lớp'}
-                </SelectItem>
-                {availableClasses.map((className) => (
-                  <SelectItem key={className} value={className}>
-                    {className}
+            <div className="space-y-2">
+              <Label>Lớp</Label>
+              <Select
+                value={selectedClass}
+                onValueChange={onClassChange}
+                disabled={classesLoading}
+              >
+                <SelectTrigger className="w-full flex items-center justify-between focus-visible:outline-none">
+                  <SelectValue
+                    placeholder={
+                      classesLoading ? 'Đang tải lớp…' : 'Tất cả lớp'
+                    }
+                  />
+                  {classesLoading && (
+                    <span className="ml-2 inline-block w-3 h-3 border-2 border-transparent border-b-muted-foreground rounded-full animate-spin" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    Tất cả lớp
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {classesLoading && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Đang tải lớp…
-              </p>
-            )}
-          </div>
+                  {availableClasses.map((className) => (
+                    <SelectItem key={className} value={className}>
+                      {className}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {classesLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Đang tải lớp…
+                </p>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <Label className="invisible">Thao tác</Label>
-            <Button onClick={onRefresh} className="w-full">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Làm mới dữ liệu
-            </Button>
+            <div className="space-y-2">
+              <Label className="invisible">Thao tác</Label>
+              <Button onClick={onRefresh} className="w-full">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Làm mới dữ liệu
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Edit, Trash2, Save, FileX } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit, Trash2, Save, FileX, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -9,8 +9,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
-import { useTabCrud } from '@/hooks/admin-management/useTabCrud';
 import { useAdminForm } from '@/hooks/admin-management/useAdminForm';
 import { useAdminSearch } from '@/hooks/admin-management/useAdminSearch';
 import { useTeacherSubjectManagement } from '@/hooks/admin-management/useTeacherSubjectManagement';
@@ -21,30 +27,43 @@ import logger from '@/utils/logger';
 
 interface AdminTableProps {
   hook: any;
+  tabCrud: any;
   filteredData: any[];
   isLoading?: boolean;
   error?: string | null;
   onRetry?: () => void;
   scoreColumnHook?: any;
+  classSelectionHook?: any;
   searchTerm?: string;
   search?: ReturnType<typeof useAdminSearch>;
 }
 
-export const AdminTable: React.FC<AdminTableProps> = ({
+export function AdminTable({
   hook,
+  tabCrud: tabCrudProp,
   filteredData,
   isLoading = false,
   error = null,
   onRetry,
-  scoreColumnHook,
   searchTerm = '',
   search,
-}) => {
+  classSelectionHook,
+} : AdminTableProps) {
   // Use search from props or fallback to hook
   const searchState = search || useAdminSearch();
-  const tabCrud = useTabCrud(hook.activeTab, searchState.showDeleted);
+  const tabCrud = tabCrudProp; // Use tabCrud from props, not creating new instance
   const form = useAdminForm();
-  const teacherSubjectHook = useTeacherSubjectManagement(tabCrud.editingItem, false, hook.activeTab);
+  // Dialog state
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [editingItemForDialog, setEditingItemForDialog] = useState<any>(null);
+
+  // Pass hook.teacherSubjects so the form can pre-populate currently assigned subjects
+  const teacherSubjectHook = useTeacherSubjectManagement(
+    tabCrud.editingItem,
+    false,
+    hook.activeTab,
+    hook.teacherSubjects
+  );
   const scoreColumnHookLocal = useScoreColumnManagement();
 
   const renderForm = (isEdit = false, item = null) => {
@@ -53,27 +72,26 @@ export const AdminTable: React.FC<AdminTableProps> = ({
         hook={hook}
         teacherSubjectHook={teacherSubjectHook}
         scoreColumnHook={scoreColumnHookLocal}
+        classSelectionHook={classSelectionHook}
         isEdit={isEdit}
         item={item}
         onCancel={() => {
+          setIsFormDialogOpen(false);
+          setEditingItemForDialog(null);
           tabCrud.setEditingItem(null);
           teacherSubjectHook.setSelectedSubjects([]);
           scoreColumnHookLocal.setScoreColumns([]);
+          classSelectionHook?.setSelectedClasses([]);
         }}
       />
     );
   };
 
   const handleEdit = (item: any) => {
-    // Toggle: if already editing this item, close the form
-    if (tabCrud.editingItem === item.id) {
-      tabCrud.setEditingItem(null);
-      teacherSubjectHook.setSelectedSubjects([]);
-      scoreColumnHookLocal.setScoreColumns([]);
-      return;
-    }
-
     tabCrud.setEditingItem(item.id);
+    setEditingItemForDialog(item);
+    setIsFormDialogOpen(true);
+
     if (hook.activeTab === 'teachers') {
       logger.debug('>>> EDIT TEACHER CLICKED');
       logger.debug('>>> Original item:', item);
@@ -94,9 +112,9 @@ export const AdminTable: React.FC<AdminTableProps> = ({
             data: (value.data as any) || null,
           })
         );
-        scoreColumnHook?.setScoreColumns(columnsArray);
+        scoreColumnHookLocal?.setScoreColumns(columnsArray);
       } else {
-        scoreColumnHook?.setScoreColumns([]);
+        scoreColumnHookLocal?.setScoreColumns([]);
       }
     } else if (hook.activeTab === 'subjects') {
       form.setFormData(item);
@@ -109,9 +127,9 @@ export const AdminTable: React.FC<AdminTableProps> = ({
           he_so: value.he_so as number,
           data: (value.data as any) || null,
         }));
-        scoreColumnHook?.setScoreColumns(columnsArray);
+        scoreColumnHookLocal?.setScoreColumns(columnsArray);
       } else {
-        scoreColumnHook?.setScoreColumns([]);
+        scoreColumnHookLocal?.setScoreColumns([]);
       }
     } else {
       form.setFormData(item);
@@ -128,6 +146,11 @@ export const AdminTable: React.FC<AdminTableProps> = ({
         teachersForSubject.includes(t.id)
       );
       hook.setFilteredTeachers(filtered);
+
+      // Initialize selected classes for editing
+      if (classSelectionHook && item.class_ids) {
+        classSelectionHook.setSelectedClasses(item.class_ids);
+      }
     }
   };
 
@@ -173,10 +196,12 @@ export const AdminTable: React.FC<AdminTableProps> = ({
     return (
       <div className="py-16 text-center">
         <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10">
-          <span className="text-2xl text-destructive">⚠️</span>
+          <AlertCircle className="w-8 h-8 text-destructive" />
         </div>
-        <p className="mb-4 font-medium text-destructive">{error}</p>
-        <Button onClick={onRetry}>Thử lại</Button>
+        <p className="mb-6 font-medium text-destructive">{error}</p>
+        <Button onClick={onRetry} variant="default">
+          Thử lại
+        </Button>
       </div>
     );
   }
@@ -223,7 +248,13 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => tabCrud.handleRestore(item.id)}
+                          onClick={() => {
+                            // For class_subjects, use recordIds array; for others use id
+                            const restoreId = hook.activeTab === 'class_subjects' && item.recordIds 
+                              ? item.recordIds 
+                              : item.id;
+                            tabCrud.handleRestore(restoreId);
+                          }}
                           className="text-green-600 border-green-200 hover:bg-green-50"
                           title="Khôi phục"
                         >
@@ -232,7 +263,13 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => tabCrud.handlePermanentDelete(item.id)}
+                          onClick={() => {
+                            // For class_subjects, use recordIds array; for others use id
+                            const deleteId = hook.activeTab === 'class_subjects' && item.recordIds 
+                              ? item.recordIds 
+                              : item.id;
+                            tabCrud.handlePermanentDelete(deleteId);
+                          }}
                           className="text-red-600 border-red-200 hover:bg-red-50"
                           title="Xóa vĩnh viễn"
                         >
@@ -253,7 +290,13 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => tabCrud.handleDelete(item.id)}
+                          onClick={() => {
+                            // For class_subjects, use recordIds array; for others use id
+                            const deleteId = hook.activeTab === 'class_subjects' && item.recordIds 
+                              ? item.recordIds 
+                              : item.id;
+                            tabCrud.handleDelete(deleteId);
+                          }}
                           className="text-destructive hover:bg-destructive/10"
                           title="Xóa tạm thời"
                         >
@@ -264,26 +307,28 @@ export const AdminTable: React.FC<AdminTableProps> = ({
                   </div>
                 </TableCell>
               </TableRow>
-              {tabCrud.editingItem === item.id && (
-                <TableRow>
-                  <TableCell
-                    colSpan={(hook.currentConfig?.displayFields?.length || 0) + 1}
-                    className="bg-muted/30"
-                  >
-                    <div className="mb-4">
-                      <h3 className="mb-2 text-lg font-semibold">Chỉnh sửa thông tin</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Cập nhật thông tin cho bản ghi này
-                      </p>
-                    </div>
-                    {renderForm(true, item)}
-                  </TableCell>
-                </TableRow>
-              )}
+              {/* Form is now rendered in Dialog instead of inline */}
             </React.Fragment>
           ))}
         </TableBody>
       </Table>
+
+      {/* Dialog for form submission */}
+      <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingItemForDialog ? 'Chỉnh sửa thông tin' : 'Tạo mới'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingItemForDialog 
+                ? 'Cập nhật thông tin cho bản ghi này'
+                : 'Tạo một bản ghi mới'}
+            </DialogDescription>
+          </DialogHeader>
+          {renderForm(!!editingItemForDialog, editingItemForDialog)}
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm Dialog for delete/restore operations */}
       {tabCrud.confirmState.open && (

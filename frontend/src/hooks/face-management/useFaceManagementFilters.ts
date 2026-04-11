@@ -27,13 +27,10 @@ interface FilterState {
  * 
  * Returns: See UseFaceManagementFiltersReturn interface
  */
-export const useFaceManagementFilters = (
-  initialClass: string = 'all',
-  initialYear: string = ''
-) => {
+export const useFaceManagementFilters = () => {
   const [filters, setFilters] = useState<FilterState>({
-    selectedClass: initialClass,
-    selectedAcademicYear: initialYear,
+    selectedClass: 'all',
+    selectedAcademicYear: '',
     currentPage: 1,
     pageSize: 20,
   });

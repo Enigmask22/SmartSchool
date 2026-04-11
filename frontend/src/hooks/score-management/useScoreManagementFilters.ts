@@ -1,3 +1,4 @@
+import { useSystemSettings } from '@/contexts/useSystemSettings';
 import { useState } from 'react';
 
 export interface UseScoreManagementFiltersReturn {
@@ -18,12 +19,11 @@ export interface UseScoreManagementFiltersReturn {
  * 
  * Returns: See UseScoreManagementFiltersReturn interface
  */
-export const useScoreManagementFilters = (
-  defaultAcademicYear: string = '2024-2025',
-  defaultSemester: string = 'HK1'
-): UseScoreManagementFiltersReturn => {
-  const [academicYear, setAcademicYear] = useState(defaultAcademicYear);
-  const [semester, setSemester] = useState(defaultSemester);
+export const useScoreManagementFilters = ()
+  : UseScoreManagementFiltersReturn => {
+  const { settings} = useSystemSettings();
+  const [academicYear, setAcademicYear] = useState(settings.academic_year || "");
+  const [semester, setSemester] = useState(settings.semester || "");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 

@@ -339,9 +339,8 @@ const SystemSettings = () => {
                   key={d}
                   type="button"
                   variant={selected.has(d) ? "default" : "outline"}
-                  className={`h-9 ${
-                    selected.has(d) ? "bg-primary text-primary-foreground" : ""
-                  }`}
+                  className={`h-9 ${selected.has(d) ? "bg-primary text-primary-foreground" : ""
+                    }`}
                   onClick={() => toggleDay(d)}
                 >
                   {d}
@@ -373,11 +372,11 @@ const SystemSettings = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center text-3xl font-bold text-primary">
+                <CardTitle className="flex items-center text-2xl font-bold">
                   <Settings className="w-8 h-8 mr-3" />
-                  Cấu hình Học kỳ - Năm học - Thời gian điểm danh
+                  Cài đặt hệ thống
                 </CardTitle>
-                <CardDescription className="mt-2 text-lg">
+                <CardDescription className="mt-2 text-sm">
                   Quản lý năm học, học kỳ và thời gian điểm danh
                 </CardDescription>
               </div>
@@ -586,11 +585,11 @@ const SystemSettings = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center text-3xl font-bold text-primary">
+              <CardTitle className="flex items-center text-2xl font-bold">
                 <Settings className="w-8 h-8 mr-3" />
-                Cấu hình Học kỳ - Năm học - Thời gian điểm danh
+                Cài đặt hệ thống
               </CardTitle>
-              <CardDescription className="mt-2 text-lg">
+              <CardDescription className="mt-2 text-sm">
                 Quản lý năm học, học kỳ và thời gian điểm danh
               </CardDescription>
             </div>
@@ -818,7 +817,7 @@ const SystemSettings = () => {
               disabled={
                 saving ||
                 formData.attendance_cutoff_time ===
-                  settings.attendance_cutoff_time?.setting_value
+                settings.attendance_cutoff_time?.setting_value
               }
               className="w-full"
             >

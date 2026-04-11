@@ -5,7 +5,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { AuthContext } from "@/contexts/AuthContext";
-import { useSystemSettings } from "@/contexts/SystemSettingsContext";
+import { useSystemSettings } from "@/contexts/useSystemSettings";
 import { useStudentList } from "@/hooks/student-list/useStudentList";
 import { useStudentFilters } from "@/hooks/student-list/useStudentFilters";
 import { useStudentScores } from "@/hooks/student-list/useStudentScores";
@@ -26,7 +26,9 @@ import {
 export function StudentListPage() {
   const authContext = useContext(AuthContext);
   const isHomeroomTeacher = authContext?.isHomeroomTeacher || (() => false);
-  const { academicYear, semester } = useSystemSettings();
+  const { settings } = useSystemSettings();
+  const academicYear = settings.academic_year || "2024-2025";
+  const semester = settings.semester || "HK1";
 
   // Initialize filters hook - StudentList is now responsible for managing filters
   const filters = useStudentFilters();

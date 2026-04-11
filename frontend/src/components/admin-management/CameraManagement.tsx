@@ -424,32 +424,27 @@ const CameraManagement = () => {
           {loading && cameras.length === 0 ? (
             <div className="overflow-x-auto border rounded-lg">
               <Table>
-                <TableHeader className="bg-muted/50">
+                <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Tên Camera</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Source/URL</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Vị trí</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Trạng thái</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">FPS</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Frame Count</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase">Thao tác</TableHead>
+                    <TableHead className="text-center relative py-3">Tên Camera<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Source/URL<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Vị trí<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Trạng thái<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">FPS<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Frame Count<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {[...Array(5)].map((_, index) => (
-                    <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
-                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
-                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
-                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
-                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
-                      <TableCell><div className="h-4 rounded animate-pulse bg-gray-200"></div></TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <div className="w-8 h-8 rounded animate-pulse bg-gray-200"></div>
-                          <div className="w-8 h-8 rounded animate-pulse bg-gray-200"></div>
-                        </div>
-                      </TableCell>
+                    <TableRow key={index} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
+                      <TableCell className="relative"><div className="h-4 rounded animate-pulse bg-muted"></div><div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200"></div></TableCell>
+                      <TableCell className="relative"><div className="h-4 rounded animate-pulse bg-muted"></div><div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200"></div></TableCell>
+                      <TableCell className="relative"><div className="h-4 rounded animate-pulse bg-muted"></div><div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200"></div></TableCell>
+                      <TableCell className="relative"><div className="h-4 rounded animate-pulse bg-muted"></div><div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200"></div></TableCell>
+                      <TableCell className="relative"><div className="h-4 rounded animate-pulse bg-muted"></div><div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200"></div></TableCell>
+                      <TableCell className="relative"><div className="h-4 rounded animate-pulse bg-muted"></div><div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200"></div></TableCell>
+                      <TableCell className="relative flex justify-center"><div className="flex space-x-2"><div className="w-8 h-8 rounded animate-pulse bg-muted"></div><div className="w-8 h-8 rounded animate-pulse bg-muted"></div></div></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -465,36 +460,38 @@ const CameraManagement = () => {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tên Camera</TableHead>
-                    <TableHead>Source/URL</TableHead>
-                    <TableHead>Vị trí</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>FPS</TableHead>
-                    <TableHead>Frame Count</TableHead>
-                    <TableHead>Thao tác</TableHead>
+                    <TableHead className="text-center relative py-3">Tên Camera<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Source/URL<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Vị trí<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Trạng thái<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">FPS<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">Frame Count<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center">Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCameras.map((camera) => (
-                    <TableRow key={camera.camera_id}>
-                      <TableCell className="font-medium">
+                  {filteredCameras.map((camera, index) => (
+                    <TableRow key={camera.camera_id} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
+                      <TableCell className="font-medium relative text-center">
                         {camera.name}
+                        <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="relative text-center">
                         <code className="px-2 py-1 text-xs rounded bg-muted">
                           {camera.source}
                         </code>
+                        <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                       </TableCell>
-                      <TableCell>{camera.location || "-"}</TableCell>
-                      <TableCell>{getStatusBadge(camera)}</TableCell>
-                      <TableCell>{camera.fps} fps</TableCell>
-                      <TableCell>{camera.frame_count || 0}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
+                      <TableCell className="relative text-center">{camera.location || "-"}<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableCell>
+                      <TableCell className="relative text-center">{getStatusBadge(camera)}<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableCell>
+                      <TableCell className="relative text-center">{camera.fps} fps<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableCell>
+                      <TableCell className="relative text-center">{camera.frame_count || 0}<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
                           {camera.status === "active" ? (
                             <Button
                               size="sm"
@@ -517,15 +514,18 @@ const CameraManagement = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="text-primary hover:bg-primary/10"
                             onClick={() => handleEdit(camera)}
+                            title="Chỉnh sửa"
                           >
                             <Edit className="w-3 h-3" />
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-red-600 hover:text-red-700"
+                            className="text-destructive hover:bg-destructive/10"
                             onClick={() => handleDelete(camera.camera_id)}
+                            title="Xóa"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>

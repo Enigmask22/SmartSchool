@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 export const TAB_CONFIG = {
   users: {
     title: 'Quản lý người dùng',
-    fields: ['email', 'username', 'full_name', 'password', 'role'],
-    displayFields: ['id', 'email', 'username', 'full_name', 'role'], //is_active 
+    fields: ['username', 'email', 'full_name', 'password', 'role'],
+    displayFields: ['id', 'username', 'email', 'full_name', 'role'], //is_active 
     endpoint: '/admin/users',
   },
   teachers: {
@@ -35,8 +35,8 @@ export const TAB_CONFIG = {
   // },
   class_subjects: {
     title: 'Quản lý phân công giảng dạy',
-    fields: ['class_id', 'subject_id', 'teacher_id', 'academic_year', 'semester'],
-    displayFields: ['id', 'class_name', 'subject_name', 'teacher_name', 'academic_year', 'semester'], //is_active
+    fields: ['subject_id', 'teacher_id', 'class_id', 'academic_year', 'semester'],
+    displayFields: ['id', 'subject_name', 'teacher_name', 'classes', 'academic_year', 'semester'], //is_active
     endpoint: '/admin/class-subjects',
   },
   // score_settings: {
@@ -47,7 +47,7 @@ export const TAB_CONFIG = {
   // },
 };
 
-export function useTabCrud(activeTab: string, showDeleted: boolean) {
+export function useTabCrud(activeTab: string) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,12 +82,9 @@ export function useTabCrud(activeTab: string, showDeleted: boolean) {
     setError(null);
     try {
       let endpoint = currentConfig.endpoint;
-      const tabsWithServerFiltering = ['subjects', 'subject_teachers', 'class_subjects'];
-
-      if (tabsWithServerFiltering.includes(activeTab) && showDeleted) {
-        endpoint = `${endpoint}?show_deleted=true`;
-      }
-
+      // Don't add show_deleted parameter - get all data from backend
+      // Let Management.tsx handle filtering based on showDeleted flag
+      
       const response = await api.request(endpoint);
       if (response.success) {
         let items = response.data || [];
@@ -107,20 +104,8 @@ export function useTabCrud(activeTab: string, showDeleted: boolean) {
           }));
         }
 
-        if (tabsWithServerFiltering.includes(activeTab)) {
-          if (showDeleted) {
-            items = items.filter((item) => item.is_active === false);
-          } else {
-            items = items.filter((item) => item.is_active !== false);
-          }
-        } else {
-          if (showDeleted) {
-            items = items.filter((item) => item.is_active === false);
-          } else {
-            items = items.filter((item) => item.is_active !== false);
-          }
-        }
-
+        // Don't filter here - let Management.tsx filter based on showDeleted flag
+        // This keeps all filtering logic in one place
         setData(items);
       } else {
         setError(response.message || 'Không thể tải dữ liệu');
@@ -130,29 +115,48 @@ export function useTabCrud(activeTab: string, showDeleted: boolean) {
     } finally {
       setLoading(false);
     }
-  }, [currentConfig?.endpoint, activeTab, showDeleted]);
+  }, [currentConfig?.endpoint, activeTab]);
 
   // Restore item
   const handleRestore = useCallback(
-    (id: number) => {
+    (id: number | number[]) => {
       if (!currentConfig?.endpoint) return;
+
+      // For class_subjects with grouped records
+      const ids = Array.isArray(id) ? id : [id];
+      const isMultiple = ids.length > 1;
 
       openConfirm({
         title: 'Khôi phục bản ghi',
-        description: 'Bạn có chắc muốn khôi phục bản ghi này?',
+        description: isMultiple
+          ? `Bạn có chắc muốn khôi phục ${ids.length} phân công này?`
+          : 'Bạn có chắc muốn khôi phục bản ghi này?',
         confirmText: 'Khôi phục',
         variant: 'default',
         onConfirm: async () => {
           closeConfirm();
           try {
-            const response = await api.request(`${currentConfig.endpoint}/${id}/restore`, {
-              method: 'POST',
-            });
-            if (response.success) {
+            // Restore each record
+            let successCount = 0;
+            for (const idToRestore of ids) {
+              try {
+                const response = await api.request(`${currentConfig.endpoint}/${idToRestore}/restore`, {
+                  method: 'POST',
+                });
+                if (response.success) {
+                  successCount++;
+                }
+              } catch (err) {
+                // Continue with next record even if one fails
+                console.warn(`Failed to restore record ${idToRestore}:`, err);
+              }
+            }
+            
+            if (successCount > 0) {
               loadData();
-              toast.success('Khôi phục thành công!');
+              toast.success(isMultiple ? `Khôi phục ${successCount}/${ids.length} bản ghi thành công!` : 'Khôi phục thành công!');
             } else {
-              toast.error(response.message || 'Không thể khôi phục');
+              toast.error('Không thể khôi phục');
             }
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
@@ -166,24 +170,47 @@ export function useTabCrud(activeTab: string, showDeleted: boolean) {
 
   // Delete item (soft delete)
   const handleDelete = useCallback(
-    (id: number) => {
+    (id: number | number[]) => {
       if (!currentConfig?.endpoint) return;
+
+      // For class_subjects with grouped records (id is actually an array of recordIds)
+      const ids = Array.isArray(id) ? id : [id];
+      const isMultiple = ids.length > 1;
 
       openConfirm({
         title: 'Xóa tạm thời bản ghi',
-        description: 'Bạn có chắc muốn xóa tạm thời bản ghi này?\nBạn có thể khôi phục lại trong tab "Đã xóa tạm thời".',
+        description: isMultiple 
+          ? `Bạn có chắc muốn xóa tạm thời ${ids.length} phân công này?\nBạn có thể khôi phục lại trong tab "Đã xóa tạm thời".`
+          : 'Bạn có chắc muốn xóa tạm thời bản ghi này?\nBạn có thể khôi phục lại trong tab "Đã xóa tạm thời".',
         confirmText: 'Xóa tạm thời',
         onConfirm: async () => {
           closeConfirm();
           try {
-            const response = await api.request(`${currentConfig.endpoint}/${id}`, {
-              method: 'DELETE',
-            });
-            if (response.success) {
+            // Delete each record
+            let successCount = 0;
+            for (const idToDelete of ids) {
+              try {
+                const response = await api.request(`${currentConfig.endpoint}/${idToDelete}`, {
+                  method: 'DELETE',
+                });
+                if (response.success) {
+                  successCount++;
+                }
+              } catch (err) {
+                // Continue with next record even if one fails
+                console.warn(`Failed to delete record ${idToDelete}:`, err);
+              }
+            }
+            
+            if (successCount > 0) {
               loadData();
-              toast.success('Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".');
+              if (isMultiple) {
+                toast.success(`Xóa tạm thời ${successCount}/${ids.length} bản ghi thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".`);
+              } else {
+                toast.success('Xóa tạm thời thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".');
+              }
             } else {
-              toast.error(response.message || 'Không thể xóa');
+              toast.error('Không thể xóa');
             }
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
@@ -197,24 +224,43 @@ export function useTabCrud(activeTab: string, showDeleted: boolean) {
 
   // Permanent delete
   const handlePermanentDelete = useCallback(
-    (id: number) => {
+    (id: number | number[]) => {
       if (!currentConfig?.endpoint) return;
+
+      // For class_subjects with grouped records
+      const ids = Array.isArray(id) ? id : [id];
+      const isMultiple = ids.length > 1;
 
       openConfirm({
         title: '⚠️ Xóa vĩnh viễn bản ghi',
-        description: 'Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!',
+        description: isMultiple
+          ? `Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN ${ids.length} phân công này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!`
+          : 'Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!',
         confirmText: 'Xóa vĩnh viễn',
         onConfirm: async () => {
           closeConfirm();
           try {
-            const response = await api.request(`${currentConfig.endpoint}/${id}/permanent`, {
-              method: 'DELETE',
-            });
-            if (response.success) {
+            // Permanent delete each record
+            let successCount = 0;
+            for (const idToDelete of ids) {
+              try {
+                const response = await api.request(`${currentConfig.endpoint}/${idToDelete}/permanent`, {
+                  method: 'DELETE',
+                });
+                if (response.success) {
+                  successCount++;
+                }
+              } catch (err) {
+                // Continue with next record even if one fails
+                console.warn(`Failed to permanently delete record ${idToDelete}:`, err);
+              }
+            }
+            
+            if (successCount > 0) {
               loadData();
-              toast.success('Xóa vĩnh viễn thành công!');
+              toast.success(isMultiple ? `Xóa vĩnh viễn ${successCount}/${ids.length} bản ghi thành công!` : 'Xóa vĩnh viễn thành công!');
             } else {
-              toast.error(response.message || 'Không thể xóa vĩnh viễn');
+              toast.error('Không thể xóa vĩnh viễn');
             }
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);

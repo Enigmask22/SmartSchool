@@ -1,8 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useState, useEffect, ReactNode, useRef, useContext } from "react";
 import api from "@/utils/api";
 import logger from "@/utils/logger";
 import { AuthContext } from "./AuthContext";
-import { USER_ROLES } from "@/utils/constants";
 
 // Define the shape of system settings
 interface Settings {
@@ -18,24 +17,11 @@ interface SystemSettingsContextValue {
   loading: boolean;
   error: string | null;
   refreshSettings: () => void;
-  academicYear: string;
-  semester: string;
-  attendanceCutoffTime: string;
 }
 
-const SystemSettingsContext = createContext<SystemSettingsContextValue | undefined>(
+export const SystemSettingsContext = createContext<SystemSettingsContextValue | undefined>(
   undefined
 );
-
-export const useSystemSettings = () => {
-  const context = useContext(SystemSettingsContext);
-  if (!context) {
-    throw new Error(
-      "useSystemSettings must be used within SystemSettingsProvider"
-    );
-  }
-  return context;
-};
 
 interface SystemSettingsProviderProps {
   children: ReactNode;
@@ -44,25 +30,35 @@ interface SystemSettingsProviderProps {
 export const SystemSettingsProvider = ({ children }: SystemSettingsProviderProps) => {
   const authContext = useContext(AuthContext);
   const user = authContext?.user;
-  const isAdmin = user?.role === USER_ROLES.ADMIN;
+  const isAuthenticated = !!user;
 
-  const [settings, setSettings] = useState<Settings>({
-    academic_year: "2024-2025",
-    semester: "HK1",
-    attendance_cutoff_time: "07:15:00",
-  });
-  const [loading, setLoading] = useState<boolean>(true);
+  // Initialize from localStorage, fallback to defaults
+  const getInitialSettings = (): Settings => {
+    try {
+      const stored = localStorage.getItem("system_settings");
+      return stored ? JSON.parse(stored) : {
+        academic_year: "2024-2025",
+        semester: "HK1",
+        attendance_cutoff_time: "07:15:00",
+      };
+    } catch {
+      return {
+        academic_year: "2024-2025",
+        semester: "HK1",
+        attendance_cutoff_time: "07:15:00",
+      };
+    }
+  };
+
+  const [settings, setSettings] = useState<Settings>(getInitialSettings());
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchSettings = async (): Promise<void> => {
     try {
       setLoading(true);
-      // Only fetch admin settings if user is admin
-      if (!isAdmin) {
-        setLoading(false);
-        return;
-      }
-
+      // Fetch system settings (only for authenticated users)
       const response = await api.request("/admin/system-settings", {
         method: "GET",
       });
@@ -74,7 +70,14 @@ export const SystemSettingsProvider = ({ children }: SystemSettingsProviderProps
           settingsMap[setting.setting_key] = setting.setting_value;
         });
         setSettings(settingsMap);
+        // Persist to localStorage
+        localStorage.setItem("system_settings", JSON.stringify(settingsMap));
         setError(null);
+        
+        // Start auto-refresh interval if not already started
+        if (!intervalRef.current) {
+          intervalRef.current = setInterval(fetchSettings, 5 * 60 * 1000);
+        }
       }
     } catch (err: any) {
       logger.error("Error fetching system settings:", err);
@@ -85,14 +88,31 @@ export const SystemSettingsProvider = ({ children }: SystemSettingsProviderProps
     }
   };
 
+  // Fetch settings only when user is authenticated
   useEffect(() => {
-    fetchSettings();
+    if (isAuthenticated) {
+      fetchSettings();
+    } else {
+      // Reset when not authenticated (e.g., on logout)
+      setLoading(false);
+      setError(null);
+      localStorage.removeItem("system_settings");
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+  }, [isAuthenticated]);
 
-    // Refresh settings mỗi 5 phút
-    const interval = setInterval(fetchSettings, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [user]);
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
 
   const refreshSettings = (): void => {
     fetchSettings();
@@ -103,9 +123,6 @@ export const SystemSettingsProvider = ({ children }: SystemSettingsProviderProps
     loading,
     error,
     refreshSettings,
-    academicYear: settings.academic_year || "2024-2025",
-    semester: settings.semester || "HK1",
-    attendanceCutoffTime: settings.attendance_cutoff_time || "07:15:00",
   };
 
   return (

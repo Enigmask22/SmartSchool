@@ -1,7 +1,7 @@
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { useScoreManagement, ACADEMIC_YEARS, SEMESTERS } from '@/hooks/score-management/useScoreManagement';
+import { useScoreManagement, SEMESTERS } from '@/hooks/score-management/useScoreManagement';
 import { useScoreManagementAPI } from '@/hooks/score-management/useScoreManagementAPI';
 import { useScoreManagementFilters } from '@/hooks/score-management/useScoreManagementFilters';
 import { useScoreEditForm } from '@/hooks/score-management/useScoreEditForm';
@@ -10,17 +10,18 @@ import { useScoreImportForm } from '@/hooks/score-management/useScoreImportForm'
 import {
   ScoreManagementHeader,
   ClassSelector,
-  GradeTableHeader,
+  ScoreTableHeader,
   ConfigEditorModal,
   AddColumnModal,
-  GradesTable,
+  ScoreTable,
   ScoreEditModal,
   ImportPreviewModal,
   NoScoreConfigState,
   ClassSelectorSkeleton,
-  GradeTableSkeleton,
+  ScoreTableSkeleton,
 } from '@/components/score-management';
 import { exportToExcel } from '@/utils/excelGradeExport';
+import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 
 export default function ScoreManagement() {
   // Use new hooks for data layer and UI state
@@ -34,6 +35,11 @@ export default function ScoreManagement() {
 
   // Keep minimal hook for confirm dialog and template download
   const { confirmState, closeConfirm, openConfirm, handleDownloadTemplate } = useScoreManagement(selectedClassSubject?.id);
+
+  // Refetch teacher info when academic year or semester changes
+  useEffect(() => {
+    api.fetchTeacherInfo(filters.academicYear, filters.semester);
+  }, [filters.academicYear, filters.semester]);
 
   // Wrap API class select to handle filters
   const handleClassSubjectSelect = async (classSubject: any) => {
@@ -56,7 +62,7 @@ export default function ScoreManagement() {
       filters.academicYear,
       filters.semester,
       api.getDisplayColumns,
-      calculateFinalGradeWrapper
+      calculateFinalScoreWrapper
     );
   };
 
@@ -91,9 +97,9 @@ export default function ScoreManagement() {
     filters.currentPage * filters.pageSize
   );
 
-  // Wrapper function to adapt calculateFinalGrade for components expecting single-argument function
-  const calculateFinalGradeWrapper = (scoreData: any) => {
-    return api.calculateFinalGrade(scoreData, api.scoreConfig?.score_column_config || {});
+  // Wrapper function to adapt calculateFinalScore for components expecting single-argument function
+  const calculateFinalScoreWrapper = (scoreData: any) => {
+    return api.calculateFinalScore(scoreData, api.scoreConfig?.score_column_config || {});
   };
 
   // Error state - only block if teacher info fails to load
@@ -119,7 +125,7 @@ export default function ScoreManagement() {
         <ScoreManagementHeader
           academicYear={filters.academicYear}
           semester={filters.semester}
-          ACADEMIC_YEARS={ACADEMIC_YEARS}
+          ACADEMIC_YEARS={ACADEMIC_YEAR_OPTIONS}
           SEMESTERS={SEMESTERS}
           onAcademicYearChange={filters.setAcademicYear}
           onSemesterChange={filters.setSemester}
@@ -138,7 +144,7 @@ export default function ScoreManagement() {
         ) : (
           <div className="space-y-6">
             {/* Grade Table Header */}
-            <GradeTableHeader
+            <ScoreTableHeader
               selectedClassSubject={selectedClassSubject}
               academicYear={filters.academicYear}
               semester={filters.semester}
@@ -254,9 +260,9 @@ export default function ScoreManagement() {
 
             {/* Grade Table or Skeleton */}
             {api.loading && api.students.length === 0 ? (
-              <GradeTableSkeleton />
+              <ScoreTableSkeleton />
             ) : api.scoreConfig ? (
-              <GradesTable
+              <ScoreTable
                 students={paginatedStudents}
                 scoreConfig={api.scoreConfig}
                 currentPage={filters.currentPage}
@@ -272,7 +278,7 @@ export default function ScoreManagement() {
                   editForm.setScoreForm(form);
                 }}
                 getDisplayColumns={api.getDisplayColumns}
-                calculateFinalGrade={calculateFinalGradeWrapper}
+                calculateFinalScore={calculateFinalScoreWrapper}
               />
             ) : (
               <NoScoreConfigState

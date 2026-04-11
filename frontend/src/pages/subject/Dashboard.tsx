@@ -11,9 +11,9 @@ import {
 } from "@/components/subject-dashboard";
 import {
   useSubjectDashboard,
-  ACADEMIC_YEARS,
   SEMESTERS,
 } from "@/hooks/subject-dashboard/useSubjectDashboard";
+import { ACADEMIC_YEAR_OPTIONS } from "@/utils/constants";
 
 const SubjectTeacherDashboard = () => {
   // UI State - Tab selection (kept in component)
@@ -42,7 +42,7 @@ const SubjectTeacherDashboard = () => {
           onAcademicYearChange={setAcademicYear}
           onSemesterChange={setSemester}
           subjects={analytics?.subjects || []}
-          academicYears={ACADEMIC_YEARS}
+          academicYears={ACADEMIC_YEAR_OPTIONS}
           semesters={SEMESTERS}
           loading={loading}
         />

@@ -14,109 +14,109 @@ from core.dependencies import get_current_user
 logger = setup_logger("homeroom_api")
 router = APIRouter()
 
-@router.get("/bootstrap")
-async def homeroom_bootstrap(
-    academic_year: Optional[str] = Query(default=None),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
-    """Gộp các dữ liệu khởi tạo: academic_years, default_year, classes theo năm, 
-    auto-chọn lớp đầu tiên và trả về luôn danh sách học sinh của lớp đó.
+# @router.get("/bootstrap")
+# async def homeroom_bootstrap(
+#     academic_year: Optional[str] = Query(default=None),
+#     current_user=Depends(get_current_user),
+#     db=Depends(get_db),
+# ):
+#     """Gộp các dữ liệu khởi tạo: academic_years, default_year, classes theo năm, 
+#     auto-chọn lớp đầu tiên và trả về luôn danh sách học sinh của lớp đó.
 
-    Mục tiêu: 1 lần gọi API thay cho 4-6 lần gọi rời rạc ở FE.
-    """
-    try:
-        # Teacher id
-        teacher_resp = (
-            db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
-        )
-        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
-        if not teacher_id:
-            return {"success": True, "data": {
-                "academic_years": [],
-                "default_year": None,
-                "classes": [],
-                "selected_class": None,
-                "students": []
-            }}
+#     Mục tiêu: 1 lần gọi API thay cho 4-6 lần gọi rời rạc ở FE.
+#     """
+#     try:
+#         # Teacher id
+#         teacher_resp = (
+#             db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+#         )
+#         teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+#         if not teacher_id:
+#             return {"success": True, "data": {
+#                 "academic_years": [],
+#                 "default_year": None,
+#                 "classes": [],
+#                 "selected_class": None,
+#                 "students": []
+#             }}
 
-        # Years GV có lớp
-        hsh = db.table("homeroom_students_history").select("class_id").eq("teacher_id", teacher_id).execute()
-        class_ids = list({r.get("class_id") for r in (hsh.data or []) if r.get("class_id") is not None})
-        years: List[str] = []
-        if class_ids:
-            cls = db.table("classes").select("academic_year").in_("id", class_ids).execute()
-            years = sorted(list({c.get("academic_year") for c in (cls.data or []) if c.get("academic_year")}))
+#         # Years GV có lớp
+#         hsh = db.table("homeroom_students_history").select("class_id").eq("teacher_id", teacher_id).execute()
+#         class_ids = list({r.get("class_id") for r in (hsh.data or []) if r.get("class_id") is not None})
+#         years: List[str] = []
+#         if class_ids:
+#             cls = db.table("classes").select("academic_year").in_("id", class_ids).execute()
+#             years = sorted(list({c.get("academic_year") for c in (cls.data or []) if c.get("academic_year")}))
 
-        # Default year nếu chưa chọn
-        default_year_resp = (
-            db.table("system_settings").select("setting_value").eq("setting_key", "academic_year").limit(1).execute()
-        )
-        default_year = default_year_resp.data[0]["setting_value"] if default_year_resp.data else None
-        year = academic_year or default_year or (years[0] if years else None)
+#         # Default year nếu chưa chọn
+#         default_year_resp = (
+#             db.table("system_settings").select("setting_value").eq("setting_key", "academic_year").limit(1).execute()
+#         )
+#         default_year = default_year_resp.data[0]["setting_value"] if default_year_resp.data else None
+#         year = academic_year or default_year or (years[0] if years else None)
 
-        # Lớp theo năm học
-        classes = []
-        selected_class_name = None
-        selected_class_id = None
-        if class_ids:
-            q = db.table("classes").select("id, class_name, grade, academic_year").in_("id", class_ids)
-            if year:
-                q = q.eq("academic_year", year)
-            cls2 = q.order("class_name").execute()
-            classes = [
-                {"id": r.get("id"), "class_name": r.get("class_name"), "grade": r.get("grade"), "academic_year": r.get("academic_year")}
-                for r in (cls2.data or [])
-            ]
-            if classes:
-                selected_class_id = classes[0]["id"]
-                selected_class_name = classes[0]["class_name"]
+#         # Lớp theo năm học
+#         classes = []
+#         selected_class_name = None
+#         selected_class_id = None
+#         if class_ids:
+#             q = db.table("classes").select("id, class_name, grade, academic_year").in_("id", class_ids)
+#             if year:
+#                 q = q.eq("academic_year", year)
+#             cls2 = q.order("class_name").execute()
+#             classes = [
+#                 {"id": r.get("id"), "class_name": r.get("class_name"), "grade": r.get("grade"), "academic_year": r.get("academic_year")}
+#                 for r in (cls2.data or [])
+#             ]
+#             if classes:
+#                 selected_class_id = classes[0]["id"]
+#                 selected_class_name = classes[0]["class_name"]
 
-        # Học sinh của lớp được chọn
-        students = []
-        if selected_class_id:
-            hsh2 = db.table("homeroom_students_history").select("student_id").eq("class_id", selected_class_id).execute()
-            sids = [r["student_id"] for r in (hsh2.data or []) if r.get("student_id") is not None]
-            if sids:
-                sresp = (
-                    db.table("students")
-                    .select(
-                        "id, student_id, full_name, email, phone, date_of_birth, address, profile_image, class_name, grade, gender, subject_selected, is_active, received_email"
-                    )
-                    .in_("id", sids)
-                    .execute()
-                )
-                students = sresp.data or []
+#         # Học sinh của lớp được chọn
+#         students = []
+#         if selected_class_id:
+#             hsh2 = db.table("homeroom_students_history").select("student_id").eq("class_id", selected_class_id).execute()
+#             sids = [r["student_id"] for r in (hsh2.data or []) if r.get("student_id") is not None]
+#             if sids:
+#                 sresp = (
+#                     db.table("students")
+#                     .select(
+#                         "id, student_id, full_name, email, phone, date_of_birth, address, profile_image, class_name, grade, gender, subject_selected, is_active, received_email"
+#                     )
+#                     .in_("id", sids)
+#                     .execute()
+#                 )
+#                 students = sresp.data or []
                 
-                # Fetch ALL parent_info in ONE query (performance optimization)
-                if students:
-                    student_ids = [s["id"] for s in students]
-                    parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
-                    parent_info_map = {}
-                    for pi in (parent_info_resp.data or []):
-                        sid = pi["student_id"]
-                        if sid not in parent_info_map:
-                            parent_info_map[sid] = []
-                        parent_info_map[sid].append(pi)
+#                 # Fetch ALL parent_info in ONE query (performance optimization)
+#                 if students:
+#                     student_ids = [s["id"] for s in students]
+#                     parent_info_resp = db.table("parent_info").select("*").in_("student_id", student_ids).execute()
+#                     parent_info_map = {}
+#                     for pi in (parent_info_resp.data or []):
+#                         sid = pi["student_id"]
+#                         if sid not in parent_info_map:
+#                             parent_info_map[sid] = []
+#                         parent_info_map[sid].append(pi)
                     
-                    # Assign parent_contacts to each student
-                    for student in students:
-                        student["parent_contacts"] = parent_info_map.get(student["id"], [])
+#                     # Assign parent_contacts to each student
+#                     for student in students:
+#                         student["parent_contacts"] = parent_info_map.get(student["id"], [])
 
-        return {
-            "success": True,
-            "data": {
-                "academic_years": years,
-                "default_year": default_year,
-                "year": year,
-                "classes": classes,
-                "selected_class": {"id": selected_class_id, "class_name": selected_class_name} if selected_class_id else None,
-                "students": students,
-            },
-        }
-    except Exception as e:
-        logger.error(f"Error bootstrap homeroom: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+#         return {
+#             "success": True,
+#             "data": {
+#                 "academic_years": years,
+#                 "default_year": default_year,
+#                 "year": year,
+#                 "classes": classes,
+#                 "selected_class": {"id": selected_class_id, "class_name": selected_class_name} if selected_class_id else None,
+#                 "students": students,
+#             },
+#         }
+#     except Exception as e:
+#         logger.error(f"Error bootstrap homeroom: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
 @router.get("/attendance/bootstrap")
 async def homeroom_attendance_bootstrap(
@@ -554,7 +554,6 @@ async def get_homeroom_students(
     except Exception as e:
         logger.error(f"Error getting homeroom students: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
-
 
 @router.get("/info")
 async def get_homeroom_info(

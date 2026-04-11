@@ -11,7 +11,7 @@ from admin.models import (
     UserCreate, UserUpdate, TeacherCreate, TeacherUpdate,
     SubjectCreate, SubjectUpdate, ClassCreate, ClassUpdate,
     SubjectTeacherCreate, SubjectTeacherUpdate,
-    ClassSubjectCreate, ClassSubjectUpdate,
+    ClassSubjectCreate, ClassSubjectBulkCreate, ClassSubjectUpdate, ClassSubjectBulkUpdate,
     StudentCreate, StudentUpdate, BulkStudentImport,
     ResponseModel
 )
@@ -20,6 +20,7 @@ from core.database import get_db
 from core.logger import setup_logger
 from core.dependencies import get_current_user
 from core.system_settings import get_current_academic_year
+from core.errors import handle_database_error
 
 logger = setup_logger("admin_api")
 router = APIRouter()
@@ -105,15 +106,7 @@ async def create_user(
         raise
     except Exception as e:
         logger.error(f"Error creating user: {str(e)}")
-        error_str = str(e)
-        if "duplicate key value violates unique constraint" in error_str:
-            if "users_email_key" in error_str:
-                raise HTTPException(status_code=400, detail="Email đã được sử dụng bởi người dùng khác")
-            elif "users_username_key" in error_str:
-                raise HTTPException(status_code=400, detail="Username đã được sử dụng bởi người dùng khác")
-            else:
-                raise HTTPException(status_code=400, detail="Dữ liệu bị trùng lặp")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo người dùng: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.put("/users/{user_id}")
@@ -123,7 +116,7 @@ async def update_user(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Cập nhật thông tin người dùng"""
+    """Cập nhật thông tin người dùng (với sync tự động sang teachers table)"""
     try:
         # Kiểm tra username nếu thay đổi
         if user_data.username:
@@ -153,28 +146,37 @@ async def update_user(
         
         update_data["updated_at"] = datetime.now().isoformat()
         
+        # Update users table
         response = db.table("users").update(update_data).eq("id", user_id).execute()
         
-        if response.data:
-            updated_user = response.data[0]
-            updated_user.pop("password_hash", None)
-            return {"success": True, "data": updated_user, "message": "Cập nhật người dùng thành công"}
-        else:
+        if not response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+        
+        # Sync full_name and email to teachers table if this user is a teacher
+        # Find if there's a teacher record with this user_id
+        teacher_check = db.table("teachers").select("id").eq("user_id", user_id).execute()
+        if teacher_check.data:
+            teacher_id = teacher_check.data[0]["id"]
+            teacher_sync_data = {"updated_at": datetime.now().isoformat()}
+            
+            if user_data.full_name:
+                teacher_sync_data["full_name"] = user_data.full_name
+            if user_data.email:
+                teacher_sync_data["email"] = user_data.email
+            
+            if teacher_sync_data:  # Only sync if there's data to update
+                db.table("teachers").update(teacher_sync_data).eq("id", teacher_id).execute()
+                logger.info(f"✅ Synced user update ({user_id}) to teacher ({teacher_id}): {teacher_sync_data}")
+        
+        updated_user = response.data[0]
+        updated_user.pop("password_hash", None)
+        return {"success": True, "data": updated_user, "message": "Cập nhật người dùng thành công"}
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating user: {str(e)}")
-        error_str = str(e)
-        if "duplicate key value violates unique constraint" in error_str:
-            if "users_email_key" in error_str:
-                raise HTTPException(status_code=400, detail="Email đã được sử dụng bởi người dùng khác")
-            elif "users_username_key" in error_str:
-                raise HTTPException(status_code=400, detail="Username đã được sử dụng bởi người dùng khác")
-            else:
-                raise HTTPException(status_code=400, detail="Dữ liệu bị trùng lặp")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật người dùng: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.delete("/users/{user_id}")
@@ -377,9 +379,11 @@ async def create_teacher(
         else:
             raise HTTPException(status_code=500, detail="Không thể tạo giáo viên")
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating teacher: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo giáo viên: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.put("/teachers/{teacher_id}")
@@ -389,8 +393,16 @@ async def update_teacher(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Cập nhật thông tin giáo viên"""
+    """Cập nhật thông tin giáo viên (với sync tự động sang users table)"""
     try:
+        # Lấy thông tin giáo viên hiện tại (đặc biệt là user_id)
+        teacher_current = db.table("teachers").select("id, user_id").eq("id", teacher_id).execute()
+        if not teacher_current.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
+        
+        teacher = teacher_current.data[0]
+        user_id = teacher.get("user_id")
+        
         update_data = {"updated_at": datetime.now().isoformat()}
         
         if teacher_data.teacher_code:
@@ -406,18 +418,31 @@ async def update_teacher(
         if teacher_data.gender:
             update_data["gender"] = teacher_data.gender
         
+        # Update teachers table
         response = db.table("teachers").update(update_data).eq("id", teacher_id).execute()
         
-        if response.data:
-            return {"success": True, "data": response.data[0], "message": "Cập nhật giáo viên thành công"}
-        else:
+        if not response.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
+        
+        # Sync full_name and email to users table if teacher has user_id
+        if user_id:
+            user_sync_data = {"updated_at": datetime.now().isoformat()}
+            if teacher_data.full_name:
+                user_sync_data["full_name"] = teacher_data.full_name
+            if teacher_data.email:
+                user_sync_data["email"] = teacher_data.email
+            
+            if user_sync_data:  # Only sync if there's data to update
+                db.table("users").update(user_sync_data).eq("id", user_id).execute()
+                logger.info(f"✅ Synced teacher update ({teacher_id}) to user ({user_id}): {user_sync_data}")
+        
+        return {"success": True, "data": response.data[0], "message": "Cập nhật giáo viên thành công"}
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating teacher: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.delete("/teachers/{teacher_id}")
@@ -696,9 +721,10 @@ async def get_all_subjects(
         # Lấy subjects với score_column_config (không cần join vì đã merge vào subjects table)
         query = db.table("subjects").select("*")
         
-        # Nếu không show_deleted, chỉ lấy các môn học active
-        if not show_deleted:
-            query = query.eq("is_active", True)
+        # NOTE: Removed server-side is_active filtering to match frontend Option 2 approach
+        # All data (active + deleted) is returned, frontend filters based on showDeleted flag
+        # if not show_deleted:
+        #     query = query.eq("is_active", True)
         
         response = query.order("subject_code").execute()
 
@@ -740,9 +766,11 @@ async def create_subject(
         else:
             raise HTTPException(status_code=500, detail="Không thể tạo môn học")
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating subject: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.put("/subjects/{subject_id}")
@@ -778,7 +806,7 @@ async def update_subject(
         raise
     except Exception as e:
         logger.error(f"Error updating subject: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.delete("/subjects/{subject_id}")
@@ -1023,7 +1051,7 @@ async def create_class(
         raise
     except Exception as e:
         logger.error(f"Error creating class: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo lớp học: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.put("/classes/{class_id}")
@@ -1094,7 +1122,7 @@ async def update_class(
         raise
     except Exception as e:
         logger.error(f"Error updating class: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật lớp học: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.delete("/classes/{class_id}")
@@ -1239,24 +1267,48 @@ async def create_subject_teacher(
 ):
     """Phân công giáo viên dạy môn học"""
     try:
-        data = {
-            "teacher_id": assignment.teacher_id,
-            "subject_id": assignment.subject_id,
-            "is_active": assignment.is_active,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        }
+        # Kiểm tra xem phân công này đã tồn tại chưa (kể cả inactive)
+        existing = db.table("subject_teachers").select("*").eq("teacher_id", assignment.teacher_id).eq("subject_id", assignment.subject_id).execute()
         
-        response = db.table("subject_teachers").insert(data).execute()
-        
-        if response.data:
-            return {"success": True, "data": response.data[0], "message": "Phân công giáo viên thành công"}
+        if existing.data:
+            # Nếu đã tồn tại, check xem có active không
+            existing_record = existing.data[0]
+            if existing_record.get("is_active"):
+                # Đã active rồi, không cần tạo lại
+                return {"success": True, "data": existing_record, "message": "Phân công đã tồn tại"}
+            else:
+                # Inactive, reactivate nó
+                response = db.table("subject_teachers").update({
+                    "is_active": True,
+                    "updated_at": datetime.now().isoformat()
+                }).eq("id", existing_record["id"]).execute()
+                
+                if response.data:
+                    return {"success": True, "data": response.data[0], "message": "Khôi phục phân công giáo viên thành công"}
+                else:
+                    raise HTTPException(status_code=500, detail="Không thể khôi phục phân công")
         else:
-            raise HTTPException(status_code=500, detail="Không thể phân công")
+            # Không tồn tại, tạo bản ghi mới
+            data = {
+                "teacher_id": assignment.teacher_id,
+                "subject_id": assignment.subject_id,
+                "is_active": assignment.is_active,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            response = db.table("subject_teachers").insert(data).execute()
+            
+            if response.data:
+                return {"success": True, "data": response.data[0], "message": "Phân công giáo viên thành công"}
+            else:
+                raise HTTPException(status_code=500, detail="Không thể phân công")
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating subject teacher: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.put("/subject-teachers/{subject_teacher_id}")
@@ -1288,7 +1340,7 @@ async def update_subject_teacher(
         raise
     except Exception as e:
         logger.error(f"Error updating subject teacher: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.delete("/subject-teachers/{subject_teacher_id}")
@@ -1410,9 +1462,10 @@ async def get_class_subjects(
             teachers:teacher_id(id, full_name, teacher_code)
         """)
         
-        # Nếu không show_deleted, chỉ lấy các phân công active
-        if not show_deleted:
-            query = query.eq("is_active", True)
+        # NOTE: Removed server-side is_active filtering to match frontend Option 2 approach
+        # All data (active + deleted) is returned, frontend filters based on showDeleted flag
+        # if not show_deleted:
+        #     query = query.eq("is_active", True)
         
         response = query.order("academic_year", desc=True).execute()
         
@@ -1468,9 +1521,91 @@ async def create_class_subject(
         else:
             raise HTTPException(status_code=500, detail="Không thể phân công")
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating class subject: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
+
+
+@router.post("/class-subjects/bulk")
+async def create_class_subjects_bulk(
+    assignment: ClassSubjectBulkCreate,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Phân công giáo viên dạy nhiều lớp-môn (bulk assignment)
+    
+    Tạo phân công giáo viên cho một môn học ở nhiều lớp học khác nhau
+    trong cùng năm học và kỳ học
+    """
+    try:
+        if not assignment.class_ids or len(assignment.class_ids) == 0:
+            raise HTTPException(status_code=400, detail="Phải chọn ít nhất một lớp học")
+        
+        # Verify all classes exist and belong to the same academic year
+        class_ids_str = ','.join(map(str, assignment.class_ids))
+        classes_response = db.table("classes").select("id, class_name, academic_year").in_("id", assignment.class_ids).execute()
+        
+        if not classes_response.data or len(classes_response.data) != len(assignment.class_ids):
+            raise HTTPException(status_code=400, detail="Một số lớp học không tồn tại")
+        
+        # Verify all classes have the same academic year as specified
+        for cls in classes_response.data:
+            if cls.get("academic_year") != assignment.academic_year:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Lớp {cls.get('class_name')} không thuộc năm học {assignment.academic_year}"
+                )
+        
+        # Create assignment for each class
+        created_records = []
+        for class_id in assignment.class_ids:
+            data = {
+                "class_id": class_id,
+                "subject_id": assignment.subject_id,
+                "teacher_id": assignment.teacher_id,
+                "academic_year": assignment.academic_year,
+                "semester": assignment.semester,
+                "is_active": assignment.is_active,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            try:
+                response = db.table("class_subjects").insert(data).execute()
+                if response.data:
+                    created_records.append(response.data[0])
+            except Exception as e:
+                # Log but continue - don't fail entire operation if one class fails
+                logger.warning(f"Failed to create assignment for class {class_id}: {str(e)}")
+                continue
+        
+        if len(created_records) == 0:
+            raise HTTPException(status_code=500, detail="Không thể tạo phân công cho bất kỳ lớp nào")
+        
+        success_count = len(created_records)
+        total_count = len(assignment.class_ids)
+        message = f"Phân công thành công cho {success_count}/{total_count} lớp học"
+        if success_count < total_count:
+            message += f" ({total_count - success_count} lớp không thành công)"
+        
+        return {
+            "success": True,
+            "data": created_records,
+            "message": message,
+            "stats": {
+                "total": total_count,
+                "success": success_count,
+                "failed": total_count - success_count
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error bulk creating class subjects: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.put("/class-subjects/{class_subject_id}")
@@ -1508,7 +1643,101 @@ async def update_class_subject(
         raise
     except Exception as e:
         logger.error(f"Error updating class subject: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
+
+
+@router.put("/class-subjects/bulk-update")
+async def bulk_update_class_subjects(
+    bulk_update: ClassSubjectBulkUpdate,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """
+    Bulk update class assignments for a teacher-subject combo.
+    Handles adding/removing classes from an existing grouped assignment.
+    
+    Logic:
+    1. Get current class_ids for all records in record_ids
+    2. Determine which classes to add, remove, and keep
+    3. Soft delete records for removed classes
+    4. Create new records for added classes
+    5. Re-enable records for kept classes (in case they were disabled)
+    """
+    try:
+        if not bulk_update.record_ids:
+            raise HTTPException(status_code=400, detail="record_ids không được trống")
+        
+        # Get current assignments
+        current_records = db.table("class_subjects").select("*").in_(
+            "id", bulk_update.record_ids
+        ).execute().data or []
+        
+        # Extract current class IDs
+        current_class_ids = [r.get("class_id") for r in current_records]
+        new_class_ids = bulk_update.selected_class_ids
+        
+        # Determine operations
+        classes_to_remove = [cid for cid in current_class_ids if cid not in new_class_ids]
+        classes_to_add = [cid for cid in new_class_ids if cid not in current_class_ids]
+        classes_to_keep = [cid for cid in current_class_ids if cid in new_class_ids]
+        
+        # 1. Soft delete records for removed classes
+        if classes_to_remove:
+            for class_id in classes_to_remove:
+                record_to_delete = next(
+                    (r for r in current_records if r.get("class_id") == class_id),
+                    None
+                )
+                if record_to_delete:
+                    db.table("class_subjects").update({
+                        "is_active": False
+                    }).eq("id", record_to_delete["id"]).execute()
+        
+        # 2. Re-enable records for kept classes (in case they were disabled)
+        if classes_to_keep:
+            for class_id in classes_to_keep:
+                record_to_keep = next(
+                    (r for r in current_records if r.get("class_id") == class_id),
+                    None
+                )
+                if record_to_keep and not record_to_keep.get("is_active", True):
+                    db.table("class_subjects").update({
+                        "is_active": True
+                    }).eq("id", record_to_keep["id"]).execute()
+        
+        # 3. Create new records for added classes
+        new_records = []
+        for class_id in classes_to_add:
+            new_data = {
+                "teacher_id": bulk_update.teacher_id,
+                "subject_id": bulk_update.subject_id,
+                "class_id": class_id,
+                "academic_year": bulk_update.academic_year,
+                "semester": bulk_update.semester,
+                "is_active": True,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            }
+            response = db.table("class_subjects").insert(new_data).execute()
+            if response.data:
+                new_records.extend(response.data)
+        
+        return {
+            "success": True,
+            "data": {
+                "removed_count": len(classes_to_remove),
+                "added_count": len(classes_to_add),
+                "kept_count": len(classes_to_keep),
+                "new_records": new_records,
+            },
+            "message": f"Cập nhật phân công thành công (thêm {len(classes_to_add)}, xóa {len(classes_to_remove)})"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error bulk updating class subjects: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.delete("/class-subjects/{class_subject_id}")
@@ -1764,9 +1993,11 @@ async def create_student_admin(
         else:
             raise HTTPException(status_code=500, detail="Không thể tạo học sinh")
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating student: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.put("/students/{student_id}")
@@ -1845,7 +2076,7 @@ async def update_student_admin(
         raise
     except Exception as e:
         logger.error(f"Error updating student: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        raise handle_database_error(e)
 
 
 @router.delete("/students/{student_id}")

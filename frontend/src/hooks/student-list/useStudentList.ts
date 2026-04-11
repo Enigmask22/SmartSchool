@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useContext, useCallback } from "react";
 import ApiService from "@/utils/api";
 import { AuthContext } from "@/contexts/AuthContext";
-import { useSystemSettings } from "@/contexts/SystemSettingsContext";
+import { useSystemSettings } from "@/contexts/useSystemSettings";
 import logger from "@/utils/logger";
 import { toast } from "sonner";
 import { generateStudentReportCard } from "@/utils/studentReportExport";
@@ -20,7 +20,9 @@ interface UseStudentListFilters {
 export const useStudentList = (filters: UseStudentListFilters) => {
   const authContext = useContext(AuthContext);
   const isHomeroomTeacher = authContext?.isHomeroomTeacher;
-  const { academicYear, semester } = useSystemSettings();
+  const { settings } = useSystemSettings();
+  const academicYear = settings.academic_year || "2024-2025";
+  const semester = settings.semester || "HK1";
 
   // Basic student data states
   const [students, setStudents] = useState<any[]>([]);

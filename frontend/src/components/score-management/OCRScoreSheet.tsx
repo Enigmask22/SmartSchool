@@ -61,7 +61,7 @@ interface ApiError {
   message?: string;
 }
 
-const OCRGradeSheet = ({
+const OCRScoreSheet = ({
   selectedClassSubject,
   academicYear,
   semester,
@@ -1267,4 +1267,4 @@ const OCRGradeSheet = ({
   );
 };
 
-export default OCRGradeSheet;
+export default OCRScoreSheet;
