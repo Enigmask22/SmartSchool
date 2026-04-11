@@ -1,0 +1,125 @@
+import { Award } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { ClassPerformanceData } from "@/hooks/admin-dashboard/useAdminDashboard";
+
+interface ClassPerformanceTabProps {
+  classPerformance: ClassPerformanceData[];
+  loading?: boolean;
+}
+
+export function ClassPerformanceTab({
+  classPerformance,
+  loading = false,
+}: ClassPerformanceTabProps) {
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Award className="w-5 h-5" />
+          <span>Hiệu suất học tập theo lớp</span>
+        </CardTitle>
+        <CardDescription>
+          Xếp hạng lớp học theo điểm trung bình
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Lớp</TableHead>
+                <TableHead>Số Học Sinh</TableHead>
+                <TableHead>Điểm TB</TableHead>
+                <TableHead>Xuất Sắc</TableHead>
+                <TableHead>Khá</TableHead>
+                <TableHead>Trung Bình</TableHead>
+                <TableHead>Yếu</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i}>
+                  <TableCell><div className="h-4 w-20 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-16 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 w-12 rounded bg-muted animate-pulse"></div></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : classPerformance.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Lớp</TableHead>
+                <TableHead>Số Học Sinh</TableHead>
+                <TableHead>Điểm TB</TableHead>
+                <TableHead>Xuất Sắc</TableHead>
+                <TableHead>Khá</TableHead>
+                <TableHead>Trung Bình</TableHead>
+                <TableHead>Yếu</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {classPerformance.map((classData, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-medium">
+                    {classData.class_name}
+                  </TableCell>
+                  <TableCell>{classData.total_students}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        classData.average_grade >= 8
+                          ? "default"
+                          : classData.average_grade >= 6.5
+                          ? "secondary"
+                          : "destructive"
+                      }
+                    >
+                      {classData.average_grade}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-green-600">
+                    {classData.excellent_count}
+                  </TableCell>
+                  <TableCell className="text-blue-600">
+                    {classData.good_count}
+                  </TableCell>
+                  <TableCell className="text-yellow-600">
+                    {classData.average_count}
+                  </TableCell>
+                  <TableCell className="text-red-600">
+                    {classData.poor_count}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            Không có dữ liệu điểm số
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

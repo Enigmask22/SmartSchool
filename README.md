@@ -385,7 +385,7 @@ GET    /api/auth/me                   # Current user info
 
 **Multi-School Login:**
 
-```json
+```jsond
 {
   "username": "admin@school2", // @school2 routes to DB #2
   "password": "password"

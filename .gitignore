@@ -1,26 +1,6 @@
-# =======================
-# SMART SCHOOL SYSTEM
-# .gitignore for Full-Stack Application
-# =======================
-.cursor
-# ================
-# PYTHON BACKEND
-# ================
-
-# Virtual environments
-backend/venv/
-backend/env/
-backend/.venv/
-backend/.env/
-venv/
-env/
-.venv/
-.env/
-myenv/
-backend/myenv/
-.myenv/
-
-# Python compiled files
+# ==========================================
+# Python
+# ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -34,466 +14,188 @@ eggs/
 .eggs/
 lib/
 lib64/
-# Exception: Allow frontend/src/lib (contains utility functions)
-!frontend/src/lib/
-!frontend/src/lib/**
 parts/
 sdist/
 var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
+# ==========================================
+# Virtual Environments
+# ==========================================
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# ==========================================
+# IDE & Editor
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.vim/
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
+# ==========================================
+# Environment & Configuration
+# ==========================================
+.env
+.env.local
+.env.*.local
+*.local
+config.local.py
+.env.example.local
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# ==========================================
+# Sensitive/Encoded Files (Database configs)
+# ==========================================
 
-# IPython
-profile_default/
-ipython_config.py
+school_databases.json
+# Giữ file example để tham khảo
+!school_databases.json.example
 
-# pyenv
-.python-version
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# ================
-# REACT FRONTEND
-# ================
-
-# Dependencies
-frontend/node_modules/
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-
-# Runtime data
-pids
+# ==========================================
+# Logs
+# ==========================================
+logs/
+*.log
+*.log.*
 *.pid
-*.seed
-*.pid.lock
 
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Grunt intermediate storage
-.grunt
-
-# Bower dependency directory
-bower_components
-
-# node-waf configuration
-.lock-wscript
-
-# Compiled binary addons
-build/Release
-
-# Dependency directories
-jspm_packages/
-
-# TypeScript v1 declaration files
-typings/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
+# ==========================================
+# Temporary Files
+# ==========================================
+temp_otp/
+*.tmp
+*.temp
+*.cache
 .cache/
 
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
-
-# React build output
-frontend/build/
-build/
-
-# ================
-# AI & ML MODELS
-# ================
-
-# Large model files (but allow insightface_cache)
-*.h5
-*.hdf5
-*.pkl
-*.pickle
-*.joblib
-*.model
-*.weights
-*.ckpt
-*.pb
-*.tflite
-*.onnx
-*.pt
-*.pth
-*.bin
-
-# Exception: Allow insightface_cache models (tracked by Git LFS)
-!backend/insightface_cache/
-!backend/insightface_cache/**
-!insightface_cache/
-!insightface_cache/**
-
-# AI training data
-*/datasets/
-*/data/
-training_data/
-test_data/
-validation_data/
-
-# Model checkpoints and logs
-checkpoints/
-logs/
-tensorboard_logs/
-mlruns/
-wandb/
-
-# Face recognition databases
-backend/ai_models/face_encodings/
-backend/ai_models/trained_models/
-face_database/
-encoded_faces/
-
-# ================
-# UPLOADS & MEDIA
-# ================
-
-# User uploads
-backend/uploads/
+# ==========================================
+# Uploads & Media
+# ==========================================
 uploads/
-media/
-static/media/
-public/uploads/
-
-# Temporary files
-backend/temp/
-temp/
-tmp/
-
-# Images and videos (if large)
+*.jpg
+*.jpeg
+*.png
+*.gif
 *.mp4
-*.avi
-*.mov
-*.wmv
-*.flv
-*.webm
-# Uncomment if you want to ignore all images
-# *.jpg
-# *.jpeg
-# *.png
-# *.gif
-# *.bmp
-# *.tiff
-# *.svg
+*.pdf
+*.zip
+*.tar.gz
 
-# ================
-# DATABASE
-# ================
-
-# SQLite databases
+# ==========================================
+# Database Files
+# ==========================================
 *.db
 *.sqlite
 *.sqlite3
+*.pkl
+*.pickle
 
-# PostgreSQL dumps
-*.sql
-*.dump
+# ==========================================
+# Dependencies & Packages
+# ==========================================
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Database logs
-database/logs/
-db_logs/
-
-# ================
-# CONFIGURATION
-# ================
-
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-backend/.env
-frontend/.env
-.env.*
-
-# Configuration backups
-config.backup.*
-settings.backup.*
-
-# Multi-school database configuration (contains sensitive API keys)
-backend/database/school_databases.json
-database/school_databases.json
-school_databases.json
-backend/database/encode_school_config.py
-
-# ================
-# LOGS
-# ================
-
-# Application logs
-*.log
-logs/
-backend/logs/
-app.log
-error.log
-access.log
-debug.log
-backend/temp_otp
-backend_modular/temp_otp
-# ================
-# IDE & EDITORS
-# ================
-
-# VSCode
-.vscode/
-*.code-workspace
-
-# IntelliJ IDEA
-.idea/
-*.iml
-*.ipr
-*.iws
-
-# PyCharm
-.idea/
-
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# Vim
-*.swp
-*.swo
-*~
-
-# Emacs
-*~
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-auto-save-list
-tramp
-.\#*
-
-# ================
-# OPERATING SYSTEM
-# ================
-
-# macOS
+# ==========================================
+# OS & System Files
+# ==========================================
+Thumbs.db
 .DS_Store
 .AppleDouble
 .LSOverride
-Icon?
-._*
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
-
-# Windows
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-*.stackdump
-[Dd]esktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-*.lnk
-
-# Linux
-*~
-.fuse_hidden*
-.directory
-.Trash-*
-.nfs*
-
-# ================
-# DOCKER
-# ================
-
-# Docker files (uncomment if using Docker)
-# Dockerfile.local
-# docker-compose.override.yml
-# .dockerignore
-
-# ================
-# MISC
-# ================
-
-# Backup files
 *.bak
-*.backup
-*.old
-*.orig
 
-# Archive files (but allow insightface model archives)
-*.zip
-*.tar
-*.tar.gz
-*.rar
-*.7z
+# ==========================================
+# Testing & Coverage
+# ==========================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
 
-# Exception: Allow insightface model archives (tracked by Git LFS)
-!backend/insightface_cache/**/*.zip
-!insightface_cache/**/*.zip
+# ==========================================
+# Jupyter & Notebooks
+# ==========================================
+.ipynb_checkpoints/
+*.ipynb
 
-# Test files
-test_output/
-test_results/
+# ==========================================
+# OCR Models & Large Files (AI Models)
+# ==========================================
+ai_models/
+models/
+*.onnx
+*.pt
+*.pth
+*.h5
+*.keras
+model_*.pkl
 
-# Documentation builds
-docs/_build/
-docs/build/
+# ==========================================
+# schema files
+# ==========================================
+core/schema/
+*.sql
+# ==========================================
+# Docker Build Files (khi chạy locally)
+# ==========================================
+docker_build/
+.dockerignore
 
-# Security
-*.pem
-*.key
-*.cert
-*.crt
-private_key.*
-public_key.*
+# ==========================================
+# FastAPI Generated
+# ==========================================
+.fastapi_cache/
 
-# Package files
-*.deb
-*.rpm
-*.pkg
-*.dmg
+# ==========================================
+# OS Temp Files
+# ==========================================
+.tmp/
+temp/
+tmp/
 
-# Swap files
-*.swp
-*.swo
+# ==========================================
+# Node modules (nếu có frontend)
+# ==========================================
+node_modules/
+npm-debug.log
+yarn-error.log
 
-# Lock files (uncomment if you want to ignore them)
-# package-lock.json
-# yarn.lock
-# Pipfile.lock
+# ==========================================
+# CI/CD & Git
+# ==========================================
+.github/workflows/private_*
+.gitlab-ci.local.yml
 
-# ================
-# PROJECT SPECIFIC
-# ================
+# ==========================================
+# IDE Caches
+# ==========================================
+*.vscode-unsupported
+*.iml
+.gradle/
+.m2/
 
-# Smart School specific ignores
-attendance_data/
-student_photos/
-temp_captures/
-face_cache/
-recognition_cache/
-
-# Setup artifacts
-setup_complete.flag
-installation.log
-
-# Other generated files
-instruction_md/
-llm_gen/
-build_wheel/
-latex/
-# Train/Test module (không commit vào repo)
-backend_modular/ai_services/train_test/
-backend_modular/ai_services/train_test/**/*
-
-# InsightFace cache (không commit vào repo)
-backend_modular/ai_services/insightface_cache/
-backend_modular/ai_services/insightface_cache/**/*
+# ==========================================
+# Others
+# ==========================================
+ai_services/train_test

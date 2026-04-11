@@ -1,0 +1,8 @@
+export { Header } from './Header';
+export { StatsCards } from './StatsCards';
+export { ClassFilter } from './ClassFilter';
+export { TabButtons } from './TabButtons';
+export { OverviewTab } from './tabs/OverviewTab';
+export { AttentionTab } from './tabs/AttentionTab';
+export { TopStudentsTab } from './tabs/TopStudentsTab';
+export { ComparisonTab } from './tabs/ComparisonTab';
