@@ -157,13 +157,18 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
 
   const handleClassSubjectSelect = async (classSubject: any, academicYear?: string, semester?: string) => {
     try {
+      console.log('\n' + '='.repeat(80));
+      console.log('🟡 [handleClassSubjectSelect] CALLED with:', { classSubject, academicYear, semester });
+      console.log('='.repeat(80));
       setLoading(true);
       setError(null);
+      console.log('[handleClassSubjectSelect] About to call api.getStudentsByClassSubject...');
       const studentsResponse = await api.getStudentsByClassSubject(
         classSubject.id,
         academicYear || defaultAcademicYear || '2024-2025',
         semester || defaultSemester || 'HK1'
       );
+      console.log('[handleClassSubjectSelect] API Response received:', studentsResponse);
 
       if (studentsResponse.success) {
         const sortedStudents = (studentsResponse.data.students || []).sort(
@@ -173,6 +178,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
             return aId - bId;
           }
         );
+        console.log('Sorted students:', sortedStudents);
         setStudents(sortedStudents);
       }
 
