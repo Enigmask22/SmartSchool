@@ -1,7 +1,6 @@
 import React from 'react';
 import { BookOpen } from 'lucide-react';
 import { CommonFormFields } from './CommonFormFields';
-import { FormFieldRenderer } from './FormFieldRenderer';
 
 interface TeachersFormSectionProps {
   hook: any;
