@@ -131,11 +131,17 @@ export function AdminTable({
       } else {
         scoreColumnHookLocal?.setScoreColumns([]);
       }
-    } else {
-      form.setFormData(item);
-    }
-
-    if (hook.activeTab === 'class_subjects' && item.subject_id) {
+    } else if (hook.activeTab === 'class_subjects' && item.subject_id) {
+      // For class_subjects: explicitly set form data with all required fields from item
+      const formInitData = {
+        subject_id: item.subject_id,
+        teacher_id: item.teacher_id,
+        academic_year: item.academic_year,
+        semester: item.semester,
+      };
+      form.setFormData(formInitData);
+      
+      // Filter teachers for this subject
       const teachersForSubject = hook.subjectTeachersData
         .filter(
           (st: any) =>
@@ -151,6 +157,8 @@ export function AdminTable({
       if (classSelectionHook && item.class_ids) {
         classSelectionHook.setSelectedClasses(item.class_ids);
       }
+    } else {
+      form.setFormData(item);
     }
   };
 

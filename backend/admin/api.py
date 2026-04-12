@@ -1462,10 +1462,13 @@ async def get_class_subjects(
             teachers:teacher_id(id, full_name, teacher_code)
         """)
         
-        # NOTE: Removed server-side is_active filtering to match frontend Option 2 approach
-        # All data (active + deleted) is returned, frontend filters based on showDeleted flag
-        # if not show_deleted:
-        #     query = query.eq("is_active", True)
+        # Filter by is_active status
+        if show_deleted:
+            # Show only deleted records (is_active = false)
+            query = query.eq("is_active", False)
+        else:
+            # Show only active records (is_active = true) by default
+            query = query.eq("is_active", True)
         
         response = query.order("academic_year", desc=True).execute()
         
@@ -1608,44 +1611,6 @@ async def create_class_subjects_bulk(
         raise handle_database_error(e)
 
 
-@router.put("/class-subjects/{class_subject_id}")
-async def update_class_subject(
-    class_subject_id: int,
-    assignment: ClassSubjectUpdate,
-    admin_user=Depends(get_admin_user),
-    db=Depends(get_db)
-):
-    """Cập nhật phân công lớp-môn"""
-    try:
-        update_data = {"updated_at": datetime.now().isoformat()}
-        
-        if assignment.class_id:
-            update_data["class_id"] = assignment.class_id
-        if assignment.subject_id:
-            update_data["subject_id"] = assignment.subject_id
-        if assignment.teacher_id:
-            update_data["teacher_id"] = assignment.teacher_id
-        if assignment.academic_year:
-            update_data["academic_year"] = assignment.academic_year
-        if assignment.semester:
-            update_data["semester"] = assignment.semester
-        if assignment.is_active is not None:
-            update_data["is_active"] = assignment.is_active
-        
-        response = db.table("class_subjects").update(update_data).eq("id", class_subject_id).execute()
-        
-        if response.data:
-            return {"success": True, "data": response.data[0], "message": "Cập nhật phân công thành công"}
-        else:
-            raise HTTPException(status_code=404, detail="Không tìm thấy phân công")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating class subject: {str(e)}")
-        raise handle_database_error(e)
-
-
 @router.put("/class-subjects/bulk-update")
 async def bulk_update_class_subjects(
     bulk_update: ClassSubjectBulkUpdate,
@@ -1664,6 +1629,14 @@ async def bulk_update_class_subjects(
     5. Re-enable records for kept classes (in case they were disabled)
     """
     try:
+        logger.debug(f"Bulk update request received")
+        logger.debug(f"  record_ids: {bulk_update.record_ids} (type: {type(bulk_update.record_ids)})")
+        logger.debug(f"  teacher_id: {bulk_update.teacher_id} (type: {type(bulk_update.teacher_id)})")
+        logger.debug(f"  subject_id: {bulk_update.subject_id} (type: {type(bulk_update.subject_id)})")
+        logger.debug(f"  academic_year: {bulk_update.academic_year}")
+        logger.debug(f"  semester: {bulk_update.semester}")
+        logger.debug(f"  selected_class_ids: {bulk_update.selected_class_ids}")
+        
         if not bulk_update.record_ids:
             raise HTTPException(status_code=400, detail="record_ids không được trống")
         
@@ -1737,6 +1710,44 @@ async def bulk_update_class_subjects(
         raise
     except Exception as e:
         logger.error(f"Error bulk updating class subjects: {str(e)}")
+        raise handle_database_error(e)
+
+
+@router.put("/class-subjects/{class_subject_id}")
+async def update_class_subject(
+    class_subject_id: int,
+    assignment: ClassSubjectUpdate,
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """Cập nhật phân công lớp-môn"""
+    try:
+        update_data = {"updated_at": datetime.now().isoformat()}
+        
+        if assignment.class_id:
+            update_data["class_id"] = assignment.class_id
+        if assignment.subject_id:
+            update_data["subject_id"] = assignment.subject_id
+        if assignment.teacher_id:
+            update_data["teacher_id"] = assignment.teacher_id
+        if assignment.academic_year:
+            update_data["academic_year"] = assignment.academic_year
+        if assignment.semester:
+            update_data["semester"] = assignment.semester
+        if assignment.is_active is not None:
+            update_data["is_active"] = assignment.is_active
+        
+        response = db.table("class_subjects").update(update_data).eq("id", class_subject_id).execute()
+        
+        if response.data:
+            return {"success": True, "data": response.data[0], "message": "Cập nhật phân công thành công"}
+        else:
+            raise HTTPException(status_code=404, detail="Không tìm thấy phân công")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating class subject: {str(e)}")
         raise handle_database_error(e)
 
 

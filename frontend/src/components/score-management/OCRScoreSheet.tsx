@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
@@ -17,12 +17,7 @@ import {
   Trash2,
   Save,
 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -80,13 +75,23 @@ const OCRScoreSheet = ({
   const [parsedData, setParsedData] = useState<ParsedDataType | null>(null);
   const [confirmState, setConfirmState] = useState<any>({ open: false });
 
-  const openConfirm = useCallback((config: any) =>
-    setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
+  const openConfirm = useCallback(
+    (config: any) =>
+      setConfirmState({
+        open: true,
+        variant: "destructive",
+        confirmText: "Xác nhận",
+        ...config,
+      }),
+    [],
+  );
 
-  const closeConfirm = useCallback(() =>
-    setConfirmState((prev: any) => ({ ...prev, open: false })), []);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const closeConfirm = useCallback(
+    () => setConfirmState((prev: any) => ({ ...prev, open: false })),
+    [],
+  );
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   // Queue management states
   const [_requestId, setRequestId] = useState<string | null>(null);
@@ -94,6 +99,13 @@ const OCRScoreSheet = ({
   const [_progress, setProgress] = useState<number>(0);
   const [_statusMessage, setStatusMessage] = useState<string>("");
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [ocrEngine, setOcrEngine] = useState<"gemini" | "qwen">("gemini");
+  const [estimatedWaitSeconds, setEstimatedWaitSeconds] = useState<
+    number | null
+  >(null);
+  const [nextWindowInSeconds, setNextWindowInSeconds] = useState<number | null>(
+    null,
+  );
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -103,8 +115,84 @@ const OCRScoreSheet = ({
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null); // Index của row đang edit (trong sorted list)
   const [editValues, setEditValues] = useState<any>({}); // Giá trị đang edit
 
+  const scoreColumns = useMemo(() => {
+    if (!parsedData) return [];
+
+    if (
+      Array.isArray(parsedData.score_columns) &&
+      parsedData.score_columns.length > 0
+    ) {
+      return parsedData.score_columns;
+    }
+
+    if (
+      !Array.isArray(parsedData.parsed_rows) ||
+      parsedData.parsed_rows.length === 0
+    ) {
+      return [];
+    }
+
+    const excludedFields = new Set([
+      "id",
+      "student_id",
+      "student_db_id",
+      "ho_va_ten",
+      "full_name",
+      "class_name",
+      "ocr_name",
+      "diem_thuong_xuyen",
+    ]);
+
+    const columnsSet = new Set<string>();
+    parsedData.parsed_rows.forEach((row) => {
+      if (!row || typeof row !== "object") return;
+      Object.keys(row).forEach((key) => {
+        if (!excludedFields.has(key)) {
+          columnsSet.add(key);
+        }
+      });
+    });
+
+    const sortKey = (column: string): [number, number, string] => {
+      const lowered = column.toLowerCase();
+      if (lowered.startsWith("diem_tx") || lowered.includes("thuong_xuyen")) {
+        const match = lowered.match(/diem_tx(\d+)/);
+        return [1, match ? Number(match[1]) : 0, lowered];
+      }
+      if (lowered.includes("giua") || lowered.endsWith("_gk")) {
+        return [2, 0, lowered];
+      }
+      if (lowered.includes("cuoi") || lowered.endsWith("_ck")) {
+        return [3, 0, lowered];
+      }
+      return [4, 0, lowered];
+    };
+
+    return Array.from(columnsSet).sort((a, b) => {
+      const [pa, ia, sa] = sortKey(a);
+      const [pb, ib, sb] = sortKey(b);
+      if (pa !== pb) return pa - pb;
+      if (ia !== ib) return ia - ib;
+      return sa.localeCompare(sb);
+    });
+  }, [parsedData]);
+
+  const getColumnLabel = (column: string) => {
+    const lowered = column.toLowerCase();
+    if (lowered === "diem_tx") return "ĐTX";
+    if (lowered.startsWith("diem_tx"))
+      return column.replace("Diem_", "").replace("diem_", "").toUpperCase();
+    if (lowered.includes("giua") || lowered.endsWith("_gk")) return "ĐGK";
+    if (lowered.includes("cuoi") || lowered.endsWith("_ck")) return "ĐCK";
+    return column;
+  };
+
   // Hàm cập nhật điểm trong parsedData
-  const handleScoreChange = (_globalIndex: number, field: string, value: any) => {
+  const handleScoreChange = (
+    _globalIndex: number,
+    field: string,
+    value: any,
+  ) => {
     // Validate score value
     let normalizedValue = value.trim();
 
@@ -157,7 +245,7 @@ const OCRScoreSheet = ({
     // Tìm original index trong parsedData.parsed_rows
     const rowToUpdate = sortedRows[globalIndex];
     const originalIndex = parsedData.parsed_rows.findIndex(
-      (r) => r.student_id === rowToUpdate.student_id
+      (r) => r.student_id === rowToUpdate.student_id,
     );
 
     if (originalIndex === -1) return;
@@ -166,38 +254,36 @@ const OCRScoreSheet = ({
     const updatedRows = [...parsedData.parsed_rows];
     const row = { ...updatedRows[originalIndex] };
 
-    // Update each field if it was edited
-    ["diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"].forEach(
-      (field) => {
-        if (editValues[field] !== undefined) {
-          const value = editValues[field].trim();
-          if (value === "") {
-            row[field] = null;
+    // Update each score column if it was edited
+    scoreColumns.forEach((field) => {
+      if (editValues[field] !== undefined) {
+        const value = String(editValues[field] ?? "").trim();
+        if (value === "") {
+          row[field] = null;
+        } else {
+          const upperValue = value.toUpperCase();
+          if (["Đ", "D", "DAT", "ĐẠT"].includes(upperValue)) {
+            row[field] = "Đ";
+          } else if (
+            [
+              "KĐ",
+              "KD",
+              "KHONG_DAT",
+              "KHONGDAT",
+              "KHÔNG_ĐẠT",
+              "KHÔNG ĐẠT",
+            ].includes(upperValue)
+          ) {
+            row[field] = "KĐ";
           } else {
-            const upperValue = value.toUpperCase();
-            if (["Đ", "D", "DAT", "ĐẠT"].includes(upperValue)) {
-              row[field] = "Đ";
-            } else if (
-              [
-                "KĐ",
-                "KD",
-                "KHONG_DAT",
-                "KHONGDAT",
-                "KHÔNG_ĐẠT",
-                "KHÔNG ĐẠT",
-              ].includes(upperValue)
-            ) {
-              row[field] = "KĐ";
-            } else {
-              const numValue = parseFloat(value);
-              if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
-                row[field] = numValue;
-              }
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
+              row[field] = numValue;
             }
           }
         }
       }
-    );
+    });
 
     updatedRows[originalIndex] = row;
 
@@ -213,21 +299,15 @@ const OCRScoreSheet = ({
 
   // Bắt đầu edit một row
   const handleStartEdit = (globalIndex, row) => {
-    setEditingRowIndex(globalIndex);
-    setEditValues({
-      diem_thuong_xuyen:
-        row.diem_thuong_xuyen !== null && row.diem_thuong_xuyen !== undefined
-          ? String(row.diem_thuong_xuyen)
-          : "",
-      diem_thi_giua_ki:
-        row.diem_thi_giua_ki !== null && row.diem_thi_giua_ki !== undefined
-          ? String(row.diem_thi_giua_ki)
-          : "",
-      diem_thi_cuoi_ki:
-        row.diem_thi_cuoi_ki !== null && row.diem_thi_cuoi_ki !== undefined
-          ? String(row.diem_thi_cuoi_ki)
-          : "",
+    const initialValues = {};
+    scoreColumns.forEach((column) => {
+      const value = row[column];
+      initialValues[column] =
+        value !== null && value !== undefined ? String(value) : "";
     });
+
+    setEditingRowIndex(globalIndex);
+    setEditValues(initialValues);
   };
 
   // Hủy edit
@@ -263,7 +343,7 @@ const OCRScoreSheet = ({
 
     const rowToDelete = sortedRows[globalIndex];
     const updatedRows = parsedData.parsed_rows.filter(
-      (r) => r.student_id !== rowToDelete.student_id
+      (r) => r.student_id !== rowToDelete.student_id,
     );
 
     setParsedData({
@@ -297,33 +377,64 @@ const OCRScoreSheet = ({
     }
   }, [parsedData]);
 
-  const handleImageSelect = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  const handleImageSelect = async (event) => {
+    const files = Array.from(event.target.files ?? []) as File[];
+    if (files.length === 0) return;
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      toast.warning("Vui lòng chọn file ảnh (jpg, png, etc.)");
-      return;
-    }
-
-    // Validate file size (max 10MB)
+    const maxFiles = 5;
     const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      toast.warning("File ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 10MB.");
+
+    if (files.length > maxFiles) {
+      toast.warning(`Chỉ được chọn tối đa ${maxFiles} ảnh mỗi lần.`);
+    }
+
+    const limitedFiles = files.slice(0, maxFiles);
+    const validFiles: File[] = [];
+
+    for (const file of limitedFiles) {
+      if (!file.type.startsWith("image/")) {
+        toast.warning(`Bỏ qua ${file.name}: không phải file ảnh hợp lệ.`);
+        continue;
+      }
+
+      if (file.size > maxSize) {
+        toast.warning(`Bỏ qua ${file.name}: ảnh lớn hơn 10MB.`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      event.target.value = "";
       return;
     }
 
-    setSelectedImage(file);
+    try {
+      const previews = await Promise.all(
+        validFiles.map(
+          (file) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                if (typeof reader.result === "string") {
+                  resolve(reader.result);
+                } else {
+                  reject(new Error("Không đọc được ảnh preview"));
+                }
+              };
+              reader.onerror = () => reject(new Error("Lỗi đọc file ảnh"));
+              reader.readAsDataURL(file);
+            }),
+        ),
+      );
 
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        setImagePreview(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+      setSelectedImages(validFiles);
+      setImagePreviews(previews);
+    } catch (error) {
+      logger.error("Error creating image previews:", error);
+      toast.error("Không thể tạo preview cho ảnh đã chọn.");
+    }
 
     event.target.value = ""; // Reset input
   };
@@ -332,39 +443,50 @@ const OCRScoreSheet = ({
   const pollOCRStatus = async (reqId) => {
     try {
       const response = await api.getOCRStatus(reqId);
+      const payload = response?.data;
+      const status = payload?.status;
 
-      if (response.success) {
-        const status = response.data.status;
+      if (status) {
         setOcrStatus(status);
-        setProgress(response.data.progress || 0);
-        setStatusMessage(response.data.message || "");
+        setProgress(payload.progress || 0);
+        setStatusMessage(payload.message || "");
+        setQueuePosition(payload.position_in_queue ?? null);
+        setEstimatedWaitSeconds(payload.estimated_wait_seconds ?? null);
+        setNextWindowInSeconds(payload.next_window_in_seconds ?? null);
 
         if (status === "queued") {
-          setQueuePosition(response.data.position_in_queue);
           // Continue polling
           setTimeout(() => pollOCRStatus(reqId), 3000); // Poll every 3 seconds
         } else if (status === "processing") {
           setQueuePosition(null);
+          setEstimatedWaitSeconds(null);
           // Continue polling
           setTimeout(() => pollOCRStatus(reqId), 2000); // Poll every 2 seconds when processing
         } else if (status === "completed") {
           // Parse completed!
-          const result = response.data.result;
+          const result = payload.result;
           setParsedData(result);
           setParsing(false);
           setUploading(false);
           setOcrStatus(null); // Clear status để ẩn UI loading
           setProgress(0);
           setStatusMessage("");
+          setQueuePosition(null);
+          setEstimatedWaitSeconds(null);
+          setNextWindowInSeconds(null);
 
           if (result.total_valid === 0) {
             toast.warning("Không tìm thấy dữ liệu hợp lệ trong ảnh!", {
-              description: "Kiểm tra: ảnh đủ sáng, rõ nét và đúng format (id, họ và tên, điểm).",
+              description:
+                "Kiểm tra: ảnh đủ sáng, rõ nét và đúng format (id, họ và tên, điểm).",
             });
           } else if (result.total_errors > 0) {
-            toast.warning(`Phân tích thành công nhưng có ${result.total_errors} lỗi!`, {
-              description: `Hợp lệ: ${result.total_valid} học sinh • Lỗi: ${result.total_errors} dòng`,
-            });
+            toast.warning(
+              `Phân tích thành công nhưng có ${result.total_errors} lỗi!`,
+              {
+                description: `Hợp lệ: ${result.total_valid} học sinh • Lỗi: ${result.total_errors} dòng`,
+              },
+            );
           } else {
             toast.success("Phân tích bảng điểm thành công!", {
               description: `Tìm thấy ${result.total_valid} học sinh.`,
@@ -377,22 +499,30 @@ const OCRScoreSheet = ({
           setOcrStatus(null); // Clear status
           setProgress(0);
           setStatusMessage("");
-          toast.error("Lỗi khi xử lý ảnh: " + (response.data.error || "Unknown error"));
+          setQueuePosition(null);
+          setEstimatedWaitSeconds(null);
+          setNextWindowInSeconds(null);
+          toast.error(
+            "Lỗi khi xử lý ảnh: " + (payload.error || "Unknown error"),
+          );
         }
       } else {
-        throw new Error(response.message || "Failed to get status");
+        throw new Error(response?.message || "Failed to get status");
       }
     } catch (error) {
       logger.error("Error polling OCR status:", error);
       setParsing(false);
       setUploading(false);
+      setQueuePosition(null);
+      setEstimatedWaitSeconds(null);
+      setNextWindowInSeconds(null);
       toast.error("Lỗi khi kiểm tra trạng thái OCR!");
     }
   };
 
   const handleUploadAndParse = async () => {
-    if (!selectedImage) {
-      toast.warning("Vui lòng chọn ảnh bảng điểm!");
+    if (!selectedImages || selectedImages.length === 0) {
+      toast.warning("Vui lòng chọn ít nhất 1 ảnh bảng điểm!");
       return;
     }
 
@@ -401,10 +531,13 @@ const OCRScoreSheet = ({
       setParsing(true);
       setOcrStatus("uploading");
       setProgress(0);
-      setStatusMessage("Đang upload ảnh...");
+      setStatusMessage(`Đang upload ${selectedImages.length} ảnh...`);
 
       const formData = new FormData();
-      formData.append("file", selectedImage);
+      selectedImages.forEach((file) => {
+        formData.append("files", file);
+      });
+      formData.append("ocr_engine", ocrEngine);
 
       const response = await api.parseScoreSheetOCR(formData);
 
@@ -413,8 +546,10 @@ const OCRScoreSheet = ({
         const reqId = response.data.request_id;
         setRequestId(reqId);
         setOcrStatus(response.data.status); // Should be 'queued'
-        setQueuePosition(response.data.position_in_queue);
-        setStatusMessage("Đã thêm vào hàng chờ...");
+        setQueuePosition(response.data.position_in_queue ?? null);
+        setEstimatedWaitSeconds(response.data.estimated_wait_seconds ?? null);
+        setNextWindowInSeconds(response.data.next_window_in_seconds ?? null);
+        setStatusMessage(response.data.message || "Đã thêm vào hàng chờ...");
 
         // Start polling status
         setTimeout(() => pollOCRStatus(reqId), 2000); // Start polling after 2s
@@ -438,6 +573,9 @@ const OCRScoreSheet = ({
 
       setUploading(false);
       setParsing(false);
+      setQueuePosition(null);
+      setEstimatedWaitSeconds(null);
+      setNextWindowInSeconds(null);
     }
   };
 
@@ -454,13 +592,25 @@ const OCRScoreSheet = ({
     try {
       setUploading(true);
 
-      // Convert parsed data to import format
-      const grades = parsedData.parsed_rows.map((row) => ({
-        student_id: row.student_id,
-        diem_thuong_xuyen: row.diem_thuong_xuyen,
-        diem_thi_giua_ki: row.diem_thi_giua_ki,
-        diem_thi_cuoi_ki: row.diem_thi_cuoi_ki,
-      }));
+      const importScoreColumns =
+        scoreColumns.length > 0
+          ? scoreColumns
+          : ["diem_thuong_xuyen", "diem_thi_giua_ki", "diem_thi_cuoi_ki"];
+
+      // Convert parsed data to import format (dynamic score columns)
+      const grades = parsedData.parsed_rows.map((row) => {
+        const gradeRow: any = {
+          student_id: row.student_id,
+        };
+
+        importScoreColumns.forEach((column) => {
+          if (row[column] !== undefined) {
+            gradeRow[column] = row[column];
+          }
+        });
+
+        return gradeRow;
+      });
 
       const importPayload = {
         class_subject_id: selectedClassSubject.id,
@@ -509,7 +659,11 @@ const OCRScoreSheet = ({
     }
 
     try {
-      await api.exportParsedOCRToExcel({ parsed_rows: parsedData.parsed_rows });
+      await api.exportParsedOCRToExcel({
+        parsed_rows: parsedData.parsed_rows,
+        class_subject_id: selectedClassSubject?.id,
+        score_columns: scoreColumns,
+      });
       toast.success("Tải file Excel thành công!");
     } catch (error) {
       logger.error("Error exporting OCR data:", error);
@@ -520,8 +674,8 @@ const OCRScoreSheet = ({
   const handleCloseModal = () => {
     setShowOCRModal(false);
     setParsedData(null);
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedImages([]);
+    setImagePreviews([]);
 
     // Reset queue states
     setRequestId(null);
@@ -529,6 +683,8 @@ const OCRScoreSheet = ({
     setProgress(0);
     setStatusMessage("");
     setQueuePosition(null);
+    setEstimatedWaitSeconds(null);
+    setNextWindowInSeconds(null);
   };
 
   return (
@@ -538,7 +694,11 @@ const OCRScoreSheet = ({
         onClick={() => setShowOCRModal(true)}
         disabled={disabled}
         className="flex items-center space-x-2"
-        title={disabled ? 'Vui lòng cấu hình điểm trước khi quét ảnh' : 'Upload ảnh bảng điểm viết tay để tự động nhận dạng'}
+        title={
+          disabled
+            ? "Vui lòng cấu hình điểm trước khi quét ảnh"
+            : "Upload ảnh bảng điểm viết tay để tự động nhận dạng"
+        }
       >
         <Camera className="w-4 h-4" />
         <span>OCR - Nhập điểm từ ảnh</span>
@@ -576,54 +736,102 @@ const OCRScoreSheet = ({
                       <li>
                         • Bảng điểm phải có các cột:{" "}
                         <strong>
-                          id, ho_va_ten, diem_thuong_xuyen, diem_thi_giua_ki,
-                          diem_thi_cuoi_ki
+                          id, ho_va_ten và các cột điểm theo môn (ví dụ: Diem_tx
+                          hoặc Diem_tx1..Diem_tx4, Diem_thi_giua_ki,
+                          Diem_thi_cuoi_ki)
                         </strong>
                       </li>
                       <li>• Viết tay hoặc in đều được hỗ trợ</li>
-                      <li>• Định dạng ảnh: JPG, PNG (tối đa 10MB)</li>
+                      <li>• Định dạng ảnh: JPG, PNG (tối đa 10MB/ảnh)</li>
+                      <li>• Có thể chọn nhiều ảnh, tối đa 5 ảnh/lần</li>
+                      <li>
+                        • Nên đặt ảnh có header cột ở vị trí đầu tiên để OCR map
+                        cột chính xác
+                      </li>
                     </ul>
                   </CardContent>
                 </Card>
 
                 {/* Image Preview */}
-                {imagePreview && selectedImage && (
+                {imagePreviews.length > 0 && selectedImages.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Ảnh đã chọn</CardTitle>
+                      <CardTitle className="text-lg">
+                        Ảnh đã chọn ({selectedImages.length})
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="mx-auto max-w-full max-h-96 rounded-lg shadow-md"
-                      />
-                      <p className="mt-2 text-xs text-center text-muted-foreground">
-                        {selectedImage.name} (
-                        {(selectedImage.size / 1024 / 1024).toFixed(2)} MB)
-                      </p>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {imagePreviews.map((preview, idx) => (
+                          <div
+                            key={`${selectedImages[idx]?.name || "image"}-${idx}`}
+                            className="rounded-lg border p-3"
+                          >
+                            <img
+                              src={preview}
+                              alt={`Preview ${idx + 1}`}
+                              className="mx-auto max-h-64 w-full rounded-md object-contain"
+                            />
+                            <p className="mt-2 text-xs text-center text-muted-foreground">
+                              #{idx + 1} {selectedImages[idx]?.name} (
+                              {(
+                                (selectedImages[idx]?.size || 0) /
+                                1024 /
+                                1024
+                              ).toFixed(2)}{" "}
+                              MB)
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
                 )}
 
                 {/* Upload Button */}
                 <div className="flex flex-col items-center space-y-4">
+                  <div className="w-full max-w-md rounded-md border bg-muted/20 p-3">
+                    <label className="mb-2 block text-sm font-medium">
+                      OCR Engine
+                    </label>
+                    <select
+                      value={ocrEngine}
+                      onChange={(event) =>
+                        setOcrEngine(event.target.value as "gemini" | "qwen")
+                      }
+                      disabled={parsing || uploading}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="gemini">Gemini API (nhanh, cloud)</option>
+                      <option value="qwen">
+                        Qwen local (chậm hơn, private)
+                      </option>
+                    </select>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Qwen thường mất lâu hơn (có thể 1-2 phút/ảnh), phù hợp khi
+                      muốn xử lý local.
+                    </p>
+                  </div>
+
                   <Button asChild className="w-full max-w-md">
                     <label className="cursor-pointer">
                       <Upload className="w-5 h-5 mr-2" />
                       <span>
-                        {selectedImage ? "Chọn ảnh khác" : "Chọn ảnh bảng điểm"}
+                        {selectedImages.length > 0
+                          ? "Chọn lại ảnh"
+                          : "Chọn ảnh bảng điểm"}
                       </span>
                       <input
                         type="file"
                         accept="image/*"
+                        multiple
                         onChange={handleImageSelect}
                         className="hidden"
                       />
                     </label>
                   </Button>
 
-                  {selectedImage && !parsing && (
+                  {selectedImages.length > 0 && !parsing && (
                     <Button
                       onClick={handleUploadAndParse}
                       disabled={uploading}
@@ -638,7 +846,9 @@ const OCRScoreSheet = ({
                       ) : (
                         <>
                           <Camera className="w-5 h-5 mr-2" />
-                          <span>Phân tích bảng điểm</span>
+                          <span>
+                            Phân tích {selectedImages.length} ảnh bảng điểm
+                          </span>
                         </>
                       )}
                     </Button>
@@ -677,9 +887,15 @@ const OCRScoreSheet = ({
                           <p className="text-sm font-medium text-blue-800 flex items-center space-x-2">
                             <Loader2 className="w-4 h-4 animate-spin" />
                             <span>
-                              Vui lòng đợi 2-3 phút để hệ thống xử lý ảnh...
+                              {_statusMessage ||
+                                "Yêu cầu đã vào hàng đợi. Vui lòng chờ hệ thống xử lý..."}
                             </span>
                           </p>
+                          {_progress > 0 && (
+                            <p className="mt-2 text-xs text-blue-700">
+                              Tiến độ: {_progress}%
+                            </p>
+                          )}
                         </div>
 
                         {/* Queue Position */}
@@ -696,6 +912,33 @@ const OCRScoreSheet = ({
                             </p>
                           </div>
                         )}
+
+                        {/* Estimated Wait */}
+                        {estimatedWaitSeconds !== null &&
+                          estimatedWaitSeconds > 0 && (
+                            <div className="p-3 mt-3 bg-amber-50 rounded-md border border-amber-200">
+                              <p className="text-xs text-amber-800">
+                                Ước tính chờ: khoảng{" "}
+                                <strong>
+                                  {estimatedWaitSeconds >= 60
+                                    ? `${Math.ceil(estimatedWaitSeconds / 60)} phút`
+                                    : `${estimatedWaitSeconds} giây`}
+                                </strong>
+                              </p>
+                            </div>
+                          )}
+
+                        {/* Next Window */}
+                        {ocrStatus === "queued" &&
+                          nextWindowInSeconds !== null &&
+                          nextWindowInSeconds > 0 && (
+                            <div className="p-3 mt-3 bg-slate-50 rounded-md border border-slate-200">
+                              <p className="text-xs text-slate-700">
+                                Đợt xử lý quota kế tiếp sau khoảng{" "}
+                                <strong>{nextWindowInSeconds}s</strong>
+                              </p>
+                            </div>
+                          )}
 
                         {/* Info */}
                         <p className="mt-3 text-xs italic text-muted-foreground">
@@ -809,55 +1052,59 @@ const OCRScoreSheet = ({
                 )}
 
                 {/* Pagination Summary */}
-                {parsedData && parsedData.parsed_rows && (() => {
-                  const totalRows = parsedData.parsed_rows.length;
-                  // const totalPages = Math.ceil(totalRows / pageSize);
-                  const startIndex = (currentPage - 1) * pageSize;
-                  const endIndex = startIndex + pageSize;
+                {parsedData &&
+                  parsedData.parsed_rows &&
+                  (() => {
+                    const totalRows = parsedData.parsed_rows.length;
+                    // const totalPages = Math.ceil(totalRows / pageSize);
+                    const startIndex = (currentPage - 1) * pageSize;
+                    const endIndex = startIndex + pageSize;
 
-                  if (totalRows > pageSize) {
-                    return (
-                      <Card className="mb-4">
-                        <CardContent className="p-4">
-                          <div className="flex flex-wrap gap-3 justify-between items-center">
-                            <div className="text-sm text-muted-foreground">
-                              Hiển thị{" "}
-                              <span className="font-semibold">
-                                {startIndex + 1}
-                              </span>{" "}
-                              đến{" "}
-                              <span className="font-semibold">
-                                {Math.min(endIndex, totalRows)}
-                              </span>{" "}
-                              trong tổng số{" "}
-                              <span className="font-semibold">{totalRows}</span>{" "}
-                              bản ghi
+                    if (totalRows > pageSize) {
+                      return (
+                        <Card className="mb-4">
+                          <CardContent className="p-4">
+                            <div className="flex flex-wrap gap-3 justify-between items-center">
+                              <div className="text-sm text-muted-foreground">
+                                Hiển thị{" "}
+                                <span className="font-semibold">
+                                  {startIndex + 1}
+                                </span>{" "}
+                                đến{" "}
+                                <span className="font-semibold">
+                                  {Math.min(endIndex, totalRows)}
+                                </span>{" "}
+                                trong tổng số{" "}
+                                <span className="font-semibold">
+                                  {totalRows}
+                                </span>{" "}
+                                bản ghi
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <label className="text-sm text-muted-foreground">
+                                  Số lượng/trang:
+                                </label>
+                                <select
+                                  value={pageSize}
+                                  onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setCurrentPage(1);
+                                  }}
+                                  className="py-1 pr-8 pl-3 text-sm bg-background rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                                >
+                                  <option value={10}>10</option>
+                                  <option value={20}>20</option>
+                                  <option value={30}>30</option>
+                                  <option value={50}>50</option>
+                                </select>
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <label className="text-sm text-muted-foreground">
-                                Số lượng/trang:
-                              </label>
-                              <select
-                                value={pageSize}
-                                onChange={(e) => {
-                                  setPageSize(Number(e.target.value));
-                                  setCurrentPage(1);
-                                }}
-                                className="py-1 pr-8 pl-3 text-sm bg-background rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring"
-                              >
-                                <option value={10}>10</option>
-                                <option value={20}>20</option>
-                                <option value={30}>30</option>
-                                <option value={50}>50</option>
-                              </select>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  }
-                  return null;
-                })()}
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                    return null;
+                  })()}
 
                 {/* Data Table */}
                 <Card>
@@ -890,243 +1137,176 @@ const OCRScoreSheet = ({
                             <TableHead className="text-xs font-medium text-left">
                               Lớp
                             </TableHead>
-                            <TableHead className="text-xs font-medium text-center">
-                              ĐTX
-                            </TableHead>
-                            <TableHead className="text-xs font-medium text-center">
-                              ĐGK
-                            </TableHead>
-                            <TableHead className="text-xs font-medium text-center">
-                              ĐCK
-                            </TableHead>
+                            {scoreColumns.map((column) => (
+                              <TableHead
+                                key={column}
+                                className="text-xs font-medium text-center"
+                              >
+                                {getColumnLabel(column)}
+                              </TableHead>
+                            ))}
                             <TableHead className="text-xs font-medium text-center w-24">
                               Thao tác
                             </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {parsedData && parsedData.parsed_rows && (() => {
-                            // const totalRows = parsedData.parsed_rows.length;
-                            const startIndex = (currentPage - 1) * pageSize;
-                            const endIndex = startIndex + pageSize;
-                            // Sắp xếp theo student_id tăng dần trước khi phân trang
-                            const sortedRows = [...parsedData.parsed_rows].sort(
-                              (a, b) => {
+                          {parsedData &&
+                            parsedData.parsed_rows &&
+                            (() => {
+                              // const totalRows = parsedData.parsed_rows.length;
+                              const startIndex = (currentPage - 1) * pageSize;
+                              const endIndex = startIndex + pageSize;
+                              // Sắp xếp theo student_id tăng dần trước khi phân trang
+                              const sortedRows = [
+                                ...parsedData.parsed_rows,
+                              ].sort((a, b) => {
                                 const aId = parseInt(a.student_id) || 0;
                                 const bId = parseInt(b.student_id) || 0;
                                 return aId - bId;
-                              }
-                            );
-                            const paginatedRows = sortedRows.slice(
-                              startIndex,
-                              endIndex
-                            );
-
-                            return paginatedRows.map((row, idx) => {
-                              const globalIndex = startIndex + idx; // Index trong sorted list
-                              const isEditing = editingRowIndex === globalIndex;
-
-                              return (
-                                <TableRow
-                                  key={idx}
-                                  className={`${
-                                    isEditing
-                                      ? "bg-blue-50"
-                                      : "hover:bg-muted/50 cursor-pointer"
-                                  }`}
-                                  onClick={() =>
-                                    !isEditing &&
-                                    handleStartEdit(globalIndex, row)
-                                  }
-                                >
-                                  <TableCell className="text-sm">
-                                    {startIndex + idx + 1}
-                                  </TableCell>
-                                  <TableCell className="text-sm font-medium text-primary">
-                                    {row.student_id}
-                                  </TableCell>
-                                  <TableCell className="text-sm">
-                                    {row.full_name}
-                                    {row.ocr_name &&
-                                      row.ocr_name !== row.full_name && (
-                                        <span className="block text-xs text-muted-foreground">
-                                          OCR: {row.ocr_name}
-                                        </span>
-                                      )}
-                                  </TableCell>
-                                  <TableCell className="text-sm text-muted-foreground">
-                                    {row.class_name}
-                                  </TableCell>
-
-                                  {/* ĐTX */}
-                                  <TableCell
-                                    className="text-sm text-center"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {isEditing ? (
-                                      <Input
-                                        type="text"
-                                        value={
-                                          editValues.diem_thuong_xuyen ?? ""
-                                        }
-                                        onChange={(e) =>
-                                          handleScoreChange(
-                                            globalIndex,
-                                            "diem_thuong_xuyen",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="0-10, Đ, KĐ"
-                                        className="w-16 h-7 text-xs text-center mx-auto"
-                                      />
-                                    ) : row.diem_thuong_xuyen !== null &&
-                                      row.diem_thuong_xuyen !== undefined ? (
-                                      <Badge
-                                        variant="secondary"
-                                        className="bg-blue-100 text-blue-700"
-                                      >
-                                        {row.diem_thuong_xuyen}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-muted-foreground">
-                                        -
-                                      </span>
-                                    )}
-                                  </TableCell>
-
-                                  {/* ĐGK */}
-                                  <TableCell
-                                    className="text-sm text-center"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {isEditing ? (
-                                      <Input
-                                        type="text"
-                                        value={
-                                          editValues.diem_thi_giua_ki ?? ""
-                                        }
-                                        onChange={(e) =>
-                                          handleScoreChange(
-                                            globalIndex,
-                                            "diem_thi_giua_ki",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="0-10, Đ, KĐ"
-                                        className="w-16 h-7 text-xs text-center mx-auto"
-                                      />
-                                    ) : row.diem_thi_giua_ki !== null &&
-                                      row.diem_thi_giua_ki !== undefined ? (
-                                      <Badge
-                                        variant="secondary"
-                                        className="bg-blue-100 text-blue-700"
-                                      >
-                                        {row.diem_thi_giua_ki}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-muted-foreground">
-                                        -
-                                      </span>
-                                    )}
-                                  </TableCell>
-
-                                  {/* ĐCK */}
-                                  <TableCell
-                                    className="text-sm text-center"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {isEditing ? (
-                                      <Input
-                                        type="text"
-                                        value={
-                                          editValues.diem_thi_cuoi_ki ?? ""
-                                        }
-                                        onChange={(e) =>
-                                          handleScoreChange(
-                                            globalIndex,
-                                            "diem_thi_cuoi_ki",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="0-10, Đ, KĐ"
-                                        className="w-16 h-7 text-xs text-center mx-auto"
-                                      />
-                                    ) : row.diem_thi_cuoi_ki !== null &&
-                                      row.diem_thi_cuoi_ki !== undefined ? (
-                                      <Badge
-                                        variant="secondary"
-                                        className="bg-blue-100 text-blue-700"
-                                      >
-                                        {row.diem_thi_cuoi_ki}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-muted-foreground">
-                                        -
-                                      </span>
-                                    )}
-                                  </TableCell>
-
-                                  {/* Actions */}
-                                  <TableCell
-                                    className="text-center"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {isEditing ? (
-                                      <div className="flex items-center justify-center gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="default"
-                                          className="h-6 w-6 p-0"
-                                          onClick={() =>
-                                            handleSaveEdit(globalIndex)
-                                          }
-                                          title="Lưu"
-                                        >
-                                          <Save className="w-3 h-3" />
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-6 w-6 p-0"
-                                          onClick={handleCancelEdit}
-                                          title="Hủy"
-                                        >
-                                          <XCircle className="w-3 h-3" />
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center justify-center gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleStartEdit(globalIndex, row);
-                                          }}
-                                          title="Sửa"
-                                        >
-                                          <Edit2 className="w-3 h-3" />
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-100"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteRow(globalIndex);
-                                          }}
-                                          title="Xóa"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
+                              });
+                              const paginatedRows = sortedRows.slice(
+                                startIndex,
+                                endIndex,
                               );
-                            });
-                          })()}
+
+                              return paginatedRows.map((row, idx) => {
+                                const globalIndex = startIndex + idx; // Index trong sorted list
+                                const isEditing =
+                                  editingRowIndex === globalIndex;
+
+                                return (
+                                  <TableRow
+                                    key={idx}
+                                    className={`${
+                                      isEditing
+                                        ? "bg-blue-50"
+                                        : "hover:bg-muted/50 cursor-pointer"
+                                    }`}
+                                    onClick={() =>
+                                      !isEditing &&
+                                      handleStartEdit(globalIndex, row)
+                                    }
+                                  >
+                                    <TableCell className="text-sm">
+                                      {startIndex + idx + 1}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-primary">
+                                      {row.student_id}
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      {row.full_name}
+                                      {row.ocr_name &&
+                                        row.ocr_name !== row.full_name && (
+                                          <span className="block text-xs text-muted-foreground">
+                                            OCR: {row.ocr_name}
+                                          </span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">
+                                      {row.class_name}
+                                    </TableCell>
+
+                                    {scoreColumns.map((column) => {
+                                      const cellValue = row[column];
+                                      return (
+                                        <TableCell
+                                          key={`${globalIndex}-${column}`}
+                                          className="text-sm text-center"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {isEditing ? (
+                                            <Input
+                                              type="text"
+                                              value={editValues[column] ?? ""}
+                                              onChange={(e) =>
+                                                handleScoreChange(
+                                                  globalIndex,
+                                                  column,
+                                                  e.target.value,
+                                                )
+                                              }
+                                              placeholder="0-10, Đ, KĐ"
+                                              className="w-16 h-7 text-xs text-center mx-auto"
+                                            />
+                                          ) : cellValue !== null &&
+                                            cellValue !== undefined ? (
+                                            <Badge
+                                              variant="secondary"
+                                              className="bg-blue-100 text-blue-700"
+                                            >
+                                              {cellValue}
+                                            </Badge>
+                                          ) : (
+                                            <span className="text-muted-foreground">
+                                              -
+                                            </span>
+                                          )}
+                                        </TableCell>
+                                      );
+                                    })}
+
+                                    {/* Actions */}
+                                    <TableCell
+                                      className="text-center"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {isEditing ? (
+                                        <div className="flex items-center justify-center gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="default"
+                                            className="h-6 w-6 p-0"
+                                            onClick={() =>
+                                              handleSaveEdit(globalIndex)
+                                            }
+                                            title="Lưu"
+                                          >
+                                            <Save className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0"
+                                            onClick={handleCancelEdit}
+                                            title="Hủy"
+                                          >
+                                            <XCircle className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-center gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleStartEdit(globalIndex, row);
+                                            }}
+                                            title="Sửa"
+                                          >
+                                            <Edit2 className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-100"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteRow(globalIndex);
+                                            }}
+                                            title="Xóa"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })()}
                         </TableBody>
                       </Table>
                     </div>
@@ -1134,93 +1314,97 @@ const OCRScoreSheet = ({
                 </Card>
 
                 {/* Pagination Controls */}
-                {parsedData && parsedData.parsed_rows && (() => {
-                  const totalRows = parsedData.parsed_rows.length;
-                  const totalPages = Math.ceil(totalRows / pageSize);
-                  // const startIndex = (currentPage - 1) * pageSize;
-                  // const endIndex = startIndex + pageSize;
+                {parsedData &&
+                  parsedData.parsed_rows &&
+                  (() => {
+                    const totalRows = parsedData.parsed_rows.length;
+                    const totalPages = Math.ceil(totalRows / pageSize);
+                    // const startIndex = (currentPage - 1) * pageSize;
+                    // const endIndex = startIndex + pageSize;
 
-                  if (totalPages <= 1) return null;
+                    if (totalPages <= 1) return null;
 
-                  return (
-                    <div className="flex justify-center items-center mt-4 space-x-2">
-                      <Button
-                        onClick={() =>
-                          setCurrentPage((prev) => Math.max(1, prev - 1))
-                        }
-                        disabled={currentPage === 1}
-                        variant="outline"
-                        size="sm"
-                      >
-                        ← Trước
-                      </Button>
-
-                      <div className="flex items-center space-x-1">
-                        {Array.from(
-                          { length: totalPages },
-                          (_, i) => i + 1
-                        ).map((pageNum) => {
-                          const showPage =
-                            pageNum === 1 ||
-                            pageNum === totalPages ||
-                            (pageNum >= currentPage - 1 &&
-                              pageNum <= currentPage + 1);
-
-                          if (!showPage) {
-                            if (
-                              pageNum === currentPage - 2 ||
-                              pageNum === currentPage + 2
-                            ) {
-                              return (
-                                <span
-                                  key={pageNum}
-                                  className="px-2 text-muted-foreground"
-                                >
-                                  ...
-                                </span>
-                              );
-                            }
-                            return null;
+                    return (
+                      <div className="flex justify-center items-center mt-4 space-x-2">
+                        <Button
+                          onClick={() =>
+                            setCurrentPage((prev) => Math.max(1, prev - 1))
                           }
+                          disabled={currentPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          ← Trước
+                        </Button>
 
-                          return (
-                            <Button
-                              key={pageNum}
-                              onClick={() => setCurrentPage(pageNum)}
-                              variant={
-                                currentPage === pageNum ? "default" : "outline"
+                        <div className="flex items-center space-x-1">
+                          {Array.from(
+                            { length: totalPages },
+                            (_, i) => i + 1,
+                          ).map((pageNum) => {
+                            const showPage =
+                              pageNum === 1 ||
+                              pageNum === totalPages ||
+                              (pageNum >= currentPage - 1 &&
+                                pageNum <= currentPage + 1);
+
+                            if (!showPage) {
+                              if (
+                                pageNum === currentPage - 2 ||
+                                pageNum === currentPage + 2
+                              ) {
+                                return (
+                                  <span
+                                    key={pageNum}
+                                    className="px-2 text-muted-foreground"
+                                  >
+                                    ...
+                                  </span>
+                                );
                               }
-                              size="sm"
-                            >
-                              {pageNum}
-                            </Button>
-                          );
-                        })}
-                      </div>
+                              return null;
+                            }
 
-                      <Button
-                        onClick={() =>
-                          setCurrentPage((prev) =>
-                            Math.min(totalPages, prev + 1)
-                          )
-                        }
-                        disabled={currentPage === totalPages}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Sau →
-                      </Button>
-                    </div>
-                  );
-                })()}
+                            return (
+                              <Button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                variant={
+                                  currentPage === pageNum
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+
+                        <Button
+                          onClick={() =>
+                            setCurrentPage((prev) =>
+                              Math.min(totalPages, prev + 1),
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Sau →
+                        </Button>
+                      </div>
+                    );
+                  })()}
 
                 {/* Action Buttons */}
                 <div className="flex justify-between items-center pt-4 border-t border-border">
                   <Button
                     onClick={() => {
                       setParsedData(null);
-                      setSelectedImage(null);
-                      setImagePreview(null);
+                      setSelectedImages([]);
+                      setImagePreviews([]);
                     }}
                     variant="outline"
                   >
