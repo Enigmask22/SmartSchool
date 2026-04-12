@@ -32,7 +32,7 @@ class QwenOCRService:
 			self.device = "cpu"
 
 		self.max_image_width = int(os.getenv("QWEN_MAX_IMAGE_WIDTH", "2048"))
-		self.max_new_tokens = int(os.getenv("QWEN_MAX_NEW_TOKENS", "4096"))
+		self.max_new_tokens = int(os.getenv("QWEN_MAX_NEW_TOKENS", "7000"))
 		self.repetition_penalty = float(os.getenv("QWEN_REPETITION_PENALTY", "1.08"))
 
 		self.model = None
@@ -216,21 +216,13 @@ class QwenOCRService:
 
 		return normalized
 
-	def _build_prompt(self, header_hint: Optional[list[str]] = None, force_full_table: bool = False) -> str:
+	def _build_prompt(self, header_hint: Optional[list[str]] = None) -> str:
 		header_note = ""
 		if header_hint:
 			header_note = (
 				"\nHeader chuẩn từ ảnh trước: "
 				+ ", ".join(header_hint)
 				+ ". Giữ nguyên thứ tự/key theo header này nếu ảnh hiện tại thiếu tiêu đề."
-			)
-
-		full_table_note = ""
-		if force_full_table:
-			full_table_note = (
-				"\nBẮT BUỘC đọc toàn bộ các dòng học sinh trong ảnh, kể cả các dòng cuối trang. "
-				"Không được chỉ trả vài dòng đầu. "
-				"Nếu ảnh có 20+ dòng thì phải trả đúng toàn bộ số dòng nhìn thấy."
 			)
 
 		return (
@@ -240,7 +232,6 @@ class QwenOCRService:
 			"Điểm có thể là số 0-10 hoặc Đ/KĐ. "
 			"Không trả về markdown, không thêm giải thích."
 			+ header_note
-			+ full_table_note
 		)
 
 	def _prepare_image_for_ocr(self, image_path: str) -> tuple[str, Optional[str]]:
@@ -277,10 +268,8 @@ class QwenOCRService:
 		self,
 		image_path: str,
 		header_hint: Optional[list[str]] = None,
-		max_new_tokens: Optional[int] = None,
-		force_full_table: bool = False,
 	) -> list[dict[str, Any]]:
-		prompt = self._build_prompt(header_hint, force_full_table=force_full_table)
+		prompt = self._build_prompt(header_hint)
 		prepared_image_path, temp_image_path = self._prepare_image_for_ocr(image_path)
 
 		try:
@@ -309,7 +298,7 @@ class QwenOCRService:
 			with torch.inference_mode():
 				generated_ids = self.model.generate(
 					**inputs,
-					max_new_tokens=max_new_tokens or self.max_new_tokens,
+					max_new_tokens=self.max_new_tokens,
 					do_sample=False,
 					num_beams=1,
 					repetition_penalty=self.repetition_penalty,
@@ -331,7 +320,7 @@ class QwenOCRService:
 			logger.info(
 				"Qwen OCR response length=%s chars (tokens_limit=%s)",
 				len(response_text),
-				max_new_tokens or self.max_new_tokens,
+				self.max_new_tokens,
 			)
 
 			return self._parse_json_rows(response_text)
@@ -343,32 +332,11 @@ class QwenOCRService:
 					logger.warning("Không xóa được ảnh tạm Qwen OCR: %s", temp_image_path)
 
 	def _generate_single_image(self, image_path: str, header_hint: Optional[list[str]] = None) -> list[dict[str, Any]]:
-		"""Thử OCR 2 lần nếu lần đầu trả quá ít dòng."""
-		first_limit = self.max_new_tokens
-		second_limit = max(self.max_new_tokens, 8192)
-
-		rows = self._generate_single_image_once(
+		"""OCR 1 lần để tối ưu tốc độ xử lý."""
+		return self._generate_single_image_once(
 			image_path,
 			header_hint=header_hint,
-			max_new_tokens=first_limit,
-			force_full_table=False,
 		)
-
-		if len(rows) <= 2:
-			logger.warning(
-				"Qwen OCR trả về %s dòng (ít bất thường), retry với prompt chặt hơn và token lớn hơn",
-				len(rows),
-			)
-			rows_retry = self._generate_single_image_once(
-				image_path,
-				header_hint=header_hint,
-				max_new_tokens=second_limit,
-				force_full_table=True,
-			)
-			if len(rows_retry) >= len(rows):
-				return rows_retry
-
-		return rows
 
 	def extract_all_grades(self, image_paths: list[str]) -> list[dict[str, Any]]:
 		valid_paths = [path for path in image_paths if path and os.path.exists(path)]
