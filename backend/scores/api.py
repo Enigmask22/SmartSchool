@@ -2,13 +2,18 @@
 API Router cho Scores management
 """
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, BackgroundTasks, status
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, BackgroundTasks, status, Form
+from typing import Optional, Any
 from pathlib import Path
 from datetime import datetime
 import uuid
 import os
 import asyncio
+import re
+import time
+import tempfile
+from collections import deque
+from dataclasses import dataclass
 
 from scores.models import ScoreCreate, ScoreUpdate, ResponseModel
 from scores.services import calculate_final_grade
@@ -16,8 +21,6 @@ from core.database import get_db
 from core.logger import setup_logger
 from core.system_settings import get_current_academic_year, get_current_semester
 from core.dependencies import get_current_user
-from scores.ocr_services.qwen_queue_manager import get_queue_manager
-from scores.ocr_services.ocr_factory import OCRFactory
 
 logger = setup_logger("scores_api")
 router = APIRouter()
@@ -25,11 +28,450 @@ router = APIRouter()
 # Global dict to store OCR results (in production, use Redis or database)
 ocr_results = {}
 
-# Global semaphore để limit concurrent OCR processing
-# Đọc từ environment variable OCR_MAX_CONCURRENT
-OCR_MAX_CONCURRENT = int(os.getenv('OCR_MAX_CONCURRENT', '2'))
-OCR_SEMAPHORE = asyncio.Semaphore(OCR_MAX_CONCURRENT)
-logger.info(f"OCR Semaphore initialized with max_concurrent={OCR_MAX_CONCURRENT}")
+
+# OCR engines, swap config và queue theo từng engine
+def _read_int_env(name: str, default_value: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default_value
+
+    try:
+        return int(raw_value)
+    except ValueError:
+        logger.warning("Giá trị env %s=%s không hợp lệ, dùng mặc định %s", name, raw_value, default_value)
+        return default_value
+
+
+def _read_bool_env(name: str, default_value: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default_value
+
+    return raw_value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+@dataclass(frozen=True)
+class OCREngineConfig:
+    name: str
+    max_concurrent_requests: int
+    batch_size_per_window: int
+    window_seconds: int
+    max_queue_size: int
+    average_processing_seconds: int
+
+
+@dataclass
+class OCRQueueJob:
+    request_id: str
+    teacher_key: str
+    teacher_name: str
+    engine: str
+    temp_paths: list[str]
+    db_client: Any
+    created_at: float
+
+
+@dataclass
+class OCREngineState:
+    queue: deque[OCRQueueJob]
+    active: dict[str, OCRQueueJob]
+    current_window_key: int
+    dispatched_in_window: int
+
+
+OCR_DEFAULT_ENGINE = os.getenv("OCR_DEFAULT_ENGINE", "gemini").strip().lower()
+OCR_ALLOW_ENGINE_OVERRIDE = _read_bool_env("OCR_ALLOW_ENGINE_OVERRIDE", True)
+
+OCR_ENGINE_CONFIGS: dict[str, OCREngineConfig] = {
+    "gemini": OCREngineConfig(
+        name="gemini",
+        max_concurrent_requests=_read_int_env("GEMINI_OCR_MAX_CONCURRENT_REQUESTS", 10),
+        batch_size_per_window=_read_int_env("GEMINI_OCR_BATCH_SIZE_PER_WINDOW", 10),
+        window_seconds=_read_int_env("GEMINI_OCR_WINDOW_SECONDS", 60),
+        max_queue_size=_read_int_env("GEMINI_OCR_MAX_QUEUE_SIZE", 300),
+        average_processing_seconds=_read_int_env("GEMINI_OCR_AVG_PROCESSING_SECONDS", 20),
+    ),
+    "qwen": OCREngineConfig(
+        name="qwen",
+        max_concurrent_requests=_read_int_env("QWEN_OCR_MAX_CONCURRENT_REQUESTS", 1),
+        batch_size_per_window=_read_int_env("QWEN_OCR_BATCH_SIZE_PER_WINDOW", 1),
+        window_seconds=_read_int_env("QWEN_OCR_WINDOW_SECONDS", 120),
+        max_queue_size=_read_int_env("QWEN_OCR_MAX_QUEUE_SIZE", 100),
+        average_processing_seconds=_read_int_env("QWEN_OCR_AVG_PROCESSING_SECONDS", 120),
+    ),
+}
+
+if OCR_DEFAULT_ENGINE not in OCR_ENGINE_CONFIGS:
+    logger.warning("OCR_DEFAULT_ENGINE=%s không hợp lệ, fallback về gemini", OCR_DEFAULT_ENGINE)
+    OCR_DEFAULT_ENGINE = "gemini"
+
+
+def _init_engine_state(engine_name: str) -> OCREngineState:
+    config = OCR_ENGINE_CONFIGS[engine_name]
+    current_window_key = int(time.time() // max(1, config.window_seconds))
+    return OCREngineState(
+        queue=deque(),
+        active={},
+        current_window_key=current_window_key,
+        dispatched_in_window=0,
+    )
+
+
+ocr_engine_states: dict[str, OCREngineState] = {
+    engine_name: _init_engine_state(engine_name)
+    for engine_name in OCR_ENGINE_CONFIGS
+}
+ocr_state_lock = asyncio.Lock()
+ocr_dispatcher_task: asyncio.Task | None = None
+
+logger.info(
+    "OCR engine configs loaded: default=%s, allow_override=%s, configs=%s",
+    OCR_DEFAULT_ENGINE,
+    OCR_ALLOW_ENGINE_OVERRIDE,
+    {
+        name: {
+            "max_concurrent": config.max_concurrent_requests,
+            "batch_per_window": config.batch_size_per_window,
+            "window_seconds": config.window_seconds,
+            "max_queue_size": config.max_queue_size,
+            "avg_processing_seconds": config.average_processing_seconds,
+        }
+        for name, config in OCR_ENGINE_CONFIGS.items()
+    },
+)
+
+
+def _sync_ocr_window_state_locked(engine_name: str) -> None:
+    """Reset quota khi sang cửa sổ mới của engine."""
+    config = OCR_ENGINE_CONFIGS[engine_name]
+    state = ocr_engine_states[engine_name]
+    now_window_key = int(time.time() // max(1, config.window_seconds))
+
+    if now_window_key != state.current_window_key:
+        state.current_window_key = now_window_key
+        state.dispatched_in_window = 0
+        logger.info("OCR window reset cho engine=%s", engine_name)
+
+
+def _seconds_until_next_window(engine_name: str) -> int:
+    config = OCR_ENGINE_CONFIGS[engine_name]
+    seconds_left = config.window_seconds - int(time.time() % max(1, config.window_seconds))
+    return max(1, seconds_left)
+
+
+def _estimate_wait_seconds_locked(engine_name: str, position_in_queue: int) -> int:
+    """Ước lượng thời gian chờ dựa trên quota còn lại của engine hiện tại."""
+    if position_in_queue <= 0:
+        return 0
+
+    config = OCR_ENGINE_CONFIGS[engine_name]
+    state = ocr_engine_states[engine_name]
+    remaining_in_window = max(0, config.batch_size_per_window - state.dispatched_in_window)
+    seconds_to_next_window = _seconds_until_next_window(engine_name)
+
+    if remaining_in_window <= 0:
+        requests_before = position_in_queue - 1
+        full_windows_before = requests_before // max(1, config.batch_size_per_window)
+        return seconds_to_next_window + (full_windows_before * config.window_seconds)
+
+    if position_in_queue <= remaining_in_window:
+        return 0
+
+    requests_after_current_window = position_in_queue - remaining_in_window - 1
+    full_windows_before = requests_after_current_window // max(1, config.batch_size_per_window)
+    return seconds_to_next_window + (full_windows_before * config.window_seconds)
+
+
+def _queue_position_locked(engine_name: str, request_id: str) -> Optional[int]:
+    state = ocr_engine_states[engine_name]
+    for index, job in enumerate(state.queue, start=1):
+        if job.request_id == request_id:
+            return index
+    return None
+
+
+def _build_engine_stats_locked(engine_name: str) -> dict:
+    config = OCR_ENGINE_CONFIGS[engine_name]
+    state = ocr_engine_states[engine_name]
+    queued = len(state.queue)
+    active = len(state.active)
+    remaining_quota = max(0, config.batch_size_per_window - state.dispatched_in_window)
+
+    return {
+        "engine": engine_name,
+        "queue_size": queued,
+        "active_workers": active,
+        "max_queue_size": config.max_queue_size,
+        "max_concurrent": config.max_concurrent_requests,
+        "batch_per_window": config.batch_size_per_window,
+        "window_seconds": config.window_seconds,
+        "processed_in_current_window": state.dispatched_in_window,
+        "remaining_quota_in_window": remaining_quota,
+        "next_window_in_seconds": _seconds_until_next_window(engine_name),
+        "unique_teachers_waiting": len({job.teacher_key for job in state.queue}),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+def _build_queue_stats_locked(engine_name: Optional[str] = None) -> dict:
+    if engine_name:
+        return _build_engine_stats_locked(engine_name)
+
+    per_engine_stats = {
+        name: _build_engine_stats_locked(name)
+        for name in OCR_ENGINE_CONFIGS
+    }
+
+    return {
+        "queue_size": sum(item["queue_size"] for item in per_engine_stats.values()),
+        "active_workers": sum(item["active_workers"] for item in per_engine_stats.values()),
+        "max_queue_size": sum(item["max_queue_size"] for item in per_engine_stats.values()),
+        "max_concurrent": sum(item["max_concurrent"] for item in per_engine_stats.values()),
+        "default_engine": OCR_DEFAULT_ENGINE,
+        "allow_engine_override": OCR_ALLOW_ENGINE_OVERRIDE,
+        "per_engine": per_engine_stats,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+def _refresh_queued_metadata_locked(engine_name: str) -> None:
+    """Cập nhật vị trí queue + ETA cho các request đang chờ theo engine."""
+    next_window = _seconds_until_next_window(engine_name)
+    state = ocr_engine_states[engine_name]
+
+    for index, job in enumerate(state.queue, start=1):
+        if job.request_id not in ocr_results:
+            continue
+
+        result_obj = ocr_results[job.request_id]
+        if result_obj.get("status") != "queued":
+            continue
+
+        result_obj["position_in_queue"] = index
+        result_obj["estimated_wait_seconds"] = _estimate_wait_seconds_locked(engine_name, index)
+        result_obj["next_window_in_seconds"] = next_window
+        result_obj["message"] = f"Đang chờ xử lý OCR ({engine_name}, vị trí #{index})"
+
+
+def _cleanup_temp_paths(temp_paths: list[str]) -> None:
+    for path in temp_paths:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            logger.warning("Không thể xóa file tạm OCR: %s", path)
+
+
+def _validate_ocr_rows(extracted_data: list[dict], db_client: Any) -> dict:
+    """Đối chiếu dữ liệu OCR với học sinh trong DB và chuẩn hóa output."""
+    validated_data = []
+    validation_errors = []
+    ocr_errors = []
+
+    for row_index, row in enumerate(extracted_data, start=1):
+        if not isinstance(row, dict):
+            ocr_errors.append(f"Dòng {row_index}: Dữ liệu OCR không hợp lệ")
+            continue
+
+        raw_student_id = row.get("id", row.get("student_id", ""))
+        student_id = str(raw_student_id).strip()
+        if not student_id:
+            validation_errors.append({
+                "row": row_index,
+                "error": "Không tìm thấy mã học sinh (id)",
+            })
+            continue
+
+        student_resp = db_client.table("students").select(
+            "id, student_id, full_name, class_name"
+        ).eq("student_id", student_id).execute()
+
+        if not student_resp.data:
+            validation_errors.append({
+                "row": row_index,
+                "student_id": student_id,
+                "error": f"Không tìm thấy học sinh {student_id} trong hệ thống",
+            })
+            continue
+
+        student_info = student_resp.data[0]
+        normalized_row = {
+            "student_id": student_id,
+            "student_db_id": student_info["id"],
+            "full_name": student_info["full_name"],
+            "class_name": student_info["class_name"],
+            "ocr_name": row.get("ho_va_ten", row.get("full_name", "")),
+        }
+
+        for key, value in row.items():
+            if key in ["id", "student_id", "ho_va_ten", "full_name"]:
+                continue
+            normalized_row[key] = value
+
+        validated_data.append(normalized_row)
+
+    return {
+        "parsed_rows": validated_data,
+        "validation_errors": validation_errors,
+        "ocr_errors": ocr_errors,
+        "total_parsed": len(extracted_data),
+        "total_valid": len(validated_data),
+        "total_errors": len(validation_errors) + len(ocr_errors),
+    }
+
+
+def _run_ocr_pipeline_sync(temp_paths: list[str], db_client: Any, engine_name: str) -> dict:
+    """Pipeline OCR sync để chạy trong thread pool với engine có thể hoán đổi."""
+    if engine_name == "qwen":
+        from scores.ocr_services.qwen_ocr import extract_all_grades
+    else:
+        from scores.ocr_services.gemini_ocr import extract_all_grades
+
+    extracted_data = extract_all_grades(temp_paths)
+    return _validate_ocr_rows(extracted_data, db_client)
+
+
+async def _process_ocr_job(job: OCRQueueJob) -> None:
+    try:
+        async with ocr_state_lock:
+            if job.request_id in ocr_results:
+                ocr_results[job.request_id].update({
+                    "status": "processing",
+                    "progress": 20,
+                    "message": f"Đang xử lý OCR với {job.engine}...",
+                    "started_at": datetime.now().isoformat(),
+                })
+
+        result_data = await asyncio.to_thread(
+            _run_ocr_pipeline_sync,
+            job.temp_paths,
+            job.db_client,
+            job.engine,
+        )
+
+        async with ocr_state_lock:
+            if job.request_id in ocr_results:
+                ocr_results[job.request_id].update({
+                    "status": "completed",
+                    "progress": 100,
+                    "message": f"Hoàn thành OCR {job.engine}: {result_data['total_valid']} bản ghi hợp lệ",
+                    "result": result_data,
+                    "completed_at": datetime.now().isoformat(),
+                })
+
+    except Exception as process_error:
+        logger.error("OCR processing failed for request %s: %s", job.request_id, str(process_error))
+        async with ocr_state_lock:
+            if job.request_id in ocr_results:
+                ocr_results[job.request_id].update({
+                    "status": "failed",
+                    "progress": 0,
+                    "message": "Xử lý OCR thất bại",
+                    "error": str(process_error),
+                    "failed_at": datetime.now().isoformat(),
+                })
+
+    finally:
+        _cleanup_temp_paths(job.temp_paths)
+
+        async with ocr_state_lock:
+            state = ocr_engine_states.get(job.engine)
+            if state and job.request_id in state.active:
+                del state.active[job.request_id]
+            _refresh_queued_metadata_locked(job.engine)
+
+
+def _dispatch_jobs_for_engine_locked(engine_name: str) -> list[OCRQueueJob]:
+    config = OCR_ENGINE_CONFIGS[engine_name]
+    state = ocr_engine_states[engine_name]
+    jobs_to_start: list[OCRQueueJob] = []
+
+    available_slots = max(0, config.max_concurrent_requests - len(state.active))
+    remaining_quota = max(0, config.batch_size_per_window - state.dispatched_in_window)
+    dispatch_limit = min(available_slots, remaining_quota)
+
+    if dispatch_limit <= 0 or not state.queue:
+        _refresh_queued_metadata_locked(engine_name)
+        return jobs_to_start
+
+    active_teacher_keys = {job.teacher_key for job in state.active.values()}
+    selected_teacher_keys: set[str] = set()
+    deferred_jobs: list[OCRQueueJob] = []
+
+    # Pass 1: ưu tiên tối đa 1 request/giáo viên cho mỗi đợt dispatch
+    while state.queue and len(jobs_to_start) < dispatch_limit:
+        job = state.queue.popleft()
+
+        if job.teacher_key in active_teacher_keys or job.teacher_key in selected_teacher_keys:
+            deferred_jobs.append(job)
+            continue
+
+        jobs_to_start.append(job)
+        selected_teacher_keys.add(job.teacher_key)
+
+    # Pass 2: nếu thiếu slot thì lấy request còn lại (trừ teacher đang active)
+    while state.queue and len(jobs_to_start) < dispatch_limit:
+        job = state.queue.popleft()
+        if job.teacher_key in active_teacher_keys:
+            deferred_jobs.append(job)
+            continue
+        jobs_to_start.append(job)
+
+    remaining_jobs = list(state.queue)
+    state.queue.clear()
+    state.queue.extend(deferred_jobs)
+    state.queue.extend(remaining_jobs)
+
+    for job in jobs_to_start:
+        state.active[job.request_id] = job
+        state.dispatched_in_window += 1
+
+        if job.request_id in ocr_results:
+            ocr_results[job.request_id].update({
+                "status": "processing",
+                "progress": 10,
+                "message": f"Được cấp slot {engine_name}, đang khởi chạy OCR...",
+                "position_in_queue": None,
+                "estimated_wait_seconds": 0,
+                "next_window_in_seconds": _seconds_until_next_window(engine_name),
+            })
+
+    _refresh_queued_metadata_locked(engine_name)
+    return jobs_to_start
+
+
+async def _dispatch_ocr_jobs() -> None:
+    """Dispatch theo queue riêng của từng engine, với quota và window độc lập."""
+    jobs_to_start: list[OCRQueueJob] = []
+
+    async with ocr_state_lock:
+        for engine_name in OCR_ENGINE_CONFIGS:
+            _sync_ocr_window_state_locked(engine_name)
+            jobs_to_start.extend(_dispatch_jobs_for_engine_locked(engine_name))
+
+    for job in jobs_to_start:
+        asyncio.create_task(_process_ocr_job(job))
+
+
+async def _ocr_dispatcher_loop() -> None:
+    while True:
+        try:
+            await _dispatch_ocr_jobs()
+        except Exception as dispatch_error:
+            logger.error("OCR dispatcher loop error: %s", str(dispatch_error))
+
+        await asyncio.sleep(1)
+
+
+async def _ensure_ocr_dispatcher_running() -> None:
+    global ocr_dispatcher_task
+
+    async with ocr_state_lock:
+        if ocr_dispatcher_task and not ocr_dispatcher_task.done():
+            return
+
+        ocr_dispatcher_task = asyncio.create_task(_ocr_dispatcher_loop())
+        logger.info("OCR dispatcher started")
 
 
 
@@ -726,234 +1168,122 @@ async def delete_score(
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
 
-# Background task for OCR processing
-async def process_ocr_in_background(
-    request_id: str,
-    image_path: str,
-    teacher_id: int,
-    db
-):
-    """
-    Background task để xử lý OCR request với semaphore để limit concurrency
-    
-    Args:
-        request_id: Unique request ID
-        image_path: Path to uploaded image
-        teacher_id: Teacher ID
-        db: Database connection
-    """
-    # Cleanup old score sheets before processing (opportunistic cleanup)
-    try:
-        from scores.services import cleanup_old_score_sheets
-        cleanup_old_score_sheets(max_age_hours=24)
-    except Exception as e:
-        logger.warning(f"Failed to cleanup old score sheets: {str(e)}")
-    
-    # Wait for semaphore (queue management)
-    async with OCR_SEMAPHORE:
-        try:
-            logger.info(f"🔄 Starting OCR processing for request {request_id}")
-            
-            # Update status: processing
-            ocr_results[request_id] = {
-                'status': 'processing',
-                'message': 'Đang xử lý OCR...',
-                'progress': 0,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            # Parse ảnh bằng OCR service
-            ocr_service = OCRFactory.get_ocr_service()
-            
-            # Update progress: 30%
-            ocr_results[request_id]['progress'] = 30
-            ocr_results[request_id]['message'] = 'Đang nhận diện văn bản...'
-            
-            parsed_result = ocr_service.parse_score_sheet(image_path)
-            
-            # Update progress: 60%
-            ocr_results[request_id]['progress'] = 60
-            ocr_results[request_id]['message'] = 'Đang chuyển đổi dữ liệu...'
-            
-            # Convert to Excel format
-            excel_data = ocr_service.export_to_excel_format(parsed_result)
-            
-            # Update progress: 80%
-            ocr_results[request_id]['progress'] = 80
-            ocr_results[request_id]['message'] = 'Đang xác thực học sinh...'
-            
-            # Validate students exist in database
-            validated_data = []
-            validation_errors = []
-            
-            for idx, row in enumerate(excel_data, start=1):
-                student_id = row.get('student_id')
-                if not student_id:
-                    validation_errors.append({
-                        'row': idx,
-                        'error': 'Không tìm thấy ID học sinh',
-                        'data': row
-                    })
-                    continue
-                
-                # Check if student exists
-                student = db.table("students").select("id, student_id, full_name, class_name").eq("student_id", student_id).execute()
-                
-                if not student.data:
-                    validation_errors.append({
-                        'row': idx,
-                        'student_id': student_id,
-                        'error': f'Không tìm thấy học sinh với ID {student_id} trong hệ thống',
-                        'data': row
-                    })
-                else:
-                    # Add student info to validated data
-                    student_info = student.data[0]
-                    validated_data.append({
-                        'student_id': student_id,
-                        'student_db_id': student_info['id'],
-                        'full_name': student_info['full_name'],
-                        'class_name': student_info['class_name'],
-                        'ocr_name': row.get('ho_va_ten', ''),
-                        'diem_thuong_xuyen': row.get('diem_thuong_xuyen'),
-                        'diem_thi_giua_ki': row.get('diem_thi_giua_ki'),
-                        'diem_thi_cuoi_ki': row.get('diem_thi_cuoi_ki')
-                    })
-            
-            # Cleanup: xóa file tạm sau khi xử lý
-            try:
-                os.remove(image_path)
-                logger.info(f"Removed temporary file {image_path}")
-            except Exception as e:
-                logger.warning(f"Failed to remove temp file: {str(e)}")
-            
-            # Update status: completed
-            ocr_results[request_id] = {
-                'status': 'completed',
-                'message': f'Hoàn thành! Tìm thấy {len(validated_data)} học sinh hợp lệ.',
-                'progress': 100,
-            'timestamp': datetime.now().isoformat(),
-            'result': {
-                'parsed_rows': validated_data,
-                'validation_errors': validation_errors,
-                'total_parsed': len(excel_data),
-                'total_valid': len(validated_data),
-                'total_errors': len(validation_errors)
-            }
-            }
-            
-            logger.info(f"✅ OCR processing completed for request {request_id}")
-        
-        except Exception as e:
-            logger.error(f"❌ ERROR: OCR processing failed for request {request_id}: {str(e)}")
-            
-            # Update status: failed
-            ocr_results[request_id] = {
-                'status': 'failed',
-                'message': f'Lỗi xử lý: {str(e)}',
-                'progress': 0,
-                'timestamp': datetime.now().isoformat(),
-                'error': str(e)
-            }
-            # Cleanup on error
-            try:
-                os.remove(image_path)
-            except:
-                pass
-
+# ===============================================
+# OCR ENDPOINTS
+# ===============================================
 
 @router.post("/ocr/parse-score-sheet")
-async def parse_score_sheet_from_image(
-    file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
+async def parse_score_sheet_from_images(
+    files: list[UploadFile] = File(...),
+    ocr_engine: Optional[str] = Form(None),
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
-    """
-    Upload và phân tích ảnh bảng điểm viết tay sử dụng OCR với Queue Manager
-    
-    Returns: Request ID để track progress
-    """
+    temp_paths: list[str] = []
+
     try:
-        # Validate file type
-        if not file.content_type or not file.content_type.startswith('image/'):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="File phải là ảnh (jpg, png, etc.)"
-            )
-        
-        # Tạo thư mục uploads nếu chưa có
-        upload_dir = Path("uploads/score_sheets")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Lưu file tạm thời
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_filename = f"score_sheet_{current_teacher['id']}_{timestamp}_{file.filename}"
-        temp_path = upload_dir / temp_filename
-        
-        # Save uploaded file
-        with open(temp_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        logger.info(f"Saved uploaded score sheet to {temp_path}")
-        
-        # Generate unique request ID
         request_id = str(uuid.uuid4())
-        
-        # Get queue manager (singleton pattern using global function)
-        queue_manager = get_queue_manager(max_concurrent=3, max_queue_size=50)
-        
-        # Get queue stats
-        stats = queue_manager.get_stats()
-        
-        # Check if queue is full
-        if stats['in_queue'] >= 50:
-            # Cleanup uploaded file
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-            
+
+        requested_engine = (ocr_engine or OCR_DEFAULT_ENGINE).strip().lower()
+        if requested_engine not in OCR_ENGINE_CONFIGS:
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Hệ thống đang quá tải. Queue đã đầy ({stats['in_queue']}/50). Vui lòng thử lại sau."
+                status_code=400,
+                detail=f"OCR engine không hợp lệ: {requested_engine}. Hỗ trợ: {', '.join(OCR_ENGINE_CONFIGS.keys())}",
             )
-        
-        # Add to queue (background processing)
-        ocr_results[request_id] = {
-            'status': 'queued',
-            'message': 'Request đã được thêm vào hàng chờ',
-            'progress': 0,
-            'position_in_queue': stats['in_queue'] + 1,
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # Start background task (sử dụng standalone function)
-        background_tasks.add_task(
-            process_ocr_in_background,
-            request_id,
-            str(temp_path),
-            current_teacher['id'],
-            db
+
+        if not OCR_ALLOW_ENGINE_OVERRIDE and requested_engine != OCR_DEFAULT_ENGINE:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Hệ thống đang khóa OCR engine={OCR_DEFAULT_ENGINE}. Không cho phép override.",
+            )
+
+        engine_config = OCR_ENGINE_CONFIGS[requested_engine]
+
+        # 1. Lưu file tạm
+        for f in files:
+            if not f.content_type or not f.content_type.startswith('image/'):
+                continue
+
+            fd, path = tempfile.mkstemp(suffix=f"_{f.filename}")
+            with os.fdopen(fd, 'wb') as out:
+                content = await f.read()
+                out.write(content)
+            temp_paths.append(path)
+
+        if not temp_paths:
+            raise HTTPException(status_code=400, detail="Không có file hợp lệ")
+
+        teacher_key = str(current_teacher.get("id") or current_teacher.get("user_id") or "unknown")
+        teacher_name = current_teacher.get("full_name") or "Giáo viên"
+
+        queued_job = OCRQueueJob(
+            request_id=request_id,
+            teacher_key=teacher_key,
+            teacher_name=teacher_name,
+            engine=requested_engine,
+            temp_paths=temp_paths,
+            db_client=db,
+            created_at=time.time(),
         )
-        
+
+        async with ocr_state_lock:
+            _sync_ocr_window_state_locked(requested_engine)
+            state = ocr_engine_states[requested_engine]
+
+            current_load = len(state.queue) + len(state.active)
+            if current_load >= engine_config.max_queue_size:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Hàng chờ OCR {requested_engine} đã đầy ({current_load}/{engine_config.max_queue_size}). Vui lòng thử lại sau."
+                )
+
+            ocr_results[request_id] = {
+                "status": "queued",
+                "progress": 0,
+                "message": "Đã nhận ảnh, đang chờ vào lượt xử lý",
+                "result": None,
+                "error": None,
+                "created_at": datetime.now().isoformat(),
+                "position_in_queue": None,
+                "estimated_wait_seconds": None,
+                "next_window_in_seconds": _seconds_until_next_window(requested_engine),
+                "teacher_key": teacher_key,
+                "engine": requested_engine,
+            }
+
+            state.queue.append(queued_job)
+            _refresh_queued_metadata_locked(requested_engine)
+
+            queue_position = ocr_results[request_id].get("position_in_queue")
+            estimated_wait_seconds = ocr_results[request_id].get("estimated_wait_seconds")
+            next_window_in_seconds = ocr_results[request_id].get("next_window_in_seconds")
+            queue_stats = _build_queue_stats_locked(requested_engine)
+
+        await _ensure_ocr_dispatcher_running()
+
         return {
             "success": True,
-            "message": "File đã được upload. Đang xử lý trong background.",
+            "message": "Đã thêm request vào hàng chờ OCR",
             "data": {
-                'request_id': request_id,
-                'status': 'queued',
-                'position_in_queue': stats['in_queue'] + 1,
-                'queue_info': stats
+                "request_id": request_id,
+                "status": "queued",
+                "engine": requested_engine,
+                "position_in_queue": queue_position,
+                "estimated_wait_seconds": estimated_wait_seconds,
+                "next_window_in_seconds": next_window_in_seconds,
+                "queue_stats": queue_stats,
+                "message": f"Đã thêm vào hàng chờ OCR {requested_engine} (vị trí #{queue_position})",
             }
         }
-        
+
     except HTTPException:
+        _cleanup_temp_paths(temp_paths)
         raise
+
     except Exception as e:
-        logger.error(f"Error uploading score sheet: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+        logger.error(f"OCR enqueue error: {str(e)}")
+        _cleanup_temp_paths(temp_paths)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/ocr/status/{request_id}")
@@ -961,89 +1291,60 @@ async def get_ocr_status(
     request_id: str,
     current_teacher=Depends(get_current_teacher)
 ):
-    """
-    Kiểm tra status của OCR request
-    
-    Args:
-        request_id: Unique request ID từ endpoint upload
-        
-    Returns:
-        Status và data nếu đã hoàn thành
-    """
-    try:
-        # Check if request exists
+    async with ocr_state_lock:
         if request_id not in ocr_results:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Không tìm thấy request {request_id}"
-            )
-        
-        result = ocr_results[request_id]
-        status_value = result['status']
-        
-        if status_value == 'queued':
-            return {
-                "success": True,
-                "message": "Request đang trong hàng chờ",
-                "data": {
-                    'request_id': request_id,
-                    'status': status_value,
-                    'progress': result.get('progress', 0),
-                    'message': result.get('message', ''),
-                    'position_in_queue': result.get('position_in_queue', 0),
-                    'timestamp': result.get('timestamp')
-                }
-            }
-        
-        elif status_value == 'processing':
-            return {
-                "success": True,
-                "message": "Đang xử lý OCR",
-                "data": {
-                    'request_id': request_id,
-                    'status': status_value,
-                    'progress': result.get('progress', 0),
-                    'message': result.get('message', ''),
-                    'timestamp': result.get('timestamp')
-                }
-            }
-        
-        elif status_value == 'completed':
-            return {
-                "success": True,
-                "message": "OCR hoàn thành",
-                "data": {
-                    'request_id': request_id,
-                    'status': status_value,
-                    'progress': 100,
-                    'result': result.get('result'),
-                    'timestamp': result.get('timestamp')
-                }
-            }
-        
-        elif status_value == 'failed':
-            return {
-                "success": False,
-                "message": "OCR thất bại",
-                "data": {
-                    'request_id': request_id,
-                    'status': status_value,
-                    'error': result.get('message', 'Unknown error'),
-                    'timestamp': result.get('timestamp')
-                }
-            }
-        
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Unknown status: {status_value}"
-            )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting OCR status: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
+            raise HTTPException(status_code=404, detail="Không tìm thấy request")
+
+        result = dict(ocr_results.get(request_id) or {})
+        owner_teacher_key = str(result.get("teacher_key") or "")
+        current_teacher_key = str(current_teacher.get("id") or current_teacher.get("user_id") or "")
+        is_admin = bool(current_teacher.get("is_admin", False))
+
+        if owner_teacher_key and not is_admin and current_teacher_key != owner_teacher_key:
+            raise HTTPException(status_code=403, detail="Bạn không có quyền xem request OCR này")
+
+        status_value = result.get("status")
+        engine_name = result.get("engine", OCR_DEFAULT_ENGINE)
+
+        if engine_name not in OCR_ENGINE_CONFIGS:
+            engine_name = OCR_DEFAULT_ENGINE
+
+        _sync_ocr_window_state_locked(engine_name)
+
+        if status_value == "queued":
+            queue_position = _queue_position_locked(engine_name, request_id)
+            if queue_position is not None:
+                result["position_in_queue"] = queue_position
+                result["estimated_wait_seconds"] = _estimate_wait_seconds_locked(engine_name, queue_position)
+
+            result["next_window_in_seconds"] = _seconds_until_next_window(engine_name)
+            result["message"] = result.get("message") or "Đang chờ trong hàng đợi OCR"
+
+        elif status_value == "processing":
+            result["message"] = result.get("message") or "Đang xử lý OCR"
+            result["next_window_in_seconds"] = _seconds_until_next_window(engine_name)
+
+        result["queue_stats"] = _build_queue_stats_locked(engine_name)
+
+    return {
+        "success": True,
+        "data": {
+            "request_id": request_id,
+            "status": status_value,
+            "engine": engine_name,
+            "progress": result.get("progress", 0),
+            "message": result.get("message", ""),
+            "position_in_queue": result.get("position_in_queue"),
+            "estimated_wait_seconds": result.get("estimated_wait_seconds"),
+            "next_window_in_seconds": result.get("next_window_in_seconds"),
+            "result": result.get("result"),
+            "error": result.get("error"),
+            "queue_stats": result.get("queue_stats"),
+            "created_at": result.get("created_at"),
+            "started_at": result.get("started_at"),
+            "completed_at": result.get("completed_at"),
+        }
+    }
 
 
 # ===============================================
@@ -1673,7 +1974,7 @@ async def download_score_template(
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         worksheet = workbook.add_worksheet('Bảng điểm')
         
-        # Tính toán kích thước cột để fit vào A4
+               # Tính toán kích thước cột để fit vào A4
         # A4 width: Portrait = 8.5 inches, Landscape = 11 inches
         # Margins: 0.5 inches mỗi bên
         # Usable width: Portrait = 7.5 inches, Landscape = 10 inches
@@ -1758,6 +2059,44 @@ async def download_score_template(
         if score_columns:
             last_col_letter = chr(ord('C') + len(score_columns) - 1)
             worksheet.set_column(f'C:{last_col_letter}', score_column_width)
+        
+        # Định dạng - Toàn bộ trắng để dễ OCR
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': 'white',
+            'font_color': 'black',
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        
+        cell_format = workbook.add_format({
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter',
+            'bg_color': 'white'
+        })
+        
+        # Header - Dynamic based on score settings
+        headers = ['id', 'ho_va_ten'] + score_columns
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        # Dữ liệu học sinh (chỉ những học sinh có học môn này)
+        for row, student in enumerate(filtered_students, start=1):
+            worksheet.write(row, 0, student['student_id'], cell_format)
+            worksheet.write(row, 1, student['full_name'], cell_format)
+            # Empty cells for all score columns
+            for col_idx in range(len(score_columns)):
+                worksheet.write(row, col_idx + 2, '', cell_format)
+        
+        # Điều chỉnh độ rộng cột
+        worksheet.set_column('A:A', 12)  # id
+        worksheet.set_column('B:B', 25)  # họ và tên
+        # Set width for all score columns dynamically
+        if score_columns:
+            last_col_letter = chr(ord('C') + len(score_columns) - 1)
+            worksheet.set_column(f'C:{last_col_letter}', 15)
         
         workbook.close()
         output.seek(0)
@@ -2008,19 +2347,26 @@ async def bulk_import_grades(
 
 @router.get("/ocr/queue-stats")
 async def get_queue_stats(
+    engine: Optional[str] = None,
     current_teacher=Depends(get_current_teacher)
 ):
     """Lấy thống kê queue OCR"""
     try:
-        # Mock queue stats (có thể integrate với queue manager thực tế)
-        stats = {
-            "queue_size": 0,
-            "active_workers": 0,
-            "completed_today": 0,
-            "average_processing_time": 0,
-            "max_queue_size": 50,
-            "max_concurrent": 3
-        }
+        requested_engine = engine.strip().lower() if engine else None
+        if requested_engine and requested_engine not in OCR_ENGINE_CONFIGS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Engine không hợp lệ: {requested_engine}",
+            )
+
+        async with ocr_state_lock:
+            if requested_engine:
+                _sync_ocr_window_state_locked(requested_engine)
+            else:
+                for engine_name in OCR_ENGINE_CONFIGS:
+                    _sync_ocr_window_state_locked(engine_name)
+
+            stats = _build_queue_stats_locked(requested_engine)
         
         return {
             "success": True,
@@ -2028,11 +2374,22 @@ async def get_queue_stats(
             "data": {
                 'queue_stats': stats,
                 'config': {
-                    'max_concurrent': 3,
-                    'max_queue_size': 50
-                }
+                    name: {
+                        'max_concurrent': config.max_concurrent_requests,
+                        'max_queue_size': config.max_queue_size,
+                        'batch_per_window': config.batch_size_per_window,
+                        'window_seconds': config.window_seconds,
+                        'average_processing_seconds': config.average_processing_seconds,
+                    }
+                    for name, config in OCR_ENGINE_CONFIGS.items()
+                },
+                'default_engine': OCR_DEFAULT_ENGINE,
+                'allow_engine_override': OCR_ALLOW_ENGINE_OVERRIDE,
             }
         }
+
+    except HTTPException:
+        raise
         
     except Exception as e:
         logger.error(f"ERROR: Error getting queue stats: {str(e)}")
@@ -2063,61 +2420,266 @@ async def export_parsed_ocr_to_excel(
     db=Depends(get_db)
 ):
     """
-    Export dữ liệu đã parse từ OCR ra file Excel để người dùng tải về
+    Export dữ liệu đã parse từ OCR ra file Excel để người dùng tải về.
+    Ưu tiên thứ tự cột điểm theo cấu hình môn học để giống template xuất điểm.
     """
     try:
         import xlsxwriter
         import io
         from fastapi.responses import StreamingResponse
         
-        parsed_rows = data.get('parsed_rows', [])
-        
+        parsed_rows = data.get("parsed_rows", [])
+        class_subject_id = data.get("class_subject_id")
+        requested_score_columns = data.get("score_columns", [])
+
+        if not isinstance(parsed_rows, list):
+            raise HTTPException(
+                status_code=400,
+                detail="Dữ liệu export không hợp lệ"
+            )
+
+        parsed_rows = [row for row in parsed_rows if isinstance(row, dict)]
+
         if not parsed_rows:
             raise HTTPException(
                 status_code=400,
                 detail="Không có dữ liệu để export"
             )
+
+        def normalize_key(key: str) -> str:
+            return re.sub(r"[^a-z0-9]", "", str(key).lower())
+
+        def flatten_score_columns(score_column_config: dict) -> list[str]:
+            """Làm phẳng score_column_config theo đúng thứ tự template download."""
+            if not score_column_config:
+                return []
+
+            priority_order = {
+                "diem_thuong_xuyen": 1,
+                "diem_tx": 1,
+                "diem_thi_giua_ki": 2,
+                "diem_gk": 2,
+                "diem_thi_cuoi_ki": 3,
+                "diem_ck": 3,
+            }
+
+            sorted_columns = sorted(
+                score_column_config.items(),
+                key=lambda item: priority_order.get(str(item[0]).lower(), 999)
+            )
+
+            flattened: list[str] = []
+            for column_name, column_config in sorted_columns:
+                if isinstance(column_config, dict) and "data" in column_config:
+                    child_keys = list(column_config["data"].keys())
+                    child_keys.sort(key=lambda item: str(item).lower())
+                    flattened.extend(child_keys)
+                else:
+                    flattened.append(column_name)
+
+            return flattened
+
+        def infer_score_columns(rows: list[dict]) -> list[str]:
+            excluded = {
+                "id",
+                "studentid",
+                "studentdbid",
+                "hovaten",
+                "fullname",
+                "classname",
+                "lop",
+                "ocrname",
+            }
+
+            found_columns: list[str] = []
+            seen: set[str] = set()
+
+            for row in rows:
+                for key in row.keys():
+                    normalized = normalize_key(key)
+                    if not normalized or normalized in excluded or normalized in seen:
+                        continue
+                    seen.add(normalized)
+                    found_columns.append(str(key))
+
+            def sort_key(column: str) -> tuple[int, int, str]:
+                normalized = normalize_key(column)
+                lowered = str(column).lower()
+
+                tx_match = re.search(r"(?:diem)?tx(\d+)", normalized)
+                if normalized.startswith("diemtx") or "thuongxuyen" in normalized:
+                    return (1, int(tx_match.group(1)) if tx_match else 0, lowered)
+                if "giuaki" in normalized or normalized.endswith("gk"):
+                    return (2, 0, lowered)
+                if "cuoiki" in normalized or normalized.endswith("ck"):
+                    return (3, 0, lowered)
+
+                return (4, 0, lowered)
+
+            return sorted(found_columns, key=sort_key)
+
+        def merge_columns(primary: list[str], fallback: list[str]) -> list[str]:
+            merged: list[str] = []
+            seen: set[str] = set()
+
+            for source in [primary, fallback]:
+                for col in source:
+                    if not isinstance(col, str):
+                        continue
+                    clean_col = col.strip()
+                    normalized = normalize_key(clean_col)
+                    if not clean_col or not normalized or normalized in seen:
+                        continue
+
+                    seen.add(normalized)
+                    merged.append(clean_col)
+
+            return merged
+
+        def get_value_by_candidates(row: dict, candidates: list[str]):
+            lookup = {normalize_key(k): v for k, v in row.items()}
+
+            for candidate in candidates:
+                if candidate in row and row.get(candidate) not in [None, ""]:
+                    return row.get(candidate)
+
+                normalized_candidate = normalize_key(candidate)
+                if normalized_candidate in lookup and lookup[normalized_candidate] not in [None, ""]:
+                    return lookup[normalized_candidate]
+
+            return ""
+
+        def normalize_score_value(value):
+            if value is None:
+                return ""
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str):
+                text = value.strip()
+                if not text:
+                    return ""
+
+                try:
+                    return float(text.replace(",", "."))
+                except ValueError:
+                    return text
+
+            return value
+
+        def normalize_student_id(value) -> str:
+            if value in [None, ""]:
+                return ""
+
+            if isinstance(value, (int, float)):
+                if float(value).is_integer():
+                    return str(int(value))
+                return str(value)
+
+            text = str(value).strip()
+            if re.fullmatch(r"\d+\.0+", text):
+                return text.split(".")[0]
+
+            return text
+
+        score_columns_from_template: list[str] = []
+        if class_subject_id is not None:
+            try:
+                class_subject_query = db.table("class_subjects").select("id, subject_id")
+                if not current_teacher.get("is_admin"):
+                    class_subject_query = class_subject_query.eq("teacher_id", current_teacher["id"])
+
+                class_subject_response = class_subject_query.eq("id", class_subject_id).execute()
+
+                if class_subject_response.data:
+                    subject_id = class_subject_response.data[0].get("subject_id")
+                    if subject_id:
+                        subject_response = db.table("subjects").select("score_column_config, is_active").eq(
+                            "id", subject_id
+                        ).eq("is_active", True).execute()
+
+                        if subject_response.data:
+                            score_config = subject_response.data[0].get("score_column_config") or {}
+                            score_columns_from_template = flatten_score_columns(score_config)
+            except Exception as config_error:
+                logger.warning(f"Không lấy được score config cho OCR export: {str(config_error)}")
+
+        valid_requested_columns = requested_score_columns if isinstance(requested_score_columns, list) else []
+        inferred_columns = infer_score_columns(parsed_rows)
+        fallback_columns = merge_columns(valid_requested_columns, inferred_columns)
+        score_columns = merge_columns(score_columns_from_template, fallback_columns)
+
+        has_class_column = any(
+            get_value_by_candidates(row, ["class_name", "lop"]) not in [None, ""]
+            for row in parsed_rows
+        )
+
+        def sort_student_rows(row: dict):
+            student_id = normalize_student_id(get_value_by_candidates(row, ["student_id", "id"]))
+            return (0, int(student_id)) if student_id.isdigit() else (1, student_id)
+
+        sorted_rows = sorted(parsed_rows, key=sort_student_rows)
         
         # Tạo file Excel
         output = io.BytesIO()
-        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-        worksheet = workbook.add_worksheet('Bảng điểm OCR')
+        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+        worksheet = workbook.add_worksheet("Bảng điểm OCR")
         
-        # Định dạng
+        # Định dạng đồng bộ với template download
         header_format = workbook.add_format({
-            'bold': True,
-            'bg_color': '#4472C4',
-            'font_color': 'white',
-            'border': 1,
-            'align': 'center',
-            'valign': 'vcenter'
+            "bold": True,
+            "bg_color": "white",
+            "font_color": "black",
+            "border": 1,
+            "align": "center",
+            "valign": "vcenter"
         })
         
         cell_format = workbook.add_format({
-            'border': 1,
-            'align': 'center',
-            'valign': 'vcenter'
+            "border": 1,
+            "align": "center",
+            "valign": "vcenter",
+            "bg_color": "white"
         })
         
-        # Header
-        headers = ['id', 'ho_va_ten', 'lop', 'diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
+        # Header động
+        headers = ["id", "ho_va_ten"]
+        if has_class_column:
+            headers.append("lop")
+        headers.extend(score_columns)
+
         for col, header in enumerate(headers):
             worksheet.write(0, col, header, header_format)
         
         # Dữ liệu
-        for row_idx, row in enumerate(parsed_rows, start=1):
-            worksheet.write(row_idx, 0, row.get('student_id', ''), cell_format)
-            worksheet.write(row_idx, 1, row.get('full_name', ''), cell_format)
-            worksheet.write(row_idx, 2, row.get('class_name', ''), cell_format)
-            worksheet.write(row_idx, 3, row.get('diem_thuong_xuyen', ''), cell_format)
-            worksheet.write(row_idx, 4, row.get('diem_thi_giua_ki', ''), cell_format)
-            worksheet.write(row_idx, 5, row.get('diem_thi_cuoi_ki', ''), cell_format)
+        for row_idx, row in enumerate(sorted_rows, start=1):
+            worksheet.write(row_idx, 0, normalize_student_id(get_value_by_candidates(row, ["student_id", "id"])), cell_format)
+            worksheet.write(row_idx, 1, str(get_value_by_candidates(row, ["full_name", "ho_va_ten", "ocr_name"])), cell_format)
+
+            score_start_col = 2
+            if has_class_column:
+                worksheet.write(row_idx, 2, str(get_value_by_candidates(row, ["class_name", "lop"])), cell_format)
+                score_start_col = 3
+
+            for score_index, score_column in enumerate(score_columns):
+                score_value = normalize_score_value(get_value_by_candidates(row, [score_column]))
+                write_col = score_start_col + score_index
+
+                if isinstance(score_value, (int, float)):
+                    worksheet.write_number(row_idx, write_col, score_value, cell_format)
+                else:
+                    worksheet.write(row_idx, write_col, score_value, cell_format)
         
         # Điều chỉnh độ rộng cột
-        worksheet.set_column('A:A', 12)
-        worksheet.set_column('B:B', 25)
-        worksheet.set_column('C:C', 15)
-        worksheet.set_column('D:F', 20)
+        worksheet.set_column(0, 0, 12)
+        worksheet.set_column(1, 1, 25)
+
+        first_score_col = 2
+        if has_class_column:
+            worksheet.set_column(2, 2, 12)
+            first_score_col = 3
+
+        if score_columns:
+            worksheet.set_column(first_score_col, first_score_col + len(score_columns) - 1, 15)
         
         workbook.close()
         output.seek(0)

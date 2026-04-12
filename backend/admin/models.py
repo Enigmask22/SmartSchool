@@ -107,7 +107,7 @@ class ClassSubjectUpdate(BaseModel):
 class ClassSubjectBulkUpdate(BaseModel):
     """Bulk update for class assignments - allows changing which classes are assigned"""
     record_ids: List[int]  # Array of class_subject record IDs in the group
-    teacher_id: int
+    teacher_id: Optional[int] = None  # Can be null if no teacher assigned
     subject_id: int
     academic_year: str
     semester: str

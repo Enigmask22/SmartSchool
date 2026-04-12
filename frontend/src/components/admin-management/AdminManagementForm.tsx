@@ -63,8 +63,12 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
 
     // For class_subjects tab, include selected classes and recordIds for editing
     if (hook.activeTab === 'class_subjects' && classSelectionHook) {
+      // Ensure all required fields are present (use item data as fallback)
       submitData = {
-        ...form.formData,
+        subject_id: form.formData.subject_id ?? item?.subject_id,
+        teacher_id: form.formData.teacher_id ?? item?.teacher_id,
+        academic_year: form.formData.academic_year ?? item?.academic_year,
+        semester: form.formData.semester ?? item?.semester,
         _selectedClasses: classSelectionHook.selectedClasses || [],
       };
       // For editing, also include recordIds so backend knows which records to update

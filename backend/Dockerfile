@@ -69,7 +69,7 @@ RUN python3.12 -m pip install --upgrade pip setuptools wheel
 
 # Copy và install requirements trước (để tận dụng Docker layer caching)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -q -U -r requirements.txt
 
 # Install FlashAttention-2 for Qwen (optional - tăng tốc 2x, giảm VRAM 30%)
 # SKIP cài FlashAttention-2 trong build time để tránh timeout và OOM
