@@ -682,13 +682,15 @@ export function useAdminManagement() {
           const selectedClasses = data._selectedClasses || [];
 
           const bulkUpdatePayload = {
-            record_ids: recordIds,
-            teacher_id: data.teacher_id,
-            subject_id: data.subject_id,
+            record_ids: Array.isArray(recordIds) ? recordIds.map(r => typeof r === 'string' ? parseInt(r) : r) : [recordIds],
+            teacher_id: typeof data.teacher_id === 'string' ? parseInt(data.teacher_id) : data.teacher_id,
+            subject_id: typeof data.subject_id === 'string' ? parseInt(data.subject_id) : data.subject_id,
             academic_year: data.academic_year,
             semester: data.semester,
-            selected_class_ids: selectedClasses,
+            selected_class_ids: Array.isArray(selectedClasses) ? selectedClasses.map(c => typeof c === 'string' ? parseInt(c) : c) : [],
           };
+
+          logger.debug('Bulk update payload:', bulkUpdatePayload);
 
           const bulkResponse = await api.request('/admin/class-subjects/bulk-update', {
             method: 'PUT',

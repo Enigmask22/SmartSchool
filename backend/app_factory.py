@@ -1,5 +1,4 @@
-"""
-FastAPI Application Factory
+"""FastAPI Application Factory
 Tạo và cấu hình FastAPI app cho backend modular
 """
 
