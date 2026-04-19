@@ -4,6 +4,8 @@ API Router cho Students management
 
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from datetime import datetime
 import os
 import aiofiles
@@ -28,7 +30,23 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
         if student.gender not in ['Nam', 'Nữ', 'Khác']:
             raise HTTPException(status_code=400, detail="Giới tính phải là Nam, Nữ hoặc Khác")
         
+        # NEW: Check for duplicate full_name + date_of_birth (unless force_create=true)
+        if student.date_of_birth and not student.force_create:
+            duplicate_check = db.table("students").select("id, full_name")\
+                .eq("full_name", student.full_name)\
+                .eq("date_of_birth", student.date_of_birth)\
+                .eq("is_active", True).execute()
+            
+            if duplicate_check.data:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Học sinh cùng tên '{student.full_name}' và cùng ngày sinh đã tồn tại. Vui lòng xác nhận để tiếp tục."
+                )
+        
         student_data = student.dict()
+        
+        # Remove force_create flag before inserting to DB
+        student_data.pop("force_create", None)
         
         # Extract parent_contacts để insert riêng vào bảng parent_info
         parent_contacts = student_data.pop("parent_contacts", None)
@@ -84,11 +102,15 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
             parent_info = db.table("parent_info").select("*").eq("student_id", student_id).execute()
             student_data["parent_contacts"] = parent_info.data if parent_info.data else []
             
-            return {
-                "success": True,
-                "message": "Tạo học sinh thành công",
-                "data": student_data
-            }
+            # CHANGED: Return 201 Created (not 200)
+            return JSONResponse(
+                content=jsonable_encoder({
+                    "success": True,
+                    "message": "Tạo học sinh thành công",
+                    "data": student_data
+                }),
+                status_code=201
+            )
         else:
             raise HTTPException(status_code=500, detail="Lỗi tạo học sinh")
             
@@ -304,15 +326,31 @@ async def update_student(
 
 @router.delete("/{student_id}")
 async def delete_student(student_id: int, db=Depends(get_db)):
-    """Xóa học sinh (soft delete)"""
+    """Xóa học sinh (soft delete) - chỉ được phép nếu học sinh không đang trong lớp"""
     try:
         # Kiểm tra student tồn tại
-        existing = db.table("students").select("id, is_active").eq("id", student_id).execute()
+        existing = db.table("students").select("id, is_active, class_name, grade").eq("id", student_id).execute()
         
         if not existing.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
-        # Soft delete
+        student = existing.data[0]
+        
+        # NEW: Check if student is currently in a class
+        # Student is "in class" if both class_name and grade are non-empty
+        is_in_class = bool(
+            (student.get("class_name") and str(student.get("class_name")).strip()) and 
+            (student.get("grade") and str(student.get("grade")).strip())
+        )
+        
+        if is_in_class:
+            # Cannot delete student currently in a class
+            raise HTTPException(
+                status_code=409,
+                detail=f"Không thể xóa học sinh đang trong lớp '{student['class_name']}'. Vui lòng chuyển lớp hoặc hủy thôi học trước."
+            )
+        
+        # Soft delete (only for students NOT in a class)
         response = db.table("students").update({
             "is_active": False,
             "updated_at": datetime.now().isoformat()

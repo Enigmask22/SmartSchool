@@ -132,15 +132,15 @@ const AttendanceTable = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[80px]">Mã HS</TableHead>
-                  <TableHead className="w-[150px]">Họ tên</TableHead>
-                  <TableHead className="w-[80px]">Lớp</TableHead>
-                  <TableHead className="w-[100px]">Giờ vào</TableHead>
-                  <TableHead className="w-[100px]">Giờ ra</TableHead>
-                  <TableHead className="w-[100px]">Trạng thái</TableHead>
-                  <TableHead className="w-[100px]">Độ chính xác</TableHead>
-                  <TableHead className="w-[150px]">Ghi chú</TableHead>
-                  <TableHead className="w-[120px] text-center">Thao tác</TableHead>
+                  <TableHead className="w-[80px]">MÃ SỐ HỌC SINH</TableHead>
+                  <TableHead className="w-[150px]">HỌ VÀ TÊN</TableHead>
+                  <TableHead className="w-[80px]">LỚP</TableHead>
+                  <TableHead className="w-[100px]">GIỜ VÀO</TableHead>
+                  <TableHead className="w-[100px]">GIỜ RA</TableHead>
+                  <TableHead className="w-[100px]">TRẠNG THÁI</TableHead>
+                  <TableHead className="w-[100px]">ĐỘ CHÍNH XÁC</TableHead>
+                  <TableHead className="w-[150px]">GHI CHÚ</TableHead>
+                  <TableHead className="w-[120px] text-center">TÙY CHỌN</TableHead>
                 </TableRow>
               </TableHeader>
 

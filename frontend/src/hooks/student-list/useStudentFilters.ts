@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useSystemSettings } from '@/contexts/useSystemSettings';
+import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
 
@@ -8,7 +9,6 @@ export const useStudentFilters = () => {
   const authContext = useContext(AuthContext);
   const isHomeroomTeacher = authContext?.isHomeroomTeacher;
   const { settings } = useSystemSettings();
-  const academicYear = settings.academic_year || "2024-2025";
 
   // Search and class filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,11 +17,10 @@ export const useStudentFilters = () => {
   const [classesLoading, setClassesLoading] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
 
-  // Academic year and semester
+  // Academic year and semester - Initialize from settings
   const [homeroomClasses, setHomeroomClasses] = useState<any[]>([]);
-  const [academicYears, setAcademicYears] = useState<any[]>([]);
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
-  const [selectedSemester, setSelectedSemester] = useState('HK1');
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(settings.academic_year || '');
+  const [selectedSemester, setSelectedSemester] = useState(settings.semester || 'HK1');
   const [availableSemesters] = useState(['HK1', 'HK2', 'CN']);
 
   // Pagination
@@ -31,6 +30,8 @@ export const useStudentFilters = () => {
 
   // Refs
   const classesReqIdRef = useRef(0);
+  const isFetchingRef = useRef(false);
+  const previousYearRef = useRef<string | null>(null);
 
   // Calculate pagination
   const calculatePagination = (students: any[]) => {
@@ -57,7 +58,8 @@ export const useStudentFilters = () => {
 
       if (res.success && Array.isArray(res.data)) {
         setAvailableClasses(res.data);
-        if (selectedClass && !res.data.find((c: any) => c.class_name === selectedClass)) {
+        // Reset selected class if it no longer exists in the new year
+        if (selectedClass && selectedClass !== 'all' && !res.data.find((c: any) => c.class_name === selectedClass)) {
           setSelectedClass('all');
         }
       } else {
@@ -75,68 +77,82 @@ export const useStudentFilters = () => {
     }
   };
 
-  // Initial load via bootstrap
+  // Unified bootstrap: fetch both homeroom classes and available classes for current year
   useEffect(() => {
-    const loadBootstrap = async () => {
-      try {
-        const [yearsRes, classesRes] = await Promise.all([
-          api.request('/homeroom/academic-years'),
-          api.request('/homeroom/classes'),
-        ]);
+    const loadClassesForYear = async () => {
+      // Prevent concurrent requests
+      if (isFetchingRef.current) {
+        logger.debug('Class fetch already in progress, skipping duplicate');
+        return;
+      }
 
-        if (yearsRes.success && Array.isArray(yearsRes.data)) {
-          setAcademicYears(yearsRes.data);
-          const toSelect =
-            yearsRes.data.includes(academicYear) && academicYear
-              ? academicYear
-              : yearsRes.data[yearsRes.data.length - 1] || '';
-          if (toSelect) {
-            setSelectedAcademicYear(toSelect);
-            if (selectedSemester === 'HK1') {
-              setSelectedSemester('HK1');
-            }
-          }
+      try {
+        isFetchingRef.current = true;
+
+        // Fetch all classes to populate homeroom classes list (no year filter)
+        // This gives us the complete list for filtering by year
+        const allClassesRes = await api.request('/homeroom/classes');
+        //logger.info('📡 Raw API response for /homeroom/classes:', allClassesRes);
+        
+        if (allClassesRes.success && Array.isArray(allClassesRes.data)) {
+          // logger.info('🏫 Homeroom classes fetched:', {
+          //   count: allClassesRes.data.length,
+          //   rawData: allClassesRes.data,  // Raw array to see exact structure
+          //   classes: allClassesRes.data.map((c: any) => ({
+          //     id: c.id,
+          //     class_name: c.class_name,
+          //     academic_year: c.academic_year,
+          //     grade: c.grade,
+          //     allKeys: Object.keys(c),  // Show all keys in the object
+          //   })),
+          // });
+          setHomeroomClasses(allClassesRes.data);
         } else {
-          logger.error('Failed to fetch academic years:', yearsRes);
-          setAcademicYears([]);
+          logger.warn('Failed to fetch all homeroom classes for list');
+          logger.warn('Response structure:', {
+            success: allClassesRes.success,
+            data: allClassesRes.data,
+            isArray: Array.isArray(allClassesRes.data),
+          });
         }
 
-        if (classesRes.success && Array.isArray(classesRes.data)) {
-          setHomeroomClasses(classesRes.data);
-        } else {
-          logger.error('Failed to fetch homeroom classes:', classesRes);
+        // Fetch classes filtered by current academic year for display
+        if (selectedAcademicYear) {
+          await fetchAvailableClasses(selectedAcademicYear);
         }
       } catch (err) {
-        logger.error('Error loading bootstrap data:', err);
+        logger.error('Error loading class data:', err);
+      } finally {
+        isFetchingRef.current = false;
       }
     };
 
-    loadBootstrap();
-  }, []);
+    loadClassesForYear();
+  }, []); // Empty deps - only run once on mount
 
-  // When academic year changes
+  // When academic year changes - fetch classes for new year
   useEffect(() => {
-    if (!isHomeroomTeacher) return;
+    if (!isHomeroomTeacher || !selectedAcademicYear) {
+      logger.debug('Skipping class fetch - teacher or year not set');
+      return;
+    }
 
-    const run = async () => {
-      try {
-        const res = await api.request(
-          `/homeroom/classes?academic_year=${selectedAcademicYear}`
-        );
-        if (res.success && Array.isArray(res.data)) {
-          setAvailableClasses(res.data);
-        } else {
-          logger.error('Failed to fetch classes:', res);
-          setAvailableClasses([]);
-        }
-      } catch (err) {
-        logger.error('Error fetching classes:', err);
-        setAvailableClasses([]);
-      }
-    };
+    // Only fetch if the year actually changed
+    if (previousYearRef.current === selectedAcademicYear) {
+      //logger.debug(`Year unchanged: ${selectedAcademicYear}, skipping fetch`);
+      return;
+    }
 
-    run();
-  }, [selectedAcademicYear]);
+    previousYearRef.current = selectedAcademicYear;
+
+    // Prevent concurrent requests
+    if (isFetchingRef.current) {
+      logger.debug(`Fetch in progress, deferring year change to ${selectedAcademicYear}`);
+      return;
+    }
+
+    fetchAvailableClasses(selectedAcademicYear);
+  }, [selectedAcademicYear, isHomeroomTeacher]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -156,7 +172,7 @@ export const useStudentFilters = () => {
 
     // Academic year and semester
     homeroomClasses,
-    academicYears,
+    academicYears: ACADEMIC_YEAR_OPTIONS,  // Use constant year list, not fetched from API
     selectedAcademicYear,
     setSelectedAcademicYear,
     selectedSemester,

@@ -51,7 +51,7 @@ const CameraView = ({
 }: CameraViewProps) => {
   return (
     <div className="lg:col-span-2">
-      <Card className="shadow-md rounded-2xl overflow-hidden">
+      <Card className="shadow-md rounded-2xl overflow-hidden max-h-[800px]">
         <CardHeader className="bg-gray-50 border-b border-gray-200 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -98,14 +98,20 @@ const CameraView = ({
                       <SelectValue placeholder="Chọn camera" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableCameras.map((cam) => (
-                        <SelectItem
-                          key={cam.camera_id}
-                          value={cam.camera_id}
-                        >
-                          {cam.name} ({cam.location || "N/A"})
-                        </SelectItem>
-                      ))}
+                      {availableCameras && availableCameras.length > 0 ? (
+                        availableCameras.map((cam, index) => (
+                          <SelectItem
+                            key={`camera-${cam.camera_id || index}`}
+                            value={cam.camera_id}
+                          >
+                            {cam.name} ({cam.location || "N/A"})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          Không có camera
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -257,8 +263,18 @@ const CameraView = ({
                   />
                 </div>
               ) : (
-                <div className="h-96 bg-gray-300 flex items-center justify-center text-gray-600">
-                  Chọn camera để xem preview
+                <div className="h-96 bg-gray-300 flex flex-col items-center justify-center text-gray-600 rounded-lg">
+                  <Camera className="w-12 h-12 mb-3 text-gray-400" />
+                  <p className="text-center">
+                    {selectedCameraId 
+                      ? "Đang tải preview từ camera..." 
+                      : "Chọn camera để xem preview"}
+                  </p>
+                  {selectedCameraId && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      (Nếu bị treo, kiểm tra console và xem camera có hoạt động không)
+                    </p>
+                  )}
                 </div>
               ))}
 
@@ -323,12 +339,13 @@ const CameraView = ({
                           {recognition.student.full_name}
                         </div>
                         <div className="text-xs opacity-90">
-                          {recognition.student.student_code}
+                          {recognition.student.student_id || recognition.student.student_code}
+                          {(recognition.student.class || recognition.student.class_name) && ` - ${recognition.student.class || recognition.student.class_name}`}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="font-semibold">
-                          {(recognition.confidence * 100).toFixed(0)}%
+                          {(recognition.confidence > 100 ? (recognition.confidence / 100).toFixed(2) : recognition.confidence.toFixed(2)).replace('.', ',')}%
                         </div>
                         <div className="text-xs opacity-90">Độ khớp</div>
                       </div>

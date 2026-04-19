@@ -47,7 +47,7 @@ export const TAB_CONFIG = {
   // },
 };
 
-export function useTabCrud(activeTab: string) {
+export function useTabCrud(activeTab: string, onDataUpdated?: () => Promise<void>) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +154,10 @@ export function useTabCrud(activeTab: string) {
             
             if (successCount > 0) {
               loadData();
+              // Also refresh the main data source if callback provided
+              if (onDataUpdated) {
+                await onDataUpdated();
+              }
               toast.success(isMultiple ? `Khôi phục ${successCount}/${ids.length} bản ghi thành công!` : 'Khôi phục thành công!');
             } else {
               toast.error('Không thể khôi phục');
@@ -165,7 +169,7 @@ export function useTabCrud(activeTab: string) {
         },
       });
     },
-    [currentConfig?.endpoint, loadData, openConfirm, closeConfirm]
+    [currentConfig?.endpoint, loadData, openConfirm, closeConfirm, onDataUpdated]
   );
 
   // Delete item (soft delete)
@@ -204,6 +208,10 @@ export function useTabCrud(activeTab: string) {
             
             if (successCount > 0) {
               loadData();
+              // Also refresh the main data source if callback provided
+              if (onDataUpdated) {
+                await onDataUpdated();
+              }
               if (isMultiple) {
                 toast.success(`Xóa tạm thời ${successCount}/${ids.length} bản ghi thành công! Bạn có thể khôi phục trong tab "Đã xóa tạm thời".`);
               } else {
@@ -219,7 +227,7 @@ export function useTabCrud(activeTab: string) {
         },
       });
     },
-    [currentConfig?.endpoint, loadData, openConfirm, closeConfirm]
+    [currentConfig?.endpoint, loadData, openConfirm, closeConfirm, onDataUpdated]
   );
 
   // Permanent delete
@@ -258,6 +266,10 @@ export function useTabCrud(activeTab: string) {
             
             if (successCount > 0) {
               loadData();
+              // Also refresh the main data source if callback provided
+              if (onDataUpdated) {
+                await onDataUpdated();
+              }
               toast.success(isMultiple ? `Xóa vĩnh viễn ${successCount}/${ids.length} bản ghi thành công!` : 'Xóa vĩnh viễn thành công!');
             } else {
               toast.error('Không thể xóa vĩnh viễn');
@@ -269,7 +281,7 @@ export function useTabCrud(activeTab: string) {
         },
       });
     },
-    [currentConfig?.endpoint, loadData, openConfirm, closeConfirm]
+    [currentConfig?.endpoint, loadData, openConfirm, closeConfirm, onDataUpdated]
   );
 
   // Filter data based on search term

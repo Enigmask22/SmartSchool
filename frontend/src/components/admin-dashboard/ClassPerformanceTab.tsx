@@ -88,14 +88,14 @@ export function ClassPerformanceTab({
                   <TableCell>
                     <Badge
                       variant={
-                        classData.average_grade >= 8
+                        classData.average_score >= 8
                           ? "default"
-                          : classData.average_grade >= 6.5
+                          : classData.average_score >= 6.5
                           ? "secondary"
                           : "destructive"
                       }
                     >
-                      {classData.average_grade}
+                      {classData.average_score}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-green-600">

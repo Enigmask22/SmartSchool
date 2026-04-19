@@ -6,7 +6,7 @@ export interface UseRecognitionCameraSourceReturn {
   selectedCameraId: string;
   selectedMultiCameras: string[];
   useMultiCamera: boolean;
-  availableCameras: Array<{ id: string; name: string }>;
+  availableCameras: Array<{ camera_id: string; name: string; location?: string; status?: string }>;
   setCameraSource: (source: "webcam" | "managed") => void;
   setSelectedCameraId: (id: string) => void;
   setSelectedMultiCameras: (ids: string[]) => void;
@@ -24,34 +24,67 @@ export interface UseRecognitionCameraSourceReturn {
  */
 export const useRecognitionCameraSource = (): UseRecognitionCameraSourceReturn => {
   const [cameraSource, setCameraSource] = useState<"webcam" | "managed">("webcam");
-  const [selectedCameraId, setSelectedCameraId] = useState<string>("0");
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [selectedMultiCameras, setSelectedMultiCameras] = useState<string[]>([]);
   const [useMultiCamera, setUseMultiCamera] = useState<boolean>(false);
   const [availableCameras, setAvailableCameras] = useState<
-    Array<{ id: string; name: string }>
+    Array<{ camera_id: string; name: string; location?: string; status?: string }>
   >([]);
 
   const loadCameras = useCallback(async () => {
     try {
       const response = await api.get("/cameras/");
+      console.log("📹 Raw camera response:", response);
+      
       if (response.success && response.data) {
-        const enabledCameras = response.data.filter((cam: any) => cam.enabled);
+        console.log("📹 Total cameras from API:", response.data.length);
+        console.log("📹 Camera data:", response.data);
+        
+        // Try without filter first to see all cameras
+        const cameras = Array.isArray(response.data) ? response.data : [];
+        console.log("📹 Cameras array:", cameras);
+        
+        const enabledCameras = cameras.filter((cam: any) => {
+          console.log(`📹 Checking camera ${cam.camera_id}: enabled=${cam.enabled}`);
+          return cam.enabled !== false; // Include if enabled is true or undefined
+        });
+        
+        console.log("📹 Enabled cameras:", enabledCameras.length);
+        
         setAvailableCameras(
           enabledCameras.map((cam: any) => ({
-            id: cam.camera_id,
+            camera_id: cam.camera_id,
             name: cam.name || `Camera ${cam.camera_id}`,
+            location: cam.location,
+            status: cam.status,
           }))
         );
         console.log(`✅ Loaded ${enabledCameras.length} cameras`);
+      } else {
+        console.warn("⚠️ No success or data in response:", response);
       }
     } catch (error) {
-      console.error("Error loading cameras:", error);
+      console.error("❌ Error loading cameras:", error);
     }
   }, []);
 
-  // Load cameras on mount
+  // Auto-select first camera when switching to managed mode
+  useEffect(() => {
+    if (
+      cameraSource === "managed" &&
+      !selectedCameraId &&
+      availableCameras.length > 0
+    ) {
+      setSelectedCameraId(availableCameras[0].camera_id);
+    }
+  }, [cameraSource, availableCameras, selectedCameraId]);
+
+  // Load cameras on mount and periodically refresh
   useEffect(() => {
     loadCameras();
+    // Refresh cameras every 10 seconds
+    const interval = setInterval(loadCameras, 10000);
+    return () => clearInterval(interval);
   }, [loadCameras]);
 
   return {

@@ -71,7 +71,7 @@ export function PageHeader({
   );
 
   return (
-    <div className={`space-y-4 border-2 shadow-md border-gray-200 rounded-lg p-6 ${className}`}>
+    <div className={`space-y-4 border-2 shadow-md border-gray-200 bg-white rounded-lg p-6 ${className}`}>
       {/* Row 1: Title Section */}
       <div>
         <PageHeaderTitle title={title} description={description} icon={icon} />

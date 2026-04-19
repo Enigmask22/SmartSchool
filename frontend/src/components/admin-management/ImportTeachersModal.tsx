@@ -39,17 +39,17 @@ export const ImportTeachersModal: React.FC<ImportTeachersModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Import giáo viên từ Users</DialogTitle>
+          <DialogTitle>Nhập thông tin giáo viên từ tài khoản người dùng</DialogTitle>
           <DialogDescription>
-            Chọn những user có role teacher hoặc homeroom_teacher để tạo thành giáo viên
+            Chọn tài khoản người dùng để tạo giáo viên. Bạn có thể chọn nhiều tài khoản cùng lúc.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[60vh] overflow-y-auto mb-6">
           {availableUsers.length === 0 ? (
             <div className="py-12 text-center">
               <Users className="w-8 h-8 mx-auto mb-4 text-gray-400" />
-              <p className="font-medium text-gray-500">Không có user nào có thể import</p>
+              <p className="font-medium text-gray-500">Không có tài khoản thỏa điều kiện</p>
             </div>
           ) : (
             <div className="space-y-2">

@@ -80,30 +80,35 @@ export const useRecognitionCamera = (
   const captureFromManagedCamera = useCallback(
     async (cameraId: string, updatePreviewOnly: boolean = false) => {
       try {
-        const response = await api.post(`/cameras/${cameraId}/capture`);
+        const response = await api.get(`/cameras/${cameraId}/frame?format=base64`);
         if (response.success && response.data) {
-          const base64Image = response.data.frame || response.data.image;
+          const base64Image = response.data.frame;
           if (base64Image) {
             setCameraPreviews(prev => ({
               ...prev,
               [cameraId]: `data:image/jpeg;base64,${base64Image}`,
             }));
+            console.log(`📸 Camera ${cameraId} frame received (${base64Image.length} bytes, preview=${updatePreviewOnly})`);
 
             if (!updatePreviewOnly && wsRef.current?.readyState === 1) {
               // Send frame through WebSocket if connected and not preview-only
               wsRef.current.send(JSON.stringify({
                 type: "frame",
+                image: base64Image,
                 camera_id: cameraId,
-                frame: base64Image,
               }));
             }
+          } else {
+            console.warn(`⚠️ Camera ${cameraId} responded but no frame data`);
           }
+        } else {
+          console.warn(`⚠️ Camera ${cameraId} capture failed:`, response);
         }
       } catch (error) {
-        logger.error(`❌ Error capturing from camera ${cameraId}:`, error);
+        console.error(`❌ Error capturing from camera ${cameraId}:`, error);
         setStreamErrors(prev => ({
           ...prev,
-          [cameraId]: "Failed to capture frame",
+          [cameraId]: `Failed to capture frame: ${error}`,
         }));
       }
     },
