@@ -262,8 +262,8 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
             <SelectValue placeholder="Chọn học kỳ" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="1">Học kỳ 1</SelectItem>
-            <SelectItem value="2">Học kỳ 2</SelectItem>
+            <SelectItem value="HK1">Học kỳ 1</SelectItem>
+            <SelectItem value="HK2">Học kỳ 2</SelectItem>
           </SelectContent>
         </Select>
       ) : field === 'grade' ? (

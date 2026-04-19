@@ -9,7 +9,6 @@ import {
   BarChart3,
   MessageCircle,
   RefreshCw,
-  Images,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -28,11 +27,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStudentEdit } from "@/hooks/student-list/useStudentEdit";
-import { useMultipleFaceRegistration } from "@/hooks/student-list/useMultipleFaceRegistration";
 import { useStudentSubjects } from "@/hooks/student-list/useStudentSubjects";
 import {
   EditStudentModal,
-  FaceRegistrationModal,
   SubjectSelectionModal,
 } from "./modals";
 
@@ -76,19 +73,18 @@ export function StudentTableView({
   onViewScores,
   onFeedback,
   onSelectSubjects,
-  onUploadMultiple,
   onRestore,
   loading = false,
 }: StudentTableViewProps) {
   // Local modal state for view component
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [faceModalOpen, setFaceModalOpen] = useState(false);
+  //const [faceModalOpen, setFaceModalOpen] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
   const [selectedStudentForModal, setSelectedStudentForModal] = useState<Student | null>(null);
 
   // Initialize hooks for modal data management
   const edit = useStudentEdit(fetchStudents, () => {}, () => {});
-  const multipleFace = useMultipleFaceRegistration(fetchStudents, selectedStudentForModal);
+  //const multipleFace = useMultipleFaceRegistration(fetchStudents, selectedStudentForModal);
   const subjects = useStudentSubjects({ setStudents: () => {} });
 
   // Handle edit button click
@@ -100,12 +96,12 @@ export function StudentTableView({
   };
 
   // Handle upload multiple click
-  const handleUploadClick = (student: Student) => {
-    setSelectedStudentForModal(student);
-    multipleFace.setSelectedStudentForMultiple(student);
-    setFaceModalOpen(true);
-    onUploadMultiple?.(student);
-  };
+  // const handleUploadClick = (student: Student) => {
+  //   setSelectedStudentForModal(student);
+  //   multipleFace.setSelectedStudentForMultiple(student);
+  //   setFaceModalOpen(true);
+  //   onUploadMultiple?.(student);
+  // };
 
   // Handle select subjects click
   const handleSubjectClick = (student: Student) => {
@@ -147,13 +143,13 @@ export function StudentTableView({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[60px] text-center">STT</TableHead>
-                  <TableHead>Học sinh</TableHead>
-                  <TableHead className="text-center">Lớp</TableHead>
-                  <TableHead className="text-center">Email</TableHead>
-                  <TableHead className="text-center">Số điện thoại</TableHead>
-                  <TableHead className="text-center">Khối</TableHead>
-                  <TableHead className="text-center">Trạng thái</TableHead>
-                  <TableHead className="text-center">Thao tác</TableHead>
+                  <TableHead>HỌC SINH</TableHead>
+                  <TableHead className="text-center">LỚP</TableHead>
+                  <TableHead className="text-center">EMAIL</TableHead>
+                  <TableHead className="text-center">SĐT</TableHead>
+                  <TableHead className="text-center">KHỐI</TableHead>
+                  <TableHead className="text-center">TRẠNG THÁI</TableHead>
+                  <TableHead className="text-center">TÙY CHỌN</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -343,7 +339,7 @@ export function StudentTableView({
                           >
                             <GraduationCap className="w-4 h-4" />
                           </Button>
-                          <Button
+                          {/* <Button
                             onClick={() => handleUploadClick(student)}
                             size="sm"
                             variant="ghost"
@@ -351,7 +347,7 @@ export function StudentTableView({
                             title="Upload ảnh"
                           >
                             <Images className="w-4 h-4" />
-                          </Button>
+                          </Button> */}
                         </>
                       )}
                     </div>
@@ -384,7 +380,7 @@ export function StudentTableView({
       }}
     />
 
-    <FaceRegistrationModal
+    {/* <FaceRegistrationModal
       open={faceModalOpen}
       onOpenChange={setFaceModalOpen}
       selectedStudent={multipleFace.selectedStudentForMultiple || undefined}
@@ -393,7 +389,7 @@ export function StudentTableView({
       selectedStudentForMultiple={multipleFace.selectedStudentForMultiple || undefined}
       setSelectedStudentForMultiple={multipleFace.setSelectedStudentForMultiple}
       fetchStudents={fetchStudents}
-    />
+    /> */}
 
     <SubjectSelectionModal
       open={subjectModalOpen}

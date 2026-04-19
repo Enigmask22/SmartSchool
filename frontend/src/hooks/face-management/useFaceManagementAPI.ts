@@ -165,7 +165,7 @@ export const useFaceManagementAPI = () => {
         isHomeroomTeacher() &&
         (!selectedClass || selectedClass === 'all')
       ) {
-        logger.debug('No class selected for homeroom teacher, skipping fetch');
+        //logger.debug('No class selected for homeroom teacher, skipping fetch');
         setStudents([]);
         return;
       }

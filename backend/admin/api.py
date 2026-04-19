@@ -1678,22 +1678,43 @@ async def bulk_update_class_subjects(
                         "is_active": True
                     }).eq("id", record_to_keep["id"]).execute()
         
-        # 3. Create new records for added classes
+        # 3. Create new records for added classes (or restore soft-deleted ones)
         new_records = []
         for class_id in classes_to_add:
-            new_data = {
+            # First, check if a soft-deleted record exists for this combination
+            existing_deleted = db.table("class_subjects").select("*").match({
                 "teacher_id": bulk_update.teacher_id,
                 "subject_id": bulk_update.subject_id,
                 "class_id": class_id,
                 "academic_year": bulk_update.academic_year,
                 "semester": bulk_update.semester,
-                "is_active": True,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
-            }
-            response = db.table("class_subjects").insert(new_data).execute()
-            if response.data:
-                new_records.extend(response.data)
+            }).eq("is_active", False).execute().data or []
+            
+            if existing_deleted:
+                # Restore the soft-deleted record
+                response = db.table("class_subjects").update({
+                    "is_active": True,
+                    "updated_at": datetime.now().isoformat(),
+                }).eq("id", existing_deleted[0]["id"]).execute()
+                if response.data:
+                    new_records.extend(response.data)
+                logger.debug(f"Restored soft-deleted record for class_id {class_id}")
+            else:
+                # Create a new record if no soft-deleted record exists
+                new_data = {
+                    "teacher_id": bulk_update.teacher_id,
+                    "subject_id": bulk_update.subject_id,
+                    "class_id": class_id,
+                    "academic_year": bulk_update.academic_year,
+                    "semester": bulk_update.semester,
+                    "is_active": True,
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat(),
+                }
+                response = db.table("class_subjects").insert(new_data).execute()
+                if response.data:
+                    new_records.extend(response.data)
+                logger.debug(f"Created new record for class_id {class_id}")
         
         return {
             "success": True,
@@ -2397,7 +2418,287 @@ async def bulk_import_students(
 # DASHBOARD ANALYTICS ENDPOINTS
 # ===============================================
 
-# Dashboard analytics endpoints removed as per requirements
+@router.get("/dashboard/overview")
+async def get_dashboard_overview(
+    academic_year: str = Query(...),
+    period_days: int = Query(30),
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """
+    Get dashboard overview stats
+    - Total users, students, classes, teachers
+    - Attendance rate for selected period/year
+    """
+    logger.debug(f"Dashboard overview request - academic_year: {academic_year}, period_days: {period_days}")
+    logger.debug(f"Academic year type: {type(academic_year)}, Period days type: {type(period_days)}")
+    
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get total counts
+        users_count = len(db.table("users").select("id").eq("is_active", True).execute().data or [])
+        students_count = len(db.table("students").select("id").eq("is_active", True).execute().data or [])
+        classes_count = len(db.table("classes").select("id").eq("is_active", True).eq("academic_year", academic_year).execute().data or [])
+        teachers_count = len(db.table("teachers").select("id").eq("is_active", True).execute().data or [])
+        
+        # Get current settings to determine current academic year
+        settings_response = db.table("settings").select("academic_year").execute()
+        current_academic_year = settings_response.data[0].get("academic_year") if settings_response.data else academic_year
+        
+        # Calculate attendance rate
+        if academic_year == current_academic_year:
+            # Current year: use period_days window
+            start_date = (datetime.now() - timedelta(days=period_days)).date().isoformat()
+            attendance_response = db.table("attendance").select("id, status").gte("date", start_date).execute()
+        else:
+            # Past year: use full academic year
+            attendance_response = db.table("attendance").select("id, status").execute()
+            # Filter by academic year (if attendance table has academic_year field)
+        
+        attendance_data = attendance_response.data or []
+        present_count = len([a for a in attendance_data if a.get("status") == "present"])
+        total_attendance = len(attendance_data)
+        attendance_rate = (present_count / total_attendance * 100) if total_attendance > 0 else 0
+        
+        logger.info(f"Dashboard overview retrieved successfully for {academic_year}")
+        return {
+            "success": True,
+            "data": {
+                "total_users": users_count,
+                "total_students": students_count,
+                "total_classes": classes_count,
+                "total_teachers": teachers_count,
+                "attendance_rate": round(attendance_rate, 1),
+                "period_days": period_days
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting dashboard overview: {str(e)}", exc_info=True)
+        logger.error(f"Failed parameters - academic_year: {academic_year} (type: {type(academic_year)}), period_days: {period_days} (type: {type(period_days)})")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.get("/dashboard/attendance-trends")
+async def get_attendance_trends(
+    academic_year: str = Query(...),
+    period_days: int = Query(30),
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """
+    Get attendance trends for selected period/year
+    Groups by date and returns present/absent/rate
+    """
+    logger.debug(f"Dashboard attendance trends request - academic_year: {academic_year}, period_days: {period_days}")
+    logger.debug(f"Academic year type: {type(academic_year)}, Period days type: {type(period_days)}")
+    
+    try:
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        
+        # Get current settings
+        settings_response = db.table("settings").select("academic_year").execute()
+        current_academic_year = settings_response.data[0].get("academic_year") if settings_response.data else academic_year
+        
+        # Fetch attendance data
+        if academic_year == current_academic_year:
+            start_date = (datetime.now() - timedelta(days=period_days)).date().isoformat()
+            attendance_response = db.table("attendance").select("id, date, status").gte("date", start_date).order("date", desc=False).execute()
+        else:
+            attendance_response = db.table("attendance").select("id, date, status").order("date", desc=False).execute()
+        
+        attendance_data = attendance_response.data or []
+        
+        # Group by date
+        daily_stats = defaultdict(lambda: {"present": 0, "absent": 0})
+        for record in attendance_data:
+            date = record.get("date", "")
+            status = record.get("status", "")
+            if status == "present":
+                daily_stats[date]["present"] += 1
+            else:
+                daily_stats[date]["absent"] += 1
+        
+        # Get total students
+        students_response = db.table("students").select("id").eq("is_active", True).execute()
+        total_students = len(students_response.data or [])
+        
+        # Build response
+        trends = []
+        for date in sorted(daily_stats.keys()):
+            stats = daily_stats[date]
+            rate = ((stats["present"] / total_students) * 100) if total_students > 0 else 0
+            trends.append({
+                "date": date,
+                "present": stats["present"],
+                "absent": stats["absent"],
+                "rate": round(rate, 1)
+            })
+        
+        logger.info(f"Dashboard attendance trends retrieved successfully for {academic_year}")
+        return {
+            "success": True,
+            "data": trends
+        }
+    except Exception as e:
+        logger.error(f"Error getting attendance trends: {str(e)}", exc_info=True)
+        logger.error(f"Failed parameters - academic_year: {academic_year} (type: {type(academic_year)}), period_days: {period_days} (type: {type(period_days)})")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting attendance trends: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.get("/dashboard/class-performance")
+async def get_class_performance(
+    academic_year: str = Query(...),
+    period_days: int = Query(30),
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """
+    Get class performance by average score
+    Shows average score and score distribution per class
+    """
+    logger.debug(f"Dashboard class performance request - academic_year: {academic_year}, period_days: {period_days}")
+    logger.debug(f"Academic year type: {type(academic_year)}, Period days type: {type(period_days)}")
+    
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get current settings
+        settings_response = db.table("settings").select("academic_year").execute()
+        current_academic_year = settings_response.data[0].get("academic_year") if settings_response.data else academic_year
+        
+        # Fetch classes for this academic year
+        classes_response = db.table("classes").select("id, class_name, academic_year").eq("academic_year", academic_year).eq("is_active", True).execute()
+        classes_data = classes_response.data or []
+        
+        performance = []
+        for class_record in classes_data:
+            class_id = class_record.get("id")
+            class_name = class_record.get("class_name")
+            
+            # Get students in this class
+            students_response = db.table("homeroom_students_history").select("student_id").eq("class_id", class_id).eq("academic_year", academic_year).execute()
+            student_ids = [s.get("student_id") for s in (students_response.data or [])]
+            total_students = len(student_ids)
+            
+            if total_students == 0:
+                continue
+            
+            # Get scores for students in this class
+            scores_response = db.table("scores").select("id, value").in_("student_id", student_ids).eq("class_id", class_id).execute()
+            scores_data = scores_response.data or []
+            
+            if not scores_data:
+                performance.append({
+                    "class_name": class_name,
+                    "total_students": total_students,
+                    "average_score": 0,
+                    "excellent_count": 0,
+                    "good_count": 0,
+                    "average_count": 0,
+                    "poor_count": 0
+                })
+                continue
+            
+            # Calculate stats
+            values = [float(s.get("value", 0)) for s in scores_data]
+            avg_score = sum(values) / len(values) if values else 0
+            
+            excellent = len([v for v in values if v >= 8.5])
+            good = len([v for v in values if 7.0 <= v < 8.5])
+            average = len([v for v in values if 5.5 <= v < 7.0])
+            poor = len([v for v in values if v < 5.5])
+            
+            performance.append({
+                "class_name": class_name,
+                "total_students": total_students,
+                "average_score": round(avg_score, 1),
+                "excellent_count": excellent,
+                "good_count": good,
+                "average_count": average,
+                "poor_count": poor
+            })
+        
+        logger.info(f"Dashboard class performance retrieved successfully for {academic_year}")
+        return {
+            "success": True,
+            "data": performance
+        }
+    except Exception as e:
+        logger.error(f"Error getting class performance: {str(e)}", exc_info=True)
+        logger.error(f"Failed parameters - academic_year: {academic_year} (type: {type(academic_year)}), period_days: {period_days} (type: {type(period_days)})")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.get("/dashboard/academic-years")
+async def get_dashboard_academic_years(
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """
+    Get list of available academic years from classes/settings
+    """
+    try:
+        # Get distinct academic years from classes
+        classes_response = db.table("classes").select("academic_year").execute()
+        academic_years = list(set([c.get("academic_year") for c in (classes_response.data or []) if c.get("academic_year")]))
+        academic_years.sort(reverse=True)
+        
+        return {
+            "success": True,
+            "data": academic_years
+        }
+    except Exception as e:
+        logger.error(f"Error getting academic years: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.get("/dashboard/system-health")
+async def get_system_health(
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """
+    Get system health status
+    Returns database connection status, error count in last 24h, and uptime
+    """
+    try:
+        # Check database connectivity
+        try:
+            health_check = db.table("settings").select("count").limit(1).execute()
+            db_status = "healthy" if health_check.data is not None else "unhealthy"
+        except:
+            db_status = "unhealthy"
+        
+        # Get error count from logs (simplified - assumes logs table exists)
+        error_count = 0
+        try:
+            from datetime import datetime, timedelta
+            start_time = (datetime.now() - timedelta(hours=24)).isoformat()
+            errors_response = db.table("logs").select("id").gte("timestamp", start_time).eq("level", "error").execute()
+            error_count = len(errors_response.data or [])
+        except:
+            error_count = 0
+        
+        # Calculate uptime (for now, return a placeholder)
+        # In production, this would come from application startup time
+        uptime = "--"
+        
+        return {
+            "success": True,
+            "data": {
+                "database_status": db_status,
+                "error_count_24h": error_count,
+                "uptime": uptime
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting system health: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 
 # ===============================================
@@ -2668,8 +2969,7 @@ async def move_students_class(
             # Cùng năm học: UPDATE record cũ
             db.table("homeroom_students_history").update({
                 "teacher_id": target_class.get("homeroom_teacher_id"),
-                "class_id": target_class["id"],
-                "updated_at": datetime.now().isoformat()
+                "class_id": target_class["id"]
             }).eq("class_id", current_class_id).in_("student_id", student_ids).execute()
         else:
             # Năm học khác: GIỮ record cũ, TẠO record mới

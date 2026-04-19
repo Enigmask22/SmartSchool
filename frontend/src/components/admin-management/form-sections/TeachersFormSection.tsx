@@ -38,9 +38,9 @@ export const TeachersFormSection: React.FC<TeachersFormSectionProps> = ({
           <p className="mb-3 text-xs text-gray-600">
             Chọn các môn học mà giáo viên này sẽ giảng dạy (có thể chọn nhiều môn)
           </p>
-          <div className="grid grid-cols-2 gap-2 p-3 overflow-y-auto rounded-md bg-gray-50 max-h-60">
+          <div className="grid grid-cols-2 gap-2 p-3 overflow-y-auto rounded-md bg-gray-50 max-h-80">
             {hook.subjects.map((subject: any) => (
-              <label key={subject.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 p-1 rounded">
+              <label key={subject.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 p-1 rounded overflow-hidden">
                 <input
                   type="checkbox"
                   checked={teacherSubjectHook.selectedSubjects.includes(subject.id)}
@@ -51,9 +51,9 @@ export const TeachersFormSection: React.FC<TeachersFormSectionProps> = ({
                         : [...prev, subject.id]
                     );
                   }}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 flex-shrink-0"
                 />
-                <span className="text-sm text-gray-700">{subject.subject_name}</span>
+                <span className="text-sm text-gray-700 truncate">{subject.subject_name}</span>
               </label>
             ))}
           </div>

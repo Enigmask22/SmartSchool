@@ -4,6 +4,9 @@ import { useAdminManagement } from '@/hooks/admin-management/useAdminManagement'
 import { useAdminSearch } from '@/hooks/admin-management/useAdminSearch';
 import { useAdminFilters } from '@/hooks/admin-management/useAdminFilters';
 import { useTabCrud } from '@/hooks/admin-management/useTabCrud';
+import { useSorting } from '@/hooks/admin-management/useSorting';
+import { applyFilters } from '@/hooks/admin-management/useTableFilters';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
 import { useAdminImport } from '@/hooks/admin-management/useAdminImport';
 import { useTeacherSubjectManagement } from '@/hooks/admin-management/useTeacherSubjectManagement';
 import { useScoreColumnManagement } from '@/hooks/admin-management/useScoreColumnManagement';
@@ -37,7 +40,7 @@ const AdminManagement = () => {
   const hook = useAdminManagement();
   const search = useAdminSearch();
   const filters = useAdminFilters();
-  const tabCrud = useTabCrud(hook.activeTab);
+  const tabCrud = useTabCrud(hook.activeTab, hook.loadData);
   const importHook = useAdminImport(() => hook.loadData());
   // Pass hook.teacherSubjects so editing mode can pre-populate current subjects
   const teacherSubjectHook = useTeacherSubjectManagement(
@@ -59,6 +62,40 @@ const AdminManagement = () => {
   // Create form dialog state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
+  // Sorting state
+  const sorting = useSorting();
+
+  // System settings for filter defaults
+  const { settings } = useSystemSettings();
+  const defaultAcademicYear = settings?.academic_year || '';
+  const defaultSemester = settings?.semester || 'HK1';
+
+  // Nested filter state - per tab
+  const [tabFilters, setTabFilters] = useState(() => ({
+    users: {},
+    teachers: {},
+    subjects: {},
+    classes: { academic_year: defaultAcademicYear || '' },
+    class_subjects: { academic_year: defaultAcademicYear || '', semester: defaultSemester || 'HK1' },
+  }));
+
+  const handleTabFiltersChange = (fieldName: string, value: any) => {
+    setTabFilters((prev) => ({
+      ...prev,
+      [hook.activeTab]: {
+        ...prev[hook.activeTab as keyof typeof prev],
+        [fieldName]: value === 'none' || value === '' ? null : value,
+      },
+    }));
+  };
+
+  // const resetTabFilters = () => {
+  //   setTabFilters((prev) => ({
+  //     ...prev,
+  //     [hook.activeTab]: {},
+  //   }));
+  // };
+
   const handleTabClick = (tabId: string) => {
     hook.setActiveTab(tabId);
     // Reset form and search states when switching tabs
@@ -67,6 +104,8 @@ const AdminManagement = () => {
     tabCrud.setEditingItem(null);
     search.setSearchTerm('');
     search.setShowDeleted(false);
+    // Reset sorting only, preserve tab filters with their defaults
+    sorting.resetSort();
   };
 
   const handleAddNew = () => {
@@ -108,27 +147,77 @@ const AdminManagement = () => {
         result = allFiltered.filter((item: any) => item.is_active !== false);
       }
 
-      // Remove duplicates by ID and sort by ID
+      // Remove duplicates by ID
       const uniqueMap = new Map<number, any>();
       result.forEach((item: any) => {
         if (item.id && !uniqueMap.has(item.id)) {
           uniqueMap.set(item.id, item);
         }
       });
-      const dedupedSorted = Array.from(uniqueMap.values()).sort((a: any, b: any) => a.id - b.id);
+      let dedupedData = Array.from(uniqueMap.values());
 
-      // Debug logging
-      // console.log(`[Management] filteredDataMemo for tab ${hook.activeTab}:`, {
-      //   totalData: hook.data.length,
-      //   afterFilter: result.length,
-      //   afterDedup: dedupedSorted.length,
-      //   ids: dedupedSorted.map((item: any) => item.id),
-      //   data: dedupedSorted,
-      // });
+      // Enrich data with related objects for filtering
+      // Teachers tab: add full subject objects
+      if (hook.activeTab === 'teachers') {
+        if (hook.teacherSubjects && hook.subjects?.length > 0) {
+          dedupedData = dedupedData.map((teacher: any) => {
+            const subjectIds = hook.teacherSubjects[teacher.id] || [];
+            const enrichedSubjects = subjectIds
+              .map((subjectId: number) => hook.subjects.find((s: any) => s.id === subjectId))
+              .filter((s: any) => s !== undefined && s !== null);
+            
+            return {
+              ...teacher,
+              subjects: enrichedSubjects,
+            };
+          });
+        }
+      }
 
-      return dedupedSorted;
+      // Class_subjects tab: enrich with grades from classes
+      if (hook.activeTab === 'class_subjects' && hook.classes?.length > 0) {
+        dedupedData = dedupedData.map((item: any) => {
+          // Get all class objects for this class_subject's class_ids array
+          const classObjects = (item.class_ids || [])
+            .map((classId: number) => hook.classes.find((c: any) => c.id === classId))
+            .filter(Boolean);
+          
+          // Extract all grades from the classes - keep as array for multi-value filtering
+          const grades = classObjects
+            .map((c: any) => c.grade)
+            .filter((g: any) => g !== null && g !== undefined);
+          
+          return {
+            ...item,
+            // Store as array for multi-value filtering (like subjects/classes)
+            grade: grades.length > 0 ? grades : null,
+          };
+        });
+        
+        // Debug: log grade values
+        // console.log('[Management] Class_subjects enrichment - Sample data with grade:', {
+        //   firstItem: dedupedData[0],
+        //   firstItemGrade: dedupedData[0]?.grade,
+        //   firstItemGradeType: typeof dedupedData[0]?.grade,
+        //   sampleGrades: dedupedData.slice(0, 5).map((item: any) => ({ 
+        //     id: item.id, 
+        //     class_ids: item.class_ids,
+        //     grade: item.grade,
+        //     gradeType: typeof item.grade
+        //   })),
+        // });
+      }
+
+      // Apply unified tab-specific filters
+      const currentTabFilters = tabFilters[hook.activeTab as keyof typeof tabFilters];
+      dedupedData = applyFilters(dedupedData, currentTabFilters, hook.activeTab);
+
+      // Apply sorting
+      dedupedData = sorting.applySorting(dedupedData);
+
+      return dedupedData;
     },
-    [hook.filteredData, hook.data, search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId, filters.classes, search.showDeleted]
+    [hook.filteredData, hook.data, search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId, filters.classes, search.showDeleted, tabFilters, hook.activeTab, sorting, hook.classes, hook.teacherSubjects, hook.subjects]
   );
 
   // Pagination calculations
@@ -152,18 +241,11 @@ const AdminManagement = () => {
     setCurrentPage(1);
   }, [search.searchTerm, filters.selectedAcademicYear, filters.selectedGrade, filters.selectedClassId]);
 
-  // Load academic years only for class_subjects tab
-  // NOTE: Classes are loaded by loadReferenceData() in useAdminManagement
-  // to avoid duplicate API calls to GET /api/admin/classes
-  useEffect(() => {
-    if (hook.activeTab === 'class_subjects') {
-      filters.loadAcademicYears();
-    }
-  }, [hook.activeTab]); // Only activeTab - filters object is recreated each render
+  // Note: Academic years are now loaded from ACADEMIC_YEAR_OPTIONS constant in SearchAndFilters
 
 
   return (
-    <div className="min-h-screen p-6 bg-background space-y-6">
+    <div className="min-h-screen p-6 bg-background space-y-6 bg-gray-50" style={{ overflow: 'visible' }}>
       {/* Header Section with PageHeader */}
       <PageHeader
         title="Quản lý hệ thống"
@@ -195,7 +277,7 @@ const AdminManagement = () => {
                   <CardTitle className="text-2xl font-bold mb-1">
                     {hook.currentConfig?.title || 'Quản lý'}
                   </CardTitle>
-                  <CardDescription>Quản lý và cấu hình dữ liệu hệ thống</CardDescription>
+                  <CardDescription>Quản lý tài khoản người dùng trong hệ thống</CardDescription>
                 </div>
                 <ActionButtons
                   activeTab={hook.activeTab}
@@ -211,6 +293,11 @@ const AdminManagement = () => {
                 activeTab={hook.activeTab}
                 search={search}
                 filters={filters}
+                tabFilters={tabFilters[hook.activeTab as keyof typeof tabFilters]}
+                onTabFiltersChange={handleTabFiltersChange}
+                allData={filteredDataMemo}
+                subjects={hook.subjects}
+                classes={hook.classes}
               />
             </CardHeader>
 
@@ -227,6 +314,9 @@ const AdminManagement = () => {
                 classSelectionHook={classSelectionHook}
                 searchTerm={search.searchTerm}
                 search={search}
+                currentPage={currentPage}
+                pageSize={pageSize}
+                sorting={sorting}
               />
             </CardContent>
           </Card>

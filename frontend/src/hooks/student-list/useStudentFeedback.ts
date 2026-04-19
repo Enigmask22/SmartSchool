@@ -311,8 +311,9 @@ export const useStudentFeedback = ({
     }
 
     try {
+      // Find the class by BOTH name AND academic year to get the correct ID
       const found = filters.homeroomClasses.find(
-        (c) => c.class_name === filters.selectedClass,
+        (c) => c.class_name === filters.selectedClass && c.academic_year === filters.selectedAcademicYear,
       );
       const classId = found?.id;
 

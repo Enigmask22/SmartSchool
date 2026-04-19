@@ -99,6 +99,8 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
   const [studentFormData, setStudentFormData] = useState<StudentFormData>(INITIAL_FORM_DATA);
   const [studentFormErrors, setStudentFormErrors] = useState<Record<string, string | null>>({});
   const [studentFormLoading, setStudentFormLoading] = useState(false);
+  const [forceCreateEnabled, setForceCreateEnabled] = useState(false);  // NEW: for duplicate bypass
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);  // NEW: duplicate message
 
   // Edit Student Form State
   const [editForm, setEditForm] = useState<Partial<EditFormData>>({});
@@ -280,6 +282,7 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
       const studentData = {
         student_id: studentId,
         ...studentFormData,
+        force_create: forceCreateEnabled,  // NEW: include force_create flag
       };
 
       const nullableFields = ['received_email'];
@@ -298,13 +301,24 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
         toast.success('Thêm học sinh thành công!');
         setStudentFormData(INITIAL_FORM_DATA);
         setStudentFormErrors({});
+        setForceCreateEnabled(false);  // NEW: reset flag
+        setDuplicateWarning(null);  // NEW: clear warning
         onSuccess();
       } else {
         toast.error('Lỗi khi thêm học sinh!');
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error adding student:', error);
-      toast.error('Lỗi khi thêm học sinh!');
+      
+      // NEW: Handle 409 Conflict (duplicate detected)
+      if (error.response?.status === 409) {
+        setDuplicateWarning(error.response?.data?.detail || 'Học sinh này có thể đã tồn tại');
+        toast.warning('Phát hiện học sinh trùng. Vui lòng xác nhận để tiếp tục.');
+      } else if (error.response?.status === 400) {
+        toast.error(error.response?.data?.detail || 'Dữ liệu không hợp lệ');
+      } else {
+        toast.error('Lỗi khi thêm học sinh!');
+      }
     } finally {
       setStudentFormLoading(false);
     }
@@ -357,9 +371,15 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
             onSuccess?.();
             onCloseConfirm?.();
           }
-        } catch (error) {
+        } catch (error: any) {
           logger.error('Error deactivating student:', error);
-          toast.error('Lỗi khi vô hiệu hóa học sinh!');
+          
+          // NEW: Handle 409 Conflict (student in class)
+          if (error.response?.status === 409) {
+            toast.error(error.response?.data?.detail || 'Không thể xóa học sinh đang trong lớp');
+          } else {
+            toast.error('Lỗi khi vô hiệu hóa học sinh!');
+          }
           onCloseConfirm?.();
         }
       },
@@ -800,6 +820,10 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
     setStudentFormData,
     studentFormErrors,
     studentFormLoading,
+    forceCreateEnabled,  // NEW
+    setForceCreateEnabled,  // NEW
+    duplicateWarning,  // NEW
+    setDuplicateWarning,  // NEW
     handleStudentFormChange,
     addParentContactRow,
     removeParentContactRow,

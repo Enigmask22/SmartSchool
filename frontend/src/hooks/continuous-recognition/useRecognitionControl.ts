@@ -52,6 +52,7 @@ export const useRecognitionControl = (
   const [cooldownPeriod, setCooldownPeriod] = useState(5);
   const [message, setMessage] = useState("");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const previewIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle start API call
   const handleStart = async () => {
@@ -145,9 +146,11 @@ export const useRecognitionControl = (
         staggerTimeoutsRef.current = [];
 
         selectedMultiCameras.forEach((cameraId: string, index: number) => {
-          const staggerDelay = index * 50; // Stagger by 50ms
+          const staggerDelay = index * 500; // Stagger by 500ms
           const timeoutId = setTimeout(() => {
-            captureFromManagedCamera(cameraId, false);
+            if (isRunning) {
+              captureFromManagedCamera(cameraId, false);
+            }
           }, staggerDelay);
           staggerTimeoutsRef.current.push(timeoutId);
         });
@@ -212,8 +215,8 @@ export const useRecognitionControl = (
       isRunning && isConnected && (cameraSource === "managed" || isCameraOn);
 
     if (shouldCapture) {
-      console.log("▶️ Starting frame capture (100ms interval)");
-      intervalRef.current = setInterval(captureAndSendFrame, 100);
+      console.log("▶️ Starting frame capture (2000ms interval - 0.5 FPS)");
+      intervalRef.current = setInterval(captureAndSendFrame, 2000);
     } else {
       if (intervalRef.current) {
         console.log("⏹️ Stopping frame capture");
@@ -229,6 +232,42 @@ export const useRecognitionControl = (
       }
     };
   }, [isRunning, isConnected, isCameraOn, captureAndSendFrame, cameraSource]);
+
+  // Preview-only capture for managed cameras (even when not running recognition)
+  useEffect(() => {
+    const captureForPreview = async () => {
+      if (cameraSource !== "managed") return;
+      
+      if (useMultiCamera && selectedMultiCameras.length > 0) {
+        // Multi-camera preview
+        selectedMultiCameras.forEach((cameraId: string) => {
+          captureFromManagedCamera(cameraId, true); // true = preview only
+        });
+      } else if (selectedCameraId) {
+        // Single camera preview
+        captureFromManagedCamera(selectedCameraId, true); // true = preview only
+      }
+    };
+
+    // Start preview capture if managed camera is selected (regardless of recognition status)
+    if (cameraSource === "managed" && (selectedCameraId || selectedMultiCameras.length > 0)) {
+      console.log("📷 Starting camera preview capture (300ms interval - ~3.3 FPS)");
+      previewIntervalRef.current = setInterval(captureForPreview, 300);
+    } else {
+      if (previewIntervalRef.current) {
+        console.log("📷 Stopping camera preview capture");
+        clearInterval(previewIntervalRef.current);
+        previewIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (previewIntervalRef.current) {
+        clearInterval(previewIntervalRef.current);
+        previewIntervalRef.current = null;
+      }
+    };
+  }, [cameraSource, selectedCameraId, selectedMultiCameras, useMultiCamera, captureFromManagedCamera]);
 
   return {
     isRunning,

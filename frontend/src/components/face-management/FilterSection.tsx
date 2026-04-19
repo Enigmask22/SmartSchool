@@ -115,7 +115,7 @@ export default function FilterSection({
             </div>
 
             <div className="space-y-2">
-              <Label className="invisible">Thao tác</Label>
+              <Label className="invisible">TÙY CHỌN</Label>
               <Button onClick={onRefresh} className="w-full">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Làm mới dữ liệu
