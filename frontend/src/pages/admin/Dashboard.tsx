@@ -17,12 +17,15 @@ export default function AdminDashboard() {
     loading,
     refreshing,
     selectedPeriod,
+    selectedAcademicYear,
+    academicYears,
     overview,
     attendanceTrends,
     classPerformance,
     teacherPerformance,
     systemHealth,
     handlePeriodChange,
+    handleAcademicYearChange,
     handleRefresh,
   } = useAdminDashboard();
 
@@ -32,19 +35,22 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6 p-6 min-h-screen">
       {/* Header */}
-      <Header
+      {/* <Header
         selectedPeriod={selectedPeriod}
+        selectedAcademicYear={selectedAcademicYear}
+        academicYears={academicYears}
         onPeriodChange={handlePeriodChange}
+        onAcademicYearChange={handleAcademicYearChange}
         onRefresh={handleRefresh}
         refreshing={refreshing}
         loading={loading}
-      />
+      /> */}
 
       {/* Overview Cards */}
-      <OverviewCards overview={overview} loading={loading} />
+      {/* <OverviewCards overview={overview} loading={loading} /> */}
 
       {/* System Health */}
-      <SystemHealth systemHealth={systemHealth} loading={loading} />
+      {/* <SystemHealth systemHealth={systemHealth} loading={loading} /> */}
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">

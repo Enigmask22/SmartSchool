@@ -1,7 +1,69 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip } from '@/components/ui/tooltip';
+import { ChevronDown } from 'lucide-react';
 import logger from '@/utils/logger';
+
+// Portal Tooltip Component - renders outside table DOM
+function PortalTooltip({ 
+  children, 
+  tooltipContent 
+}: { 
+  children: React.ReactNode
+  tooltipContent: React.ReactNode
+}) {
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  const [position, setPosition] = React.useState({ top: 0, left: 0 });
+  const triggerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.top - 10, // Position above with gap
+        left: rect.left + rect.width / 2, // Center horizontally
+      });
+      setShowTooltip(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+  };
+
+  return (
+    <>
+      <div 
+        ref={triggerRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="w-full"
+      >
+        {children}
+      </div>
+      
+      {showTooltip && createPortal(
+        <div 
+          className="fixed z-[99999] pointer-events-none"
+          style={{
+            top: `${position.top}px`,
+            left: `${position.left}px`,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <div className="bg-white border border-gray-300 rounded-lg shadow-xl p-4 whitespace-normal w-max max-w-sm">
+            {tooltipContent}
+            {/* Arrow pointing down */}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 -translate-y-[7px]">
+              <div className="border-8 border-transparent border-t-white border-t-8" />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 // Helper function to highlight search term in text
 export function highlightText(text: string, searchTerm: string): React.ReactNode {
@@ -41,6 +103,7 @@ export function highlightText(text: string, searchTerm: string): React.ReactNode
 
 export function renderFieldHeader(field: string): string {
   const headerMap: Record<string, string> = {
+    id: 'STT',
     username: 'USERNAME',
     full_name: 'HỌ TÊN',
     is_active: 'TRẠNG THÁI',
@@ -49,7 +112,7 @@ export function renderFieldHeader(field: string): string {
     subject_code: 'MÃ MÔN HỌC',
     subject_name: 'TÊN MÔN HỌC',
     description: 'MÔ TẢ',
-    is_mandatory: 'BẮT BUỘC',
+    is_mandatory: 'NHÓM MÔN',
     class_name: 'TÊN LỚP',
     grade: 'KHỐI',
     homeroom_teacher: 'GIÁO VIÊN CHỦ NHIỆM',
@@ -67,37 +130,129 @@ export function renderFieldHeader(field: string): string {
   return headerMap[field] || field.replace(/_/g, ' ').toUpperCase();
 }
 
-export function renderTableCell(field: string, item: any, hook: any, searchTerm: string = ''): React.ReactNode {
+export function renderTableCell(
+  field: string,
+  item: any,
+  hook: any,
+  searchTerm: string = '',
+  index?: number,
+  currentPage: number = 1,
+  pageSize: number = 10,
+  sorting?: any,
+  totalItems: number = 0
+): React.ReactNode {
   // Safety check: ensure item exists
   if (!item) {
     return <span className="text-gray-400">-</span>;
   }
 
+  // Handle id field - display as sequential number (STT)
+  if (field === 'id') {
+    if (index !== undefined) {
+      let stt: number;
+      
+      // If sorting by 'id' field, reflect the sort order in STT
+      if (sorting?.sortState.field === 'id') {
+        if (sorting.sortState.direction === 'desc') {
+          // For descending sort: show reverse order
+          // Total items - current position + 1
+          stt = totalItems - ((currentPage - 1) * pageSize + index);
+        } else {
+          // For ascending sort: show normal order
+          stt = (currentPage - 1) * pageSize + index + 1;
+        }
+      } else {
+        // Not sorting by id: always show sequential position
+        stt = (currentPage - 1) * pageSize + index + 1;
+      }
+      
+      return <span className="font-medium">{stt}</span>;
+    }
+    return <span className="text-gray-400">-</span>;
+  }
+
   if (field === 'classes') {
-    // This is used for class_subjects tab - display classes as badges
+    // This is used for class_subjects tab - display classes as badges with height limit and hover tooltip
     if (!item.class_names || !Array.isArray(item.class_names) || item.class_names.length === 0) {
       return <span className="text-xs italic text-gray-400">Chưa phân công lớp</span>;
     }
 
-    return (
-      <div className="flex flex-col gap-1">
-        {item.class_names.map((className: string, idx: number) => (
+    const MAX_VISIBLE_CLASSES = 4;
+    const visibleClasses = item.class_names.slice(0, MAX_VISIBLE_CLASSES);
+    const hiddenCount = Math.max(0, item.class_names.length - MAX_VISIBLE_CLASSES);
+
+    // Group classes by grade if available
+    const classesByGrade: Record<string, string[]> = {};
+    if (Array.isArray(item.class_ids) && hook?.classes) {
+      item.class_ids.forEach((classId: number, idx: number) => {
+        const classData = hook.classes.find((c: any) => c.id === classId);
+        if (classData && item.class_names[idx]) {
+          const grade = classData.grade || 'Không xác định';
+          if (!classesByGrade[grade]) {
+            classesByGrade[grade] = [];
+          }
+          classesByGrade[grade].push(item.class_names[idx]);
+        }
+      });
+    }
+
+    const content = (
+      <div className="w-full flex flex-col gap-1 max-h-[150px] overflow-y-auto">
+        {visibleClasses.map((className: string, idx: number) => (
           <Badge key={idx} className="text-xs text-blue-700 bg-blue-50 border-blue-200 border whitespace-nowrap min-w-[60px] h-7 flex items-center justify-center">
             {className}
           </Badge>
         ))}
+        {hiddenCount > 0 && (
+          <Badge className="text-xs text-orange-700 bg-orange-50 border-orange-200 border whitespace-nowrap h-7 flex items-center justify-center gap-1 cursor-default">
+            <ChevronDown className="w-3 h-3" />
+            +{hiddenCount} lớp
+          </Badge>
+        )}
       </div>
     );
+
+    // If there are hidden classes, wrap with custom portal tooltip
+    if (hiddenCount > 0) {
+      const tooltipContent = (
+        <>
+          <p className="font-semibold text-gray-800 text-sm mb-3">Danh sách lớp học ({item.class_names.length})</p>
+          <div className="space-y-3">
+            {Object.keys(classesByGrade).sort().map((grade) => (
+              <div key={grade}>
+                <p className="text-xs font-semibold text-gray-600 mb-2">Khối {grade}:</p>
+                <div className="flex flex-wrap gap-2 ml-2">
+                  {classesByGrade[grade].map((className: string, idx: number) => (
+                    <Badge key={idx} className="text-xs text-blue-700 bg-blue-50 border-blue-200 border whitespace-nowrap">
+                      {className}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      );
+
+      return (
+        <PortalTooltip tooltipContent={tooltipContent}>
+          {content}
+        </PortalTooltip>
+      );
+    }
+
+    // If all classes fit, just show them without tooltip
+    return content;
   }
 
   if (field === 'subjects') {
     // This is only used for teachers tab
     // Debug logging to understand data structure
-    logger.debug('[renderTableCell] subjects field:', {
-      teacherId: item.id,
-      hook_teacherSubjects: hook?.teacherSubjects,
-      hook_subjects: hook?.subjects?.length,
-    });
+    // logger.debug('[renderTableCell] subjects field:', {
+    //   teacherId: item.id,
+    //   hook_teacherSubjects: hook?.teacherSubjects,
+    //   hook_subjects: hook?.subjects?.length,
+    // });
 
     if (!hook?.teacherSubjects || typeof hook.teacherSubjects !== 'object') {
       return <span className="text-xs italic text-gray-400">Chưa phân công</span>;
@@ -110,7 +265,7 @@ export function renderTableCell(field: string, item: any, hook: any, searchTerm:
 
     // Ensure hook.subjects exists and is an array
     if (!Array.isArray(hook.subjects)) {
-      logger.warn('[renderTableCell] hook.subjects is not an array:', hook.subjects);
+      //logger.warn('[renderTableCell] hook.subjects is not an array:', hook.subjects);
       return <span className="text-xs italic text-gray-400">Dữ liệu môn học chưa tải</span>;
     }
 
@@ -225,15 +380,17 @@ export function renderTableCell(field: string, item: any, hook: any, searchTerm:
   return item[field] ? highlightText(String(item[field]), searchTerm) : '-';
 }
 
-// Helper function to truncate long text with styled tooltip
+// Helper function to truncate long text with portal tooltip
 export function renderTruncatedCell(content: React.ReactNode, maxWidth: string = 'max-w-[180px]', fullText: string = ''): React.ReactNode {
   if (!content || content === '-') return '-';
   
+  const tooltipText = fullText || String(content);
+  
   return (
-    <Tooltip content={fullText || String(content)} side="top">
+    <PortalTooltip tooltipContent={tooltipText}>
       <span className={`block ${maxWidth} truncate cursor-help`}>
         {content}
       </span>
-    </Tooltip>
+    </PortalTooltip>
   );
 }

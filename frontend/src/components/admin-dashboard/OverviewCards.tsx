@@ -83,11 +83,9 @@ export function OverviewCards({ overview, loading = false }: OverviewCardsProps)
           <div>
             <p className="text-sm font-medium text-gray-600">Tổng Người Dùng</p>
             <h3 className="mt-2 text-4xl font-bold text-blue-600">
-              {overview?.overview.total_users || 0}
+              {overview?.total_users || 0}
             </h3>
-            <p className="mt-1 text-xs text-gray-500">
-              +{overview?.activity.recent_logins || 0} đăng nhập gần đây
-            </p>
+            <p className="mt-1 text-xs text-gray-500">Trong hệ thống</p>
           </div>
           <div className="flex items-center justify-center bg-blue-100 w-14 h-14 rounded-xl flex-shrink-0">
             <Users className="text-blue-600 w-7 h-7" />
@@ -101,10 +99,10 @@ export function OverviewCards({ overview, loading = false }: OverviewCardsProps)
           <div>
             <p className="text-sm font-medium text-gray-600">Học Sinh</p>
             <h3 className="mt-2 text-4xl font-bold text-slate-700">
-              {overview?.overview.total_students || 0}
+              {overview?.total_students || 0}
             </h3>
             <p className="mt-1 text-xs text-gray-500">
-              {overview?.overview.total_classes || 0} lớp học
+              {overview?.total_classes || 0} lớp học
             </p>
           </div>
           <div className="flex items-center justify-center bg-slate-100 w-14 h-14 rounded-xl flex-shrink-0">
@@ -119,7 +117,7 @@ export function OverviewCards({ overview, loading = false }: OverviewCardsProps)
           <div>
             <p className="text-sm font-medium text-gray-600">Giáo Viên</p>
             <h3 className="mt-2 text-4xl font-bold text-emerald-600">
-              {overview?.overview.total_teachers || 0}
+              {overview?.total_teachers || 0}
             </h3>
             <p className="mt-1 text-xs text-gray-500">Đang hoạt động</p>
           </div>
@@ -135,11 +133,10 @@ export function OverviewCards({ overview, loading = false }: OverviewCardsProps)
           <div>
             <p className="text-sm font-medium text-gray-600">Tỷ Lệ Điểm Danh</p>
             <h3 className="mt-2 text-4xl font-bold text-amber-600">
-              {overview?.attendance_today.rate || 0}%
+              {overview?.attendance_rate || 0}%
             </h3>
             <p className="mt-1 text-xs text-gray-500">
-              {overview?.attendance_today.present || 0}/
-              {overview?.attendance_today.total || 0} hôm nay
+              Kỳ {overview?.period_days || 30} ngày
             </p>
           </div>
           <div className="flex items-center justify-center bg-amber-100 w-14 h-14 rounded-xl flex-shrink-0">

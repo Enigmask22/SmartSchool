@@ -181,9 +181,9 @@ export const useFaceManagement = () => {
         isHomeroomTeacher() &&
         (!state.selectedClass || state.selectedClass === 'all')
       ) {
-        logger.debug(
-          '🚫 No class selected for homeroom teacher, skipping face management students fetch'
-        );
+        // logger.debug(
+        //   '🚫 No class selected for homeroom teacher, skipping face management students fetch'
+        // );
         updateState({ students: [], loading: false });
         return;
       }

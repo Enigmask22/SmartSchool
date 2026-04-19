@@ -47,10 +47,10 @@ export const useStudentList = (filters: UseStudentListFilters) => {
   const closeConfirm = useCallback(() =>
     setConfirmState((prev) => ({ ...prev, open: false })), []);
 
-  // When selected class changes, fetch students
+  // When selected class or academic year changes, fetch students
   useEffect(() => {
     fetchStudents();
-  }, [filters.selectedClass]);
+  }, [filters.selectedClass, filters.selectedAcademicYear]);
 
   // Fetch students
   const fetchStudents = async () => {
@@ -69,22 +69,38 @@ export const useStudentList = (filters: UseStudentListFilters) => {
           setLoading(false);
           return;
         }
+        
+        // Find the class by BOTH name AND academic year to get the correct ID
         const found = filters.homeroomClasses.find(
-          (c) => c.class_name === filters.selectedClass,
+          (c) => c.class_name === filters.selectedClass && c.academic_year === filters.selectedAcademicYear,
         );
         const classId = found?.id;
+
+        // If class not found for this year, don't fetch - just clear students
+        if (!classId) {
+          logger.warn(
+            `❌ No class found for "${filters.selectedClass}" in year ${filters.selectedAcademicYear}`,
+          );
+          setStudents([]);
+          setLoading(false);
+          return;
+        }
+
+        logger.info('🔎 Fetching students for class:', {
+          selectedClass: filters.selectedClass,
+          selectedAcademicYear: filters.selectedAcademicYear,
+          foundClass: found,
+          classId: classId,
+        });
+
         response = await ApiService.request(
-          classId
-            ? `/homeroom/students?class_id=${classId}`
-            : `/homeroom/students?class_name=${encodeURIComponent(
-                filters.selectedClass,
-              )}&academic_year=${encodeURIComponent(filters.selectedAcademicYear)}`,
+          `/homeroom/students?class_id=${classId}`,
         );
       } else {
         response = await ApiService.getStudents({});
       }
 
-      logger.debug("Students API response:", response);
+      //logger.debug("Students API response:", response);
 
       if (response.success && response.data) {
         setStudents(Array.isArray(response.data) ? response.data : []);
@@ -172,7 +188,7 @@ export const useStudentList = (filters: UseStudentListFilters) => {
   // We just provide the filtered students and let the caller handle pagination
 
   // Use extracted scores hook - needed internally for exportStudentReportCard
-  const scores = useStudentScores(academicYear, semester, filters.selectedAcademicYear, filters.selectedSemester);
+  const scores = useStudentScores(filters.selectedAcademicYear, filters.selectedSemester);
 
   // Use extracted feedback hook (now that scores is defined) - needed internally for exportStudentReportCard
   const feedback = useStudentFeedback({

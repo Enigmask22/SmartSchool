@@ -27,11 +27,22 @@ export function StudentListPage() {
   const authContext = useContext(AuthContext);
   const isHomeroomTeacher = authContext?.isHomeroomTeacher || (() => false);
   const { settings } = useSystemSettings();
-  const academicYear = settings.academic_year || "2024-2025";
-  const semester = settings.semester || "HK1";
 
   // Initialize filters hook - StudentList is now responsible for managing filters
   const filters = useStudentFilters();
+
+  // Initialize academic year and semester from settings (matching FaceManagement pattern)
+  useEffect(() => {
+    if (settings.academic_year && !filters.selectedAcademicYear) {
+      filters.setSelectedAcademicYear(settings.academic_year);
+    }
+  }, [settings.academic_year, filters]);
+
+  useEffect(() => {
+    if (settings.semester && !filters.selectedSemester) {
+      filters.setSelectedSemester(settings.semester);
+    }
+  }, [settings.semester, filters]);
 
   // Initialize student list hook with filter dependencies
   const studentList = useStudentList({
@@ -44,7 +55,7 @@ export function StudentListPage() {
   });
 
   // Initialize scores hook - needed by feedback
-  const scores = useStudentScores(academicYear, semester, filters.selectedAcademicYear, filters.selectedSemester);
+  const scores = useStudentScores(filters.selectedAcademicYear, filters.selectedSemester);
 
   // Initialize feedback hook (depends on scores)
   const feedback = useStudentFeedback({
@@ -52,7 +63,7 @@ export function StudentListPage() {
     scoresData: scores,
   });
 
-  // Auto-select first class for homeroom teachers when classes load
+  // Auto-select homeroom teacher's class for current academic year
   useEffect(() => {
     if (
       isHomeroomTeacher() &&
@@ -62,7 +73,7 @@ export function StudentListPage() {
     ) {
       filters.setSelectedClass(filters.homeroomClasses[0].class_name);
     }
-  }, [filters.homeroomClasses, isHomeroomTeacher, filters]);
+  }, [filters.selectedAcademicYear, filters.homeroomClasses, isHomeroomTeacher, filters]);
 
   // Calculate pagination from filteredStudents
   const { totalStudents, totalPages, startIndex, endIndex } = filters.calculatePagination(studentList.filteredStudents);
@@ -76,7 +87,6 @@ export function StudentListPage() {
         selectedAcademicYear={filters.selectedAcademicYear}
         onAcademicYearChange={(year) => {
           filters.setSelectedAcademicYear(year);
-          filters.fetchAvailableClasses(year);
         }}
         selectedSemester={filters.selectedSemester}
         onSemesterChange={filters.setSelectedSemester}
@@ -171,8 +181,8 @@ export function StudentListPage() {
         loading={scores.scoresLoading}
         hasData={scores.hasScoreData}
         onClose={scores.closeScoresModal}
-        academicYear={academicYear}
-        semester={semester}
+        academicYear={filters.selectedAcademicYear}
+        semester={filters.selectedSemester}
       />
 
       <FeedbackModal
@@ -205,9 +215,9 @@ export function StudentListPage() {
         emailError={studentList.emailError}
         emailSuccess={studentList.emailSuccess}
         generatedFeedback={feedback.generatedFeedback}
-        semester={semester}
+        semester={filters.selectedSemester}
         selectedSemester={filters.selectedSemester}
-        academicYear={academicYear}
+        academicYear={filters.selectedAcademicYear}
         selectedAcademicYear={filters.selectedAcademicYear}
         onEmailRecipientChange={studentList.setEmailRecipient}
         onSend={studentList.handleSendEmailReportCard}

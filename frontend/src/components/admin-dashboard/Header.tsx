@@ -13,7 +13,10 @@ import { PageHeaderControls } from "@/components/common/PageHeader/PageHeaderCon
 
 interface HeaderProps {
   selectedPeriod: string;
+  selectedAcademicYear: string;
+  academicYears: string[];
   onPeriodChange: (period: string) => void;
+  onAcademicYearChange: (year: string) => void;
   onRefresh: () => Promise<void>;
   refreshing: boolean;
   loading?: boolean;
@@ -21,7 +24,10 @@ interface HeaderProps {
 
 export function Header({
   selectedPeriod,
+  selectedAcademicYear,
+  academicYears,
   onPeriodChange,
+  onAcademicYearChange,
   onRefresh,
   refreshing,
   loading = false,
@@ -41,6 +47,12 @@ export function Header({
         <div className="flex gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">
+              Năm học
+            </label>
+            <Skeleton className="h-10 w-[160px]" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">
               Thời kỳ
             </label>
             <Skeleton className="h-10 w-[140px]" />
@@ -49,6 +61,23 @@ export function Header({
         </div>
       ) : (
         <PageHeaderControls spacing="md">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">
+              Năm học
+            </label>
+            <Select value={selectedAcademicYear} onValueChange={onAcademicYearChange}>
+              <SelectTrigger className="w-[160px] focus-visible:outline-none">
+                <SelectValue placeholder="Chọn năm học" />
+              </SelectTrigger>
+              <SelectContent>
+                {academicYears.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">
               Thời kỳ

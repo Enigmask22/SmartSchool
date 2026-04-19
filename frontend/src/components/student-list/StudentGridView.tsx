@@ -6,7 +6,6 @@ import {
   BookOpen,
   Edit,
   MessageCircle,
-  Images,
   BarChart3,
   X,
   RefreshCw,
@@ -22,11 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStudentEdit } from "@/hooks/student-list/useStudentEdit";
-import { useMultipleFaceRegistration } from "@/hooks/student-list/useMultipleFaceRegistration";
 import { useStudentSubjects } from "@/hooks/student-list/useStudentSubjects";
 import {
   EditStudentModal,
-  FaceRegistrationModal,
   SubjectSelectionModal,
 } from "./modals";
 
@@ -67,7 +64,6 @@ export function StudentGridView({
   fetchStudents,
   onEdit,
   onFeedback,
-  onUploadMultiple,
   onViewScores,
   onSelectSubjects,
   onRestore,
@@ -75,13 +71,13 @@ export function StudentGridView({
 }: StudentGridViewProps) {
   // Local modal state for view component
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [faceModalOpen, setFaceModalOpen] = useState(false);
+  //const [faceModalOpen, setFaceModalOpen] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
   const [selectedStudentForModal, setSelectedStudentForModal] = useState<Student | null>(null);
 
   // Initialize hooks for modal data management
   const edit = useStudentEdit(fetchStudents, () => {}, () => {});
-  const multipleFace = useMultipleFaceRegistration(fetchStudents, selectedStudentForModal);
+  //const multipleFace = useMultipleFaceRegistration(fetchStudents, selectedStudentForModal);
   const subjects = useStudentSubjects({ setStudents: () => {} });
 
   // Wrapper for toggleSubjectSelection to match modal's expected interface
@@ -98,12 +94,12 @@ export function StudentGridView({
   };
 
   // Handle upload multiple click
-  const handleUploadClick = (student: Student) => {
-    setSelectedStudentForModal(student);
-    multipleFace.setSelectedStudentForMultiple(student);
-    setFaceModalOpen(true);
-    onUploadMultiple?.(student);
-  };
+  // const handleUploadClick = (student: Student) => {
+  //   setSelectedStudentForModal(student);
+  //   multipleFace.setSelectedStudentForMultiple(student);
+  //   setFaceModalOpen(true);
+  //   onUploadMultiple?.(student);
+  // };
 
   // Handle select subjects click
   const handleSubjectClick = (student: Student) => {
@@ -347,7 +343,7 @@ export function StudentGridView({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex gap-2">
                     <Button
                       onClick={() => onFeedback(student)}
                       variant="outline"
@@ -358,18 +354,6 @@ export function StudentGridView({
                       <span>Nhận xét</span>
                     </Button>
 
-                    <Button
-                      onClick={() => handleUploadClick(student)}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
-                    >
-                      <Images className="w-4 h-4" />
-                      <span>Upload nhiều ảnh</span>
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       onClick={() => onViewScores(student)}
                       variant="outline"
@@ -389,6 +373,16 @@ export function StudentGridView({
                       <GraduationCap className="w-4 h-4" />
                       <span>Môn học</span>
                     </Button>
+
+                    {/* <Button
+                      onClick={() => handleUploadClick(student)}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center space-x-2 text-xs hover:bg-primary/5 hover:border-primary/50"
+                    >
+                      <Images className="w-4 h-4" />
+                      <span>Upload nhiều ảnh</span>
+                    </Button> */}
                   </div>
                 </div>
               )}
@@ -417,7 +411,7 @@ export function StudentGridView({
         }}
       />
 
-      <FaceRegistrationModal
+      {/* <FaceRegistrationModal
         open={faceModalOpen}
         onOpenChange={setFaceModalOpen}
         selectedStudent={multipleFace.selectedStudentForMultiple || undefined}
@@ -426,7 +420,7 @@ export function StudentGridView({
         selectedStudentForMultiple={multipleFace.selectedStudentForMultiple || undefined}
         setSelectedStudentForMultiple={multipleFace.setSelectedStudentForMultiple}
         fetchStudents={fetchStudents}
-      />
+      /> */}
 
       <SubjectSelectionModal
         open={subjectModalOpen}

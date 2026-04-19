@@ -32,6 +32,7 @@ class StudentCreate(BaseModel):
     address: Optional[str] = None
     received_email: Optional[str] = None  # Email phụ huynh để nhận phiếu điểm
     is_active: Optional[bool] = True
+    force_create: Optional[bool] = False  # Bypass duplicate (full_name + date_of_birth) detection
 
 class StudentUpdate(BaseModel):
     student_id: Optional[str] = None

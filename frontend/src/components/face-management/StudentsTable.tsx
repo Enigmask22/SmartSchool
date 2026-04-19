@@ -1,4 +1,4 @@
-import { Users, UserX, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, UserX, Trash2, ChevronLeft, ChevronRight, Images } from 'lucide-react';
 import { UserCheck, Search } from 'lucide-react';
 import {
   Card,
@@ -36,6 +36,7 @@ interface StudentsTableProps {
   totalPages: number;
   totalStudents: number;
   onDeleteFace: (studentId: string, studentName: string) => Promise<boolean>;
+  onUploadFace: (student: Student) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
@@ -61,6 +62,7 @@ export default function StudentsTable({
   totalPages,
   totalStudents,
   onDeleteFace,
+  onUploadFace,
   onPageChange,
   onPageSizeChange,
 }: StudentsTableProps) {
@@ -112,23 +114,23 @@ export default function StudentsTable({
             <TableHeader className="bg-gray-50 border-b border-gray-200">
               <TableRow>
                 <TableHead className="text-center relative py-3 font-semibold text-xs text-gray-700">
-                  Mã HS
+                  MÃ SỐ HỌC SINH
                   <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                 </TableHead>
                 <TableHead className="text-center relative py-3 font-semibold text-xs text-gray-700">
-                  Họ tên
+                  HỌ VÀ TÊN
                   <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                 </TableHead>
                 <TableHead className="text-center relative py-3 font-semibold text-xs text-gray-700">
-                  Lớp
+                  LỚP
                   <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                 </TableHead>
                 <TableHead className="text-center relative py-3 font-semibold text-xs text-gray-700">
-                  Trạng thái khuôn mặt
+                  DỮ LIỆU KHUÔN MẶT
                   <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                 </TableHead>
                 <TableHead className="text-center py-3 font-semibold text-xs text-gray-700">
-                  Thao tác
+                  TÙY CHỌN
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -205,25 +207,31 @@ export default function StudentsTable({
                       <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                     </TableCell>
                     <TableCell className="text-sm font-medium text-center">
-                      {student.face_samples_count &&
-                      student.face_samples_count > 0 ? (
+                      <div className="flex gap-2 justify-center">
+                        <Button
+                          onClick={() => onUploadFace(student)}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7 hover:bg-primary/5 hover:border-primary/50 w-20"
+                          title="Upload ảnh khuôn mặt"
+                        >
+                          <Images className="w-3 h-3 mr-1" />
+                          Upload
+                        </Button>
                         <Button
                           onClick={() =>
                             onDeleteFace(student.id, student.full_name)
                           }
                           variant="destructive"
                           size="sm"
-                          className="text-xs h-7 px-2"
-                          title="Xóa khuôn mặt đã đăng ký"
+                          className="text-xs h-7 px-2 w-20"
+                          disabled={!student.face_samples_count || student.face_samples_count === 0}
+                          title={student.face_samples_count && student.face_samples_count > 0 ? "Xóa khuôn mặt đã đăng ký" : "Không có ảnh để xóa"}
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
                           Xóa
                         </Button>
-                      ) : (
-                        <span className="px-3 py-1 text-xs rounded text-gray-600 bg-gray-100 border border-gray-200 whitespace-nowrap inline-block">
-                          Không có
-                        </span>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

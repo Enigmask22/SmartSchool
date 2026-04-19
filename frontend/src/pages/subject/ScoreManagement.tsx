@@ -119,7 +119,7 @@ export default function ScoreManagement() {
   }
 
   return (
-    <div className="min-h-screen p-6 space-y-6 bg-background">
+    <div className="min-h-screen p-6 space-y-6">
       <div className="mx-auto space-y-6 max-w-7xl">
         {/* Header Card - Always visible, with loading skeleton controls if needed */}
         <ScoreManagementHeader

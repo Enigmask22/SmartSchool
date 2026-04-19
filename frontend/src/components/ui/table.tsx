@@ -7,10 +7,11 @@ interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
 
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+    <div className="relative w-full" style={{ overflow: 'visible' }}>
       <table
         ref={ref}
         className={cn("w-full caption-bottom text-sm", className)}
+        style={{ overflow: 'visible' }}
         {...props}
       />
     </div>
@@ -24,7 +25,7 @@ interface TableHeaderProps extends React.HTMLAttributes<HTMLTableSectionElement>
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, TableHeaderProps>(
   ({ className, ...props }, ref) => (
-    <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+    <thead ref={ref} className={cn("[&_tr]:border-b", className)} style={{ overflow: 'visible' }} {...props} />
   )
 )
 TableHeader.displayName = "TableHeader"
@@ -38,6 +39,7 @@ const TableBody = React.forwardRef<HTMLTableSectionElement, TableBodyProps>(
     <tbody
       ref={ref}
       className={cn("[&_tr:last-child]:border-0", className)}
+      style={{ overflow: 'visible' }}
       {...props}
     />
   )
@@ -56,6 +58,7 @@ const TableFooter = React.forwardRef<HTMLTableSectionElement, TableFooterProps>(
         "border-t bg-gray-100/50 font-medium [&>tr]:last:border-b-0",
         className
       )}
+      style={{ overflow: 'visible' }}
       {...props}
     />
   )
@@ -74,6 +77,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, TableRowProps>(
         "border-b transition-colors hover:bg-gray-100/50 data-[state=selected]:bg-gray-100",
         className
       )}
+      style={{ overflow: 'visible' }}
       {...props}
     />
   )
@@ -92,6 +96,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
         "h-12 px-4 text-left align-middle font-medium text-gray-500 [&:has([role=checkbox])]:pr-0",
         className
       )}
+      style={{ overflow: 'visible' }}
       {...props}
     />
   )
@@ -107,6 +112,7 @@ const TableCell = React.forwardRef<HTMLTableCellElement, TableCellProps>(
     <td
       ref={ref}
       className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)}
+      style={{ overflow: 'visible' }}
       {...props}
     />
   )

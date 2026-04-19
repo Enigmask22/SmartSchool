@@ -426,13 +426,13 @@ const CameraManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-center relative py-3">Tên Camera<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Source/URL<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Vị trí<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Trạng thái<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">TÊN CAMERA<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">SOURCE/URL<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">VỊ TRÍ<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">TRẠNG THÁI<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
                     <TableHead className="text-center relative py-3">FPS<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Frame Count<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Thao tác</TableHead>
+                    <TableHead className="text-center relative py-3">SỐ FRAME<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">TÙY CHỌN</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -464,13 +464,13 @@ const CameraManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-center relative py-3">Tên Camera<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Source/URL<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Vị trí<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Trạng thái<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">TÊN CAMERA<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">SOURCE/URL<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">VỊ TRÍ<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center relative py-3">TRẠNG THÁI<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
                     <TableHead className="text-center relative py-3">FPS<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center relative py-3">Frame Count<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
-                    <TableHead className="text-center">Thao tác</TableHead>
+                    <TableHead className="text-center relative py-3">SỐ FRAME<div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" /></TableHead>
+                    <TableHead className="text-center">TÙY CHỌN</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

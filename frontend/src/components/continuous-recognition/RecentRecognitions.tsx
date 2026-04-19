@@ -16,7 +16,10 @@ interface RecognitionItem {
   student: {
     full_name: string;
     student_code?: string;
-    id?: string;
+    student_id?: string;
+    code?: string;
+    class?: string;
+    class_name?: string;
   };
   confidence?: number;
   timestamp?: string;
@@ -66,7 +69,7 @@ const RecentRecognitions = ({
   };
 
   return (
-    <div className="p-6 transition-shadow duration-200 bg-white border-2 shadow-md rounded-2xl hover:shadow-lg flex flex-col max-h-[600px]">
+    <div className="p-6 duration-200 bg-white border-2 shadow-md rounded-2xl hover:shadow-lg flex flex-col h-full max-h-[673px]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
         <div className="flex items-center gap-3">
@@ -98,6 +101,7 @@ const RecentRecognitions = ({
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase">Thời gian</TableHead>
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase">Mã HS</TableHead>
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase">Họ tên</TableHead>
+                  <TableHead className="text-xs font-semibold text-gray-600 uppercase">Lớp</TableHead>
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center">Mức độ khớp</TableHead>
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase">Loại</TableHead>
                   <TableHead className="text-xs font-semibold text-gray-600 uppercase">Camera</TableHead>
@@ -113,17 +117,20 @@ const RecentRecognitions = ({
                       {item.timestamp || new Date().toLocaleTimeString('vi-VN')}
                     </TableCell>
                     <TableCell className="text-sm font-mono font-semibold text-gray-700">
-                      {item.student?.student_code || 'N/A'}
+                      {item.student?.student_code || item.student?.student_id || item.student?.code || 'N/A'}
                     </TableCell>
                     <TableCell className="text-sm font-medium text-gray-900">
                       {item.student?.full_name}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-700">
+                      {item.student?.class || item.student?.class_name || 'N/A'}
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center gap-1">
                         {getConfidenceBadge(item.confidence)}
                         {item.confidence && (
                           <span className="text-xs font-semibold text-gray-600">
-                            {(item.confidence * 100).toFixed(0)}%
+                            {(item.confidence > 100 ? (item.confidence / 100).toFixed(2) : item.confidence.toFixed(2)).replace('.', ',')}%
                           </span>
                         )}
                       </div>

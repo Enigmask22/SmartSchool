@@ -5,17 +5,17 @@
 
 export const TEST_USER = {
   admin: {
-    username: process.env.TEST_ADMIN_USER || 'admin.chuyen_le_quy_don.tphcm',
+    username: process.env.TEST_ADMIN_USER || 'admin',
     password: process.env.TEST_ADMIN_PASS || 'password',
     role: 'admin',
   },
   homeroom: {
-    username: process.env.TEST_HOMEROOM_USER || 'nguyen_thi_lan.chuyen_le_quy_don.tphcm',
+    username: process.env.TEST_HOMEROOM_USER || 'nguyen_thi_lan',
     password: process.env.TEST_HOMEROOM_PASS || 'password',
     role: 'homeroom',
   },
   subject: {
-    username: process.env.TEST_SUBJECT_USER || 'nguyen_thi_lan.chuyen_le_quy_don.tphcm',
+    username: process.env.TEST_SUBJECT_USER || 'nguyen_thi_lan',
     password: process.env.TEST_SUBJECT_PASS || 'password',
     role: 'subject',
   },
