@@ -82,7 +82,7 @@ const MainLayout = () => {
           ml-0
         `}
       >
-        <div className="px-4 lg:px-6">
+        <div className="px-4 lg:px-6 bg-gray-50">
           <Outlet context={{ dashboardType: currentDashboardType }} />
         </div>
       </main>

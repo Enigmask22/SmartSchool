@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import ApiService from "@/utils/api";
 import logger from "@/utils/logger";
 
-export const useStudentScores = (academicYear: string, semester: string, selectedAcademicYear: string, selectedSemester: string) => {
+export const useStudentScores = (selectedAcademicYear: string, selectedSemester: string) => {
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [selectedStudentForScores, setSelectedStudentForScores] = useState<any>(null);
   const [studentScores, setStudentScores] = useState<any[]>([]);
@@ -33,12 +33,13 @@ export const useStudentScores = (academicYear: string, semester: string, selecte
       }
     } catch (error) {
       logger.error("Error fetching student scores:", error);
+      // Fallback mock data
       setStudentScores([
         {
           subject_name: "Toán",
           class_name: student.class_name,
-          academic_year: academicYear,
-          semester: semester,
+          academic_year: selectedAcademicYear,
+          semester: selectedSemester,
           score_data: {
             Diem_thuong_xuyen: { Diem: 8.5, He_so: 1 },
             Diem_thi_giua_ki: { Diem: 9.0, He_so: 2 },
@@ -50,8 +51,8 @@ export const useStudentScores = (academicYear: string, semester: string, selecte
         {
           subject_name: "Ngữ Văn",
           class_name: student.class_name,
-          academic_year: academicYear,
-          semester: semester,
+          academic_year: selectedAcademicYear,
+          semester: selectedSemester,
           score_data: {
             Diem_mieng: { Diem: 7.5, He_so: 1 },
             Diem_15_phut: { Diem: 8.0, He_so: 1 },
@@ -65,7 +66,7 @@ export const useStudentScores = (academicYear: string, semester: string, selecte
     } finally {
       setScoresLoading(false);
     }
-  }, [selectedAcademicYear, selectedSemester, academicYear, semester]);
+  }, [selectedAcademicYear, selectedSemester]);
 
   const closeScoresModal = useCallback(() => {
     setShowScoresModal(false);

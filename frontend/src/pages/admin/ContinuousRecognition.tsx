@@ -38,8 +38,7 @@ const API_BASE_URL =
 export default function ContinuousRecognitionPage() {
   const [settingsError, setSettingsError] = useState("");
 
-  // Create refs early
-  const staggerTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const staggerTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Initialize recognition data hook
   const {
@@ -232,7 +231,7 @@ export default function ContinuousRecognitionPage() {
         />
 
         {/* ==================== MAIN CONTENT ==================== */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 auto-rows-max lg:auto-rows-fr">
           {/* ================== LEFT: CAMERA VIEW ================== */}
           <div className="lg:col-span-2 space-y-6">
             <CameraView
@@ -255,7 +254,7 @@ export default function ContinuousRecognitionPage() {
           </div>
 
           {/* ================== RIGHT PANEL ================== */}
-          <div className="space-y-6">
+          <div className="flex flex-col h-full">
             {/* Recent Recognitions */}
             <RecentRecognitions
               recognitions={recentRecognitions}

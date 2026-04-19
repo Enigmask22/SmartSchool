@@ -3,6 +3,8 @@ import api from '@/utils/api';
 import logger from '@/utils/logger';
 import { toast } from 'sonner';
 import { TAB_CONFIG } from './useTabCrud';
+import { useSystemSettings } from '@/contexts/useSystemSettings';
+import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 
 // Helper function to group class_subjects by (subject, teacher, year, semester)
 const groupClassSubjects = (items: any[]): any[] => {
@@ -45,6 +47,9 @@ const groupClassSubjects = (items: any[]): any[] => {
 };
 
 export function useAdminManagement() {
+  // Get system settings for default academic year
+  const { settings } = useSystemSettings();
+
   // Tab Management - restore from localStorage on mount
   const [activeTab, setActiveTabState] = useState(() => {
     const saved = localStorage.getItem('adminManagement_activeTab');
@@ -185,6 +190,24 @@ export function useAdminManagement() {
             }
           });
           setTeacherSubjects(teacherSubjectsMap);
+
+          // Enrich teachers data with subject objects for filtering
+          if (subjectsRes.success && teachersRes.success) {
+            const subjectsData = (subjectsRes.data || [])
+              .filter((s: any) => s !== null && s !== undefined);
+            
+            const enrichedTeachers = (teachersRes.data || [])
+              .filter((t: any) => t.is_active !== false)
+              .map((teacher: any) => ({
+                ...teacher,
+                subjects: (teacherSubjectsMap[teacher.id] || [])
+                  .map((subjectId: number) =>
+                    subjectsData.find((s: any) => s.id === subjectId)
+                  )
+                  .filter(Boolean), // Remove undefined entries
+              }));
+            setTeachers(enrichedTeachers);
+          }
         }
       } else if (activeTab === 'class_subjects') {
         // Class subjects tab needs: teachers, subjects, classes, subject_teachers
@@ -293,39 +316,21 @@ export function useAdminManagement() {
     }
   }, [activeTab, editingItem, showAddForm, teacherSubjects]);
 
-  // Load academic years for class_subjects
+  // Load academic years for class_subjects and classes
   useEffect(() => {
-    if (activeTab === 'class_subjects') {
-      (async () => {
-        try {
-          const [yearsRes, defaultYearRes] = await Promise.all([
-            api.request('/admin/classes/academic-years'),
-            api.request('/admin/classes/default-academic-year'),
-          ]);
+    if (activeTab === 'class_subjects' || activeTab === 'classes') {
+      // Set academic years from constant
+      setAcademicYears(ACADEMIC_YEAR_OPTIONS);
 
-          if (yearsRes.success) {
-            const years = yearsRes.data || [];
-            // Set academic years for the form dropdown
-            setAcademicYears(years);
-
-            let toSelect = '';
-            if (defaultYearRes.success && years.includes(defaultYearRes.data)) {
-              toSelect = defaultYearRes.data;
-            } else if (years.length > 0) {
-              toSelect = years[years.length - 1];
-            }
-            setSelectedAcademicYear(toSelect);
-          }
-        } catch (e) {
-          logger.error('Error loading academic years:', e);
-        }
-      })();
+      // Set default academic year from context settings
+      const defaultYear = settings.academic_year || ACADEMIC_YEAR_OPTIONS[0];
+      setSelectedAcademicYear(defaultYear);
     } else {
       setAcademicYears([]);
       setSelectedAcademicYear('');
       setSelectedClassId('');
     }
-  }, [activeTab]);
+  }, [activeTab, settings.academic_year]);
 
   // Filter classes when academic year or grade changes
   // Score Settings

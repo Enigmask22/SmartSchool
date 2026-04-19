@@ -1,5 +1,5 @@
 import { Camera } from 'lucide-react';
-import { useEffect, useContext } from 'react';
+import { useEffect, useContext, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { PageHeaderControls } from '@/components/common/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFaceManagementAPI } from '@/hooks/face-management/useFaceManagementAPI';
 import { useFaceManagementFilters } from '@/hooks/face-management/useFaceManagementFilters';
+import { useMultipleFaceRegistration } from '@/hooks/face-management/useMultipleFaceRegistration';
 import { useSystemSettings } from '@/contexts/useSystemSettings';
 import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -20,6 +21,7 @@ import {
   AIStatusCard,
   StudentsTable,
   Instructions,
+  MultipleFaceRegistration,
 } from '@/components/face-management';
 import {
   AIStatusCardSkeleton,
@@ -37,6 +39,13 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
 
   const api = useFaceManagementAPI();
   const filters = useFaceManagementFilters();
+
+  // Face Registration modal state
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [selectedStudentForFace, setSelectedStudentForFace] = useState<any>(null);
+  const multipleFace = useMultipleFaceRegistration(() => {
+    api.fetchStudentsData(filters.selectedClass, filters.selectedAcademicYear, api.bootstrapData.homeroomClasses);
+  }, selectedStudentForFace);
 
   // Sync filters with bootstrap data updates
   useEffect(() => {
@@ -68,6 +77,13 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
       await api.fetchStudentsData(filters.selectedClass, filters.selectedAcademicYear, api.bootstrapData.homeroomClasses);
     }
     return success;
+  };
+
+  // Handle upload face click
+  const handleUploadFaceClick = (student: any): void => {
+    setSelectedStudentForFace(student);
+    multipleFace.setSelectedStudentForMultiple(student);
+    setShowFaceModal(true);
   };
 
   // Pagination
@@ -162,8 +178,26 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
           totalPages={totalPages}
           totalStudents={api.students.length}
           onDeleteFace={handleDeleteFace}
+          onUploadFace={handleUploadFaceClick}
           onPageChange={filters.setCurrentPage}
           onPageSizeChange={filters.setPageSize}
+        />
+      )}
+
+      {/* Multiple Face Registration Modal */}
+      {selectedStudentForFace && (
+        <MultipleFaceRegistration
+          open={showFaceModal}
+          onOpenChange={setShowFaceModal}
+          student={selectedStudentForFace}
+          onClose={() => {
+            setShowFaceModal(false);
+            setSelectedStudentForFace(null);
+            multipleFace.setSelectedStudentForMultiple(null);
+          }}
+          onSuccess={() => {
+            api.fetchStudentsData(filters.selectedClass, filters.selectedAcademicYear, api.bootstrapData.homeroomClasses);
+          }}
         />
       )}
 

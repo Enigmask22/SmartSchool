@@ -1129,13 +1129,13 @@ const OCRScoreSheet = ({
                               STT
                             </TableHead>
                             <TableHead className="text-xs font-medium text-left">
-                              Mã HS
+                              MÃ SỐ HỌC SINH
                             </TableHead>
                             <TableHead className="text-xs font-medium text-left">
-                              Họ và tên
+                              HỌ VÀ TÊN
                             </TableHead>
                             <TableHead className="text-xs font-medium text-left">
-                              Lớp
+                              LỚP
                             </TableHead>
                             {scoreColumns.map((column) => (
                               <TableHead
@@ -1146,7 +1146,7 @@ const OCRScoreSheet = ({
                               </TableHead>
                             ))}
                             <TableHead className="text-xs font-medium text-center w-24">
-                              Thao tác
+                              TÙY CHỌN
                             </TableHead>
                           </TableRow>
                         </TableHeader>

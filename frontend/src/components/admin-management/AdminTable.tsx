@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit, Trash2, Save, FileX, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, Save, FileX, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -21,6 +21,7 @@ import { useAdminForm } from '@/hooks/admin-management/useAdminForm';
 import { useAdminSearch } from '@/hooks/admin-management/useAdminSearch';
 import { useTeacherSubjectManagement } from '@/hooks/admin-management/useTeacherSubjectManagement';
 import { useScoreColumnManagement } from '@/hooks/admin-management/useScoreColumnManagement';
+import { FILTER_CONFIGS } from '@/hooks/admin-management/useTableFilters';
 import { renderFieldHeader, renderTableCell } from './tableHelpers';
 import { AdminManagementForm } from './AdminManagementForm';
 import logger from '@/utils/logger';
@@ -36,6 +37,9 @@ interface AdminTableProps {
   classSelectionHook?: any;
   searchTerm?: string;
   search?: ReturnType<typeof useAdminSearch>;
+  currentPage?: number;
+  pageSize?: number;
+  sorting?: any;
 }
 
 export function AdminTable({
@@ -48,11 +52,15 @@ export function AdminTable({
   searchTerm = '',
   search,
   classSelectionHook,
+  currentPage = 1,
+  pageSize = 10,
+  sorting,
 } : AdminTableProps) {
   // Use search from props or fallback to hook
   const searchState = search || useAdminSearch();
   const tabCrud = tabCrudProp; // Use tabCrud from props, not creating new instance
   const form = useAdminForm();
+  const totalItems = filteredData.length;
   // Dialog state
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingItemForDialog, setEditingItemForDialog] = useState<any>(null);
@@ -164,7 +172,7 @@ export function AdminTable({
 
   if (isLoading) {
     return (
-      <div className="overflow-x-auto border rounded-lg">
+      <div className="border rounded-lg" style={{ overflowX: 'auto', overflowY: 'visible' }}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -226,26 +234,47 @@ export function AdminTable({
   }
 
   return (
-    <div className="overflow-x-auto border rounded-lg">
+    <div className="border rounded-lg" style={{ overflowX: 'auto', overflowY: 'visible' }}>
       <Table>
         <TableHeader>
           <TableRow>
-            {hook.currentConfig?.displayFields?.map((field: string) => (
-              <TableHead key={field} className="text-center relative py-3">
-                {renderFieldHeader(field)}
-                <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
-              </TableHead>
-            ))}
+            {hook.currentConfig?.displayFields?.map((field: string) => {
+              const isSortable = sorting && FILTER_CONFIGS[hook.activeTab]?.sortableFields?.includes(field);
+              const isSorted = sorting?.sortState.field === field;
+              const sortDirection = isSorted ? sorting.sortState.direction : null;
+              
+              return (
+                <TableHead
+                  key={field}
+                  className={`text-center relative py-3 ${isSortable ? 'cursor-pointer hover:bg-muted transition-colors' : ''}`}
+                  onClick={() => isSortable && sorting?.setSortField(field)}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span>{renderFieldHeader(field)}</span>
+                    {isSorted && (
+                      <>
+                        {sortDirection === 'asc' ? (
+                          <ArrowUp className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ArrowDown className="w-4 h-4 text-primary" />
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
+                </TableHead>
+              );
+            })}
             <TableHead className="text-center">TÙY CHỌN</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredData.map((item: any, index: number) => (
             <React.Fragment key={item.id}>
-              <TableRow className={index % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
+              <TableRow className={index % 2 === 0 ? 'bg-background' : 'bg-blue-50/50'}>
                 {hook.currentConfig?.displayFields?.map((field: string) => (
                   <TableCell key={field} className="relative">
-                    {renderTableCell(field, item, hook, searchTerm)}
+                    {renderTableCell(field, item, hook, searchTerm, index, currentPage, pageSize, sorting, totalItems)}
                     <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                   </TableCell>
                 ))}

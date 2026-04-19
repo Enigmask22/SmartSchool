@@ -82,23 +82,47 @@ async def create_camera(request: CameraCreateRequest, db=Depends(get_db)):
 async def list_cameras(enabled_only: bool = Query(False), db=Depends(get_db)):
     """Lấy danh sách tất cả camera"""
     try:
+        #logger.info(f"📹 LIST CAMERAS requested (enabled_only={enabled_only})")
+        
         # Load từ database nếu chưa có trong manager
         db_cameras = await CameraDBService.get_all_cameras(db, enabled_only=enabled_only)
+        #logger.info(f"   DB returned {len(db_cameras)} cameras (enabled_only={enabled_only})")
+        #for db_cam in db_cameras:
+            #logger.info(f"     - {db_cam['camera_id']}: enabled={db_cam.get('enabled')}, name={db_cam.get('name')}")
         
-        # Sync cameras từ DB vào manager (nếu chưa có)
+        # Sync cameras từ DB vào manager
         for db_camera in db_cameras:
             camera_id = db_camera["camera_id"]
-            if camera_manager.get_camera(camera_id) is None:
+            existing_camera = camera_manager.get_camera(camera_id)
+            
+            if existing_camera is None:
+                logger.info(f"   Adding {camera_id} to manager from DB")
                 # Load vào manager
                 config = CameraDBService.dict_to_config(db_camera)
                 camera_manager.add_camera(config, frame_callback=None)
+            else:
+                # Only update if enabled status changed
+                db_enabled = db_camera.get("enabled", True)
+                existing_enabled = existing_camera.config.enabled
+                
+                if db_enabled != existing_enabled:
+                    #logger.info(f"   Updating {camera_id}: enabled {existing_enabled} → {db_enabled}")
+                    config = CameraDBService.dict_to_config(db_camera)
+                    camera_manager.update_camera(camera_id, config)
+                #else:
+                    #logger.info(f"   {camera_id} unchanged (enabled={db_enabled})")
         
-        # Lấy từ manager (đã có status real-time)
+        # Lấy từ manager (đã có status real-time + fresh enabled status)
         cameras = camera_manager.list_cameras()
+        # logger.info(f"   Manager has {len(cameras)} cameras total")
         
         # Nếu enabled_only, filter
         if enabled_only:
-            cameras = [c for c in cameras if c.enabled]
+            filtered = [c for c in cameras if c.enabled]
+            logger.info(f"   After filtering enabled_only=True: {len(filtered)} cameras")
+            cameras = filtered
+        
+        #logger.info(f"   📤 Returning {len(cameras)} cameras")
         
         return CameraListResponse(
             success=True,
@@ -138,10 +162,15 @@ async def get_camera(camera_id: str):
 async def update_camera(camera_id: str, request: CameraUpdateRequest, db=Depends(get_db)):
     """Cập nhật camera"""
     try:
+        logger.info(f"🔄 Updating camera {camera_id}")
+        logger.info(f"   Request data: {request.dict()}")
+        
         # Lấy config hiện tại từ database
         db_camera = await CameraDBService.get_camera(db, camera_id)
         if not db_camera:
             raise HTTPException(status_code=404, detail="Không tìm thấy camera trong database")
+        
+        logger.info(f"   Current DB state: enabled={db_camera.get('enabled')}")
         
         current_config = CameraDBService.dict_to_config(db_camera)
         
@@ -157,6 +186,7 @@ async def update_camera(camera_id: str, request: CameraUpdateRequest, db=Depends
             updates["description"] = request.description
         if request.enabled is not None:
             updates["enabled"] = request.enabled
+            logger.info(f"   ✅ Updating enabled: {current_config.enabled} → {request.enabled}")
         if request.fps is not None:
             updates["fps"] = request.fps
         if request.width is not None:
@@ -170,8 +200,11 @@ async def update_camera(camera_id: str, request: CameraUpdateRequest, db=Depends
         if request.metadata is not None:
             updates["metadata"] = request.metadata
         
+        logger.info(f"   Updates to apply: {updates}")
+        
         # Cập nhật database
-        await CameraDBService.update_camera(db, camera_id, updates)
+        result = await CameraDBService.update_camera(db, camera_id, updates)
+        logger.info(f"   ✅ DB updated. New enabled state from DB: {result.get('enabled') if result else 'None'}")
         
         # Cập nhật trong manager
         updated_config = CameraConfig(
@@ -236,13 +269,19 @@ async def delete_camera(camera_id: str, db=Depends(get_db)):
 
 
 @router.post("/{camera_id}/start", response_model=CameraResponse)
-async def start_camera(camera_id: str):
+async def start_camera(camera_id: str, db=Depends(get_db)):
     """Bắt đầu camera"""
     try:
+        logger.info(f"🟢 START camera {camera_id}")
         success = camera_manager.start_camera(camera_id)
         
         if not success:
             raise HTTPException(status_code=400, detail="Không thể bắt đầu camera (kiểm tra kết nối)")
+        
+        # Update database: set enabled=True
+        logger.info(f"   📝 Saving enabled=True to database")
+        result = await CameraDBService.update_camera(db, camera_id, {"enabled": True})
+        logger.info(f"   ✅ Database updated: enabled={result.get('enabled') if result else 'unknown'}")
         
         camera_info = camera_manager.get_camera_info(camera_id)
         
@@ -260,13 +299,19 @@ async def start_camera(camera_id: str):
 
 
 @router.post("/{camera_id}/stop", response_model=CameraResponse)
-async def stop_camera(camera_id: str):
+async def stop_camera(camera_id: str, db=Depends(get_db)):
     """Dừng camera"""
     try:
+        logger.info(f"🔴 STOP camera {camera_id}")
         success = camera_manager.stop_camera(camera_id)
         
         if not success:
             raise HTTPException(status_code=404, detail="Không tìm thấy camera")
+        
+        # Update database: set enabled=False
+        logger.info(f"   📝 Saving enabled=False to database")
+        result = await CameraDBService.update_camera(db, camera_id, {"enabled": False})
+        logger.info(f"   ✅ Database updated: enabled={result.get('enabled') if result else 'unknown'}")
         
         camera_info = camera_manager.get_camera_info(camera_id)
         
