@@ -90,7 +90,7 @@ const EditStudentModal = ({
 }: EditStudentModalProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Sửa thông tin học sinh</DialogTitle>
           <DialogDescription>

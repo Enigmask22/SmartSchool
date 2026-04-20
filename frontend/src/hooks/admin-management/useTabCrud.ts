@@ -240,10 +240,10 @@ export function useTabCrud(activeTab: string, onDataUpdated?: () => Promise<void
       const isMultiple = ids.length > 1;
 
       openConfirm({
-        title: '⚠️ Xóa vĩnh viễn bản ghi',
+        title: 'Xóa vĩnh viễn bản ghi\n',
         description: isMultiple
           ? `Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN ${ids.length} phân công này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!`
-          : 'Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!',
+          : 'Bạn có CHẮC CHẮN muốn xóa VĨNH VIỄN bản ghi này?\nHành động này KHÔNG THỂ HOÀN TÁC!',
         confirmText: 'Xóa vĩnh viễn',
         onConfirm: async () => {
           closeConfirm();
