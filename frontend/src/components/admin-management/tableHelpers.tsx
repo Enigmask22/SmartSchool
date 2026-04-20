@@ -380,17 +380,28 @@ export function renderTableCell(
   return item[field] ? highlightText(String(item[field]), searchTerm) : '-';
 }
 
-// Helper function to truncate long text with portal tooltip
+// Helper function to truncate long text with styled tooltip
 export function renderTruncatedCell(content: React.ReactNode, maxWidth: string = 'max-w-[180px]', fullText: string = ''): React.ReactNode {
   if (!content || content === '-') return '-';
   
   const tooltipText = fullText || String(content);
   
   return (
-    <PortalTooltip tooltipContent={tooltipText}>
+    <div className="group relative w-full block">
       <span className={`block ${maxWidth} truncate cursor-help`}>
         {content}
       </span>
-    </PortalTooltip>
+      
+      {/* Inline white tooltip */}
+      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
+        <div className="bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 whitespace-normal w-max max-w-xs text-sm text-gray-800">
+          {tooltipText}
+          {/* Arrow pointing down */}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -translate-y-[7px]">
+            <div className="border-6 border-transparent border-t-white border-t-6" />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
