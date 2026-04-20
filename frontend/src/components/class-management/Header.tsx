@@ -77,7 +77,16 @@ const Header = ({
   return (
     <PageHeader
       title="Quản lý học sinh"
-      description="Quản lý học sinh và lớp học trong hệ thống"
+      description={
+        <div className="flex gap-2 flex-wrap">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+            {selectedAcademicYear || 'Năm học'}
+          </span>
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+            {selectedGrade ? `Khối ${selectedGrade}` : 'Khối'}
+          </span>
+        </div>
+      }
       icon={
         <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-blue-600 flex-shrink-0">
           <GraduationCap className="w-8 h-8 text-white" />
