@@ -7,7 +7,8 @@ import {
 } from '@/components/ui/card';
 //import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight, Users, User, FolderOpen } from 'lucide-react';
+import { ChevronRight, Users, User, FolderOpen, Download, Upload, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ClassInfo {
   id: number;
@@ -29,6 +30,9 @@ interface ClassManagementSelectorProps {
   academicYear: string;
   onSelect: (classInfo: ClassInfo) => void;
   loading?: boolean;
+  downloadStudentTemplate?: () => void;
+  handleFileUpload?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onAddStudent?: () => void;
 }
 
 export default function ClassManagementSelector({
@@ -37,6 +41,9 @@ export default function ClassManagementSelector({
   //academicYear,
   onSelect,
   loading = false,
+  downloadStudentTemplate,
+  handleFileUpload,
+  onAddStudent,
 }: ClassManagementSelectorProps) {
   // Filter classes by selected grade
   const filteredClasses = selectedGrade 
@@ -46,23 +53,67 @@ export default function ClassManagementSelector({
   return (
     <Card className="shadow-md border-gray-200">
       <CardHeader className="border-b border-gray-200">
-        <div className="text-center">
-          <CardTitle className="text-xl font-bold text-gray-900">
-            Chọn lớp học
-          </CardTitle>
-          <CardDescription className="text-gray-600">
-            Lựa chọn lớp để quản lý học sinh
-          </CardDescription>
+        <div className="flex items-start justify-between gap-4">
+          <div className="text-left">
+            <CardTitle className="text-xl font-bold text-gray-900">
+              Danh sách lớp học
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              Lựa chọn lớp để quản lý học sinh
+            </CardDescription>
+          </div>
+          <div className="flex items-center flex-wrap gap-2">
+            {downloadStudentTemplate && (
+              <Button
+                variant="outline"
+                onClick={downloadStudentTemplate}
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <Download className="w-4 h-4" />
+                <span>Tải template</span>
+              </Button>
+            )}
+            {handleFileUpload && (
+              <Button
+                variant="outline"
+                asChild
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <label className="cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  <span>Nhập</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </Button>
+            )}
+            {onAddStudent && (
+              <Button
+                onClick={onAddStudent}
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm</span>
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-6 bg-gray-50">
+      <CardContent className="pt-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 min-h-[400px] items-start">
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="p-5 space-y-3 border border-gray-200 rounded-lg bg-white">
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-24 w-3/4" />
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-8 w-2/3" />
               </div>
             ))
           ) : filteredClasses.length > 0 ? (
@@ -74,8 +125,8 @@ export default function ClassManagementSelector({
               >
                 <CardContent className="p-5 bg-white rounded-lg">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center justify-center text-lg font-bold rounded-lg w-12 h-12 text-white bg-amber-500">
-                      {classInfo.class_name.charAt(0)}
+                    <div className="flex items-center justify-center text-lg font-bold rounded-md w-24 h-12 text-white bg-amber-500">
+                      {classInfo.class_name}
                     </div>
                     <div className="flex items-center justify-center transition-all rounded-full w-7 h-7 bg-amber-100 group-hover:bg-rose-200">
                       <span className="text-amber-700 group-hover:text-rose-700">
@@ -84,13 +135,13 @@ export default function ClassManagementSelector({
                     </div>
                   </div>
 
-                  <h3 className="mb-3 text-base font-bold text-amber-950">
+                  {/* <h3 className="mb-3 text-base font-bold text-amber-950">
                     {classInfo.class_name}
-                  </h3>
+                  </h3> */}
 
                   {/* Homeroom Teacher Section */}
                   {classInfo.teachers ? (
-                    <div className="mb-4 p-2.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-md border border-amber-200">
+                    <div className="mb-4 p-2.5 bg-gradient-to-r from-amber-100 to-orange-100 rounded-md border border-amber-200">
                       <div className="flex items-center text-sm text-amber-800 mb-1">
                         <User className="w-4 h-4 mr-2 flex-shrink-0" />
                         <span className="font-medium">Chủ nhiệm:</span>
@@ -103,7 +154,7 @@ export default function ClassManagementSelector({
                       </p>
                     </div>
                   ) : (
-                    <div className="mb-4 p-2.5 bg-amber-50 rounded-md border border-amber-100">
+                    <div className="mb-4 p-2.5 bg-amber-100 rounded-md border border-amber-100">
                       <div className="flex items-center text-sm text-amber-700">
                         <User className="w-4 h-4 mr-2 flex-shrink-0" />
                         <span className="text-xs">Chưa có chủ nhiệm</span>
@@ -112,7 +163,7 @@ export default function ClassManagementSelector({
                   )}
 
                   {/* Student Count Section */}
-                  <div className="p-2.5 bg-gradient-to-r from-rose-50 to-red-50 rounded-md border border-rose-200">
+                  <div className="p-2.5 bg-gradient-to-r from-rose-100 to-red-100 rounded-md border border-rose-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center text-sm text-rose-700 font-medium">
                         <Users className="w-4 h-4 mr-2 flex-shrink-0" />

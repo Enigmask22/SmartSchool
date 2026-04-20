@@ -377,7 +377,7 @@ const StudentsTableCard = ({
               </TableHeader>
               <TableBody>
                 {paginatedStudents.map((student, index) => (
-                  <TableRow key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                  <TableRow key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50/50'}>
                     <TableCell className="text-center w-12">
                       <input
                         type="checkbox"

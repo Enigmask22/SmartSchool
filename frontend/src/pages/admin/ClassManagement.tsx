@@ -367,6 +367,9 @@ const ClassManagement = () => {
           academicYear={selectedAcademicYear}
           onSelect={handleClassSelect}
           loading={apiHook.loading}
+          downloadStudentTemplate={downloadStudentTemplate}
+          handleFileUpload={handleFileUpload}
+          onAddStudent={() => setShowAddStudentModal(true)}
         />
       )}
 
