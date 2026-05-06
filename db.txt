@@ -1,0 +1,239 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.attendance (
+  id integer NOT NULL DEFAULT nextval('attendance_id_seq'::regclass),
+  student_id integer NOT NULL,
+  date date NOT NULL,
+  check_in_time timestamp with time zone,
+  check_out_time timestamp with time zone,
+  status character varying NOT NULL CHECK (status::text = ANY (ARRAY['present'::character varying::text, 'absent'::character varying::text, 'late'::character varying::text, 'excused'::character varying::text, 'auto'::character varying::text])),
+  method character varying DEFAULT 'manual'::character varying CHECK (method::text = ANY (ARRAY['manual'::character varying::text, 'auto'::character varying::text, 'import'::character varying::text])),
+  confidence_score double precision,
+  recognition_model character varying,
+  recognition_time timestamp with time zone,
+  notes text,
+  device_info jsonb,
+  location_info jsonb,
+  created_by integer,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  leave_request_image character varying,
+  CONSTRAINT attendance_pkey PRIMARY KEY (id),
+  CONSTRAINT attendance_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT attendance_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+);
+CREATE TABLE public.cameras (
+  id integer NOT NULL DEFAULT nextval('cameras_id_seq'::regclass),
+  camera_id character varying NOT NULL UNIQUE,
+  name character varying NOT NULL,
+  source character varying NOT NULL,
+  location character varying,
+  description text,
+  enabled boolean DEFAULT true,
+  fps integer DEFAULT 30,
+  width integer,
+  height integer,
+  username character varying,
+  password character varying,
+  metadata jsonb,
+  status character varying DEFAULT 'inactive'::character varying,
+  last_connected_at timestamp with time zone,
+  last_disconnected_at timestamp with time zone,
+  error_message text,
+  frame_count bigint DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT cameras_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.class_subjects (
+  id integer NOT NULL DEFAULT nextval('class_subjects_id_seq'::regclass),
+  class_id integer NOT NULL,
+  subject_id integer NOT NULL,
+  teacher_id integer,
+  academic_year character varying NOT NULL,
+  semester character varying NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT class_subjects_pkey PRIMARY KEY (id),
+  CONSTRAINT class_subjects_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT class_subjects_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id),
+  CONSTRAINT class_subjects_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id)
+);
+CREATE TABLE public.classes (
+  id integer NOT NULL DEFAULT nextval('classes_id_seq'::regclass),
+  class_name character varying NOT NULL,
+  grade character varying NOT NULL,
+  homeroom_teacher character varying,
+  room_number character varying,
+  total_students integer DEFAULT 0,
+  academic_year character varying,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  homeroom_teacher_id integer,
+  CONSTRAINT classes_pkey PRIMARY KEY (id),
+  CONSTRAINT classes_homeroom_teacher_id_fkey FOREIGN KEY (homeroom_teacher_id) REFERENCES public.teachers(id)
+);
+CREATE TABLE public.comments (
+  id integer NOT NULL DEFAULT nextval('comments_id_seq'::regclass),
+  student_id integer NOT NULL,
+  class_id integer,
+  description text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  semester character varying NOT NULL DEFAULT 'HK1'::character varying,
+  CONSTRAINT comments_pkey PRIMARY KEY (id),
+  CONSTRAINT comments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT comments_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id)
+);
+CREATE TABLE public.dayoff (
+  id integer NOT NULL DEFAULT nextval('config_holidays_id_seq'::regclass),
+  year integer NOT NULL,
+  month integer NOT NULL CHECK (month >= 1 AND month <= 12),
+  grade integer NOT NULL CHECK (grade = ANY (ARRAY[10, 11, 12])),
+  dayoffs_list jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT dayoff_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.face_embeddings (
+  id integer NOT NULL DEFAULT nextval('face_embeddings_id_seq'::regclass),
+  student_id integer NOT NULL,
+  embedding_vector ARRAY NOT NULL CHECK (array_length(embedding_vector, 1) = 512),
+  embedding_index integer NOT NULL,
+  quality_score double precision,
+  angle_type character varying,
+  registered_at timestamp with time zone DEFAULT now(),
+  detection_score double precision,
+  landmark_data jsonb,
+  CONSTRAINT face_embeddings_pkey PRIMARY KEY (id),
+  CONSTRAINT face_embeddings_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+);
+CREATE TABLE public.homeroom_students_history (
+  id integer NOT NULL DEFAULT nextval('homeroom_students_history_id_seq'::regclass),
+  teacher_id integer,
+  class_id integer,
+  student_id integer,
+  recorded_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT homeroom_students_history_pkey PRIMARY KEY (id),
+  CONSTRAINT homeroom_students_history_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT homeroom_students_history_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT homeroom_students_history_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id)
+);
+CREATE TABLE public.parent_info (
+  id integer NOT NULL DEFAULT nextval('parent_info_id_seq'::regclass),
+  student_id integer NOT NULL,
+  relation character varying DEFAULT 'parent'::character varying CHECK (relation::text = ANY (ARRAY['parent'::character varying, 'father'::character varying, 'mother'::character varying, 'guardian'::character varying]::text[])),
+  name character varying,
+  phone character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT parent_info_pkey PRIMARY KEY (id),
+  CONSTRAINT parent_info_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+);
+CREATE TABLE public.scores (
+  id integer NOT NULL DEFAULT nextval('grades_id_seq'::regclass),
+  student_id integer NOT NULL,
+  class_subject_id integer NOT NULL,
+  academic_year character varying NOT NULL,
+  semester character varying NOT NULL,
+  score_data jsonb NOT NULL,
+  final_score text,
+  created_by integer,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scores_pkey PRIMARY KEY (id),
+  CONSTRAINT grades_class_subject_id_fkey FOREIGN KEY (class_subject_id) REFERENCES public.class_subjects(id),
+  CONSTRAINT grades_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT grades_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+);
+CREATE TABLE public.students (
+  id integer NOT NULL DEFAULT nextval('students_id_seq'::regclass),
+  student_id character varying NOT NULL UNIQUE,
+  full_name character varying NOT NULL,
+  email character varying,
+  phone character varying,
+  class_name character varying NOT NULL,
+  grade character varying NOT NULL,
+  date_of_birth date,
+  address text,
+  encoding_version character varying DEFAULT '2.0'::character varying,
+  face_samples_count integer DEFAULT 0,
+  profile_image character varying,
+  is_active boolean DEFAULT true,
+  recognition_enabled boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by integer,
+  updated_by integer,
+  subject_selected jsonb,
+  gender character varying DEFAULT 'Nam'::character varying CHECK (gender::text = ANY (ARRAY['Nam'::character varying, 'Nữ'::character varying, 'Khác'::character varying]::text[])),
+  received_email character varying,
+  CONSTRAINT students_pkey PRIMARY KEY (id),
+  CONSTRAINT students_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT students_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.subject_teachers (
+  id integer NOT NULL DEFAULT nextval('subject_teachers_id_seq'::regclass),
+  teacher_id integer NOT NULL,
+  subject_id integer NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT subject_teachers_pkey PRIMARY KEY (id),
+  CONSTRAINT subject_teachers_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id),
+  CONSTRAINT subject_teachers_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id)
+);
+CREATE TABLE public.subjects (
+  id integer NOT NULL DEFAULT nextval('subjects_id_seq'::regclass),
+  subject_code character varying NOT NULL UNIQUE,
+  subject_name character varying NOT NULL,
+  description text,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  is_mandatory boolean DEFAULT false,
+  score_column_config jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT subjects_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.system_settings (
+  id integer NOT NULL DEFAULT nextval('system_settings_id_seq'::regclass),
+  setting_key character varying NOT NULL UNIQUE,
+  setting_value text,
+  setting_type character varying DEFAULT 'string'::character varying CHECK (setting_type::text = ANY (ARRAY['string'::character varying::text, 'number'::character varying::text, 'boolean'::character varying::text, 'json'::character varying::text])),
+  description text,
+  category character varying DEFAULT 'general'::character varying,
+  is_readonly boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_settings_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.teachers (
+  id integer NOT NULL DEFAULT nextval('teachers_id_seq'::regclass),
+  teacher_code character varying NOT NULL UNIQUE,
+  full_name character varying NOT NULL,
+  email character varying UNIQUE,
+  phone character varying,
+  user_id integer,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  date_of_birth date,
+  gender character varying DEFAULT 'Nam'::character varying CHECK (gender::text = ANY (ARRAY['Nam'::character varying, 'Nữ'::character varying, 'Khác'::character varying]::text[])),
+  CONSTRAINT teachers_pkey PRIMARY KEY (id),
+  CONSTRAINT teachers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.users (
+  id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+  email character varying NOT NULL UNIQUE,
+  password_hash character varying NOT NULL,
+  full_name character varying NOT NULL,
+  role character varying DEFAULT 'teacher'::character varying CHECK (role::text = ANY (ARRAY['admin'::character varying::text, 'teacher'::character varying::text, 'homeroom_teacher'::character varying::text, 'staff'::character varying::text])),
+  is_active boolean DEFAULT true,
+  last_login timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  username character varying UNIQUE,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);

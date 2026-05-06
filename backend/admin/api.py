@@ -16,11 +16,22 @@ from admin.models import (
     ResponseModel
 )
 from admin.services import generate_student_id
+from admin.validators import (
+    validate_teacher_code, validate_full_name, validate_email,
+    validate_phone, validate_date_of_birth, validate_gender,
+    validate_subject_code, validate_subject_name, validate_score_column_config,
+    validate_username, validate_password, validate_role, validate_academic_year,
+    validate_class_name, validate_grade, validate_semester
+)
 from core.database import get_db
 from core.logger import setup_logger
 from core.dependencies import get_current_user
 from core.system_settings import get_current_academic_year
 from core.errors import handle_database_error
+from core.error_codes import (
+    TeacherErrorCode, SubjectErrorCode, UserErrorCode, ClassErrorCode,
+    ClassSubjectErrorCode, SubjectTeacherErrorCode, raise_validation_error
+)
 
 logger = setup_logger("admin_api")
 router = APIRouter()
@@ -65,33 +76,53 @@ async def create_user(
 ):
     """Tạo người dùng mới"""
     try:
-        # Kiểm tra username đã tồn tại chưa
+        # Validate required fields
+        email = validate_email(user_data.email)
+        password = validate_password(user_data.password, strict=False)
+        full_name = validate_full_name(user_data.full_name)
+        role = validate_role(user_data.role)
+        
+        # Check email uniqueness
+        existing_email = db.table("users").select("id").eq("email", email).execute()
+        if existing_email.data:
+            raise_validation_error(
+                UserErrorCode.USER_EMAIL_DUPLICATE,
+                f"Email '{email}' này đã được sử dụng",
+                field="email"
+            )
+        
+        # Validate and check username uniqueness if provided
         if user_data.username:
-            trimmed_username = user_data.username.strip()
-            if trimmed_username:
-                existing = db.table("users").select("id").eq("username", trimmed_username).execute()
-                if existing.data:
-                    raise HTTPException(status_code=400, detail="Username đã được sử dụng")
+            username = validate_username(user_data.username)
+            existing_username = db.table("users").select("id").eq("username", username).execute()
+            if existing_username.data:
+                raise_validation_error(
+                    UserErrorCode.USER_USERNAME_DUPLICATE,
+                    f"Tên đăng nhập '{username}' này đã tồn tại",
+                    field="username"
+                )
+        else:
+            username = None
         
         # Hash password
         password_hash = bcrypt.hashpw(
-            user_data.password.encode('utf-8'),
+            password.encode('utf-8'),
             bcrypt.gensalt()
         ).decode('utf-8')
         
         # Create user
         data = {
-            "email": user_data.email,
+            "email": email,
             "password_hash": password_hash,
-            "full_name": user_data.full_name,
-            "role": user_data.role,
+            "full_name": full_name,
+            "role": role,
             "is_active": user_data.is_active,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
         
-        if user_data.username:
-            data["username"] = user_data.username.strip()
+        if username:
+            data["username"] = username
         
         response = db.table("users").insert(data).execute()
         
@@ -118,20 +149,46 @@ async def update_user(
 ):
     """Cập nhật thông tin người dùng (với sync tự động sang teachers table)"""
     try:
-        # Kiểm tra username nếu thay đổi
+        # Check if user exists
+        user_check = db.table("users").select("id").eq("id", user_id).execute()
+        if not user_check.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+        
+        # Validate optional fields if provided
+        if user_data.email:
+            user_data.email = validate_email(user_data.email)
+            # Check email uniqueness - exclude this user
+            existing_email = db.table("users").select("id").eq("email", user_data.email).neq("id", user_id).execute()
+            if existing_email.data:
+                raise_validation_error(
+                    UserErrorCode.USER_EMAIL_DUPLICATE,
+                    f"Email '{user_data.email}' này đã được sử dụng",
+                    field="email"
+                )
+        
         if user_data.username:
-            trimmed_username = user_data.username.strip()
-            if trimmed_username:
-                existing = db.table("users").select("id").eq("username", trimmed_username).neq("id", user_id).execute()
-                if existing.data:
-                    raise HTTPException(status_code=400, detail="Username đã được sử dụng")
+            user_data.username = validate_username(user_data.username)
+            # Check username uniqueness - exclude this user
+            existing_username = db.table("users").select("id").eq("username", user_data.username).neq("id", user_id).execute()
+            if existing_username.data:
+                raise_validation_error(
+                    UserErrorCode.USER_USERNAME_DUPLICATE,
+                    f"Tên đăng nhập '{user_data.username}' này đã tồn tại",
+                    field="username"
+                )
+        
+        if user_data.password:
+            user_data.password = validate_password(user_data.password, strict=False)
+        
+        if user_data.role:
+            user_data.role = validate_role(user_data.role)
         
         # Build update data
         update_data = {}
         if user_data.email:
             update_data["email"] = user_data.email
         if user_data.username:
-            update_data["username"] = user_data.username.strip()
+            update_data["username"] = user_data.username
         if user_data.full_name:
             update_data["full_name"] = user_data.full_name
         if user_data.role:
@@ -350,11 +407,49 @@ async def create_teacher(
     admin_user=Depends(get_admin_user),
     db=Depends(get_db)
 ):
-    """Tạo giáo viên mới"""
+    """Tạo giáo viên mới với validation"""
     try:
+        # Validate required fields
+        full_name = validate_full_name(teacher_data.full_name)
+        
+        # Validate optional fields if provided
+        if teacher_data.teacher_code:
+            teacher_code = validate_teacher_code(teacher_data.teacher_code)
+        
+        if teacher_data.email:
+            email = validate_email(teacher_data.email)
+        
+        if teacher_data.phone:
+            phone = validate_phone(teacher_data.phone)
+        
+        if teacher_data.date_of_birth:
+            dob = validate_date_of_birth(teacher_data.date_of_birth)
+        
+        if teacher_data.gender:
+            gender = validate_gender(teacher_data.gender)
+        
+        # Validate user_id if provided
+        if teacher_data.user_id:
+            # Check if user exists
+            user_response = db.table("users").select("id, is_active").eq("id", teacher_data.user_id).execute()
+            if not user_response.data:
+                raise_validation_error(
+                    TeacherErrorCode.TEACHER_USER_NOT_FOUND,
+                    f"Người dùng với ID {teacher_data.user_id} không tồn tại",
+                    field="user_id"
+                )
+            
+            # Check if user is already linked to another teacher
+            existing_teacher = db.table("teachers").select("id").eq("user_id", teacher_data.user_id).execute()
+            if existing_teacher.data:
+                raise_validation_error(
+                    TeacherErrorCode.TEACHER_USER_ALREADY_LINKED,
+                    f"Người dùng này đã được liên kết với giáo viên khác",
+                    field="user_id"
+                )
         
         data = {
-            "full_name": teacher_data.full_name,
+            "full_name": full_name,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
@@ -362,15 +457,15 @@ async def create_teacher(
         if teacher_data.user_id:
             data["user_id"] = teacher_data.user_id
         if teacher_data.teacher_code:
-            data["teacher_code"] = teacher_data.teacher_code
+            data["teacher_code"] = teacher_code
         if teacher_data.email:
-            data["email"] = teacher_data.email
+            data["email"] = email
         if teacher_data.phone:
-            data["phone"] = teacher_data.phone
+            data["phone"] = phone
         if teacher_data.date_of_birth:
-            data["date_of_birth"] = str(teacher_data.date_of_birth)
+            data["date_of_birth"] = dob
         if teacher_data.gender:
-            data["gender"] = teacher_data.gender
+            data["gender"] = gender
         
         response = db.table("teachers").insert(data).execute()
         
@@ -401,7 +496,46 @@ async def update_teacher(
             raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
         
         teacher = teacher_current.data[0]
-        user_id = teacher.get("user_id")
+        current_user_id = teacher.get("user_id")
+        
+        # Validate optional fields if provided
+        if teacher_data.full_name:
+            teacher_data.full_name = validate_full_name(teacher_data.full_name)
+        
+        if teacher_data.teacher_code:
+            teacher_data.teacher_code = validate_teacher_code(teacher_data.teacher_code)
+        
+        if teacher_data.email:
+            teacher_data.email = validate_email(teacher_data.email)
+        
+        if teacher_data.phone:
+            teacher_data.phone = validate_phone(teacher_data.phone)
+        
+        if teacher_data.date_of_birth:
+            teacher_data.date_of_birth = validate_date_of_birth(teacher_data.date_of_birth)
+        
+        if teacher_data.gender:
+            teacher_data.gender = validate_gender(teacher_data.gender)
+        
+        # Validate user_id if being changed
+        if teacher_data.user_id and teacher_data.user_id != current_user_id:
+            # Check if new user exists
+            user_response = db.table("users").select("id, is_active").eq("id", teacher_data.user_id).execute()
+            if not user_response.data:
+                raise_validation_error(
+                    TeacherErrorCode.TEACHER_USER_NOT_FOUND,
+                    f"Người dùng với ID {teacher_data.user_id} không tồn tại",
+                    field="user_id"
+                )
+            
+            # Check if new user is already linked to another teacher (exclude this teacher)
+            existing_teacher = db.table("teachers").select("id").eq("user_id", teacher_data.user_id).neq("id", teacher_id).execute()
+            if existing_teacher.data:
+                raise_validation_error(
+                    TeacherErrorCode.TEACHER_USER_ALREADY_LINKED,
+                    f"Người dùng này đã được liên kết với giáo viên khác",
+                    field="user_id"
+                )
         
         update_data = {"updated_at": datetime.now().isoformat()}
         
@@ -417,6 +551,8 @@ async def update_teacher(
             update_data["date_of_birth"] = str(teacher_data.date_of_birth)
         if teacher_data.gender:
             update_data["gender"] = teacher_data.gender
+        if teacher_data.user_id:
+            update_data["user_id"] = teacher_data.user_id
         
         # Update teachers table
         response = db.table("teachers").update(update_data).eq("id", teacher_id).execute()
@@ -425,6 +561,7 @@ async def update_teacher(
             raise HTTPException(status_code=404, detail="Không tìm thấy giáo viên")
         
         # Sync full_name and email to users table if teacher has user_id
+        user_id = teacher_data.user_id or current_user_id
         if user_id:
             user_sync_data = {"updated_at": datetime.now().isoformat()}
             if teacher_data.full_name:
@@ -782,6 +919,22 @@ async def update_subject(
 ):
     """Cập nhật thông tin môn học"""
     try:
+        # Check if subject exists
+        subject_check = db.table("subjects").select("id").eq("id", subject_id).execute()
+        if not subject_check.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy môn học")
+        
+        # Validate optional fields if provided
+        if subject_data.subject_code:
+            subject_data.subject_code = validate_subject_code(subject_data.subject_code)
+        
+        if subject_data.subject_name:
+            subject_data.subject_name = validate_subject_name(subject_data.subject_name)
+        
+        # Validate score_column_config if provided
+        if subject_data.score_column_config:
+            subject_data.score_column_config = validate_score_column_config(subject_data.score_column_config)
+        
         update_data = {"updated_at": datetime.now().isoformat()}
         
         if subject_data.subject_code:
@@ -794,6 +947,8 @@ async def update_subject(
             update_data["is_mandatory"] = subject_data.is_mandatory
         if subject_data.is_active is not None:
             update_data["is_active"] = subject_data.is_active
+        if subject_data.score_column_config is not None:
+            update_data["score_column_config"] = subject_data.score_column_config
         
         response = db.table("subjects").update(update_data).eq("id", subject_id).execute()
         
@@ -1007,29 +1162,66 @@ async def create_class(
 ):
     """Tạo lớp học mới"""
     try:
-        # Kiểm tra giáo viên chủ nhiệm nếu có
+        # Validate required fields
+        class_name = validate_class_name(class_data.class_name)
+        grade = validate_grade(class_data.grade)
+        academic_year = validate_academic_year(class_data.academic_year)
+        
+        # Check class_name uniqueness within same academic year
+        existing_class_name = db.table("classes").select("id").eq(
+            "class_name", class_name
+        ).eq("academic_year", academic_year).execute()
+        if existing_class_name.data:
+            raise_validation_error(
+                ClassErrorCode.CLASS_NAME_DUPLICATE,
+                f"Lớp '{class_name}' đã tồn tại trong năm học {academic_year}",
+                field="class_name"
+            )
+        
+        # Validate homeroom_teacher_id if provided
         if class_data.homeroom_teacher_id:
-            # Tìm lớp mà giáo viên đang chủ nhiệm trong cùng năm học
-            existing_class = db.table("classes").select(
+            # Check teacher exists
+            teacher_check = db.table("teachers").select("id, is_active").eq(
+                "id", class_data.homeroom_teacher_id
+            ).execute()
+            if not teacher_check.data:
+                raise_validation_error(
+                    ClassErrorCode.CLASS_HOMEROOM_TEACHER_NOT_FOUND,
+                    f"Giáo viên với ID {class_data.homeroom_teacher_id} không tồn tại",
+                    field="homeroom_teacher_id"
+                )
+            
+            # Check teacher is active
+            if not teacher_check.data[0].get("is_active", True):
+                raise_validation_error(
+                    ClassErrorCode.CLASS_HOMEROOM_TEACHER_INACTIVE,
+                    "Giáo viên phải hoạt động để trở thành chủ nhiệm",
+                    field="homeroom_teacher_id"
+                )
+            
+            # Check teacher not already homeroom for another class in same year
+            existing_homeroom = db.table("classes").select(
                 "id, class_name, academic_year, teachers:homeroom_teacher_id(teacher_code, full_name)"
             ).eq("homeroom_teacher_id", class_data.homeroom_teacher_id).eq(
-                "academic_year", class_data.academic_year
+                "academic_year", academic_year
             ).eq("is_active", True).execute()
             
-            if existing_class.data:
-                teacher_info = existing_class.data[0].get("teachers", {})
+            if existing_homeroom.data:
+                teacher_info = existing_homeroom.data[0].get("teachers", {})
                 teacher_code = teacher_info.get("teacher_code", "")
                 teacher_name = teacher_info.get("full_name", "")
-                existing_class_name = existing_class.data[0].get("class_name", "")
-                year = existing_class.data[0].get("academic_year", "")
+                existing_class_name = existing_homeroom.data[0].get("class_name", "")
                 
-                error_msg = f"Giáo viên {teacher_code} {teacher_name} đang chủ nhiệm lớp {existing_class_name} ({year}). Mỗi giáo viên chỉ được chủ nhiệm 1 lớp trong 1 năm học."
-                raise HTTPException(status_code=400, detail=error_msg)
+                raise_validation_error(
+                    ClassErrorCode.CLASS_HOMEROOM_TEACHER_DUPLICATE,
+                    f"Giáo viên {teacher_code} {teacher_name} đang chủ nhiệm lớp {existing_class_name}. Mỗi giáo viên chỉ được chủ nhiệm 1 lớp trong 1 năm học.",
+                    field="homeroom_teacher_id"
+                )
         
         data = {
-            "class_name": class_data.class_name,
-            "grade": class_data.grade,
-            "academic_year": class_data.academic_year,
+            "class_name": class_name,
+            "grade": grade,
+            "academic_year": academic_year,
             "is_active": class_data.is_active,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
@@ -1070,8 +1262,31 @@ async def update_class(
         
         current_class_data = current_class.data[0]
         
+        # Validate optional fields if provided
+        if class_data.class_name:
+            class_data.class_name = validate_class_name(class_data.class_name)
+        
+        if class_data.grade:
+            class_data.grade = validate_grade(class_data.grade)
+        
+        if class_data.academic_year:
+            class_data.academic_year = validate_academic_year(class_data.academic_year)
+        
         # Xác định năm học sẽ dùng để kiểm tra (nếu có cập nhật năm học thì dùng năm mới, không thì dùng năm cũ)
         academic_year_to_check = class_data.academic_year if class_data.academic_year else current_class_data.get("academic_year")
+        
+        # Check class_name uniqueness per academic year - exclude self
+        if class_data.class_name:
+            existing_class_name = db.table("classes").select("id").eq(
+                "class_name", class_data.class_name
+            ).eq("academic_year", academic_year_to_check).neq("id", class_id).execute()
+            
+            if existing_class_name.data:
+                raise_validation_error(
+                    ClassErrorCode.CLASS_NAME_DUPLICATE,
+                    f"Tên lớp '{class_data.class_name}' này đã tồn tại trong năm học {academic_year_to_check}",
+                    field="class_name"
+                )
         
         # Kiểm tra giáo viên chủ nhiệm nếu có thay đổi
         if class_data.homeroom_teacher_id is not None:
@@ -1079,7 +1294,24 @@ async def update_class(
             current_teacher_id = current_class_data.get("homeroom_teacher_id")
             
             if class_data.homeroom_teacher_id != current_teacher_id:
-                # Tìm lớp mà giáo viên đang chủ nhiệm trong cùng năm học
+                # Check if teacher exists
+                teacher_check = db.table("teachers").select("id, is_active").eq("id", class_data.homeroom_teacher_id).execute()
+                if not teacher_check.data:
+                    raise_validation_error(
+                        ClassErrorCode.CLASS_HOMEROOM_TEACHER_NOT_FOUND,
+                        f"Giáo viên với ID {class_data.homeroom_teacher_id} không tồn tại",
+                        field="homeroom_teacher_id"
+                    )
+                
+                # Check if teacher is active
+                if not teacher_check.data[0].get("is_active", True):
+                    raise_validation_error(
+                        ClassErrorCode.CLASS_HOMEROOM_TEACHER_INACTIVE,
+                        "Giáo viên chủ nhiệm phải hoạt động",
+                        field="homeroom_teacher_id"
+                    )
+                
+                # Tìm lớp mà giáo viên đang chủ nhiệm trong cùng năm học (exclude self)
                 existing_class = db.table("classes").select(
                     "id, class_name, academic_year, teachers:homeroom_teacher_id(teacher_code, full_name)"
                 ).eq("homeroom_teacher_id", class_data.homeroom_teacher_id).eq(
@@ -1093,8 +1325,11 @@ async def update_class(
                     existing_class_name = existing_class.data[0].get("class_name", "")
                     year = existing_class.data[0].get("academic_year", "")
                     
-                    error_msg = f"Giáo viên {teacher_code} {teacher_name} đang chủ nhiệm lớp {existing_class_name} ({year}). Mỗi giáo viên chỉ được chủ nhiệm 1 lớp trong 1 năm học."
-                    raise HTTPException(status_code=400, detail=error_msg)
+                    raise_validation_error(
+                        ClassErrorCode.CLASS_HOMEROOM_TEACHER_DUPLICATE,
+                        f"Giáo viên {teacher_code} {teacher_name} đang chủ nhiệm lớp {existing_class_name} ({year}). Mỗi giáo viên chỉ được chủ nhiệm 1 lớp trong 1 năm học.",
+                        field="homeroom_teacher_id"
+                    )
         
         update_data = {"updated_at": datetime.now().isoformat()}
         
@@ -1267,6 +1502,36 @@ async def create_subject_teacher(
 ):
     """Phân công giáo viên dạy môn học"""
     try:
+        # Validate teacher exists
+        teacher_check = db.table("teachers").select("id, is_active").eq("id", assignment.teacher_id).execute()
+        if not teacher_check.data:
+            raise_validation_error(
+                SubjectTeacherErrorCode.SUBJECT_TEACHER_TEACHER_NOT_FOUND,
+                f"Giáo viên với ID {assignment.teacher_id} không tồn tại",
+                field="teacher_id"
+            )
+        if not teacher_check.data[0].get("is_active", True):
+            raise_validation_error(
+                SubjectTeacherErrorCode.SUBJECT_TEACHER_TEACHER_NOT_FOUND,
+                "Giáo viên phải hoạt động",
+                field="teacher_id"
+            )
+        
+        # Validate subject exists
+        subject_check = db.table("subjects").select("id, is_active").eq("id", assignment.subject_id).execute()
+        if not subject_check.data:
+            raise_validation_error(
+                SubjectTeacherErrorCode.SUBJECT_TEACHER_SUBJECT_NOT_FOUND,
+                f"Môn học với ID {assignment.subject_id} không tồn tại",
+                field="subject_id"
+            )
+        if not subject_check.data[0].get("is_active", True):
+            raise_validation_error(
+                SubjectTeacherErrorCode.SUBJECT_TEACHER_SUBJECT_NOT_FOUND,
+                "Môn học phải hoạt động",
+                field="subject_id"
+            )
+        
         # Kiểm tra xem phân công này đã tồn tại chưa (kể cả inactive)
         existing = db.table("subject_teachers").select("*").eq("teacher_id", assignment.teacher_id).eq("subject_id", assignment.subject_id).execute()
         
@@ -1320,6 +1585,61 @@ async def update_subject_teacher(
 ):
     """Cập nhật phân công giáo viên-môn học"""
     try:
+        # Check if subject_teacher exists
+        existing = db.table("subject_teachers").select("*").eq("id", subject_teacher_id).execute()
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy phân công")
+        
+        current_assignment = existing.data[0]
+        
+        # Validate teacher_id if provided and different from current
+        if assignment.teacher_id and assignment.teacher_id != current_assignment.get("teacher_id"):
+            teacher_check = db.table("teachers").select("id, is_active").eq("id", assignment.teacher_id).execute()
+            if not teacher_check.data:
+                raise_validation_error(
+                    SubjectTeacherErrorCode.SUBJECT_TEACHER_TEACHER_NOT_FOUND,
+                    f"Giáo viên với ID {assignment.teacher_id} không tồn tại",
+                    field="teacher_id"
+                )
+            if not teacher_check.data[0].get("is_active", True):
+                raise_validation_error(
+                    SubjectTeacherErrorCode.SUBJECT_TEACHER_TEACHER_NOT_FOUND,
+                    "Giáo viên phải hoạt động",
+                    field="teacher_id"
+                )
+        
+        # Validate subject_id if provided and different from current
+        if assignment.subject_id and assignment.subject_id != current_assignment.get("subject_id"):
+            subject_check = db.table("subjects").select("id, is_active").eq("id", assignment.subject_id).execute()
+            if not subject_check.data:
+                raise_validation_error(
+                    SubjectTeacherErrorCode.SUBJECT_TEACHER_SUBJECT_NOT_FOUND,
+                    f"Môn học với ID {assignment.subject_id} không tồn tại",
+                    field="subject_id"
+                )
+            if not subject_check.data[0].get("is_active", True):
+                raise_validation_error(
+                    SubjectTeacherErrorCode.SUBJECT_TEACHER_SUBJECT_NOT_FOUND,
+                    "Môn học phải hoạt động",
+                    field="subject_id"
+                )
+        
+        # Check for duplicate (teacher+subject) - exclude self
+        teacher_id = assignment.teacher_id or current_assignment.get("teacher_id")
+        subject_id = assignment.subject_id or current_assignment.get("subject_id")
+        
+        if teacher_id and subject_id:
+            duplicate_check = db.table("subject_teachers").select("id").eq(
+                "teacher_id", teacher_id
+            ).eq("subject_id", subject_id).neq("id", subject_teacher_id).execute()
+            
+            if duplicate_check.data:
+                raise_validation_error(
+                    SubjectTeacherErrorCode.SUBJECT_TEACHER_DUPLICATE,
+                    "Giáo viên này đã dạy môn học này rồi",
+                    field="subject_id"
+                )
+        
         update_data = {"updated_at": datetime.now().isoformat()}
         
         if assignment.teacher_id:
@@ -1506,12 +1826,87 @@ async def create_class_subject(
 ):
     """Phân công giáo viên dạy lớp-môn"""
     try:
+        # Validate academic_year and semester
+        academic_year = validate_academic_year(assignment.academic_year)
+        semester = validate_semester(assignment.semester)
+        
+        # Validate class exists
+        class_check = db.table("classes").select("id, is_active").eq("id", assignment.class_id).execute()
+        if not class_check.data:
+            raise_validation_error(
+                ClassSubjectErrorCode.CLASS_SUBJECT_CLASS_NOT_FOUND,
+                f"Lớp với ID {assignment.class_id} không tồn tại",
+                field="class_id"
+            )
+        if not class_check.data[0].get("is_active", True):
+            raise_validation_error(
+                ClassSubjectErrorCode.CLASS_SUBJECT_CLASS_NOT_FOUND,
+                "Lớp phải hoạt động",
+                field="class_id"
+            )
+        
+        # Validate subject exists
+        subject_check = db.table("subjects").select("id, is_active").eq("id", assignment.subject_id).execute()
+        if not subject_check.data:
+            raise_validation_error(
+                ClassSubjectErrorCode.CLASS_SUBJECT_SUBJECT_NOT_FOUND,
+                f"Môn học với ID {assignment.subject_id} không tồn tại",
+                field="subject_id"
+            )
+        if not subject_check.data[0].get("is_active", True):
+            raise_validation_error(
+                ClassSubjectErrorCode.CLASS_SUBJECT_SUBJECT_NOT_FOUND,
+                "Môn học phải hoạt động",
+                field="subject_id"
+            )
+        
+        # Validate teacher exists
+        if assignment.teacher_id:
+            teacher_check = db.table("teachers").select("id, is_active").eq("id", assignment.teacher_id).execute()
+            if not teacher_check.data:
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_TEACHER_NOT_FOUND,
+                    f"Giáo viên với ID {assignment.teacher_id} không tồn tại",
+                    field="teacher_id"
+                )
+            if not teacher_check.data[0].get("is_active", True):
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_TEACHER_NOT_FOUND,
+                    "Giáo viên phải hoạt động",
+                    field="teacher_id"
+                )
+            
+            # Check if teacher teaches the subject
+            teaches_check = db.table("subject_teachers").select("id").eq(
+                "teacher_id", assignment.teacher_id
+            ).eq("subject_id", assignment.subject_id).execute()
+            if not teaches_check.data:
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_TEACHER_NOT_TEACH_SUBJECT,
+                    "Giáo viên này không dạy môn học này",
+                    field="teacher_id"
+                )
+        
+        # Check for duplicate assignment
+        duplicate_check = db.table("class_subjects").select("id").eq(
+            "class_id", assignment.class_id
+        ).eq("subject_id", assignment.subject_id).eq(
+            "academic_year", academic_year
+        ).eq("semester", semester).execute()
+        
+        if duplicate_check.data:
+            raise_validation_error(
+                ClassSubjectErrorCode.CLASS_SUBJECT_DUPLICATE,
+                "Môn học này đã được phân công cho lớp này trong học kỳ này",
+                field="subject_id"
+            )
+        
         data = {
             "class_id": assignment.class_id,
             "subject_id": assignment.subject_id,
             "teacher_id": assignment.teacher_id,
-            "academic_year": assignment.academic_year,
-            "semester": assignment.semester,
+            "academic_year": academic_year,
+            "semester": semester,
             "is_active": assignment.is_active,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
@@ -1629,6 +2024,40 @@ async def bulk_update_class_subjects(
     5. Re-enable records for kept classes (in case they were disabled)
     """
     try:
+        # Validate required fields
+        if not bulk_update.record_ids:
+            raise_validation_error(
+                ClassSubjectErrorCode.CLASS_SUBJECT_REQUIRED_FIELD_MISSING,
+                "record_ids không được trống"
+            )
+        
+        if not bulk_update.selected_class_ids:
+            raise_validation_error(
+                ClassSubjectErrorCode.CLASS_SUBJECT_NO_CLASSES_SELECTED,
+                "Phải chọn ít nhất một lớp"
+            )
+        
+        # Validate academic_year and semester
+        if bulk_update.academic_year:
+            bulk_update.academic_year = validate_academic_year(bulk_update.academic_year)
+        
+        if bulk_update.semester:
+            bulk_update.semester = validate_semester(bulk_update.semester)
+        
+        # Validate all classes exist and belong to the academic year
+        classes_response = db.table("classes").select("id, class_name, academic_year").eq(
+            "academic_year", bulk_update.academic_year
+        ).execute()
+        valid_class_ids = [c["id"] for c in (classes_response.data or [])]
+        
+        for class_id in bulk_update.selected_class_ids:
+            if class_id not in valid_class_ids:
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_CLASS_NOT_FOUND,
+                    f"Lớp với ID {class_id} không tồn tại hoặc không thuộc năm học {bulk_update.academic_year}",
+                    field="selected_class_ids"
+                )
+        
         logger.debug(f"Bulk update request received")
         logger.debug(f"  record_ids: {bulk_update.record_ids} (type: {type(bulk_update.record_ids)})")
         logger.debug(f"  teacher_id: {bulk_update.teacher_id} (type: {type(bulk_update.teacher_id)})")
@@ -1636,9 +2065,6 @@ async def bulk_update_class_subjects(
         logger.debug(f"  academic_year: {bulk_update.academic_year}")
         logger.debug(f"  semester: {bulk_update.semester}")
         logger.debug(f"  selected_class_ids: {bulk_update.selected_class_ids}")
-        
-        if not bulk_update.record_ids:
-            raise HTTPException(status_code=400, detail="record_ids không được trống")
         
         # Get current assignments
         current_records = db.table("class_subjects").select("*").in_(
@@ -1743,13 +2169,109 @@ async def update_class_subject(
 ):
     """Cập nhật phân công lớp-môn"""
     try:
+        # Check if class_subject exists
+        existing = db.table("class_subjects").select("*").eq("id", class_subject_id).execute()
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy phân công")
+        
+        current_assignment = existing.data[0]
+        
+        # Validate fields if provided
+        if assignment.academic_year:
+            assignment.academic_year = validate_academic_year(assignment.academic_year)
+        
+        if assignment.semester:
+            assignment.semester = validate_semester(assignment.semester)
+        
+        # Validate class_id if provided and different from current
+        if assignment.class_id and assignment.class_id != current_assignment.get("class_id"):
+            class_check = db.table("classes").select("id, is_active").eq("id", assignment.class_id).execute()
+            if not class_check.data:
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_CLASS_NOT_FOUND,
+                    f"Lớp với ID {assignment.class_id} không tồn tại",
+                    field="class_id"
+                )
+            if not class_check.data[0].get("is_active", True):
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_CLASS_NOT_FOUND,
+                    "Lớp phải hoạt động",
+                    field="class_id"
+                )
+        
+        # Validate subject_id if provided and different from current
+        if assignment.subject_id and assignment.subject_id != current_assignment.get("subject_id"):
+            subject_check = db.table("subjects").select("id, is_active").eq("id", assignment.subject_id).execute()
+            if not subject_check.data:
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_SUBJECT_NOT_FOUND,
+                    f"Môn học với ID {assignment.subject_id} không tồn tại",
+                    field="subject_id"
+                )
+            if not subject_check.data[0].get("is_active", True):
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_SUBJECT_NOT_FOUND,
+                    "Môn học phải hoạt động",
+                    field="subject_id"
+                )
+        
+        # Validate teacher_id if provided and different from current
+        if assignment.teacher_id is not None and assignment.teacher_id != current_assignment.get("teacher_id"):
+            if assignment.teacher_id:  # Only validate if not None/0
+                teacher_check = db.table("teachers").select("id, is_active").eq("id", assignment.teacher_id).execute()
+                if not teacher_check.data:
+                    raise_validation_error(
+                        ClassSubjectErrorCode.CLASS_SUBJECT_TEACHER_NOT_FOUND,
+                        f"Giáo viên với ID {assignment.teacher_id} không tồn tại",
+                        field="teacher_id"
+                    )
+                if not teacher_check.data[0].get("is_active", True):
+                    raise_validation_error(
+                        ClassSubjectErrorCode.CLASS_SUBJECT_TEACHER_NOT_FOUND,
+                        "Giáo viên phải hoạt động",
+                        field="teacher_id"
+                    )
+                
+                # Check if teacher teaches the subject
+                if assignment.subject_id:
+                    teaches_check = db.table("subject_teachers").select("id").eq(
+                        "teacher_id", assignment.teacher_id
+                    ).eq("subject_id", assignment.subject_id).execute()
+                    if not teaches_check.data:
+                        raise_validation_error(
+                            ClassSubjectErrorCode.CLASS_SUBJECT_TEACHER_NOT_TEACH_SUBJECT,
+                            f"Giáo viên này không dạy môn học này",
+                            field="teacher_id"
+                        )
+        
+        # Check for duplicate assignment - exclude self
+        class_id = assignment.class_id or current_assignment.get("class_id")
+        subject_id = assignment.subject_id or current_assignment.get("subject_id")
+        teacher_id = assignment.teacher_id if assignment.teacher_id is not None else current_assignment.get("teacher_id")
+        academic_year = assignment.academic_year or current_assignment.get("academic_year")
+        semester = assignment.semester or current_assignment.get("semester")
+        
+        if class_id and subject_id:
+            duplicate_check = db.table("class_subjects").select("id").eq(
+                "class_id", class_id
+            ).eq("subject_id", subject_id).eq(
+                "academic_year", academic_year
+            ).eq("semester", semester).neq("id", class_subject_id).execute()
+            
+            if duplicate_check.data:
+                raise_validation_error(
+                    ClassSubjectErrorCode.CLASS_SUBJECT_DUPLICATE,
+                    f"Môn học này đã được phân công cho lớp này trong học kỳ này",
+                    field="subject_id"
+                )
+        
         update_data = {"updated_at": datetime.now().isoformat()}
         
         if assignment.class_id:
             update_data["class_id"] = assignment.class_id
         if assignment.subject_id:
             update_data["subject_id"] = assignment.subject_id
-        if assignment.teacher_id:
+        if assignment.teacher_id is not None:
             update_data["teacher_id"] = assignment.teacher_id
         if assignment.academic_year:
             update_data["academic_year"] = assignment.academic_year
@@ -2376,16 +2898,31 @@ async def bulk_import_students(
                     })
                     
                     # Nếu có class_info, insert vào homeroom_students_history (giống create_student_admin)
-                    if class_info:
+                    # If no class_info filter but student has class_name, look up the class for homeroom_students_history
+                    student_class_info = class_info
+                    
+                    if not student_class_info and final_class_name:
+                        # Look up class by final_class_name + academic_year (for Profile tab bulk import)
+                        lookup_resp = db.table("classes").select("id, homeroom_teacher_id").eq("class_name", final_class_name).eq("academic_year", import_data.academic_year).execute()
+                        if lookup_resp.data:
+                            student_class_info = lookup_resp.data[0]
+                            logger.debug(f"📍 Found class for student {student_record.ho_va_ten}: {final_class_name} (class_id={student_class_info['id']})")
+                    
+                    if student_class_info:
                         try:
-                            db.table("homeroom_students_history").insert({
-                                "teacher_id": class_info.get("homeroom_teacher_id"),
-                                "class_id": class_info["id"],
-                                "student_id": created_student["id"]
-                            }).execute()
-                            logger.debug(f"✅ Đã ghi vào homeroom_students_history cho học sinh {created_student['id']} (class_id={class_info['id']})")
+                            # Validate homeroom_teacher_id exists (same as single student creation)
+                            homeroom_teacher_id = student_class_info.get("homeroom_teacher_id")
+                            if homeroom_teacher_id:
+                                db.table("homeroom_students_history").insert({
+                                    "teacher_id": homeroom_teacher_id,
+                                    "class_id": student_class_info.get("id"),
+                                    "student_id": created_student["id"]
+                                }).execute()
+                                logger.debug(f"✅ Đã ghi vào homeroom_students_history cho học sinh {created_student['id']} (class_id={student_class_info.get('id')}, teacher_id={homeroom_teacher_id})")
+                            else:
+                                logger.warn(f"⚠️ Lớp {final_class_name} không có giáo viên chủ nhiệm. Không ghi vào homeroom_students_history cho học sinh {student_record.ho_va_ten}")
                         except Exception as hist_err:
-                            logger.warn(f"⚠️ Không thể ghi vào homeroom_students_history: {str(hist_err)}")
+                            logger.error(f"❌ Lỗi khi ghi vào homeroom_students_history cho học sinh {student_record.ho_va_ten}: {str(hist_err)}")
                 else:
                     errors.append(f"Không thể tạo học sinh: {student_record.ho_va_ten}")
                     error_count += 1
@@ -2417,6 +2954,180 @@ async def bulk_import_students(
 # ===============================================
 # DASHBOARD ANALYTICS ENDPOINTS
 # ===============================================
+
+@router.get("/dashboard/bootstrap")
+async def get_dashboard_bootstrap(
+    academic_year: str = Query(...),
+    period_days: int = Query(30),
+    admin_user=Depends(get_admin_user),
+    db=Depends(get_db)
+):
+    """
+    Bootstrap endpoint — returns all dashboard data in a single call:
+    overview stats, attendance trends, class performance, system health.
+    """
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+
+    result = {
+        "overview": None,
+        "attendance_trends": [],
+        "class_performance": [],
+        "infra_stats": None,
+    }
+
+    # Resolve the academic year's full date window
+    # Academic year format: "2024-2025"
+    try:
+        year_start_int = int(academic_year.split("-")[0])
+    except (ValueError, IndexError):
+        year_start_int = datetime.now().year
+
+    year_start_date = f"{year_start_int}-09-01"   # School year starts ~Sep 1
+    year_end_date = f"{year_start_int + 1}-06-30"  # School year ends ~Jun 30
+    today_str = datetime.now().date().isoformat()
+
+    # Full-year window: capped at today if this is the current or future year
+    full_year_end = min(year_end_date, today_str)
+    full_year_start = year_start_date
+
+    # Period window for attendance trends:
+    # period_days == 0  → use the full academic year span
+    # period_days  > 0  → use last N calendar days (only meaningful for current year)
+    if period_days == 0:
+        trend_start = full_year_start
+        trend_end = full_year_end
+    else:
+        trend_start = (datetime.now() - timedelta(days=period_days)).date().isoformat()
+        trend_end = today_str
+
+    # ── 1. Overview ──────────────────────────────────────────────────────────
+    try:
+        students_count = len(db.table("students").select("id").eq("is_active", True).execute().data or [])
+        classes_count = len(db.table("classes").select("id").eq("is_active", True).eq("academic_year", academic_year).execute().data or [])
+        teachers_count = len(db.table("teachers").select("id").eq("is_active", True).execute().data or [])
+
+        # Attendance rate = full academic year rate (not period-based)
+        att_resp = (
+            db.table("attendance")
+            .select("id, status")
+            .gte("date", full_year_start)
+            .lte("date", full_year_end)
+            .execute()
+        )
+        att_data = att_resp.data or []
+        present_count = sum(1 for a in att_data if a.get("status") == "present")
+        total_att = len(att_data)
+        attendance_rate = round(present_count / total_att * 100, 1) if total_att > 0 else 0
+
+        result["overview"] = {
+            "total_students": students_count,
+            "total_classes": classes_count,
+            "total_teachers": teachers_count,
+            "attendance_rate": attendance_rate,
+            "academic_year": academic_year,
+        }
+    except Exception as e:
+        logger.error(f"Bootstrap overview error: {e}", exc_info=True)
+
+    # ── 2. Attendance Trends ─────────────────────────────────────────────────
+    try:
+        att_resp2 = (
+            db.table("attendance")
+            .select("date, status")
+            .gte("date", trend_start)
+            .lte("date", trend_end)
+            .order("date", desc=False)
+            .execute()
+        )
+        daily_stats: dict = defaultdict(lambda: {"present": 0, "absent": 0})
+        for record in (att_resp2.data or []):
+            d = record.get("date", "")
+            s = record.get("status", "")
+            if s == "present":
+                daily_stats[d]["present"] += 1
+            else:
+                daily_stats[d]["absent"] += 1
+
+        trends = []
+        for d in sorted(daily_stats.keys()):
+            stats = daily_stats[d]
+            total_on_day = stats["present"] + stats["absent"]
+            rate = round(stats["present"] / total_on_day * 100, 1) if total_on_day > 0 else 0
+            trends.append({"date": d, "present": stats["present"], "absent": stats["absent"], "rate": rate})
+        result["attendance_trends"] = trends
+    except Exception as e:
+        logger.error(f"Bootstrap attendance trends error: {e}", exc_info=True)
+
+    # ── 3. Class Performance ─────────────────────────────────────────────────
+    try:
+        classes_resp = db.table("classes").select("id, class_name").eq("academic_year", academic_year).eq("is_active", True).execute()
+        performance = []
+        for cls in (classes_resp.data or []):
+            class_id = cls["id"]
+            class_name = cls["class_name"]
+
+            # Student count via students.class_name match
+            stu_resp = db.table("students").select("id").eq("class_name", class_name).eq("is_active", True).execute()
+            total_students_cls = len(stu_resp.data or [])
+
+            # Scores via class_subjects → scores
+            cs_resp = db.table("class_subjects").select("id").eq("class_id", class_id).eq("academic_year", academic_year).execute()
+            cs_ids = [cs["id"] for cs in (cs_resp.data or [])]
+
+            numeric_scores = []
+            if cs_ids:
+                scores_resp = db.table("scores").select("final_score").in_("class_subject_id", cs_ids).eq("academic_year", academic_year).execute()
+                for s in (scores_resp.data or []):
+                    fs = s.get("final_score")
+                    if fs:
+                        try:
+                            numeric_scores.append(float(fs))
+                        except (ValueError, TypeError):
+                            pass
+
+            if numeric_scores:
+                avg_score = round(sum(numeric_scores) / len(numeric_scores), 1)
+                excellent = sum(1 for v in numeric_scores if v >= 8.5)
+                good = sum(1 for v in numeric_scores if 7.0 <= v < 8.5)
+                average = sum(1 for v in numeric_scores if 5.5 <= v < 7.0)
+                poor = sum(1 for v in numeric_scores if v < 5.5)
+            else:
+                avg_score = excellent = good = average = poor = 0
+
+            performance.append({
+                "class_name": class_name,
+                "total_students": total_students_cls,
+                "average_score": avg_score,
+                "excellent_count": excellent,
+                "good_count": good,
+                "average_count": average,
+                "poor_count": poor,
+            })
+
+        performance.sort(key=lambda x: x["average_score"], reverse=True)
+        result["class_performance"] = performance
+    except Exception as e:
+        logger.error(f"Bootstrap class performance error: {e}", exc_info=True)
+
+    # ── 4. Infra Stats ───────────────────────────────────────────────────────
+    try:
+        subjects_count = len(db.table("subjects").select("id").eq("is_active", True).execute().data or [])
+        cameras_count = len(db.table("cameras").select("id").eq("enabled", True).execute().data or [])
+        students_with_face_resp = db.table("students").select("id").eq("is_active", True).gt("face_samples_count", 0).execute()
+        students_with_face = len(students_with_face_resp.data or [])
+
+        result["infra_stats"] = {
+            "total_subjects": subjects_count,
+            "total_cameras": cameras_count,
+            "students_with_face": students_with_face,
+        }
+    except Exception as e:
+        logger.error(f"Bootstrap infra stats error: {e}", exc_info=True)
+
+    logger.info(f"Dashboard bootstrap retrieved for academic_year={academic_year}, period_days={period_days}")
+    return {"success": True, "data": result}
+
 
 @router.get("/dashboard/overview")
 async def get_dashboard_overview(
@@ -2544,9 +3255,6 @@ async def get_attendance_trends(
     except Exception as e:
         logger.error(f"Error getting attendance trends: {str(e)}", exc_info=True)
         logger.error(f"Failed parameters - academic_year: {academic_year} (type: {type(academic_year)}), period_days: {period_days} (type: {type(period_days)})")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error getting attendance trends: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 

@@ -6,6 +6,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import HTTPException, RequestValidationError
 import time
 from fastapi import Request
 import jwt
@@ -318,5 +320,43 @@ def create_app() -> FastAPI:
             "docs": "/docs",
             "health": "/health"
         }
+    
+    # Custom exception handler for HTTPException with dict detail
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """Handle HTTPException with proper JSON serialization for dict details"""
+        # If detail is a dict (from our error response), return it as JSON
+        if isinstance(exc.detail, dict):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=exc.detail
+            )
+        # Otherwise, use default FastAPI behavior
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+    
+    # Custom exception handler for Pydantic validation errors
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(request: Request, exc: RequestValidationError):
+        """Handle Pydantic validation errors with detailed logging"""
+        logger.error(f"Validation Error on {request.url.path}: {exc.errors()}")
+        errors = exc.errors()
+        return JSONResponse(
+            status_code=422,
+            content={
+                "success": False,
+                "message": "Validation error",
+                "errors": [
+                    {
+                        "field": ".".join(str(e) for e in err["loc"][1:]),
+                        "message": err["msg"],
+                        "type": err["type"]
+                    }
+                    for err in errors
+                ]
+            }
+        )
     
     return app

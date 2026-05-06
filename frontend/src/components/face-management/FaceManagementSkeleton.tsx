@@ -57,7 +57,7 @@ export const StudentsTableSkeleton = () => (
         <div>
           <CardTitle className="flex items-center space-x-2">
             <Skeleton className="w-5 h-5 rounded" />
-            <span>Học sinh đã đăng ký khuôn mặt</span>
+            <span>Danh sách học sinh</span>
           </CardTitle>
         </div>
       </div>

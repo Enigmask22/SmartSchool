@@ -46,11 +46,15 @@ export const AdminManagementForm: React.FC<AdminManagementFormProps> = ({
     if (hook.activeTab === 'subjects' && scoreColumnHook) {
       const scoreColumnConfig: Record<string, any> = {};
       scoreColumnHook.scoreColumns.forEach((col: any) => {
-        scoreColumnConfig[col.key] = {
+        const columnData: any = {
           label: col.label,
           he_so: col.he_so,
-          data: col.data || null,
         };
+        // Only include data if the column has sub-columns
+        if (col.data && Object.keys(col.data).length > 0) {
+          columnData.data = col.data;
+        }
+        scoreColumnConfig[col.key] = columnData;
       });
       submitData = {
         ...form.formData,

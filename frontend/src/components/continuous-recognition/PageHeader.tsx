@@ -40,7 +40,7 @@ const PageHeader = ({
       title="Quản lý điểm danh tự động"
       description={description}
       icon={
-        <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
+        <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-green-500 flex-shrink-0">
           <Camera className="w-8 h-8 text-white" />
         </div>
       }

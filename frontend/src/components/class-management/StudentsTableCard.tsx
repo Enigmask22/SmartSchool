@@ -10,6 +10,10 @@ import {
   Edit,
   Search,
   ChevronLeft,
+  ArrowUp,
+  ArrowDown,
+  Link2,
+  X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -58,11 +62,22 @@ interface StudentsTableCardProps {
   handleEditStudent: (student: StudentData) => void;
   onEditStudent?: (student: StudentData) => void; // For opening modal in parent
   handleDeleteStudent: (id: number) => void;
+  handleRemoveFromClass?: (id: number) => void; // NEW: for distribution tab delete
   handleRestore: (student: StudentData, onSuccess?: () => void) => Promise<void>;
   handlePermanentDeleteStudent: (id: number, name: string) => void;
   showInactiveStudents: boolean;
   setShowInactiveStudents: (value: boolean) => void;
   initialLoading?: boolean;
+  tabMode?: 'profiles' | 'distribution'; // NEW: which tab is active
+  sortState?: { field: string; direction: 'asc' | 'desc' }; // NEW: sorting state
+  onSort?: (field: string) => void; // NEW: sorting handler
+  onAssignToClass?: (student: StudentData) => void; // NEW: assign to class handler
+  // Profiles tab specific props
+  profilesGradeFilter?: string;
+  onProfilesGradeFilterChange?: (value: string) => void;
+  onProfilesClearFilters?: () => void;
+  profilesFilterStatus?: 'active' | 'inactive' | 'all';
+  onProfilesFilterStatusChange?: (value: 'active' | 'inactive' | 'all') => void;
 }
 
 const StudentsTableCard = ({
@@ -89,11 +104,21 @@ const StudentsTableCard = ({
   handleEditStudent,
   onEditStudent,
   handleDeleteStudent,
+  handleRemoveFromClass,
   handleRestore,
   handlePermanentDeleteStudent,
   showInactiveStudents,
   setShowInactiveStudents,
   initialLoading = false,
+  tabMode = 'distribution',
+  sortState,
+  onSort,
+  onAssignToClass,
+  profilesGradeFilter,
+  onProfilesGradeFilterChange,
+  onProfilesClearFilters,
+  profilesFilterStatus,
+  onProfilesFilterStatusChange,
 }: StudentsTableCardProps) => {
   // Show loading skeleton during initial data load or when no class selected but data loading
   if (initialLoading || (loadingClassData && !selectedClassForManagement && !error && paginatedStudents.length === 0)) {
@@ -101,12 +126,12 @@ const StudentsTableCard = ({
       <div className="p-6 transition-shadow duration-200 bg-white border-2 shadow-md rounded-2xl border-gray-100 hover:shadow-lg">
         {/* Header */}
         <div className="flex items-start gap-3 pb-4 mb-4 border-b border-gray-200">
-          <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
+          {/* <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
             <Users className="text-blue-600 w-6 h-6" />
-          </div>
+          </div> */}
           <div>
-            <h3 className="font-semibold text-lg text-gray-900">Danh sách học sinh</h3>
-            <p className="text-xs text-gray-500 mt-1">Đang tải dữ liệu...</p>
+            <h3 className="font-semibold text-2xl text-gray-900">Danh sách học sinh</h3>
+            <p className="text-sm text-gray-500 mt-1">Đang tải dữ liệu...</p>
           </div>
         </div>
 
@@ -149,18 +174,18 @@ const StudentsTableCard = ({
     );
   }
 
-  // Show empty state if no class selected
-  if (!selectedClassForManagement) {
+  // Show empty state if no class selected (for distribution tab only)
+  if (!selectedClassForManagement && tabMode === 'distribution') {
     return (
       <div className="p-6 transition-shadow duration-200 bg-white border-2 shadow-md rounded-2xl border-gray-50 hover:shadow-lg">
         {/* Header */}
         <div className="flex items-start gap-3 pb-6 mb-6 border-b border-gray-200">
-          <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
+          {/* <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
             <Users className="text-blue-600 w-6 h-6" />
-          </div>
+          </div> */}
           <div>
-            <h3 className="font-semibold text-lg text-gray-900">Danh sách học sinh</h3>
-            <p className="text-xs text-gray-500 mt-1">Chọn lớp học để xem danh sách học sinh</p>
+            <h3 className="font-semibold text-2xl text-gray-900">Danh sách học sinh</h3>
+            <p className="text-sm text-gray-500 mt-1">Chọn lớp học để xem danh sách học sinh</p>
           </div>
         </div>
 
@@ -185,58 +210,74 @@ const StudentsTableCard = ({
       {/* Header */}
       <div className="flex items-start justify-between gap-4 pb-4 mb-4 border-b border-gray-200">
         <div className="flex items-start gap-3 flex-1">
-          <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
+          {/* <div className="flex items-center justify-center bg-blue-100 w-12 h-12 rounded-xl flex-shrink-0">
             <Users className="text-blue-600 w-6 h-6" />
-          </div>
+          </div> */}
           <div>
-            <h3 className="font-semibold text-lg text-gray-900">Danh sách học sinh</h3>
-            <p className="text-xs text-gray-500 mt-1">{totalStudents} học sinh {searchTerm && `(tìm kiếm: "${searchTerm}")`}</p>
+            <h3 className="font-semibold text-2xl text-gray-900">Danh sách học sinh</h3>
+            <p className="text-sm text-gray-500 mt-1">{totalStudents} học sinh {searchTerm && `(tìm kiếm: "${searchTerm}")`}</p>
           </div>
         </div>
         <div className="flex items-center flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={downloadStudentTemplate}
-            size="sm"
-            className="flex items-center gap-1"
-          >
-            <Download className="w-4 h-4" />
-            <span>Tải template</span>
-          </Button>
-          <Button
-            variant="outline"
-            asChild
-            size="sm"
-            className="flex items-center gap-1"
-          >
-            <label className="cursor-pointer">
-              <Upload className="w-4 h-4" />
-              <span>Nhập</span>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-          </Button>
-          <Button
-            onClick={onAddStudent}
-            size="sm"
-            className="flex items-center gap-1"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onMoveClass}
-            size="sm"
-            className="flex items-center gap-1"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span>Chuyển</span>
-          </Button>
+          {tabMode === 'profiles' && (
+            <>
+              <Button
+                variant="outline"
+                onClick={downloadStudentTemplate}
+                size="sm"
+                className="flex items-center gap-1 border-green-500 text-green-600 hover:bg-green-50"
+              >
+                <Download className="w-4 h-4" />
+                <span>Tải template</span>
+              </Button>
+              <Button
+                variant="outline"
+                asChild
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <label className="cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  <span>Nhập danh sách</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </Button>
+              <Button
+                onClick={onAddStudent}
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm hồ sơ</span>
+              </Button>
+              {/* <Button
+                onClick={() => onAssignToClass && onAssignToClass({} as StudentData)}
+                size="sm"
+                variant="secondary"
+                className="flex items-center gap-1"
+                title="Assign students to classes"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm vào lớp</span>
+              </Button> */}
+            </>
+          )}
+          {tabMode === 'distribution' && (
+            <Button
+              variant="outline"
+              onClick={onMoveClass}
+              size="sm"
+              className="flex items-center gap-1"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Chuyển</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -254,22 +295,110 @@ const StudentsTableCard = ({
         </div>
 
         {/* Show Inactive Students Checkbox */}
-        <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
-          <input
-            type="checkbox"
-            id="show-inactive"
-            checked={showInactiveStudents}
-            onChange={(e) => setShowInactiveStudents(e.target.checked)}
-            className="w-4 h-4 rounded text-blue-600 bg-background border-gray-300 focus:ring-2 focus:ring-blue-300 focus:ring-offset-0 cursor-pointer"
-          />
-          <label
-            htmlFor="show-inactive"
-            className="text-sm font-medium text-gray-700 cursor-pointer whitespace-nowrap"
-          >
-            Hiển thị học sinh đã xóa
-          </label>
-        </div>
+        {!tabMode || tabMode === 'distribution' ? (
+          <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
+            <input
+              type="checkbox"
+              id="show-inactive"
+              checked={showInactiveStudents}
+              onChange={(e) => setShowInactiveStudents(e.target.checked)}
+              className="w-4 h-4 rounded text-blue-600 bg-background border-gray-300 focus:ring-2 focus:ring-blue-300 focus:ring-offset-0 cursor-pointer"
+            />
+            <label
+              htmlFor="show-inactive"
+              className="text-sm font-medium text-gray-700 cursor-pointer whitespace-nowrap"
+            >
+              Hiển thị học sinh đã xóa
+            </label>
+          </div>
+        ) : (
+          <div className="flex items-center px-4 py-2 space-x-2 rounded-lg bg-muted">
+            <input
+              type="checkbox"
+              id="profiles-show-all"
+              checked={profilesFilterStatus === 'all' || profilesFilterStatus === 'inactive'}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  onProfilesFilterStatusChange?.('all');
+                } else {
+                  onProfilesFilterStatusChange?.('active');
+                }
+              }}
+              className="w-4 h-4 rounded text-blue-600 bg-background border-gray-300 focus:ring-2 focus:ring-blue-300 focus:ring-offset-0 cursor-pointer"
+            />
+            <label
+              htmlFor="profiles-show-all"
+              className="text-sm font-medium text-gray-700 cursor-pointer whitespace-nowrap"
+            >
+              Hiển thị tất cả
+            </label>
+          </div>
+        )}
       </div>
+
+      {/* Profiles-specific Filters */}
+      {tabMode === 'profiles' && (
+        <div className="flex flex-wrap gap-3 p-4 rounded-lg border bg-card mb-4">
+          <div className="max-w-[240px]">
+            <label className="text-xs font-medium text-muted-foreground block mb-1">
+              Khối
+            </label>
+            <Select
+              value={String(profilesGradeFilter || 'all')}
+              onValueChange={(value) =>
+                onProfilesGradeFilterChange?.(value === 'all' ? '' : value)
+              }
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả khối</SelectItem>
+                <SelectItem value="10">Khối 10</SelectItem>
+                <SelectItem value="11">Khối 11</SelectItem>
+                <SelectItem value="12">Khối 12</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="max-w-[240px]">
+            <label className="text-xs font-medium text-muted-foreground block mb-1">
+              Trạng thái
+            </label>
+            <Select
+              value={String(profilesFilterStatus || 'active')}
+              onValueChange={(value) =>
+                onProfilesFilterStatusChange?.(value as 'active' | 'inactive' | 'all')
+              }
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Hoạt động</SelectItem>
+                <SelectItem value="inactive">Lưu trữ</SelectItem>
+                <SelectItem value="all">Tất cả</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Clear Filters Button */}
+          {(profilesGradeFilter || profilesFilterStatus !== 'active') && (
+            <div className="flex items-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onProfilesClearFilters}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Xóa bộ lọc
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {loadingClassData ? (
         <div>
           <Table>
@@ -356,12 +485,40 @@ const StudentsTableCard = ({
                       className="cursor-pointer w-4 h-4"
                     />
                   </TableHead>
-                  <TableHead className="text-center text-md font-semibold text-gray-600 uppercase relative py-3">
-                    MÃ SỐ
+                  <TableHead
+                    className={`text-center text-md font-semibold text-gray-600 uppercase relative py-3 ${
+                      tabMode === 'profiles' && onSort ? 'cursor-pointer hover:bg-gray-100' : ''
+                    }`}
+                    onClick={() => tabMode === 'profiles' && onSort?.('student_id')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <span>MÃ SỐ</span>
+                      {tabMode === 'profiles' && sortState?.field === 'student_id' && (
+                        sortState?.direction === 'asc' ? (
+                          <ArrowUp className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ArrowDown className="w-4 h-4 text-primary" />
+                        )
+                      )}
+                    </div>
                     <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                   </TableHead>
-                  <TableHead className="text-center text-md  font-semibold text-gray-600 uppercase relative py-3">
-                    HỌ TÊN
+                  <TableHead
+                    className={`text-center text-md font-semibold text-gray-600 uppercase relative py-3 ${
+                      tabMode === 'profiles' && onSort ? 'cursor-pointer hover:bg-gray-100' : ''
+                    }`}
+                    onClick={() => tabMode === 'profiles' && onSort?.('full_name')}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <span>HỌ TÊN</span>
+                      {tabMode === 'profiles' && sortState?.field === 'full_name' && (
+                        sortState?.direction === 'asc' ? (
+                          <ArrowUp className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ArrowDown className="w-4 h-4 text-primary" />
+                        )
+                      )}
+                    </div>
                     <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                   </TableHead>
                   <TableHead className="text-center text-md  font-semibold text-gray-600 uppercase relative py-3">
@@ -425,7 +582,7 @@ const StudentsTableCard = ({
                       <div className="absolute right-0 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
                     </TableCell>
                     <TableCell>
-                      <div className="flex space-x-2 justify-center">
+                      <div className="flex space-x-2 justify-center flex-wrap gap-1">
                         {student.is_active === false ? (
                           <>
                             <Button
@@ -459,27 +616,68 @@ const StudentsTableCard = ({
                           </>
                         ) : (
                           <>
-                            <Button
-                              onClick={() => {
-                                handleEditStudent(student);
-                                onEditStudent?.(student);
-                              }}
-                              variant="outline"
-                              size="sm"
-                              className="text-primary hover:bg-primary/10 border-primary/20"
-                              title="Chỉnh sửa"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              onClick={() => handleDeleteStudent(student.id)}
-                              variant="outline"
-                              size="sm"
-                              className="text-destructive hover:bg-destructive/10 border-destructive/20"
-                              title="Xóa tạm thời"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {tabMode === 'profiles' ? (
+                              // Tab 1: Profiles - Show Edit, Delete, and Assign (if unassigned)
+                              <>
+                                <Button
+                                  onClick={() => {
+                                    handleEditStudent(student);
+                                    onEditStudent?.(student);
+                                  }}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-primary hover:bg-primary/10 border-primary/20"
+                                  title="Chỉnh sửa"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                {!student.class_name && (
+                                  <Button
+                                    onClick={() => onAssignToClass?.(student)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                                    title="Phân công lớp"
+                                  >
+                                    <Link2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive hover:bg-destructive/10 border-destructive/20"
+                                  title="Xóa tạm thời"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              // Tab 2: Distribution - Show Edit, Remove from Class
+                              <>
+                                <Button
+                                  onClick={() => {
+                                    handleEditStudent(student);
+                                    onEditStudent?.(student);
+                                  }}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-primary hover:bg-primary/10 border-primary/20"
+                                  title="Chỉnh sửa"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleRemoveFromClass?.(student.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive hover:bg-destructive/10 border-destructive/20"
+                                  title="Xóa khỏi lớp"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
                           </>
                         )}
                       </div>

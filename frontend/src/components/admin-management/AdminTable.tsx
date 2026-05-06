@@ -133,7 +133,8 @@ export function AdminTable({
           key,
           label: value.label as string,
           he_so: value.he_so as number,
-          data: (value.data as any) || null,
+          data: (value.data as any) || undefined,
+          hasSubColumns: !!(value.data && Object.keys(value.data).length > 0),
         }));
         scoreColumnHookLocal?.setScoreColumns(columnsArray);
       } else {

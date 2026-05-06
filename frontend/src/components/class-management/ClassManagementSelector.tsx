@@ -5,10 +5,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 //import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight, Users, User, FolderOpen, Download, Upload, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ChevronRight, Users, User, FolderOpen } from 'lucide-react';
 
 interface ClassInfo {
   id: number;
@@ -30,20 +36,20 @@ interface ClassManagementSelectorProps {
   academicYear: string;
   onSelect: (classInfo: ClassInfo) => void;
   loading?: boolean;
-  downloadStudentTemplate?: () => void;
-  handleFileUpload?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onAddStudent?: () => void;
+  academicYearOptions?: string[];
+  onAcademicYearChange?: (year: string) => void;
+  onGradeChange?: (grade: string) => void;
 }
 
 export default function ClassManagementSelector({
   classes,
   selectedGrade,
-  //academicYear,
+  academicYear,
   onSelect,
   loading = false,
-  downloadStudentTemplate,
-  handleFileUpload,
-  onAddStudent,
+  academicYearOptions = [],
+  onAcademicYearChange,
+  onGradeChange,
 }: ClassManagementSelectorProps) {
   // Filter classes by selected grade
   const filteredClasses = selectedGrade 
@@ -53,56 +59,46 @@ export default function ClassManagementSelector({
   return (
     <Card className="shadow-md border-gray-200">
       <CardHeader className="border-b border-gray-200">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex justify-between items-start">
           <div className="text-left">
-            <CardTitle className="text-xl font-bold text-gray-900">
+            <CardTitle className="text-2xl font-semibold text-gray-900">
               Danh sách lớp học
             </CardTitle>
             <CardDescription className="text-gray-600">
               Lựa chọn lớp để quản lý học sinh
             </CardDescription>
           </div>
-          <div className="flex items-center flex-wrap gap-2">
-            {downloadStudentTemplate && (
-              <Button
-                variant="outline"
-                onClick={downloadStudentTemplate}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                <Download className="w-4 h-4" />
-                <span>Tải template</span>
-              </Button>
-            )}
-            {handleFileUpload && (
-              <Button
-                variant="outline"
-                asChild
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                <label className="cursor-pointer">
-                  <Upload className="w-4 h-4" />
-                  <span>Nhập</span>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-              </Button>
-            )}
-            {onAddStudent && (
-              <Button
-                onClick={onAddStudent}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Thêm</span>
-              </Button>
-            )}
+          {/* Filters in Header */}
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-700 whitespace-nowrap flex-shrink-0">Năm học</label>
+              <Select value={academicYear || ''} onValueChange={onAcademicYearChange}>
+                <SelectTrigger className="min-w-[120px] focus-visible:outline-none">
+                  <SelectValue placeholder="Chọn năm học" />
+                </SelectTrigger>
+                <SelectContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {academicYearOptions.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-700 whitespace-nowrap flex-shrink-0">Khối</label>
+              <Select value={String(selectedGrade || 'all')} onValueChange={(value) => onGradeChange?.(value === 'all' ? '' : value)}>
+                <SelectTrigger className="min-w-[100px] focus-visible:outline-none">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <SelectItem value="all">Tất cả khối</SelectItem>
+                  <SelectItem value="10">Khối 10</SelectItem>
+                  <SelectItem value="11">Khối 11</SelectItem>
+                  <SelectItem value="12">Khối 12</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </CardHeader>
