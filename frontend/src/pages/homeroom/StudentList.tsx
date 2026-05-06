@@ -203,7 +203,11 @@ export function StudentListPage() {
         onClose={feedback.closeFeedbackModal}
         smsLoading={feedback.smsLoading}
         exportStudentReportCard={studentList.exportStudentReportCard}
-        openEmailDialog={() => studentList.setShowEmailDialog(true)}
+        openEmailDialog={(student) => {
+          if (student) {
+            studentList.openEmailDialog(student);
+          }
+        }}
       />
 
       <EmailReportCardModal

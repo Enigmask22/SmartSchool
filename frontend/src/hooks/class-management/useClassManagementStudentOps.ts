@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import api from '@/utils/api';
@@ -16,6 +16,7 @@ export interface StudentFormData {
   email: string;
   phone: string;
   received_email: string;
+  academic_year: string;
   class_name: string;
   grade: string;
   class_id: number | null;
@@ -56,6 +57,7 @@ export interface ImportedGradeRow {
   ngay_sinh: string;
   gioi_tinh: string;
   dia_chi: string;
+  nam_nhap_hoc: string;
   ten_phu_huynh?: string;
   sdt_phu_huynh?: string;
   ten_bo?: string;
@@ -71,6 +73,7 @@ const INITIAL_FORM_DATA: StudentFormData = {
   email: '',
   phone: '',
   received_email: '',
+  academic_year: '',
   class_name: '',
   grade: '',
   class_id: null,
@@ -114,6 +117,15 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
 
   // Restore loading
   const [restoreLoading, setRestoreLoading] = useState(false);
+
+  // Refs for callbacks to avoid stale closures in dialog confirmations
+  const deleteSuccessCallbackRef = useRef<(() => void) | undefined>(undefined);
+  const deleteCloseCallbackRef = useRef<(() => void) | undefined>(undefined);
+  const permanentDeleteSuccessCallbackRef = useRef<(() => void) | undefined>(undefined);
+  const permanentDeleteCloseCallbackRef = useRef<(() => void) | undefined>(undefined);
+  const removeFromClassSuccessCallbackRef = useRef<(() => void) | undefined>(undefined);
+  const removeFromClassCloseCallbackRef = useRef<(() => void) | undefined>(undefined);
+  const restoreSuccessCallbackRef = useRef<(() => void) | undefined>(undefined);
 
   // =============== Form Handlers ===============
   const handleStudentFormChange = (field: string, value: any) => {
@@ -196,12 +208,16 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
       newErrors.full_name = 'Họ tên là bắt buộc';
     }
 
-    if (!studentFormData.class_name.trim()) {
-      newErrors.class_name = 'Lớp học là bắt buộc';
+    if (!studentFormData.academic_year.trim()) {
+      newErrors.academic_year = 'Năm học là bắt buộc';
     }
 
     if (!studentFormData.grade.trim()) {
       newErrors.grade = 'Khối là bắt buộc';
+    }
+
+    if (!studentFormData.class_name.trim()) {
+      newErrors.class_name = 'Lớp học là bắt buộc';
     }
 
     if (studentFormData.email && !/\S+@\S+\.\S+/.test(studentFormData.email)) {
@@ -277,25 +293,33 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
 
     setStudentFormLoading(true);
     try {
-      const studentId = await generateStudentId(studentFormData.grade, academicYear);
+      // Use academic_year from form data if available, otherwise use parameter
+      const yearForGeneration = studentFormData.academic_year || academicYear;
+      const studentId = await generateStudentId(studentFormData.grade, yearForGeneration);
 
       const studentData = {
         student_id: studentId,
         ...studentFormData,
-        force_create: forceCreateEnabled,  // NEW: include force_create flag
+        force_create: forceCreateEnabled,
       };
 
-      const nullableFields = ['received_email'];
+      // Convert empty strings to null for optional fields
+      const nullableFields = ['received_email', 'date_of_birth', 'email', 'phone', 'address'];
       const cleanData: any = {};
       for (const key in studentData) {
         if (nullableFields.includes(key) && !studentData[key]) {
           cleanData[key] = null;
+        } else if (key === 'parent_contacts' && Array.isArray(studentData[key])) {
+          // Filter out parent contacts with no name and no phone
+          cleanData[key] = studentData[key].filter((contact: any) => 
+            (contact.name && contact.name.trim()) || (contact.phone && contact.phone.trim())
+          );
         } else {
           cleanData[key] = studentData[key];
         }
       }
 
-      const response = await api.post('/students', cleanData);
+      const response = await api.post('/students/', cleanData);
 
       if (response.success) {
         toast.success('Thêm học sinh thành công!');
@@ -357,30 +381,69 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
   };
 
   const handleDeleteStudent = (studentId: number, onOpenConfirm: (config: any) => void, onCloseConfirm?: () => void, onSuccess?: () => void) => {
+    logger.debug('[handleDeleteStudent] Opening confirm dialog for studentId:', studentId);
+    logger.debug('[handleDeleteStudent] onSuccess provided:', !!onSuccess, 'ref before set:', !!deleteSuccessCallbackRef.current);
+    // Store callbacks in refs to avoid stale closure when onConfirm runs
+    deleteSuccessCallbackRef.current = onSuccess;
+    deleteCloseCallbackRef.current = onCloseConfirm;
+    logger.debug('[handleDeleteStudent] Ref after set:', !!deleteSuccessCallbackRef.current);
     onOpenConfirm({
       title: 'Vô hiệu học sinh',
       description: 'Bạn có chắc muốn vô hiệu hóa học sinh này?',
       confirmText: 'Vô hiệu hóa',
       onConfirm: async () => {
+        logger.debug('[handleDeleteStudent] Confirm clicked, calling API...');
+        logger.debug('[handleDeleteStudent] Ref value when confirm clicked:', !!deleteSuccessCallbackRef.current);
         try {
           const response = await api.request(`/students/${studentId}`, {
             method: 'DELETE',
           });
+          logger.debug('[handleDeleteStudent] API response:', response);
           if (response.success) {
             toast.success('Vô hiệu hóa học sinh thành công!');
-            onSuccess?.();
-            onCloseConfirm?.();
+            logger.debug('[handleDeleteStudent] About to call ref callback, exists:', !!deleteSuccessCallbackRef.current);
+            deleteSuccessCallbackRef.current?.();
+            logger.debug('[handleDeleteStudent] After ref callback call');
+            deleteCloseCallbackRef.current?.();
           }
         } catch (error: any) {
           logger.error('Error deactivating student:', error);
-          
-          // NEW: Handle 409 Conflict (student in class)
-          if (error.response?.status === 409) {
-            toast.error(error.response?.data?.detail || 'Không thể xóa học sinh đang trong lớp');
-          } else {
-            toast.error('Lỗi khi vô hiệu hóa học sinh!');
+          toast.error('Lỗi khi vô hiệu hóa học sinh!');
+          deleteCloseCallbackRef.current?.();
+        }
+      },
+    });
+  };
+
+  const handleRemoveFromClass = (
+    studentId: number,
+    classId: number,
+    onOpenConfirm: (config: any) => void,
+    onCloseConfirm?: () => void,
+    onSuccess?: () => void,
+  ) => {
+    // Store callbacks in refs to avoid stale closure when onConfirm runs
+    removeFromClassSuccessCallbackRef.current = onSuccess;
+    removeFromClassCloseCallbackRef.current = onCloseConfirm;
+    onOpenConfirm({
+      title: 'Xóa học sinh khỏi lớp',
+      description: 'Bạn có chắc muốn xóa học sinh khỏi lớp này? Học sinh sẽ được chuyển sang lớp khác nếu có hoặc xóa nếu không có lớp nào khác.',
+      confirmText: 'Xác nhận',
+      onConfirm: async () => {
+        try {
+          const response = await api.request(`/students/${studentId}/from-class/${classId}`, {
+            method: 'DELETE',
+          });
+          if (response.success) {
+            toast.success(response.message || 'Xóa học sinh khỏi lớp thành công!');
+            removeFromClassSuccessCallbackRef.current?.();
+            removeFromClassCloseCallbackRef.current?.();
           }
-          onCloseConfirm?.();
+        } catch (error: any) {
+          logger.error('Error removing student from class:', error);
+          const errorMessage = error.response?.data?.detail || 'Lỗi khi xóa học sinh khỏi lớp!';
+          toast.error(errorMessage);
+          removeFromClassCloseCallbackRef.current?.();
         }
       },
     });
@@ -393,6 +456,9 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
     onCloseConfirm?: () => void,
     onSuccess?: () => void,
   ) => {
+    // Store callbacks in refs to avoid stale closure when onConfirm runs
+    permanentDeleteSuccessCallbackRef.current = onSuccess;
+    permanentDeleteCloseCallbackRef.current = onCloseConfirm;
     onOpenConfirm({
       title: 'Xóa học sinh',
       description: `Bạn có chắc muốn xóa vĩnh viễn học sinh "${studentName}"?`,
@@ -400,22 +466,24 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
       variant: 'destructive',
       onConfirm: async () => {
         try {
-          const response = await api.request(`/students/${studentId}`, { method: 'DELETE' });
+          const response = await api.permanentDeleteStudent(studentId);
           if (response.success) {
             toast.success('Xóa học sinh thành công!');
-            onSuccess?.();
-            onCloseConfirm?.();
+            permanentDeleteSuccessCallbackRef.current?.();
+            permanentDeleteCloseCallbackRef.current?.();
           }
         } catch (error) {
           logger.error('Error deleting student:', error);
           toast.error('Lỗi khi xóa học sinh!');
-          onCloseConfirm?.();
+          permanentDeleteCloseCallbackRef.current?.();
         }
       },
     });
   };
 
   const handleRestore = async (student: StudentData, onSuccess?: () => void) => {
+    // Store callback in ref to ensure fresh reference when async completes
+    restoreSuccessCallbackRef.current = onSuccess;
     setRestoreLoading(true);
     try {
       const response = await api.request(`/students/${student.id}/restore`, {
@@ -423,7 +491,7 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
       });
       if (response.success) {
         toast.success('Khôi phục học sinh thành công!');
-        onSuccess?.();
+        restoreSuccessCallbackRef.current?.();
       }
     } catch (error) {
       logger.error('Error restoring student:', error);
@@ -448,6 +516,7 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
         'Ngày sinh',
         'Giới tính',
         'Địa chỉ',
+        'Năm nhập học',
       ];
 
       // Define borders
@@ -470,8 +539,27 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
         cell.border = borders;
       });
 
-      // Add 10 empty rows
-      for (let i = 0; i < 10; i++) {
+      // Add example row with data
+      const exampleRow = worksheet.addRow([
+        'Nguyễn Văn A',
+        'nguyenvana@example.com',
+        '0123456789',
+        '10A1',
+        '10',
+        '15/01/2009',  // dd/mm/yyyy format
+        'Nam',
+        '123 Đường ABC, TP HCM',
+        '2025-2026',
+      ]);
+      exampleRow.height = 20;
+      exampleRow.alignment = { horizontal: 'left', vertical: 'middle' };
+      exampleRow.font = { italic: true, color: { argb: 'FF999999' } };
+      exampleRow.eachCell((cell) => {
+        cell.border = borders;
+      });
+
+      // Add 9 empty rows (after the example row)
+      for (let i = 0; i < 9; i++) {
         const row = worksheet.addRow(Array(headers.length).fill(''));
         row.height = 20;
         row.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -490,6 +578,7 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
         { width: 15 }, // Ngày sinh
         { width: 12 }, // Giới tính
         { width: 25 }, // Địa chỉ
+        { width: 15 }, // Năm nhập học
       ];
 
       // Generate and download
@@ -582,6 +671,7 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
             ngay_sinh: row.ngay_sinh || row['Ngày sinh'] || row['Ngày sinh'] || '',
             gioi_tinh: row.gioi_tinh || row['Giới tính'] || '',
             dia_chi: row.dia_chi || row['Địa chỉ'] || row['Địa chỉ'] || '',
+            nam_nhap_hoc: row.nam_nhap_hoc || row['Năm nhập học'] || '',
             ten_phu_huynh: row.ten_phu_huynh || row['Tên phụ huynh'] || '',
             sdt_phu_huynh: row.sdt_phu_huynh || row['SĐT phụ huynh'] || '',
             ten_bo: row.ten_bo || row['Tên bố'] || '',
@@ -596,6 +686,11 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
           } else {
             validData.push(mapped);
           }
+        }
+
+        // Check if all rows were filtered out (all empty)
+        if (validData.length === 0 && parsedData.length > 0) {
+          toast.error('File không chứa dữ liệu hợp lệ (tất cả hàng đều trống)');
         }
 
         setImportedData(validData);
@@ -633,25 +728,47 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
       return;
     }
 
-    // Helper function to convert Excel date serial to YYYY-MM-DD format
-    const excelDateToString = (excelDate: string | number): string => {
-      if (!excelDate) return '';
+    // Helper function to convert date to YYYY-MM-DD format
+    // Handles both Excel date serial and text dates (dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd)
+    const convertDateToISOFormat = (dateValue: string | number): string => {
+      if (!dateValue) return '';
       
-      const num = typeof excelDate === 'string' ? parseFloat(excelDate) : excelDate;
-      if (isNaN(num)) return String(excelDate); // Return as-is if not a number
+      const dateStr = String(dateValue).trim();
       
-      // Excel date serial (days since Jan 1, 1900, but with a leap year bug)
-      // JavaScript uses milliseconds since Jan 1, 1970
-      // Excel serial 1 = Jan 1, 1900
-      // Excel serial 44562 = Jan 1, 2022
-      const excelEpoch = new Date(1900, 0, 1);
-      const jsDate = new Date(excelEpoch.getTime() + num * 86400000); // 86400000 ms in a day
+      // If already in YYYY-MM-DD format, return as-is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
       
-      // Format as YYYY-MM-DD
-      const year = jsDate.getFullYear();
-      const month = String(jsDate.getMonth() + 1).padStart(2, '0');
-      const day = String(jsDate.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      // Try to parse dd/mm/yyyy or dd-mm-yyyy format
+      const ddmmyyyyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/;
+      const match = dateStr.match(ddmmyyyyRegex);
+      if (match) {
+        const day = String(match[1]).padStart(2, '0');
+        const month = String(match[2]).padStart(2, '0');
+        const year = match[3];
+        return `${year}-${month}-${day}`;
+      }
+      
+      // Try to parse as Excel date serial number
+      const num = typeof dateValue === 'string' ? parseFloat(dateValue) : dateValue;
+      if (!isNaN(num) && num > 0) {
+        // Excel date serial (days since Jan 1, 1900, but with a leap year bug)
+        // JavaScript uses milliseconds since Jan 1, 1970
+        // Excel serial 1 = Jan 1, 1900
+        // Excel serial 44562 = Jan 1, 2022
+        const excelEpoch = new Date(1900, 0, 1);
+        const jsDate = new Date(excelEpoch.getTime() + num * 86400000); // 86400000 ms in a day
+        
+        // Format as YYYY-MM-DD
+        const year = jsDate.getFullYear();
+        const month = String(jsDate.getMonth() + 1).padStart(2, '0');
+        const day = String(jsDate.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // Return as-is if cannot parse
+      return dateStr;
     };
 
     setImportLoading(true);
@@ -689,6 +806,18 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
           continue;
         }
 
+        // Validate nam_nhap_hoc format if provided
+        const namNhapHoc = String(student.nam_nhap_hoc || '').trim();
+        if (namNhapHoc && !/^\d{4}-\d{4}$/.test(namNhapHoc)) {
+          validationErrors.push(`Hàng ${rowNum}: Năm nhập học không hợp lệ (định dạng: YYYY-YYYY, ví dụ: 2025-2026)`);
+          continue;
+        }
+
+        // Warn if nam_nhap_hoc doesn't match stored academic year
+        if (namNhapHoc && namNhapHoc !== storedAcademicYear) {
+          logger.warn(`Hàng ${rowNum}: Năm nhập học '${namNhapHoc}' không khớp với năm học hiện tại '${storedAcademicYear}'. Sẽ dùng năm học hiện tại cho tạo mã học sinh.`);
+        }
+
         // Format the student record with proper null handling
         const formatted: Record<string, any> = {
           ho_va_ten: hoVaTen,
@@ -708,8 +837,8 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
           formatted.so_dien_thoai = sodt;
         }
 
-        // Convert Excel date to proper format
-        const ngaysinh = excelDateToString(student.ngay_sinh || '');
+        // Convert date to proper YYYY-MM-DD format
+        const ngaysinh = convertDateToISOFormat(student.ngay_sinh || '');
         if (ngaysinh) {
           formatted.ngay_sinh = ngaysinh;
         }
@@ -813,6 +942,81 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
     setImportErrors([]);
   };
 
+  // =============== Tab 1: Profile Management ===============
+
+  /**
+   * Load all students (active and inactive) - fetches all pages
+   * Used in ClassManagement Tab 1 (Profiles)
+   * Automatically fetches all pages from paginated API response
+   * 
+   * Note: For 10,000+ records, consider implementing:
+   * - Server-side search/filter to reduce data transfer
+   * - Virtual scrolling for large tables
+   * - Lazy loading / infinite scroll pattern
+   */
+  const loadAllStudents = useCallback(async () => {
+    try {
+      const allStudents: any[] = [];
+      let page = 1;
+      let hasMore = true;
+      const PAGE_SIZE = 100; // Use max allowed by backend
+
+      while (hasMore) {
+        const response = await api.get(`/students/?page=${page}&page_size=${PAGE_SIZE}`);
+        
+        if (response.success && response.data) {
+          allStudents.push(...response.data);
+          
+          // Check if we got fewer records than requested (means this is the last page)
+          if (response.data.length < PAGE_SIZE) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          toast.error(response.message || 'Lỗi tải danh sách học sinh!');
+          hasMore = false;
+        }
+      }
+
+      return allStudents;
+    } catch (error) {
+      logger.error('Error loading all students:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Lỗi tải danh sách học sinh!';
+      toast.error(errorMsg);
+      return [];
+    }
+  }, []);
+
+  /**
+   * Assign a student to a class
+   * Used in ClassManagement Tab 1 (Profiles) for orphaned student assignment
+   */
+  const assignStudentToClass = useCallback(
+    async (studentId: number | string, classId: number | string) => {
+      try {
+        const response = await api.put(`/students/${studentId}/assign-class`, {
+          class_id: classId,
+        });
+
+        if (response.success) {
+          toast.success('Phân bổ lớp thành công!');
+          return { success: true, data: response.data };
+        } else {
+          const errorMsg = response.message || 'Lỗi phân bổ lớp!';
+          toast.error(errorMsg);
+          return { success: false, message: errorMsg };
+        }
+      } catch (error) {
+        logger.error('Error assigning student to class:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Lỗi phân bổ lớp!';
+        toast.error(errorMsg);
+        return { success: false, message: errorMsg };
+      }
+    },
+    []
+  );
+
   // =============== Return ===============
   return {
     // Add form
@@ -845,6 +1049,7 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
 
     // Student operations
     handleDeleteStudent,
+    handleRemoveFromClass,
     handlePermanentDeleteStudent,
     handleRestore,
     restoreLoading,
@@ -860,5 +1065,9 @@ export const useClassManagementStudentOps = (academicYear?: string, classId?: nu
     handleFileUpload,
     handleConfirmImport,
     handleCloseImportModal,
+
+    // Tab 1: Profile Management
+    loadAllStudents,
+    assignStudentToClass,
   };
 };

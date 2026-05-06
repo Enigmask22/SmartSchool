@@ -18,7 +18,7 @@ const TABS = [
   { id: 'classes', label: 'Lớp học', icon: 'School' },
   { id: 'class_subjects', label: 'Phân công giảng dạy', icon: 'Building' },
   { id: 'cameras', label: 'Quản lý Camera', icon: 'Camera' },
-  { id: 'system_settings', label: 'Cấu hình thời gian', icon: 'Settings' },
+  { id: 'system_settings', label: 'Cài đặt hệ thống', icon: 'Settings' },
 ];
 
 interface TabNavigationProps {

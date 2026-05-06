@@ -15,6 +15,31 @@ interface QueueItem {
   reject: (error: Error) => void;
 }
 
+// Custom error class for API errors
+class APIError extends Error {
+  statusCode: number;
+  code?: string;
+  message: string;
+  field?: string;
+  data?: Record<string, any>;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    code?: string,
+    field?: string,
+    data?: Record<string, any>
+  ) {
+    super(message);
+    this.name = "APIError";
+    this.message = message;
+    this.statusCode = statusCode;
+    this.code = code;
+    this.field = field;
+    this.data = data;
+  }
+}
+
 class ApiService {
   baseURL: string;
   isRefreshing: boolean;
@@ -182,20 +207,32 @@ class ApiService {
       }
 
       if (!response.ok) {
-        let errorMessage;
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        let errorCode = undefined;
+        let errorField = undefined;
+        let errorData = undefined;
+
         try {
           const responseText = await response.text();
-          const errorData = JSON.parse(responseText);
-          errorMessage =
-            errorData.detail ||
-            errorData.message ||
-            `HTTP error! status: ${response.status}`;
+          const parsedError = JSON.parse(responseText);
+          
+          // Extract error information from backend error response
+          errorMessage = parsedError.message || errorMessage;
+          errorCode = parsedError.code;
+          errorField = parsedError.field;
+          errorData = parsedError;
         } catch (parseError) {
           // Nếu không parse được JSON, fallback về message cũ
-          errorMessage = `HTTP error! status: ${response.status}`;
+          logger.warn("Failed to parse error response JSON");
         }
 
-        throw new Error(errorMessage);
+        throw new APIError(
+          errorMessage,
+          response.status,
+          errorCode,
+          errorField,
+          errorData
+        );
       }
 
       const result = await response.json();
@@ -1398,3 +1435,4 @@ class ApiService {
 // Create and export singleton instance
 const apiService = new ApiService();
 export default apiService;
+export { APIError };

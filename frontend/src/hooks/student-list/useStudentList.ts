@@ -163,10 +163,16 @@ export const useStudentList = (filters: UseStudentListFilters) => {
             student.student_id
               ?.toLowerCase()
               .includes(filters.searchTerm.toLowerCase());
-          const matchesClass =
-            filters.selectedClass === "all" ||
-            filters.selectedClass === "" ||
-            student.class_name === filters.selectedClass;
+
+          // For homeroom teachers: backend already filtered by class_id
+          // For other roles: apply class filter if needed
+          let matchesClass = true;
+          if (!isHomeroomTeacher) {
+            matchesClass =
+              filters.selectedClass === "all" ||
+              filters.selectedClass === "" ||
+              student.class_name === filters.selectedClass;
+          }
 
           let matchesActiveStatus = true;
           if (filters.showInactive) {
@@ -196,20 +202,23 @@ export const useStudentList = (filters: UseStudentListFilters) => {
     scoresData: scores,
   });
 
-  const exportStudentReportCard = async () => {
-    if (!feedback.selectedStudentForFeedback) {
+  const exportStudentReportCard = async (student?: any) => {
+    // Use passed student param if available, otherwise fall back to state
+    const selectedStudent = student || feedback.selectedStudentForFeedback;
+    if (!selectedStudent) {
       toast.error("Không có thông tin học sinh!");
       return;
     }
 
     try {
-      const student = feedback.selectedStudentForFeedback;
+      // Use the passed or state student
+      const studentData = selectedStudent;
 
       // Fetch scores if not already loaded
       let feedbackScores = scores.studentScores;
       if (!feedbackScores || feedbackScores.length === 0) {
         const response = await ApiService.getStudentScores(
-          student.id,
+          studentData.id,
           filters.selectedAcademicYear,
           filters.selectedSemester,
         );
@@ -225,7 +234,7 @@ export const useStudentList = (filters: UseStudentListFilters) => {
 
       // Generate and download report card
       await generateStudentReportCard({
-        student,
+        student: studentData,
         feedbackScores,
         generatedFeedback: feedback.generatedFeedback,
         academicYear,
@@ -238,11 +247,13 @@ export const useStudentList = (filters: UseStudentListFilters) => {
       );
     }
   };
-  const openEmailDialog = () => {
-    if (!feedback.selectedStudentForFeedback) return;
+  const openEmailDialog = (student?: any) => {
+    // Use passed student param if available, otherwise fall back to state
+    const selectedStudent = student || feedback.selectedStudentForFeedback;
+    if (!selectedStudent) return;
     setEmailRecipient(
-      feedback.selectedStudentForFeedback.received_email ||
-        feedback.selectedStudentForFeedback.email ||
+      selectedStudent.received_email ||
+        selectedStudent.email ||
         "",
     );
     setEmailError("");

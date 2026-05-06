@@ -105,7 +105,7 @@ export function Header({
 
   return (
     <PageHeader
-      title="Dashboard phân tích điểm số"
+      title="Thống kê điểm số"
       description={description}
       icon={
         <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">

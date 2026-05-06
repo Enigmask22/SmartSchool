@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown } from 'lucide-react';
+import { Settings2, Package, FileText, ChevronRight, ChevronDown } from 'lucide-react';
 import logger from '@/utils/logger';
 
 // Portal Tooltip Component - renders outside table DOM
@@ -53,6 +53,124 @@ function PortalTooltip({
         >
           <div className="bg-white border border-gray-300 rounded-lg shadow-xl p-4 whitespace-normal w-max max-w-sm">
             {tooltipContent}
+            {/* Arrow pointing down */}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 -translate-y-[7px]">
+              <div className="border-8 border-transparent border-t-white border-t-8" />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// Score Config Portal Component - shows hierarchical config on hover
+function ScoreConfigPortal({ 
+  scoreConfig 
+}: { 
+  scoreConfig: Record<string, any>
+}) {
+  const [showPortal, setShowPortal] = React.useState(false);
+  const [position, setPosition] = React.useState({ top: 0, left: 0 });
+  const triggerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.top - 10,
+        left: rect.left + rect.width / 2,
+      });
+      setShowPortal(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setShowPortal(false);
+  };
+
+  return (
+    <>
+      <div 
+        ref={triggerRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="w-full"
+      >
+        <Badge className="text-xs text-purple-700 bg-purple-50 border-purple-200 border whitespace-nowrap h-7 flex items-center justify-center gap-1 cursor-help hover:bg-purple-100 transition-colors">
+          <Settings2 className="w-3 h-3" />
+          {Object.keys(scoreConfig).length} cột
+        </Badge>
+      </div>
+
+      {showPortal && createPortal(
+        <div 
+          className="fixed z-[99999] pointer-events-none"
+          style={{
+            top: `${position.top}px`,
+            left: `${position.left}px`,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <div className="bg-white border border-gray-300 rounded-lg shadow-xl p-4 w-max max-w-md">
+            {/* Header */}
+            <div className="mb-3 pb-2 border-b border-gray-200">
+              <p className="text-sm font-semibold text-gray-900">Cấu hình cột điểm</p>
+            </div>
+
+            {/* Content - no scroll, let it expand */}
+            <div className="space-y-2">
+              {Object.entries(scoreConfig).map(([key, value]: any) => {
+                const isParent = value.data && Object.keys(value.data).length > 0;
+                return (
+                  <div key={key}>
+                    {/* Parent Column */}
+                    <div className="p-2 bg-gray-50 rounded border border-gray-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          {isParent ? (
+                            <Package className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-900 truncate">{value.label}</p>
+                            <p className="text-xs text-gray-600">{key} • HS: {value.he_so}</p>
+                          </div>
+                        </div>
+                        {isParent && (
+                          <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded flex-shrink-0">
+                            {Object.keys(value.data).length}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Child Columns */}
+                    {isParent && value.data && (
+                      <div className="ml-4 mt-1 space-y-1 border-l border-gray-200 pl-3">
+                        {Object.entries(value.data).map(([childKey, childValue]: any) => (
+                          <div key={childKey} className="py-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <ChevronRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-800 truncate">{childValue.label}</p>
+                                  <p className="text-xs text-gray-600">{childKey}</p>
+                                </div>
+                              </div>
+                              <span className="text-xs text-gray-700 font-medium flex-shrink-0">HS: {childValue.he_so}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
             {/* Arrow pointing down */}
             <div className="absolute top-full left-1/2 transform -translate-x-1/2 -translate-y-[7px]">
               <div className="border-8 border-transparent border-t-white border-t-8" />
@@ -357,17 +475,11 @@ export function renderTableCell(
   }
 
   if (field === 'score_column_config') {
-    return item[field] && typeof item[field] === 'object' ? (
-      <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto">
-        {Object.entries(item[field]).map(([key, value]: any) => (
-          <Badge key={key} className="text-xs text-purple-700 bg-purple-50 border-purple-200 border whitespace-nowrap flex-shrink-0 h-7 flex items-center justify-center">
-            {value.label} (HS: {value.he_so})
-          </Badge>
-        ))}
-      </div>
-    ) : (
-      <span className="text-xs italic text-gray-400">Chưa cấu hình</span>
-    );
+    if (!item[field] || typeof item[field] !== 'object' || Object.keys(item[field]).length === 0) {
+      return <span className="text-xs italic text-gray-400">Chưa cấu hình</span>;
+    }
+
+    return <ScoreConfigPortal scoreConfig={item[field]} />;
   }
 
   // For text fields that might be long (email, username, descriptions, etc.)

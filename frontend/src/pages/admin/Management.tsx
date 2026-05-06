@@ -106,6 +106,8 @@ const AdminManagement = () => {
     search.setShowDeleted(false);
     // Reset sorting only, preserve tab filters with their defaults
     sorting.resetSort();
+    // Reset pagination to page 1 when switching tabs
+    setCurrentPage(1);
   };
 
   const handleAddNew = () => {

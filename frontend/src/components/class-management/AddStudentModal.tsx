@@ -25,11 +25,18 @@ interface ParentContact {
   phone: string;
 }
 
+interface ClassInfo {
+  id: number;
+  class_name: string;
+  grade: number | string;
+}
+
 interface StudentFormData {
   full_name: string;
   email: string;
   phone: string;
   received_email: string;
+  academic_year: string;
   class_name: string;
   grade: string;
   class_id: number | null;
@@ -55,6 +62,9 @@ interface AddStudentModalProps {
   ) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
+  academicYearOptions: string[];
+  availableClasses: ClassInfo[];
+  loadingClasses?: boolean;
 }
 
 const AddStudentModal = ({
@@ -69,14 +79,21 @@ const AddStudentModal = ({
   updateParentContactField,
   onSubmit,
   onClose,
+  academicYearOptions,
+  availableClasses,
+  loadingClasses = false,
 }: AddStudentModalProps) => {
+  // Filter classes based on selected grade
+  const filteredClasses = studentFormData.grade
+    ? availableClasses.filter(cls => String(cls.grade) === String(studentFormData.grade))
+    : availableClasses;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Thêm học sinh mới</DialogTitle>
           <DialogDescription>
-            Điền thông tin để đăng ký học sinh mới vào hệ thống
+            Điền thông tin để đăng ký hồ sơ học sinh mới vào hệ thống
           </DialogDescription>
         </DialogHeader>
 
@@ -99,6 +116,36 @@ const AddStudentModal = ({
               {studentFormErrors.full_name && (
                 <p className="text-sm text-destructive">
                   {studentFormErrors.full_name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="academic_year">Năm học *</Label>
+              <Select
+                value={studentFormData.academic_year || ''}
+                onValueChange={(value) =>
+                  onFormChange('academic_year', value)
+                }
+              >
+                <SelectTrigger
+                  className={
+                    studentFormErrors.academic_year ? 'border-destructive' : ''
+                  }
+                >
+                  <SelectValue placeholder="Chọn năm học" />
+                </SelectTrigger>
+                <SelectContent>
+                  {academicYearOptions.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {studentFormErrors.academic_year && (
+                <p className="text-sm text-destructive">
+                  {studentFormErrors.academic_year}
                 </p>
               )}
             </div>
@@ -152,20 +199,48 @@ const AddStudentModal = ({
 
             <div className="space-y-2">
               <Label htmlFor="class_name">Lớp học *</Label>
-              <Input
-                id="class_name"
-                type="text"
-                value={studentFormData.class_name}
-                onChange={(e) =>
-                  onFormChange('class_name', e.target.value)
-                }
-                disabled
-                readOnly
-                className={
-                  studentFormErrors.class_name ? 'border-destructive' : ''
-                }
-                placeholder="VD: 10A1"
-              />
+              <Select
+                value={studentFormData.class_id ? String(studentFormData.class_id) : ''}
+                onValueChange={(value) => {
+                  const classId = Number(value);
+                  const selectedClass = availableClasses.find(c => c.id === classId);
+                  if (selectedClass) {
+                    onFormChange('class_id', classId);
+                    onFormChange('class_name', selectedClass.class_name);
+                    onFormChange('grade', String(selectedClass.grade));
+                  }
+                }}
+                disabled={loadingClasses || !studentFormData.grade || filteredClasses.length === 0}
+              >
+                <SelectTrigger
+                  className={
+                    studentFormErrors.class_name ? 'border-destructive' : ''
+                  }
+                >
+                  <SelectValue placeholder={
+                    !studentFormData.grade 
+                      ? "Chọn khối trước" 
+                      : loadingClasses 
+                      ? "Đang tải..." 
+                      : filteredClasses.length === 0
+                      ? "Không có lớp học nào"
+                      : "Chọn lớp học"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredClasses.length > 0 ? (
+                    filteredClasses.map((cls) => (
+                      <SelectItem key={cls.id} value={String(cls.id)}>
+                        {cls.class_name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      Không có lớp học nào
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
               {studentFormErrors.class_name && (
                 <p className="text-sm text-destructive">
                   {studentFormErrors.class_name}
@@ -176,24 +251,24 @@ const AddStudentModal = ({
             <div className="space-y-2">
               <Label htmlFor="grade">Khối *</Label>
               <Select
-                value={studentFormData.grade || 'none'}
+                value={studentFormData.grade || ''}
                 onValueChange={(value) =>
-                  onFormChange(
-                    'grade',
-                    value === 'none' ? '' : value,
-                  )
+                  onFormChange('grade', value === '' ? '' : value)
                 }
-                disabled
+                disabled={!studentFormData.academic_year}
               >
                 <SelectTrigger
                   className={
                     studentFormErrors.grade ? 'border-destructive' : ''
                   }
                 >
-                  <SelectValue placeholder="Chọn khối" />
+                  <SelectValue placeholder={
+                    !studentFormData.academic_year
+                      ? "Chọn năm học trước"
+                      : "Chọn khối"
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Chọn khối</SelectItem>
                   <SelectItem value="10">Khối 10</SelectItem>
                   <SelectItem value="11">Khối 11</SelectItem>
                   <SelectItem value="12">Khối 12</SelectItem>

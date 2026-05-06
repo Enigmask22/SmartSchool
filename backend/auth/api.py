@@ -22,6 +22,7 @@ from core.database import get_db, get_school_db
 from core.logger import setup_logger
 from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from core.dependencies import get_current_user, get_current_user_from_refresh_token
+from core.error_codes import AuthErrorCode, raise_validation_error
 
 logger = setup_logger("auth_api")
 
@@ -124,38 +125,43 @@ async def register(user: UserCreate):
 
 @router.post("/login")
 async def login(user_credentials: UserLogin):
-    """Đăng nhập user"""
+    """Đăng nhập user với username hoặc email"""
     try:
         # Multi-database routing disabled - using single database
         # db = get_school_db(user_credentials.username)
         db = get_db()
         
+        # Backend supports login with both username and email via .or_() query
         user_response = db.table("users").select("*").or_(
             f"username.eq.{user_credentials.username},email.eq.{user_credentials.username}"
         ).execute()
         
         if not user_response.data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Username hoặc password không đúng"
+            # Generic message for security (doesn't reveal if email/username exists)
+            raise_validation_error(
+                AuthErrorCode.LOGIN_INVALID_CREDENTIALS,
+                "Tên đăng nhập/email hoặc mật khẩu không chính xác"
             )
         
         user = user_response.data[0]
         
+        # Verify password
         password_valid = verify_password(user_credentials.password, user["password_hash"])
         
         if not password_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Username hoặc password không đúng"
+            raise_validation_error(
+                AuthErrorCode.LOGIN_INVALID_CREDENTIALS,
+                "Tên đăng nhập/email hoặc mật khẩu không chính xác"
             )
         
+        # Check if account is active
         if not user.get("is_active", True):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Tài khoản đã bị vô hiệu hóa"
+            raise_validation_error(
+                AuthErrorCode.LOGIN_ACCOUNT_INACTIVE,
+                "Tài khoản này không hoạt động"
             )
         
+        # Create tokens
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         
@@ -171,6 +177,7 @@ async def login(user_credentials: UserLogin):
             expires_delta=refresh_token_expires
         )
         
+        # Remove sensitive data before returning
         user.pop("password_hash", None)
         
         return {
