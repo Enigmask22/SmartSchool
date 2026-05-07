@@ -389,7 +389,7 @@ const StudentsTableCard = ({
                 size="sm"
                 variant="outline"
                 onClick={onProfilesClearFilters}
-                className="text-muted-foreground hover:text-destructive"
+                className="text-muted-foreground hover:text-destructive h-10"
               >
                 <X className="w-4 h-4 mr-1" />
                 Xóa bộ lọc

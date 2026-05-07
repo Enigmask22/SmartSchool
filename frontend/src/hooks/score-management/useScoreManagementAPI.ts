@@ -57,6 +57,8 @@ export interface TeacherInfo {
     classes: { class_name: string; grade: string };
     subjects: { subject_name: string };
   }>;
+  /** true = giáo viên không được sửa điểm (đã quá hạn và không có quyền ngoại lệ). */
+  grade_edit_locked?: boolean;
 }
 
 export interface UseScoreManagementAPIReturn {

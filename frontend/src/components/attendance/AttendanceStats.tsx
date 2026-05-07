@@ -1,4 +1,4 @@
-import { Users, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Clock, FileCheck } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface AttendanceStats {
@@ -6,6 +6,7 @@ interface AttendanceStats {
   present_count: number;
   absent_count: number;
   late_count: number;
+  excused_count?: number;
   attendance_rate?: number;
 }
 
@@ -41,6 +42,14 @@ const AttendanceStats = ({ stats, loading = false }: AttendanceStatsProps) => {
       borderColor: 'border-l-red-500',
     },
     {
+      icon: FileCheck,
+      label: 'Vắng có phép',
+      value: stats?.excused_count || 0,
+      bgColor: 'bg-indigo-100',
+      textColor: 'text-indigo-600',
+      borderColor: 'border-l-indigo-500',
+    },
+    {
       icon: Clock,
       label: 'Muộn',
       value: stats?.late_count || 0,
@@ -53,7 +62,7 @@ const AttendanceStats = ({ stats, loading = false }: AttendanceStatsProps) => {
   const isLoadingOrEmpty = loading || !stats;
 
   return (
-    <div className="grid grid-cols-1 gap-6 mb-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-6 mb-6 md:grid-cols-2 lg:grid-cols-5">
       {statConfigs.map((config, idx) => {
         const Icon = config.icon;
         return (

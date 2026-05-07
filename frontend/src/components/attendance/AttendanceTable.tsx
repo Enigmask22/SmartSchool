@@ -132,7 +132,7 @@ const AttendanceTable = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[80px]">MÃ SỐ HỌC SINH</TableHead>
+                  <TableHead className="w-[80px]">MÃ SỐ HS</TableHead>
                   <TableHead className="w-[150px]">HỌ VÀ TÊN</TableHead>
                   <TableHead className="w-[80px]">LỚP</TableHead>
                   <TableHead className="w-[100px]">GIỜ VÀO</TableHead>

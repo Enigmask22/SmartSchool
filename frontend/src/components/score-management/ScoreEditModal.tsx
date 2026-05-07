@@ -22,6 +22,8 @@ interface ScoreEditModalProps {
   onScoreInputChange: (columnKey: string, value: string) => void;
   onSaveScore: () => void;
   getDisplayColumns: (config: Record<string, any>) => any[];
+  /** Khóa chỉnh sửa (đã quá hạn nhập điểm). */
+  readOnly?: boolean;
 }
 
 const ScoreEditModal = ({
@@ -33,6 +35,7 @@ const ScoreEditModal = ({
   onScoreInputChange,
   onSaveScore,
   getDisplayColumns,
+  readOnly = false,
 }: ScoreEditModalProps) => {
   if (!editingStudent) return null;
 
@@ -82,6 +85,7 @@ const ScoreEditModal = ({
                                 onChange={(e) =>
                                   onScoreInputChange(child.key, e.target.value)
                                 }
+                                disabled={readOnly}
                                 className="flex-1 text-lg font-semibold text-center"
                               />
                               <div className="text-xs text-gray-500 min-w-16">
@@ -115,6 +119,7 @@ const ScoreEditModal = ({
                             onChange={(e) =>
                               onScoreInputChange(column.key, e.target.value)
                             }
+                            disabled={readOnly}
                             className="flex-1 text-lg font-semibold text-center"
                           />
                           <div className="text-xs text-gray-500 min-w-16">
@@ -131,11 +136,13 @@ const ScoreEditModal = ({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Hủy
+            {readOnly ? 'Đóng' : 'Hủy'}
           </Button>
-          <Button onClick={onSaveScore}>Lưu điểm</Button>
+          {!readOnly && (
+            <Button onClick={onSaveScore}>Lưu điểm</Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

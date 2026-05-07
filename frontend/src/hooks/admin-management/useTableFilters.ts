@@ -27,7 +27,15 @@ export const FILTER_CONFIGS: TabFilterConfigs = {
         ],
       },
     ],
-    sortableFields: ['id', 'username', 'email', 'full_name', 'role'],
+    sortableFields: [
+      'id',
+      'username',
+      'email',
+      'full_name',
+      'role',
+      'can_edit_grade',
+      'can_edit_attendance',
+    ],
   },
   teachers: {
     filters: [

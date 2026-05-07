@@ -26,7 +26,7 @@ from admin.validators import (
 from core.database import get_db
 from core.logger import setup_logger
 from core.dependencies import get_current_user
-from core.system_settings import get_current_academic_year
+from core.system_settings import get_current_academic_year, clear_settings_cache
 from core.errors import handle_database_error
 from core.error_codes import (
     TeacherErrorCode, SubjectErrorCode, UserErrorCode, ClassErrorCode,
@@ -59,7 +59,7 @@ async def get_all_users(
     """Lấy danh sách tất cả người dùng"""
     try:
         response = db.table("users").select(
-            "id, email, username, full_name, role, is_active, last_login, created_at, updated_at"
+            "id, email, username, full_name, role, is_active, can_edit_grade, can_edit_attendance, last_login, created_at, updated_at"
         ).order("created_at", desc=True).execute()
         
         return {"success": True, "data": response.data}
@@ -117,6 +117,8 @@ async def create_user(
             "full_name": full_name,
             "role": role,
             "is_active": user_data.is_active,
+            "can_edit_grade": bool(user_data.can_edit_grade) if user_data.can_edit_grade is not None else False,
+            "can_edit_attendance": bool(user_data.can_edit_attendance) if user_data.can_edit_attendance is not None else False,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
@@ -200,6 +202,10 @@ async def update_user(
                 user_data.password.encode('utf-8'),
                 bcrypt.gensalt()
             ).decode('utf-8')
+        if user_data.can_edit_grade is not None:
+            update_data["can_edit_grade"] = user_data.can_edit_grade
+        if user_data.can_edit_attendance is not None:
+            update_data["can_edit_attendance"] = user_data.can_edit_attendance
         
         update_data["updated_at"] = datetime.now().isoformat()
         
@@ -3476,6 +3482,7 @@ async def update_system_setting(
         response = db.table("system_settings").update(update_data).eq("setting_key", setting_key).execute()
         
         if response.data:
+            clear_settings_cache()
             return {"success": True, "data": response.data[0], "message": "Cập nhật cấu hình thành công"}
         else:
             raise HTTPException(status_code=500, detail="Không thể cập nhật cấu hình")

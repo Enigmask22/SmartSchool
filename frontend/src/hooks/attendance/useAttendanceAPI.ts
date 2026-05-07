@@ -36,7 +36,7 @@ interface Student {
 export interface AttendanceRecord {
   id: number | null;
   student_id: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'excused';
   check_in_time?: string;
   check_out_time?: string;
   confidence_score?: number;
@@ -50,6 +50,7 @@ export interface AttendanceStats {
   present_count: number;
   absent_count: number;
   late_count: number;
+  excused_count?: number;
   attendance_rate?: number;
 }
 
@@ -60,6 +61,8 @@ interface BootstrapData {
   selected_class: { class_name: string };
   records: AttendanceRecord[];
   stats: AttendanceStats;
+  /** Khóa sửa điểm danh thủ công theo deadline / quyền user. */
+  attendance_edit_locked?: boolean;
 }
 
 interface UseAttendanceAPIReturn {
@@ -96,6 +99,9 @@ interface UseAttendanceAPIReturn {
     newStatus: string,
     newNotes: string
   ) => Promise<boolean>;
+
+  /** true = không cho sửa điểm danh / đơn nghỉ (đã quá hạn, trừ khi có quyền ngoại lệ). */
+  attendanceEditLocked: boolean;
 
   // Setters
   setError: (error: string | null) => void;
@@ -167,6 +173,7 @@ export const useAttendanceAPI = ({
   // UI states
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [attendanceEditLocked, setAttendanceEditLocked] = useState(false);
 
   // Load data on filter changes
   useEffect(() => {
@@ -235,6 +242,8 @@ export const useAttendanceAPI = ({
           stats: bootstrapStats,
         } = data;
 
+        setAttendanceEditLocked(!!data.attendance_edit_locked);
+
         console.log('Bootstrap data:', data);
 
         if (!selectedAcademicYear && resolvedYear)
@@ -255,11 +264,14 @@ export const useAttendanceAPI = ({
           setApiSelectedClass({ id: cls[0].id, class_name: cls[0].class_name });
         }
 
-        setAttendanceRecords(records || []);
-        setStats(bootstrapStats || null);
+        const normalizedRecords = records || [];
+        setAttendanceRecords(normalizedRecords);
+        // Ưu tiên tính lại từ records để hỗ trợ trạng thái "excused"
+        // ngay cả khi backend stats chưa có excused_count.
+        setStats(calculateStatsFromData(normalizedRecords, bootstrapStats));
 
-        onRecordsUpdated?.(records || []);
-        onStatsUpdated?.(bootstrapStats || null);
+        onRecordsUpdated?.(normalizedRecords);
+        onStatsUpdated?.(calculateStatsFromData(normalizedRecords, bootstrapStats));
       }
     } catch (e) {
       logger.error('attendance bootstrap error', e);
@@ -288,6 +300,7 @@ export const useAttendanceAPI = ({
           present_count: 0,
           absent_count: 0,
           late_count: 0,
+          excused_count: 0,
         });
         setLoading(false);
         return;
@@ -419,8 +432,12 @@ export const useAttendanceAPI = ({
       if (!showFullList) {
         const response = await ApiService.getAttendanceStats(selectedDate as any);
         if (response.success) {
-          setStats(response.data);
-          onStatsUpdated?.(response.data);
+          const normalizedStats: AttendanceStats = {
+            ...response.data,
+            excused_count: response.data?.excused_count || 0,
+          };
+          setStats(normalizedStats);
+          onStatsUpdated?.(normalizedStats);
         }
       }
     } catch (error) {
@@ -431,17 +448,35 @@ export const useAttendanceAPI = ({
   /**
    * Calculate statistics from raw attendance data
    */
-  const calculateStatsFromData = (data: AttendanceRecord[]): AttendanceStats => {
+  const calculateStatsFromData = (
+    data: AttendanceRecord[],
+    fallbackStats?: AttendanceStats | null
+  ): AttendanceStats => {
     const totalStudents = data.length;
     const presentCount = data.filter((record) => record.status === 'present').length;
     const lateCount = data.filter((record) => record.status === 'late').length;
-    const absentCount = totalStudents - presentCount - lateCount;
+    const excusedCount = data.filter((record) => record.status === 'excused').length;
+    const absentCount = data.filter((record) => record.status === 'absent').length;
+
+    // Nếu dataset records rỗng nhưng backend có stats sẵn (bootstrap),
+    // dùng fallback để không làm mất số liệu tổng hợp từ server.
+    if (totalStudents === 0 && fallbackStats) {
+      return {
+        total_students: fallbackStats.total_students || 0,
+        present_count: fallbackStats.present_count || 0,
+        late_count: fallbackStats.late_count || 0,
+        absent_count: fallbackStats.absent_count || 0,
+        excused_count: fallbackStats.excused_count || 0,
+        attendance_rate: fallbackStats.attendance_rate || 0,
+      };
+    }
 
     return {
       total_students: totalStudents,
       present_count: presentCount,
       late_count: lateCount,
       absent_count: absentCount,
+      excused_count: excusedCount,
       attendance_rate:
         totalStudents > 0
           ? Math.round((presentCount / totalStudents) * 100 * 10) / 10
@@ -522,6 +557,8 @@ export const useAttendanceAPI = ({
     // UI states
     error,
     successMessage,
+
+    attendanceEditLocked,
 
     // Handlers
     attendanceBootstrap,
