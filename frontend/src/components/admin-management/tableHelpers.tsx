@@ -244,6 +244,8 @@ export function renderFieldHeader(field: string): string {
     phone: 'SĐT',
     score_column_config: 'CẤU HÌNH CỘT ĐIỂM',
     teacher_code: 'MÃ SỐ GIÁO VIÊN',
+    can_edit_grade: 'SỬA BẢNG ĐIỂM',
+    can_edit_attendance: 'SỬA ĐIỂM DANH',
   };
   return headerMap[field] || field.replace(/_/g, ' ').toUpperCase();
 }
@@ -438,6 +440,40 @@ export function renderTableCell(
       <Badge className="text-xs text-gray-800 bg-gray-100 border-gray-200 border whitespace-nowrap min-w-[70px] h-7 flex items-center justify-center">
         Tự chọn
       </Badge>
+    );
+  }
+
+  if (field === 'can_edit_grade' || field === 'can_edit_attendance') {
+    const isAdminUser = item.role === 'admin';
+    return (
+      <div className="flex justify-center w-full">
+        {isAdminUser ? (
+          <span className="text-xs text-muted-foreground">Không áp dụng (admin)</span>
+        ) : (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!item[field]}
+            disabled={!hook?.toggleUserEditFlag}
+            onClick={() =>
+              hook.toggleUserEditFlag(
+                item.id,
+                field as 'can_edit_grade' | 'can_edit_attendance',
+                !item[field]
+              )
+            }
+            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+              item[field] ? 'bg-emerald-500' : 'bg-gray-200'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition ${
+                item[field] ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        )}
+      </div>
     );
   }
 

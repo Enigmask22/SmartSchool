@@ -6,7 +6,15 @@ export const TAB_CONFIG = {
   users: {
     title: 'Quản lý người dùng',
     fields: ['username', 'email', 'full_name', 'password', 'role'],
-    displayFields: ['id', 'username', 'email', 'full_name', 'role'], //is_active 
+    displayFields: [
+      'id',
+      'username',
+      'email',
+      'full_name',
+      'role',
+      'can_edit_grade',
+      'can_edit_attendance',
+    ], //is_active
     endpoint: '/admin/users',
   },
   teachers: {

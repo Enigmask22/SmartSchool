@@ -22,6 +22,7 @@ from core.database import get_db, get_school_db
 from core.logger import setup_logger
 from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from core.dependencies import get_current_user, get_current_user_from_refresh_token
+from core.edit_permissions import enrich_user_for_client
 from core.error_codes import AuthErrorCode, raise_validation_error
 
 logger = setup_logger("auth_api")
@@ -179,6 +180,7 @@ async def login(user_credentials: UserLogin):
         
         # Remove sensitive data before returning
         user.pop("password_hash", None)
+        user_public = enrich_user_for_client(user)
         
         return {
             "success": True,
@@ -187,7 +189,7 @@ async def login(user_credentials: UserLogin):
                 "refresh_token": refresh_token,
                 "token_type": "bearer",
                 "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                "user": user
+                "user": user_public
             }
         }
         
@@ -206,7 +208,7 @@ async def get_current_user_info(request: Request, current_user=Depends(get_curre
     return {
         "success": True,
         "message": "Lấy thông tin user thành công",
-        "data": current_user
+        "data": enrich_user_for_client(current_user)
     }
 
 @router.post("/refresh")
@@ -219,8 +221,7 @@ async def refresh_token(request: Request, current_user=Depends(get_current_user_
             expires_delta=access_token_expires
         )
         
-        user_data = current_user.copy()
-        user_data.pop("password_hash", None)
+        user_data = enrich_user_for_client(current_user)
         
         return {
             "success": True,

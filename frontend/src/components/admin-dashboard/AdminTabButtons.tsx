@@ -1,33 +1,38 @@
-import { BarChart3, Award } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-interface AdminTabButtonsProps {
-  selectedTab: string;
-  onTabChange: (tab: "attendance" | "performance") => void;
+export interface AdminDashboardTabItem {
+  key: string;
+  label: string;
+  icon?: LucideIcon;
 }
 
-export function AdminTabButtons({ selectedTab, onTabChange }: AdminTabButtonsProps) {
+interface AdminTabButtonsProps {
+  selectedTab: string;
+  tabs: AdminDashboardTabItem[];
+  onTabChange: (tab: string) => void;
+}
+
+export function AdminTabButtons({ selectedTab, tabs, onTabChange }: AdminTabButtonsProps) {
   return (
     <Card className="shadow-md">
-      <CardContent className="p-2">
+      <CardContent className="py-6">
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => onTabChange("attendance")}
-            variant={selectedTab === "attendance" ? "default" : "outline"}
-            className="flex-1 min-w-fit"
-          >
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Điểm danh
-          </Button>
-          <Button
-            onClick={() => onTabChange("performance")}
-            variant={selectedTab === "performance" ? "default" : "outline"}
-            className="flex-1 min-w-fit"
-          >
-            <Award className="w-4 h-4 mr-2" />
-            Học lực theo lớp
-          </Button>
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <Button
+                key={tab.key}
+                onClick={() => onTabChange(tab.key)}
+                variant={selectedTab === tab.key ? "default" : "outline"}
+                className="min-w-[200px] h-12"
+              >
+                {Icon ? <Icon className="w-4 h-4 mr-2" /> : null}
+                {tab.label}
+              </Button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

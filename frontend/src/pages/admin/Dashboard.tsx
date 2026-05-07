@@ -1,5 +1,6 @@
 // React already imported by JSX transform
 import { useState } from "react";
+import { Award, BarChart3 } from "lucide-react";
 import {
   Header,
   OverviewCards,
@@ -30,6 +31,10 @@ export default function AdminDashboard() {
 
   // UI state
   const [activeTab, setActiveTab] = useState<"attendance" | "performance">("attendance");
+  const dashboardTabs = [
+    { key: "attendance", label: "Điểm danh", icon: BarChart3 },
+    { key: "performance", label: "Học lực theo lớp", icon: Award },
+  ];
 
   return (
     <div className="space-y-6 p-6 min-h-screen">
@@ -54,7 +59,11 @@ export default function AdminDashboard() {
       <InfraCards infraStats={infraStats} loading={loading} />
 
       {/* Tab Navigation */}
-      <AdminTabButtons selectedTab={activeTab} onTabChange={setActiveTab} />
+      <AdminTabButtons
+        selectedTab={activeTab}
+        tabs={dashboardTabs}
+        onTabChange={(tab) => setActiveTab(tab as "attendance" | "performance")}
+      />
 
       {/* Tab Content */}
       {activeTab === "attendance" && (

@@ -11,6 +11,7 @@ from attendance.services import get_vietnam_time_string, get_vietnam_date_string
 from core.database import get_db
 from core.logger import setup_logger
 from core.dependencies import get_current_user
+from core.edit_permissions import assert_can_edit_attendance
 from core.system_settings import get_attendance_cutoff_time
 
 logger = setup_logger("attendance_api")
@@ -94,6 +95,7 @@ async def check_in_attendance(
 @router.post("/manual")
 async def create_manual_attendance_record(
     attendance: AttendanceCreate,
+    current_user=Depends(get_current_user),
     db=Depends(get_db)
 ):
     """Tạo bản ghi điểm danh thủ công KHÔNG cập nhật giờ vào/ra.
@@ -101,6 +103,8 @@ async def create_manual_attendance_record(
     Dùng khi giáo viên chỉ muốn cập nhật trạng thái/ghi chú mà không muốn ảnh hưởng check_in/check_out.
     """
     try:
+        assert_can_edit_attendance(current_user, db)
+
         today = get_vietnam_date_string()
         now_time = get_vietnam_time_string()
 
@@ -250,10 +254,13 @@ async def get_today_stats(db=Depends(get_db)):
 async def update_attendance(
     attendance_id: int,
     attendance: AttendanceUpdate,
+    current_user=Depends(get_current_user),
     db=Depends(get_db)
 ):
     """Cập nhật bản ghi điểm danh"""
     try:
+        assert_can_edit_attendance(current_user, db)
+
         update_data = attendance.dict(exclude_unset=True)
         if not update_data:
             raise HTTPException(status_code=400, detail="Không có dữ liệu để cập nhật")
@@ -547,10 +554,13 @@ async def update_attendance_status_and_notes(
     attendance_id: int,
     status: str = Query(..., description="Trạng thái mới: present, absent, late"),
     notes: Optional[str] = Query(None, description="Ghi chú"),
+    current_user=Depends(get_current_user),
     db=Depends(get_db)
 ):
     """Cập nhật trạng thái và ghi chú cho attendance record"""
     try:
+        assert_can_edit_attendance(current_user, db)
+
         # Validate status
         valid_statuses = ["present", "absent", "late"]
         if status not in valid_statuses:
@@ -702,10 +712,13 @@ async def get_full_attendance_list(
 @router.post("/check-out/{attendance_id}")
 async def check_out_attendance(
     attendance_id: int,
+    current_user=Depends(get_current_user),
     db=Depends(get_db)
 ):
     """Check out cho attendance record"""
     try:
+        assert_can_edit_attendance(current_user, db)
+
         # Kiểm tra attendance tồn tại
         existing = db.table("attendance").select("*").eq("id", attendance_id).execute()
         

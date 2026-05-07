@@ -24,6 +24,7 @@ import {
   Step2Form,
   Step3Form,
 } from '@/components/forgot-password';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * ForgotPassword Component
@@ -33,6 +34,7 @@ import {
  * - usePasswordResetLogic: For API calls and domain validation
  */
 export function ForgotPassword() {
+  const navigate = useNavigate();
   // ============ UI State (kept in component) ============
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -201,7 +203,7 @@ export function ForgotPassword() {
                 loading={loading}
                 onInputChange={handleInputChange}
                 onSubmit={handleStep1Submit}
-                onBackClick={() => window.location.href = '/login'}
+                onBackClick={() => navigate('/login')}
               />
             )}
 

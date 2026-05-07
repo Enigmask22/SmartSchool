@@ -21,6 +21,7 @@ from core.database import get_db
 from core.logger import setup_logger
 from core.system_settings import get_current_academic_year, get_current_semester
 from core.dependencies import get_current_user
+from core.edit_permissions import assert_can_edit_grade, is_grade_edit_locked_for_user
 
 logger = setup_logger("scores_api")
 router = APIRouter()
@@ -614,9 +615,14 @@ async def get_student_all_scores(
         )
 
 @router.post("/")
-async def create_score(score: ScoreCreate, db=Depends(get_db)):
+async def create_score(
+    score: ScoreCreate,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
     """Tạo điểm mới"""
     try:
+        assert_can_edit_grade(current_user, db)
         score_data_dict = score.dict()
         final_score = calculate_final_grade(score_data_dict["score_data"])
         score_data_dict["final_score"] = final_score
@@ -639,10 +645,12 @@ async def create_score(score: ScoreCreate, db=Depends(get_db)):
 async def update_score(
     score_id: int,
     score: ScoreUpdate,
-    db=Depends(get_db)
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """Cập nhật điểm"""
     try:
+        assert_can_edit_grade(current_user, db)
         update_data = score.dict(exclude_unset=True)
         
         if "score_data" in update_data:
@@ -702,7 +710,8 @@ async def get_teacher_info(
         
         teacher_info = {
             "teacher": current_teacher,
-            "assigned_classes": class_subjects.data if class_subjects.data else []
+            "assigned_classes": class_subjects.data if class_subjects.data else [],
+            "grade_edit_locked": is_grade_edit_locked_for_user(current_user),
         }
         
         return {
@@ -1022,11 +1031,13 @@ async def get_students_by_class_subject(
 @router.post("/score")
 async def create_or_update_score(
     score: dict,
+    current_user=Depends(get_current_user),
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
     """Tạo hoặc cập nhật điểm học sinh"""
     try:
+        assert_can_edit_grade(current_user, db)
         from scores.models import ScoreCreate
         
         score_obj = ScoreCreate(**score)
@@ -2125,11 +2136,13 @@ async def download_score_template(
 @router.post("/bulk-import")
 async def bulk_import_grades(
     import_data: dict,
+    current_user=Depends(get_current_user),
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
     """Nhập điểm hàng loạt từ file Excel/CSV"""
     try:
+        assert_can_edit_grade(current_user, db)
         class_subject_id = import_data.get("class_subject_id")
         scores_data = import_data.get("scores", []) or import_data.get("grades", [])  # Backward compatibility: support both "scores" and "grades"
         
@@ -2402,6 +2415,7 @@ async def get_queue_stats(
 @router.post("/ocr/import-from-parsed")
 async def import_grades_from_parsed_ocr(
     import_data: dict,
+    current_user=Depends(get_current_user),
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
@@ -2409,8 +2423,7 @@ async def import_grades_from_parsed_ocr(
     Import điểm từ dữ liệu đã parse bởi OCR (sau khi review)
     Tái sử dụng logic bulk_import_grades
     """
-    # Sử dụng lại hàm bulk_import_grades đã có
-    return await bulk_import_grades(import_data, current_teacher, db)
+    return await bulk_import_grades(import_data, current_user, current_teacher, db)
 
 
 @router.post("/ocr/export-parsed-to-excel")

@@ -8,7 +8,9 @@ import {
   Download,
   AlertCircle,
   CheckCircle,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  RotateCcw,
 } from "lucide-react";
 import {
   Card,
@@ -26,6 +28,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Label } from "../ui/label";
+import { SimpleDatePicker } from "../ui/simple-date-picker";
 import { Alert, AlertDescription } from "../ui/alert";
 import api from "@/utils/api";
 import { ACADEMIC_YEAR_OPTIONS } from "@/utils/constants";
@@ -47,6 +50,8 @@ interface FormData {
   academic_year: string;
   semester: string;
   attendance_cutoff_time: string;
+  grade_lock_deadline: string;
+  attendance_lock_deadline: string;
 }
 
 const SystemSettings = () => {
@@ -59,6 +64,8 @@ const SystemSettings = () => {
     academic_year: "",
     semester: "",
     attendance_cutoff_time: "",
+    grade_lock_deadline: "",
+    attendance_lock_deadline: "",
   });
   const [cutoffHour, setCutoffHour] = useState("00");
   const [cutoffMinute, setCutoffMinute] = useState("00");
@@ -91,6 +98,9 @@ const SystemSettings = () => {
           semester: settingsMap.semester?.setting_value || "",
           attendance_cutoff_time:
             settingsMap.attendance_cutoff_time?.setting_value || "",
+          grade_lock_deadline: settingsMap.grade_lock_deadline?.setting_value || "",
+          attendance_lock_deadline:
+            settingsMap.attendance_lock_deadline?.setting_value || "",
         });
 
         // Sync hour/minute state from loaded value
@@ -114,6 +124,18 @@ const SystemSettings = () => {
       ...prev,
       [key]: value,
     }));
+  };
+
+  /** Reset 1 setting field về giá trị đang lưu trên server. */
+  const handleReset = (settingKey: keyof FormData) => {
+    const serverValue = settings[settingKey]?.setting_value ?? "";
+    handleChange(settingKey, serverValue);
+
+    if (settingKey === "attendance_cutoff_time") {
+      const [h, m] = (serverValue || "00:00").split(":");
+      setCutoffHour(h?.padStart(2, "0") || "00");
+      setCutoffMinute(m?.padStart(2, "0") || "00");
+    }
   };
 
   const handleSave = async (settingKey: keyof FormData) => {
@@ -661,7 +683,18 @@ const SystemSettings = () => {
               </div>
 
               {/* Right: Button */}
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("academic_year")}
+                  disabled={
+                    saving ||
+                    formData.academic_year === settings.academic_year?.setting_value
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
                 <Button
                   onClick={() => handleSave("academic_year")}
                   disabled={
@@ -728,7 +761,17 @@ const SystemSettings = () => {
               </div>
 
               {/* Right: Button */}
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("semester")}
+                  disabled={
+                    saving || formData.semester === settings.semester?.setting_value
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
                 <Button
                   onClick={() => handleSave("semester")}
                   disabled={
@@ -812,13 +855,145 @@ const SystemSettings = () => {
               </div>
 
               {/* Right: Button */}
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("attendance_cutoff_time")}
+                  disabled={
+                    saving ||
+                    formData.attendance_cutoff_time ===
+                      settings.attendance_cutoff_time?.setting_value
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
                 <Button
                   onClick={() => handleSave("attendance_cutoff_time")}
                   disabled={
                     saving ||
                     formData.attendance_cutoff_time ===
                     settings.attendance_cutoff_time?.setting_value
+                  }
+                  size="sm"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Grade lock deadline (YYYY-MM-DD, empty = không khóa theo ngày) */}
+        <Card className="transition-shadow hover:shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:gap-6">
+              <div className="flex-shrink-0 mb-4 md:mb-0 md:w-48">
+                <CardTitle className="flex items-center text-lg mb-1">
+                  <Lock className="w-5 h-5 mr-2 text-rose-600 flex-shrink-0" />
+                  Hạn sửa bảng điểm
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Sau ngày này, giáo viên không được sửa điểm trừ khi được cấp quyền. Để trống = không khóa.
+                </CardDescription>
+              </div>
+              <div className="mb-4 md:mb-0 flex flex-col gap-2">
+                <Label className="text-xs text-muted-foreground">Ngày (DD/MM/YYYY)</Label>
+                <SimpleDatePicker
+                  value={formData.grade_lock_deadline}
+                  onChange={(value) => handleChange("grade_lock_deadline", value)}
+                  placeholder="Chọn hạn sửa bảng điểm"
+                  className="w-[200px]"
+                />
+              </div>
+              <div className="flex-1 mb-4 md:mb-0 md:text-right">
+                {settings.grade_lock_deadline && (
+                  <p className="text-xs text-muted-foreground">
+                    Cập nhật:{" "}
+                    {new Date(settings.grade_lock_deadline.updated_at).toLocaleString("vi-VN")}
+                  </p>
+                )}
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("grade_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.grade_lock_deadline ===
+                      (settings.grade_lock_deadline?.setting_value ?? "")
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handleSave("grade_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.grade_lock_deadline ===
+                      (settings.grade_lock_deadline?.setting_value ?? "")
+                  }
+                  size="sm"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Attendance lock deadline */}
+        <Card className="transition-shadow hover:shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:gap-6">
+              <div className="flex-shrink-0 mb-4 md:mb-0 md:w-48">
+                <CardTitle className="flex items-center text-lg mb-1">
+                  <Lock className="w-5 h-5 mr-2 text-violet-600 flex-shrink-0" />
+                  Hạn sửa điểm danh
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Sau ngày này, không sửa điểm danh / đơn nghỉ thủ công trừ khi được cấp quyền. Để trống = không khóa.
+                </CardDescription>
+              </div>
+              <div className="mb-4 md:mb-0 flex flex-col gap-2">
+                <Label className="text-xs text-muted-foreground">Ngày (DD/MM/YYYY)</Label>
+                <SimpleDatePicker
+                  value={formData.attendance_lock_deadline}
+                  onChange={(value) => handleChange("attendance_lock_deadline", value)}
+                  placeholder="Chọn hạn sửa điểm danh"
+                  className="w-[200px]"
+                />
+              </div>
+              <div className="flex-1 mb-4 md:mb-0 md:text-right">
+                {settings.attendance_lock_deadline && (
+                  <p className="text-xs text-muted-foreground">
+                    Cập nhật:{" "}
+                    {new Date(settings.attendance_lock_deadline.updated_at).toLocaleString("vi-VN")}
+                  </p>
+                )}
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("attendance_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.attendance_lock_deadline ===
+                      (settings.attendance_lock_deadline?.setting_value ?? "")
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handleSave("attendance_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.attendance_lock_deadline ===
+                      (settings.attendance_lock_deadline?.setting_value ?? "")
                   }
                   size="sm"
                 >
@@ -882,6 +1057,9 @@ const SystemSettings = () => {
                 </li>
                 <li>
                   • Các thay đổi sẽ ảnh hưởng đến toàn bộ hệ thống ngay lập tức
+                </li>
+                <li>
+                  • Hạn sửa bảng điểm / điểm danh: để trống nghĩa là không khóa theo ngày; có thể cấp ngoại lệ từng user (tab Người dùng).
                 </li>
               </ul>
             </div>

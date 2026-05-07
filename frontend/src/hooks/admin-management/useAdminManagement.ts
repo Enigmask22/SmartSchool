@@ -771,6 +771,33 @@ export function useAdminManagement() {
     [activeTab, currentConfig?.endpoint, selectedSubjects, teacherSubjects, subjectTeachersData, loadData, loadReferenceData]
   );
 
+  /** Bật/tắt quyền sửa điểm / điểm danh sau deadline (non-admin). */
+  const toggleUserEditFlag = useCallback(
+    async (
+      userId: number,
+      field: 'can_edit_grade' | 'can_edit_attendance',
+      value: boolean
+    ) => {
+      try {
+        const response = await api.request(`/admin/users/${userId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ [field]: value }),
+        });
+        if (response.success) {
+          toast.success('Đã cập nhật quyền');
+          await loadData();
+          await loadReferenceData();
+        } else {
+          toast.error(response.message || 'Không thể cập nhật quyền');
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        toast.error('Lỗi: ' + errMsg);
+      }
+    },
+    [loadData, loadReferenceData]
+  );
+
   const filteredData = useCallback(
     (items = data, searchTerm = '', filterOptions?: { academicYear?: string; grade?: string; classId?: string; classes?: any[] }) => {
       return items.filter((item) => {
@@ -837,6 +864,7 @@ export function useAdminManagement() {
     doInitializeClassSubjects,
     handleCreate,
     handleUpdate,
+    toggleUserEditFlag,
     // Confirm Dialog
     confirmState,
     openConfirm,

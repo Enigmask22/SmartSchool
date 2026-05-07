@@ -13,6 +13,8 @@ class UserCreate(BaseModel):
     password: Optional[str] = "defaultpassword"
     role: str
     is_active: Optional[bool] = True
+    can_edit_grade: Optional[bool] = False
+    can_edit_attendance: Optional[bool] = False
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
@@ -21,6 +23,8 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
+    can_edit_grade: Optional[bool] = None
+    can_edit_attendance: Optional[bool] = None
 
 class TeacherCreate(BaseModel):
     user_id: Optional[int] = None

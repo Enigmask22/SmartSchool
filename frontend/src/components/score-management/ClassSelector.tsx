@@ -40,7 +40,7 @@ export default function ClassSelector({
           <CardTitle className="text-xl font-bold">
             Chọn lớp - môn học
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="mt-2">
             Lựa chọn lớp và môn học để bắt đầu quản lý điểm số
           </CardDescription>
         </div>
@@ -94,7 +94,7 @@ export const ClassSelectorSkeleton = () => (
         <CardTitle className="text-xl font-bold">
           Chọn lớp - môn học
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="mt-2">
           Lựa chọn lớp và môn học để bắt đầu quản lý điểm số
         </CardDescription>
       </div>

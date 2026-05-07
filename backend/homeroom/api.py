@@ -10,6 +10,7 @@ from homeroom.models import ResponseModel
 from core.database import get_db
 from core.logger import setup_logger
 from core.dependencies import get_current_user
+from core.edit_permissions import assert_can_edit_attendance, is_attendance_edit_locked_for_user
 
 logger = setup_logger("homeroom_api")
 router = APIRouter()
@@ -239,6 +240,7 @@ async def homeroom_attendance_bootstrap(
             "date": target_date.isoformat(),
             "records": records,
             "stats": stats,
+            "attendance_edit_locked": is_attendance_edit_locked_for_user(current_user),
         }}
     except Exception as e:
         logger.error(f"Error attendance bootstrap: {str(e)}")
@@ -814,6 +816,8 @@ async def create_manual_attendance(
 ):
     """Tạo/cập nhật điểm danh thủ công cho học sinh"""
     try:
+        assert_can_edit_attendance(current_user, db)
+
         if target_date is None:
             target_date = date.today()
 
@@ -1241,6 +1245,8 @@ async def upload_leave_request_image(
     URL public sẽ được lưu vào cột leave_request_image trong bảng attendance.
     """
     try:
+        assert_can_edit_attendance(current_user, db)
+
         if target_date is None:
             target_date = date.today()
 
@@ -1394,6 +1400,8 @@ async def delete_leave_request_image(
 ):
     """Xóa ảnh đơn xin nghỉ học của học sinh (chỉ xóa URL, không xóa file trên storage)."""
     try:
+        assert_can_edit_attendance(current_user, db)
+
         if target_date is None:
             target_date = date.today()
 

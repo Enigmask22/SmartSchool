@@ -1,4 +1,4 @@
-import { Activity, BarChart3 } from "lucide-react";
+import { BarChart3, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -68,9 +68,9 @@ export function Header({
             onClick={onRefresh}
             disabled={refreshing}
             variant="outline"
-            className="mt-6"
+            className="mt-6 h-10"
           >
-            <Activity
+            <RefreshCcw
               className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
             />
             Làm mới
