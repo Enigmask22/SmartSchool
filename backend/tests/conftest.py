@@ -147,10 +147,10 @@ def expired_jwt_token():
 @pytest.fixture
 def new_teacher_data():
     """Data for creating a new teacher user - TS-ADM01-03"""
-    timestamp = str(datetime.now().timestamp()).replace(".", "")
+    ts = str(int(datetime.now().timestamp()))[-6:]
     return {
-        "username": f"test_teacher_{timestamp}",
-        "email": f"test_teacher_{timestamp}@school.edu.vn",
+        "username": f"tch_{ts}",
+        "email": f"tch_{ts}@school.edu.vn",
         "full_name": "Test Teacher User",
         "password": "TestPassword123!@#",
         "role": "teacher"
@@ -160,10 +160,10 @@ def new_teacher_data():
 @pytest.fixture
 def new_admin_data():
     """Data for creating a new admin user - TS-ADM01-03"""
-    timestamp = str(datetime.now().timestamp()).replace(".", "")
+    ts = str(int(datetime.now().timestamp()))[-6:]
     return {
-        "username": f"test_admin_{timestamp}",
-        "email": f"test_admin_{timestamp}@school.edu.vn",
+        "username": f"tad_{ts}",
+        "email": f"tad_{ts}@school.edu.vn",
         "full_name": "Test Admin User",
         "password": "AdminPassword123!@#",
         "role": "admin"
@@ -173,10 +173,10 @@ def new_admin_data():
 @pytest.fixture
 def new_homeroom_data():
     """Data for creating a new homeroom teacher - TS-ADM01-03"""
-    timestamp = str(datetime.now().timestamp()).replace(".", "")
+    ts = str(int(datetime.now().timestamp()))[-6:]
     return {
-        "username": f"test_homeroom_{timestamp}",
-        "email": f"test_homeroom_{timestamp}@school.edu.vn",
+        "username": f"thr_{ts}",
+        "email": f"thr_{ts}@school.edu.vn",
         "full_name": "Test Homeroom Teacher",
         "password": "HomeroomPassword123!@#",
         "role": "homeroom_teacher"

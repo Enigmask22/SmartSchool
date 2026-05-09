@@ -279,8 +279,60 @@ class TestScoreManagementCalculation:
 
 
 class TestScoreManagementDataIntegrity:
-    """TS-SUB02-06: Alternative - Data retrieval and integrity checks"""
-    
+    """TS-SUB02-06: Alternative - Score edit lock policy (deadline + can_edit_grade bypass)"""
+
+    def test_can_edit_grade_flag_bypasses_deadline_lock(self, db):
+        """
+        nguyen_thi_lan must have can_edit_grade=True in DB so deadline lock never applies.
+        This is a precondition for all write tests that use homeroom_jwt_token.
+        """
+        from core.edit_permissions import is_grade_edit_locked_for_user
+        users = db.table("users").select("*").or_(
+            "username.eq.nguyen_thi_lan,email.eq.nguyen_thi_lan"
+        ).execute()
+        assert users.data, "User nguyen_thi_lan not found in DB"
+        user = users.data[0]
+        assert user.get("can_edit_grade") is True, (
+            "nguyen_thi_lan must have can_edit_grade=True; "
+            "set it in admin user settings so write tests are not blocked by grade_lock_deadline"
+        )
+        locked = is_grade_edit_locked_for_user(user)
+        assert locked is False, "User with can_edit_grade=True must never be reported as locked"
+
+    def test_grade_lock_blocks_write_for_teacher_without_override(
+        self, client, teacher_jwt_token, db
+    ):
+        """
+        tran_van_nam (no can_edit_grade) must be blocked with HTTP 403 when
+        grade_lock_deadline is set and has passed.
+        If the deadline is not yet set / not past, the test is skipped.
+        """
+        from core.edit_permissions import is_grade_edit_locked_for_user
+        users = db.table("users").select("*").or_(
+            "username.eq.tran_van_nam,email.eq.tran_van_nam"
+        ).execute()
+        assert users.data, "User tran_van_nam not found in DB"
+        user = users.data[0]
+        assert not user.get("can_edit_grade"), (
+            "tran_van_nam should NOT have can_edit_grade; test precondition failed"
+        )
+
+        if not is_grade_edit_locked_for_user(user):
+            pytest.skip(
+                "grade_lock_deadline is not set or not yet past — "
+                "cannot verify 403 for locked state"
+            )
+
+        # Deadline is past: any write attempt must return 403, regardless of score_id
+        response = client.put(
+            "/api/scores/99999",
+            json={"score_data": {}},
+            headers={"Authorization": f"Bearer {teacher_jwt_token}"}
+        )
+        assert response.status_code == 403, (
+            f"Expected 403 for locked write, got {response.status_code}"
+        )
+
     def test_student_scores_retrieval(self, client, homeroom_jwt_token, teacher_data):
         """Verify student scores can be retrieved correctly"""
         if not teacher_data.get("students"):

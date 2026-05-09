@@ -4,6 +4,7 @@ Module Auth - Backend Modular
 """
 
 import os
+import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, status, Form, Request
@@ -146,8 +147,8 @@ async def login(user_credentials: UserLogin):
         
         user = user_response.data[0]
         
-        # Verify password
-        password_valid = verify_password(user_credentials.password, user["password_hash"])
+        # Verify password — run in thread pool to avoid blocking the asyncio event loop
+        password_valid = await asyncio.to_thread(verify_password, user_credentials.password, user["password_hash"])
         
         if not password_valid:
             raise_validation_error(
@@ -272,13 +273,13 @@ async def change_password(
         
         user = user_response.data[0]
         
-        if not verify_password(current_password, user["password_hash"]):
+        if not await asyncio.to_thread(verify_password, current_password, user["password_hash"]):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password hiện tại không đúng"
             )
         
-        new_password_hash = get_password_hash(new_password)
+        new_password_hash = await asyncio.to_thread(get_password_hash, new_password)
         
         response = db.table("users").update({
             "password_hash": new_password_hash,

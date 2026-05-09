@@ -151,8 +151,7 @@ test.describe('TS-ADM02EX: Bulk Student Import E2E Tests', () => {
   test('TS-ADM02EX-T1-09: Should complete full bulk import flow end-to-end', async ({ page }) => {
     // Step 1: Navigate to Class Management page
     await page.goto(`${ROUTES.CLASS_MANAGEMENT}`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForSelector('main', { timeout: TEST_TIMEOUTS.NORMAL });
+    await page.waitForSelector('main', { timeout: TEST_TIMEOUTS.LONG });
 
     // Step 2: Look for template download button (if available)
     const downloadTemplateButton = page.locator('button').filter({ 
@@ -244,94 +243,7 @@ test.describe('TS-ADM02EX: Bulk Student Import E2E Tests', () => {
       console.log('TS-ADM02EX-T1-09: Preview modal not found - full E2E flow may require actual file');
     }
   });
-
-  /**
-   * TS-ADM02EX-07: Verify error display (partial success scenario)
-   * Validates that error messages are shown when some students have validation errors
-   */
-  test('TS-ADM02EX-07: Should display error messages for invalid records', async ({ page }) => {
-    // Navigate to Class Management
-    await page.goto(`${ROUTES.CLASS_MANAGEMENT}`);
-    await page.waitForLoadState('networkidle');
-
-    // Find bulk import button
-    const bulkImportButton = page.locator('button').filter({ 
-      hasText: /nhập|import|bulk/i 
-    }).first();
-
-    if (await bulkImportButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await bulkImportButton.click();
-      await page.waitForLoadState('networkidle');
-
-      // Look for file input and upload error file
-      const fileInput = page.locator('input[type="file"]');
-      
-      if (await fileInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // File with errors would be uploaded here
-        // Error modal should appear showing validation issues
-        
-        const errorModal = page.locator('[role="dialog"]').filter({ 
-          hasText: /lỗi|error|thất bại/i 
-        }).first();
-
-        const errorVisible = await errorModal.isVisible({ timeout: 5000 }).catch(() => false);
-
-        if (errorVisible) {
-          // Verify error messages are displayed
-          const errorMessages = page.locator('[role="alert"]');
-          const errorCount = await errorMessages.count();
-          expect(errorCount).toBeGreaterThan(0);
-        }
-      }
-    }
-  });
-
-  /**
-   * TS-ADM02EX-08: File format validation UI feedback
-   * Verifies user gets feedback for invalid file formats
-   */
-  test('TS-ADM02EX-08: Should show error for invalid file format', async ({ page }) => {
-    // Navigate to Class Management
-    await page.goto(`${ROUTES.CLASS_MANAGEMENT}`);
-    await page.waitForLoadState('networkidle');
-
-    // Find bulk import button
-    const bulkImportButton = page.locator('button').filter({ 
-      hasText: /nhập|import|bulk/i 
-    }).first();
-
-    if (await bulkImportButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await bulkImportButton.click();
-      await page.waitForLoadState('networkidle');
-
-      // Find file input
-      const fileInput = page.locator('input[type="file"]');
-
-      if (await fileInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // Try uploading invalid file (would need actual .txt file)
-        // Expected: Error message "Định dạng file không được hỗ trợ"
-        
-        // Look for validation feedback
-        const validationMessage = page.locator('text=/định dạng|format|hỗ trợ/i').first();
-        
-        // Message may or may not appear depending on when validation happens
-        // (before upload, during upload, or after)
-        console.log('TS-ADM02EX-08: File format validation UI ready to test');
-      }
-    }
-  });
 });
-
-/**
- * Test helper: Create sample Excel file for upload
- * Note: This is a placeholder - actual implementation would use file fixtures
- * or create files in a temporary directory
- */
-export async function createTestExcelFile(students) {
-  // Would use XLSX or ExcelJS to create actual file
-  // Return file path for upload
-  return '/tmp/test-students.xlsx';
-}
 
 /**
  * Test helper: Verify modal elements

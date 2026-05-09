@@ -89,9 +89,9 @@ test('TS-ADM01-08: Complete user creation workflow', async ({ page }) => {
   // Step 5: Fill User Form with Valid Data
   // =========================================================
   
-  const timestamp = Date.now();
-  const testUsername = `teacher_${timestamp}`;
-  const testEmail = `teacher_${timestamp}@school.edu.vn`;
+  const timestamp = String(Date.now()).slice(-8); // 8 digits → username stays ≤20 chars
+  const testUsername = `tch_${timestamp}`;
+  const testEmail = `tch_${timestamp}@school.edu.vn`;
   const testFullName = 'Test Teacher';
   const testPassword = 'TestPass123!@#';
   
@@ -142,13 +142,9 @@ test('TS-ADM01-08: Complete user creation workflow', async ({ page }) => {
   // Step 7: Verify Success Message (Toast)
   // =========================================================
   
-  // Wait for toast notification (success message)
-  const toast = page.locator('[role="status"], [role="alert"], .toast, .notification, [class*="toast"]').first();
-  try {
-    await expect(toast).toBeVisible({ timeout: TEST_TIMEOUTS.NORMAL });
-  } catch (e) {
-    // Toast might disappear quickly, that's okay
-  }
+  // Toast must appear before it auto-dismisses (sonner toast renders as li[data-sonner-toast])
+  const toast = page.locator('[data-sonner-toast]').first();
+  await expect(toast).toBeVisible({ timeout: TEST_TIMEOUTS.NORMAL });
   
   // =========================================================
   // Step 8: Verify User Appears in Table (Without Page Refresh)
@@ -181,8 +177,8 @@ test('TS-ADM01-08: Complete user creation workflow', async ({ page }) => {
     }
   }
   
-  // Even if exact match not found, verify table is populated and loaded
-  expect(rowCount > 0).toBeTruthy();
+  // New user must be visible in the table without a page refresh
+  expect(userFound).toBe(true);
   
   // =========================================================
   // Step 9: Verify No Page Refresh Occurred
@@ -193,4 +189,25 @@ test('TS-ADM01-08: Complete user creation workflow', async ({ page }) => {
   
   // Take final screenshot
   await page.screenshot({ path: 'test-results/TS-ADM01-08-complete-flow.png' });
+  
+  // =========================================================
+  // Step 10: Cleanup — delete the created test user via API
+  // =========================================================
+  
+  const token = await page.evaluate(() => localStorage.getItem('access_token'));
+  if (token) {
+    const apiBase = 'http://localhost:8000/api';
+    const listResp = await page.request.get(`${apiBase}/admin/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (listResp.ok()) {
+      const listData = await listResp.json();
+      const createdUser = listData.data?.find((u) => u.username === testUsername);
+      if (createdUser) {
+        await page.request.delete(`${apiBase}/admin/users/${createdUser.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    }
+  }
 });

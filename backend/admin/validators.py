@@ -637,11 +637,11 @@ def validate_role(role: Optional[str]) -> str:
         ValidationError if invalid
     """
     if not role:
-        role = "student"  # Default role
+        role = "teacher"  # Default role
     
     role = role.strip().lower()
     
-    valid_roles = ["admin", "teacher", "student"]
+    valid_roles = ["admin", "teacher", "homeroom_teacher"]
     if role not in valid_roles:
         raise_validation_error(
             UserErrorCode.USER_ROLE_INVALID,

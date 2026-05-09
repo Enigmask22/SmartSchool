@@ -92,7 +92,32 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
         
         dob = None
         if student.date_of_birth and student.date_of_birth.strip():
-            dob = validate_date_of_birth(student.date_of_birth)
+            # Use student-specific DOB validation (no minimum age requirement)
+            from datetime import date as _date
+            try:
+                from datetime import datetime as _dt
+                dob_parsed = _dt.strptime(student.date_of_birth.strip(), "%Y-%m-%d").date()
+                if dob_parsed >= _date.today():
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "success": False,
+                            "code": "STUDENT_006",
+                            "message": "Ngày sinh phải trước ngày hôm nay",
+                            "field": "date_of_birth"
+                        }
+                    )
+                dob = dob_parsed.isoformat()
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "success": False,
+                        "code": "STUDENT_006",
+                        "message": "Ngày sinh phải có định dạng YYYY-MM-DD",
+                        "field": "date_of_birth"
+                    }
+                )
         
         # ===== VALIDATE CLASS EXISTS =====
         class_resp = db.table("classes").select("id, grade, academic_year").eq("class_name", class_name).eq("academic_year", academic_year).execute()

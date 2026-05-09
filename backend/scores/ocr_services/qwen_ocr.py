@@ -167,7 +167,7 @@ class QwenOCRService:
 		upper = text.upper()
 		if upper in {"Đ", "D", "DAT", "ĐẠT"}:
 			return "Đ"
-		if upper in {"KĐ", "KD", "KHONG DAT", "KHÔNG ĐẠT", "KHONGDAT", "KHÔNG_ĐẠT"}:
+		if upper in {"KĐ", "KD", "KHONG DAT", "KHONG_DAT", "KHÔNG ĐẠT", "KHONGDAT", "KHÔNG_ĐẠT"}:
 			return "KĐ"
 
 		try:

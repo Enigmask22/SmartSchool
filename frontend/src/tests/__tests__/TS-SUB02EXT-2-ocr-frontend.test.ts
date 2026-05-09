@@ -148,7 +148,7 @@ describe('TS-SUB02EXT-2: OCR Queue Status Display', () => {
   });
 
   it('should display estimated wait time', () => {
-    const estimatedSeconds = 45;
+    const estimatedSeconds = 2700; // 45 minutes
     const estimatedMinutes = Math.ceil(estimatedSeconds / 60);
     const message = `Thời gian chờ khoảng ${estimatedMinutes} phút`;
     

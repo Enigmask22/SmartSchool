@@ -250,8 +250,10 @@ class TestSubjectDashboardLogicAccuracy:
             subject_id = subject_response.data[0]["id"]
             cleanup_attendance["subjects"].append(subject_id)
             
-            # Get teacher
-            teacher_response = db.table("teachers").select("id").eq("is_active", True).limit(1).execute()
+            # Get teacher matching the JWT token user (tran_van_nam)
+            user_response = db.table("users").select("*").or_("username.eq.tran_van_nam,email.eq.tran_van_nam").execute()
+            user_id = user_response.data[0]["id"]
+            teacher_response = db.table("teachers").select("id").eq("user_id", user_id).execute()
             teacher_id = teacher_response.data[0]["id"]
             
             # Assign class-subject to teacher
@@ -563,7 +565,10 @@ class TestSubjectDashboardPerformanceGrouping:
             subject_id = subject_response.data[0]["id"]
             cleanup_attendance["subjects"].append(subject_id)
             
-            teacher_response = db.table("teachers").select("id").eq("is_active", True).limit(1).execute()
+            # Get teacher matching the JWT token user (tran_van_nam)
+            user_response = db.table("users").select("*").or_("username.eq.tran_van_nam,email.eq.tran_van_nam").execute()
+            user_id = user_response.data[0]["id"]
+            teacher_response = db.table("teachers").select("id").eq("user_id", user_id).execute()
             teacher_id = teacher_response.data[0]["id"]
             
             cs_response = db.table("class_subjects").insert({

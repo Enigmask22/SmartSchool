@@ -63,6 +63,52 @@ def cleanup_settings(db):
             print(f"⚠ Failed to restore {setting_key}: {str(e)}")
 
 
+@pytest.fixture
+def cleanup_dayoffs(db):
+    """Two-phase cleanup: Restore dayoff records to their pre-test state."""
+    # key = (year, month, grade)
+    # value = original record dict or None (record did not exist before the test)
+    original_dayoffs = {}
+
+    def capture_before(year: int, month: int, grade: int):
+        key = (year, month, grade)
+        if key not in original_dayoffs:
+            existing = (
+                db.table("dayoff")
+                .select("id, dayoffs_list")
+                .eq("year", year)
+                .eq("month", month)
+                .eq("grade", grade)
+                .execute()
+            )
+            if existing.data:
+                original_dayoffs[key] = {
+                    "id": existing.data[0]["id"],
+                    "dayoffs_list": existing.data[0]["dayoffs_list"],
+                }
+            else:
+                original_dayoffs[key] = None  # record did not exist
+
+    yield capture_before
+
+    # Cleanup: restore or delete each touched record
+    for (year, month, grade), original in original_dayoffs.items():
+        try:
+            if original is None:
+                # Record was created by the test — hard delete it
+                db.table("dayoff").delete().eq("year", year).eq("month", month).eq("grade", grade).execute()
+                print(f"✓ Deleted test dayoff {year}-{month:02d} grade {grade}")
+            else:
+                # Record existed before — restore original dayoffs_list
+                db.table("dayoff").update({
+                    "dayoffs_list": original["dayoffs_list"],
+                    "updated_at": datetime.now().isoformat(),
+                }).eq("id", original["id"]).execute()
+                print(f"✓ Restored dayoff {year}-{month:02d} grade {grade}")
+        except Exception as e:
+            print(f"⚠ Failed to restore dayoff {year}-{month:02d} grade {grade}: {str(e)}")
+
+
 # =====================================================
 # TEST SUITE: TS-ADM10-01
 # =====================================================
@@ -176,8 +222,12 @@ class TestUpdateSystemSettings:
 class TestSettingsValidation:
     """Test system settings validation"""
     
-    def test_TS_ADM10_03_semester_must_be_valid_value(self, client, admin_jwt_token):
+    def test_TS_ADM10_03_semester_must_be_valid_value(self, client, admin_jwt_token, db, cleanup_settings):
         """Should validate semester is one of HK1, HK2, HK3"""
+        original = db.table("system_settings").select("setting_value").eq("setting_key", "semester").execute()
+        if original.data:
+            cleanup_settings["semester"] = original.data[0]["setting_value"]
+
         response = client.put(
             "/api/admin/system-settings/semester",
             json={"setting_value": "INVALID_SEMESTER"},
@@ -188,8 +238,12 @@ class TestSettingsValidation:
         # API may return 400, 422, or may accept but normalize
         assert response.status_code in [200, 400, 422]
     
-    def test_TS_ADM10_03_academic_year_format_validation(self, client, admin_jwt_token):
+    def test_TS_ADM10_03_academic_year_format_validation(self, client, admin_jwt_token, db, cleanup_settings):
         """Should validate academic year format (YYYY-YYYY)"""
+        original = db.table("system_settings").select("setting_value").eq("setting_key", "academic_year").execute()
+        if original.data:
+            cleanup_settings["academic_year"] = original.data[0]["setting_value"]
+
         response = client.put(
             "/api/admin/system-settings/academic_year",
             json={"setting_value": "invalid-year"},
@@ -199,8 +253,12 @@ class TestSettingsValidation:
         # Should accept or reject based on validation
         assert response.status_code in [200, 400, 422]
     
-    def test_TS_ADM10_03_time_format_validation(self, client, admin_jwt_token):
+    def test_TS_ADM10_03_time_format_validation(self, client, admin_jwt_token, db, cleanup_settings):
         """Should validate time format (HH:MM:SS)"""
+        original = db.table("system_settings").select("setting_value").eq("setting_key", "attendance_cutoff_time").execute()
+        if original.data:
+            cleanup_settings["attendance_cutoff_time"] = original.data[0]["setting_value"]
+
         response = client.put(
             "/api/admin/system-settings/attendance_cutoff_time",
             json={"setting_value": "invalid-time"},
@@ -218,9 +276,9 @@ class TestSettingsValidation:
 class TestDayoffManagement:
     """Test dayoff/holiday configuration"""
     
-    def test_TS_ADM10_04_add_dayoff_returns_201(self, client, admin_jwt_token, db, cleanup_settings):
+    def test_TS_ADM10_04_add_dayoff_returns_201(self, client, admin_jwt_token, db, cleanup_dayoffs):
         """Should return 201 Created when adding dayoff"""
-        timestamp = int(datetime.now().timestamp() * 1000) % 100000
+        cleanup_dayoffs(2025, 2, 10)  # capture pre-test state for rollback
         
         response = client.post(
             "/api/admin/dayoffs",
@@ -235,8 +293,10 @@ class TestDayoffManagement:
         
         assert response.status_code in [200, 201], f"Response: {response.text}"
     
-    def test_TS_ADM10_04_dayoff_contains_created_data(self, client, admin_jwt_token):
+    def test_TS_ADM10_04_dayoff_contains_created_data(self, client, admin_jwt_token, db, cleanup_dayoffs):
         """Created dayoff should contain submitted data"""
+        cleanup_dayoffs(2025, 9, 11)  # capture pre-test state for rollback
+        
         response = client.post(
             "/api/admin/dayoffs",
             json={
@@ -289,8 +349,10 @@ class TestDayoffRetrieval:
 class TestBulkDayoffOperations:
     """Test bulk dayoff operations"""
     
-    def test_TS_ADM10_06_add_multiple_grades_dayoff(self, client, admin_jwt_token):
+    def test_TS_ADM10_06_add_multiple_grades_dayoff(self, client, admin_jwt_token, db, cleanup_dayoffs):
         """Should allow adding dayoffs for multiple grades"""
+        cleanup_dayoffs(2025, 4, 12)  # capture pre-test state for rollback
+        
         response = client.post(
             "/api/admin/dayoffs",
             json={
@@ -304,8 +366,10 @@ class TestBulkDayoffOperations:
         
         assert response.status_code in [200, 201]
     
-    def test_TS_ADM10_06_update_existing_dayoff(self, client, admin_jwt_token):
+    def test_TS_ADM10_06_update_existing_dayoff(self, client, admin_jwt_token, db, cleanup_dayoffs):
         """Should allow updating existing dayoff configuration"""
+        cleanup_dayoffs(2025, 5, 10)  # capture pre-test state for rollback (before any writes)
+        
         # Add initial dayoffs
         client.post(
             "/api/admin/dayoffs",
@@ -494,9 +558,11 @@ class TestSettingsIntegration:
         assert found
     
     def test_TS_ADM10_dayoff_workflow(
-        self, client, admin_jwt_token
+        self, client, admin_jwt_token, db, cleanup_dayoffs
     ):
         """Complete dayoff workflow: Add -> Retrieve -> Verify"""
+        cleanup_dayoffs(2025, 7, 11)  # capture pre-test state for rollback
+        
         # 1. ADD dayoffs
         add_resp = client.post(
             "/api/admin/dayoffs",
