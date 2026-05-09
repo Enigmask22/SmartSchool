@@ -2112,14 +2112,17 @@ async def download_score_template(
         workbook.close()
         output.seek(0)
         
-        # Tên file
+        # Tên file - encode properly for Content-Disposition header
         filename = f"Template_Diem_{class_info['class_name']}_{subject_info['subject_name']}_{len(filtered_students)}HS.xlsx"
+        from urllib.parse import quote
+        encoded_filename = quote(filename, encoding='utf-8')
+        ascii_filename = filename.encode('ascii', errors='replace').decode('ascii')
         
         return StreamingResponse(
             output,
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={
-                'Content-Disposition': f'attachment; filename="{filename}"'
+                'Content-Disposition': f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
             }
         )
         

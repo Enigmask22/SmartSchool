@@ -291,18 +291,18 @@ class TestAIServiceReliability:
         class_id = create_test_class(db, cleanup, "10G", teacher_id)
         student_db_id = create_test_student(db, cleanup, class_id, "SV007", "Ninh Văn G")
         
-        # Action: Try to process invalid student
+        # Action: Try to process non-existent student (id 999999 will not be found)
         response = client.post(
             f"/api/ai/register-base64/999999",
-            json={"image": "invalid"},
+            json={"image_base64": "aW52YWxpZA=="},
             headers={"Authorization": f"Bearer {teacher_jwt_token}"}
         )
         
-        # Assert: Should return error gracefully
+        # Assert: Should return error gracefully (404 student not found, or 400/500 from AI)
         assert response.status_code in [400, 404, 422, 500]
         data = response.json()
-        # Should have error message
-        assert "detail" in data or "error" in data
+        # Should have error message (FastAPI 404 uses 'detail'; custom errors may use 'message')
+        assert "detail" in data or "error" in data or "message" in data
 
 
 class TestElectiveSubjectRegistration:

@@ -42,6 +42,7 @@ class TeacherUpdate(BaseModel):
     phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     gender: Optional[str] = None
+    user_id: Optional[int] = None
 
 class SubjectCreate(BaseModel):
     subject_code: str
@@ -56,6 +57,7 @@ class SubjectUpdate(BaseModel):
     description: Optional[str] = None
     is_mandatory: Optional[bool] = None
     is_active: Optional[bool] = None
+    score_column_config: Optional[dict] = None
 
 class ClassCreate(BaseModel):
     class_name: str
