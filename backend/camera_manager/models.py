@@ -43,6 +43,7 @@ class CameraInfo(BaseModel):
     name: str
     source: str
     location: Optional[str]
+    description: Optional[str] = None
     status: CameraStatus
     enabled: bool
     fps: int

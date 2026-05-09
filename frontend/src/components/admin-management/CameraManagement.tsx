@@ -315,6 +315,19 @@ const CameraManagement = () => {
       logger.info("API response:", response);
 
       if (response.success || response.data) {
+        const backendMsg =
+          typeof response.message === "string" && response.message.trim()
+            ? response.message
+            : typeof response.data?.message === "string" &&
+                response.data.message.trim()
+              ? response.data.message
+              : null;
+        toast.success(
+          backendMsg ||
+            (editingCamera
+              ? "Cập nhật camera thành công."
+              : "Đã thêm camera thành công.")
+        );
         setShowAddForm(false);
         setError(null);
         await loadCameras();

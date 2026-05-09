@@ -454,11 +454,21 @@ export function renderTableCell(
   }
 
   if (field === 'can_edit_grade' || field === 'can_edit_attendance') {
+    // Admin: không cần ngoại lệ deadline cho cả hai quyền.
+    // GV bộ môn: chỉ quản điểm môn — không cấp quyền ngoại lệ sửa điểm danh (cột điểm danh luôn không áp dụng).
     const isAdminUser = item.role === 'admin';
+    const isTeacherAttendanceNotApplicable =
+      item.role === 'teacher' && field === 'can_edit_attendance';
+    const showNotApplicable = isAdminUser || isTeacherAttendanceNotApplicable;
+    const notApplicableLabel = isAdminUser
+      ? 'Không áp dụng'
+      : isTeacherAttendanceNotApplicable
+        ? 'Không áp dụng'
+        : '';
     return (
       <div className="flex justify-center w-full">
-        {isAdminUser ? (
-          <span className="text-xs text-muted-foreground">Không áp dụng (admin)</span>
+        {showNotApplicable ? (
+          <span className="text-xs text-muted-foreground italic">{notApplicableLabel}</span>
         ) : (
           <PermissionSwitch
             checked={!!item[field]}
@@ -516,7 +526,9 @@ export function renderTableCell(
 
   if (field === 'score_column_config') {
     if (!item[field] || typeof item[field] !== 'object' || Object.keys(item[field]).length === 0) {
-      return <span className="text-xs italic text-gray-400">Chưa cấu hình</span>;
+      return (
+        <span className="block w-full text-center text-xs italic text-gray-400">Chưa cấu hình</span>
+      );
     }
 
     return <ScoreConfigPortal scoreConfig={item[field]} />;
