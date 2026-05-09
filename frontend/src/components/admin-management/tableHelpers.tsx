@@ -1,7 +1,17 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch.jsx';
 import { Settings2, Package, FileText, ChevronRight, ChevronDown } from 'lucide-react';
+
+/** Radix Switch props — file `switch.jsx` không export type. */
+const PermissionSwitch = Switch as React.ComponentType<{
+  checked?: boolean;
+  disabled?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  className?: string;
+  'aria-label'?: string;
+}>;
 import logger from '@/utils/logger';
 
 // Portal Tooltip Component - renders outside table DOM
@@ -450,28 +460,22 @@ export function renderTableCell(
         {isAdminUser ? (
           <span className="text-xs text-muted-foreground">Không áp dụng (admin)</span>
         ) : (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={!!item[field]}
+          <PermissionSwitch
+            checked={!!item[field]}
             disabled={!hook?.toggleUserEditFlag}
-            onClick={() =>
+            onCheckedChange={(checked) =>
               hook.toggleUserEditFlag(
                 item.id,
                 field as 'can_edit_grade' | 'can_edit_attendance',
-                !item[field]
+                checked
               )
             }
-            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-              item[field] ? 'bg-emerald-500' : 'bg-gray-200'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition ${
-                item[field] ? 'translate-x-5' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+            aria-label={
+              field === 'can_edit_grade'
+                ? 'Bật hoặc tắt quyền sửa bảng điểm'
+                : 'Bật hoặc tắt quyền sửa điểm danh'
+            }
+          />
         )}
       </div>
     );
