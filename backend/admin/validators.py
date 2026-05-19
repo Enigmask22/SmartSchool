@@ -520,12 +520,12 @@ def validate_academic_year(year: Optional[str]) -> str:
 # SEMESTER VALIDATION
 # ============================================================================
 
-def validate_semester(semester: Optional[int]) -> int:
+def validate_semester(semester: Optional[str]) -> str:
     """
-    Validate semester (1 or 2)
+    Validate semester (HK1, HK2, or HK3)
     
     Args:
-        semester: Semester number
+        semester: Semester string
     
     Returns:
         Validated semester
@@ -539,10 +539,10 @@ def validate_semester(semester: Optional[int]) -> int:
             "Học kỳ là bắt buộc"
         )
     
-    if semester not in [1, 2]:
+    if semester not in ["HK1", "HK2", "HK3"]:
         raise_validation_error(
             ClassSubjectErrorCode.CLASS_SUBJECT_INVALID_SEMESTER,
-            "Học kỳ phải là 1 hoặc 2",
+            "Học kỳ phải là HK1, HK2 hoặc HK3",
             field="semester"
         )
     
