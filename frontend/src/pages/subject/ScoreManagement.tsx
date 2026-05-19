@@ -1,6 +1,8 @@
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { Lock } from 'lucide-react';
 import { useScoreManagement, SEMESTERS } from '@/hooks/score-management/useScoreManagement';
 import { useScoreManagementAPI } from '@/hooks/score-management/useScoreManagementAPI';
 import { useScoreManagementFilters } from '@/hooks/score-management/useScoreManagementFilters';
@@ -33,8 +35,23 @@ export default function ScoreManagement() {
 
   const [selectedClassSubject, setSelectedClassSubject] = useState<any>(null);
 
+  const gradeEditLocked = api.teacherInfo?.grade_edit_locked === true;
+
   // Keep minimal hook for confirm dialog and template download
-  const { confirmState, closeConfirm, openConfirm, handleDownloadTemplate } = useScoreManagement(selectedClassSubject?.id);
+  const {
+    confirmState,
+    closeConfirm,
+    openConfirm,
+    handleDownloadTemplate: downloadTemplateRaw,
+  } = useScoreManagement(selectedClassSubject?.id);
+
+  const handleDownloadTemplate = () => {
+    if (gradeEditLocked) {
+      toast.error('Đã quá hạn chỉnh sửa bảng điểm. Liên hệ quản trị nếu cần ngoại lệ.');
+      return;
+    }
+    downloadTemplateRaw();
+  };
 
   // Refetch teacher info when academic year or semester changes
   useEffect(() => {
@@ -68,6 +85,11 @@ export default function ScoreManagement() {
 
   // Handle file upload - connect to import form
   const handleFileUploadWithForm = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (gradeEditLocked) {
+      toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+      event.target.value = '';
+      return;
+    }
     await api.handleFileUpload(event, api.scoreConfig, (data, errors) => {
       importForm.setImportedData(data);
       importForm.setImportErrors(errors);
@@ -79,6 +101,10 @@ export default function ScoreManagement() {
 
   // Handle confirm import - refetch after success
   const handleConfirmImportWithRefresh = async () => {
+    if (gradeEditLocked) {
+      toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+      return;
+    }
     await api.handleConfirmImport(
       selectedClassSubject,
       filters.academicYear,
@@ -130,6 +156,7 @@ export default function ScoreManagement() {
           onAcademicYearChange={filters.setAcademicYear}
           onSemesterChange={filters.setSemester}
           loading={api.loading && !api.teacherInfo}
+          isFilterLocked={!!selectedClassSubject}
         />
 
         {/* Class Selector - Skeleton on init, content when ready */}
@@ -143,12 +170,21 @@ export default function ScoreManagement() {
           />
         ) : (
           <div className="space-y-6">
+            {gradeEditLocked && (
+              <Alert className="border-amber-200 bg-amber-50">
+                <Lock className="h-4 w-4 text-amber-800" />
+                <AlertDescription className="text-amber-900">
+                  Bảng điểm đang khóa sửa (đã quá hạn theo cấu hình hệ thống hoặc bạn chưa được cấp quyền). Bạn vẫn có thể xem và xuất Excel.
+                </AlertDescription>
+              </Alert>
+            )}
             {/* Score Table Header */}
             <ScoreTableHeader
               selectedClassSubject={selectedClassSubject}
               academicYear={filters.academicYear}
               semester={filters.semester}
               hasScoreConfig={!!api.scoreConfig}
+              gradeEditLocked={gradeEditLocked}
               onBack={() => setSelectedClassSubject(null)}
               onDownloadTemplate={handleDownloadTemplate}
               onFileUpload={handleFileUploadWithForm}
@@ -159,16 +195,30 @@ export default function ScoreManagement() {
             {/* Config Editor Modal */}
             <ConfigEditorModal
               open={configForm.showConfigEditor}
-              onOpenChange={configForm.setShowConfigEditor}
+              onOpenChange={(open) => {
+                if (open && gradeEditLocked) {
+                  toast.error('Đã quá hạn chỉnh sửa cấu hình cột điểm.');
+                  return;
+                }
+                configForm.setShowConfigEditor(open);
+              }}
               configForm={configForm.configForm}
               onConfigInputChange={(columnName, field, value) =>
                 configForm.updateConfigField(columnName, field, value)
               }
               onAddColumn={() => {
+                if (gradeEditLocked) {
+                  toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+                  return;
+                }
                 configForm.setShowAddColumnModal(true);
                 configForm.resetNewColumnForm();
               }}
               onRemoveColumn={(columnName) => {
+                if (gradeEditLocked) {
+                  toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+                  return;
+                }
                 if (Object.keys(configForm.configForm).length <= 1) {
                   toast.error('Phải có ít nhất một cột điểm!');
                   return;
@@ -184,6 +234,10 @@ export default function ScoreManagement() {
                 });
               }}
               onSaveConfig={() => {
+                if (gradeEditLocked) {
+                  toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+                  return;
+                }
                 if (Object.keys(configForm.configForm).length === 0) {
                   toast.error('Phải có ít nhất một cột điểm!');
                   return;
@@ -225,6 +279,10 @@ export default function ScoreManagement() {
                 configForm.setNewColumnForm({ ...configForm.newColumnForm, ...updates })
               }
               onConfirm={() => {
+                if (gradeEditLocked) {
+                  toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+                  return;
+                }
                 if (configForm.newColumnForm.name && configForm.newColumnForm.label) {
                   const validName = configForm.newColumnForm.name
                     .replace(/\s+/g, '_')
@@ -280,10 +338,16 @@ export default function ScoreManagement() {
                 }}
                 getDisplayColumns={api.getDisplayColumns}
                 calculateFinalScore={calculateFinalScoreWrapper}
+                gradeEditLocked={gradeEditLocked}
               />
             ) : (
               <NoScoreConfigState
+                gradeEditLocked={gradeEditLocked}
                 onCreateConfig={() => {
+                  if (gradeEditLocked) {
+                    toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+                    return;
+                  }
                   configForm.initializeConfigEditor(api.scoreConfig?.score_column_config);
                 }}
               />
@@ -300,6 +364,10 @@ export default function ScoreManagement() {
           scoreForm={editForm.scoreForm}
           onScoreInputChange={(columnName, value) => editForm.updateScoreField(columnName, value)}
           onSaveScore={() => {
+            if (gradeEditLocked) {
+              toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
+              return;
+            }
             api.handleSaveScore(
               editForm.editingStudent,
               selectedClassSubject,
@@ -313,6 +381,7 @@ export default function ScoreManagement() {
             );
           }}
           getDisplayColumns={api.getDisplayColumns}
+          readOnly={gradeEditLocked}
         />
 
         {/* Import Preview Modal */}

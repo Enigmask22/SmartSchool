@@ -283,6 +283,7 @@ class CameraCapture:
             name=self.config.name,
             source=self.config.source,
             location=self.config.location,
+            description=self.config.description,
             status=self.status,
             enabled=self.config.enabled,
             fps=self.config.fps,

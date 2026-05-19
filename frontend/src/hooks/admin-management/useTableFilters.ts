@@ -1,3 +1,5 @@
+import { USER_ROLES } from "@/utils/constants";
+
 export interface FilterConfig {
   type: 'text' | 'select' | 'boolean' | 'date' | 'multiselect';
   label: string;
@@ -21,13 +23,21 @@ export const FILTER_CONFIGS: TabFilterConfigs = {
         label: 'Vai trò',
         field: 'role',
         options: [
-          { label: 'Quản trị viên', value: 'admin' },
-          { label: 'GVCN', value: 'homeroom_teacher' },
-          { label: 'Giáo viên', value: 'teacher' },
+          { label: 'Quản trị viên', value: USER_ROLES.ADMIN },
+          { label: 'GVCN', value: USER_ROLES.HOMEROOM_TEACHER },
+          { label: 'Giáo viên', value: USER_ROLES.SUBJECT_TEACHER },
         ],
       },
     ],
-    sortableFields: ['id', 'username', 'email', 'full_name', 'role'],
+    sortableFields: [
+      'id',
+      'username',
+      'email',
+      'full_name',
+      'role',
+      'can_edit_grade',
+      'can_edit_attendance',
+    ],
   },
   teachers: {
     filters: [

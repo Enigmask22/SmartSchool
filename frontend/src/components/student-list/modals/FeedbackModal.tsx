@@ -49,8 +49,8 @@ interface FeedbackModalProps {
   onSaveComment: () => void;
   onClose: () => void;
   smsLoading?: boolean;
-  exportStudentReportCard?: () => void;
-  openEmailDialog?: () => void;
+  exportStudentReportCard?: (student: Student) => void;
+  openEmailDialog?: (student: Student) => void;
 }
 
 export function FeedbackModal({
@@ -124,7 +124,7 @@ export function FeedbackModal({
             <div className="bg-white border border-gray-200 rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Thông Tin Học Sinh
+                  Thông tin học sinh
                 </h3>
               </div>
               <div className="px-6 py-4 space-y-4">
@@ -134,7 +134,7 @@ export function FeedbackModal({
                     htmlFor="student_name"
                     className="block mb-1 text-sm font-medium text-gray-700"
                   >
-                    Tên Học Sinh
+                    Họ và tên
                   </label>
                   <input
                     id="student_name"
@@ -155,7 +155,7 @@ export function FeedbackModal({
                     htmlFor="score"
                     className="block mb-1 text-sm font-medium text-gray-700"
                   >
-                    Điểm trung bình học kì
+                    Điểm trung bình học kỳ
                   </label>
                   <input
                     id="score"
@@ -224,14 +224,14 @@ export function FeedbackModal({
                     htmlFor="notes"
                     className="block mb-1 text-sm font-medium text-gray-700"
                   >
-                    Ghi Chú Thêm (Tùy chọn)
+                    Ghi chú thêm (Tùy chọn)
                   </label>
                   <textarea
                     id="notes"
                     value={form?.notes || ""}
                     onChange={(e) => onFormChange("notes", e.target.value)}
                     placeholder="Mặc định: học sinh chuyên cần 100%. Nếu có vắng mặt/chuyên cần kém, vui lòng ghi rõ tại đây (ví dụ: vắng 2 buổi do ốm, hay thường xuyên đi học muộn, ...)."
-                    rows={3}
+                    rows={6}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
@@ -274,7 +274,7 @@ export function FeedbackModal({
                   ) : (
                     <>
                       <MessageCircle className="w-4 h-4 mr-2" />
-                      <span>Tạo Nhận Xét</span>
+                      <span>Tạo nhận xét</span>
                     </>
                   )}
                 </button>
@@ -285,7 +285,7 @@ export function FeedbackModal({
             <div className="bg-white border border-gray-200 rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Nhận Xét Được Tạo
+                  Nhận xét được tạo
                 </h3>
               </div>
               <div className="px-6 py-4">
@@ -293,20 +293,20 @@ export function FeedbackModal({
                   <div className="space-y-4">
                     <div className="p-4 border border-indigo-200 rounded-lg bg-indigo-50">
                       <div className="flex items-start gap-3">
-                        <MessageCircle className="flex-shrink-0 w-5 h-5 mt-1 text-indigo-600" />
                         <div className="flex-1">
                           <h4 className="mb-2 font-medium text-indigo-900">
-                            Nhận xét cho {form?.student_name} (có thể
-                            chỉnh sửa trước khi gửi):
+                            {/* <MessageCircle className="inline w-5 h-5 mt-1 text-indigo-600" /> */}
+                            Nhận xét dành cho {form?.student_name} (có thể
+                            chỉnh sửa)
                           </h4>
                           <textarea
                             value={generatedFeedback}
                             onChange={(e) => onGeneratedFeedbackChange(e.target.value)}
-                            rows={6}
+                            rows={13}
                             className="w-full px-3 py-2 text-sm border border-indigo-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                           />
                           <p className="mt-2 text-xs text-indigo-700">
-                            Bạn có thể điều chỉnh câu chữ/chi tiết trước khi
+                            Bạn có thể điều chỉnh nội dung trước khi
                             gửi cho phụ huynh hoặc xuất phiếu điểm.
                           </p>
                         </div>
@@ -365,11 +365,11 @@ export function FeedbackModal({
         {/* Modal Footer */}
         <div className="px-6 py-4 rounded-b-lg bg-gray-50">
           <div className="flex items-center justify-between">
-            {generatedFeedback && (
+            {generatedFeedback && selectedStudent && (
               <div className="flex items-center gap-2">
                 {exportStudentReportCard && (
                   <Button
-                    onClick={exportStudentReportCard}
+                    onClick={() => exportStudentReportCard(selectedStudent)}
                     className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700"
                   >
                     <Download className="w-4 h-4" />
@@ -378,7 +378,7 @@ export function FeedbackModal({
                 )}
                 {openEmailDialog && (
                   <Button
-                    onClick={openEmailDialog}
+                    onClick={() => openEmailDialog(selectedStudent)}
                     className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700"
                   >
                     <Mail className="w-4 h-4" />

@@ -21,6 +21,7 @@ from core.database import get_db
 from core.logger import setup_logger
 from core.system_settings import get_current_academic_year, get_current_semester
 from core.dependencies import get_current_user
+from core.edit_permissions import assert_can_edit_grade, is_grade_edit_locked_for_user
 
 logger = setup_logger("scores_api")
 router = APIRouter()
@@ -614,9 +615,14 @@ async def get_student_all_scores(
         )
 
 @router.post("/")
-async def create_score(score: ScoreCreate, db=Depends(get_db)):
+async def create_score(
+    score: ScoreCreate,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
     """Tạo điểm mới"""
     try:
+        assert_can_edit_grade(current_user, db)
         score_data_dict = score.dict()
         final_score = calculate_final_grade(score_data_dict["score_data"])
         score_data_dict["final_score"] = final_score
@@ -639,10 +645,12 @@ async def create_score(score: ScoreCreate, db=Depends(get_db)):
 async def update_score(
     score_id: int,
     score: ScoreUpdate,
-    db=Depends(get_db)
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """Cập nhật điểm"""
     try:
+        assert_can_edit_grade(current_user, db)
         update_data = score.dict(exclude_unset=True)
         
         if "score_data" in update_data:
@@ -702,7 +710,8 @@ async def get_teacher_info(
         
         teacher_info = {
             "teacher": current_teacher,
-            "assigned_classes": class_subjects.data if class_subjects.data else []
+            "assigned_classes": class_subjects.data if class_subjects.data else [],
+            "grade_edit_locked": is_grade_edit_locked_for_user(current_user),
         }
         
         return {
@@ -953,15 +962,25 @@ async def get_students_by_class_subject(
         subject_data = db.table("subjects").select("*").eq("id", class_subject_info["subject_id"]).execute()
         subject_info = subject_data.data[0] if subject_data.data else None
         
-        # Lấy danh sách học sinh trong lớp theo class_name và grade (bao gồm subject_selected)
-        students = db.table("students").select("id, student_id, full_name, class_name, grade, subject_selected, is_active").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).execute()
+        # Lấy danh sách học sinh từ homeroom_students_history theo class_id
+        # (tránh dùng class_name vì class_name trong students phản ánh lớp hiện tại, không phải lớp cũ)
+        hsh_resp = db.table("homeroom_students_history").select("student_id").eq("class_id", class_subject_info["class_id"]).execute()
+        history_student_ids = [r["student_id"] for r in (hsh_resp.data or []) if r.get("student_id") is not None]
+        
+        if not history_student_ids:
+            students_data = []
+        else:
+            students_resp = db.table("students").select(
+                "id, student_id, full_name, class_name, grade, subject_selected, is_active"
+            ).in_("id", history_student_ids).eq("is_active", True).execute()
+            students_data = students_resp.data or []
         
         # Filter học sinh theo subject_selected (core_subjects hoặc elective_subjects)
         filtered_students = []
-        if students.data and subject_info:
+        if students_data and subject_info:
             subject_code = subject_info.get("subject_code")
             
-            for student in students.data:
+            for student in students_data:
                 subject_selected = student.get("subject_selected")
                 if subject_selected and isinstance(subject_selected, dict):
                     core_subjects = subject_selected.get("core_subjects", [])
@@ -973,7 +992,7 @@ async def get_students_by_class_subject(
                 # Nếu không có subject_selected, KHÔNG bao gồm học sinh
         else:
             # Nếu không có dữ liệu, giữ nguyên danh sách
-            filtered_students = students.data or []
+            filtered_students = students_data
         
         # Lấy điểm của các học sinh cho môn này
         student_ids = [s["id"] for s in filtered_students]
@@ -1022,11 +1041,13 @@ async def get_students_by_class_subject(
 @router.post("/score")
 async def create_or_update_score(
     score: dict,
+    current_user=Depends(get_current_user),
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
     """Tạo hoặc cập nhật điểm học sinh"""
     try:
+        assert_can_edit_grade(current_user, db)
         from scores.models import ScoreCreate
         
         score_obj = ScoreCreate(**score)
@@ -1572,12 +1593,12 @@ async def get_teacher_dashboard_analytics(
                     pass  # Ignore non-numeric strings like "Đ", "KĐ"
         average_score = sum(numeric_scores) / len(numeric_scores) if len(numeric_scores) > 0 else 0
         
-        # Lấy tổng số học sinh trong các lớp dạy
+        # Lấy tổng số học sinh trong các lớp dạy (qua homeroom_students_history)
+        unique_class_ids = list({cs["class_id"] for cs in class_subjects.data if cs.get("class_id")})
         total_students_count = 0
-        for cs in class_subjects.data:
-            if cs.get("classes"):
-                students_in_class = db.table("students").select("id").eq("class_name", cs["classes"]["class_name"]).eq("grade", cs["classes"]["grade"]).eq("is_active", True).execute()
-                total_students_count += len(students_in_class.data) if students_in_class.data else 0
+        for cid in unique_class_ids:
+            hsh_resp = db.table("homeroom_students_history").select("student_id").eq("class_id", cid).execute()
+            total_students_count += len(hsh_resp.data) if hsh_resp.data else 0
         
         # === PHÂN NHÓM HỌC LỰC (theo tiêu chuẩn giáo dục VN) ===
         excellent = []  # Giỏi: 8.0 - 10
@@ -1612,34 +1633,36 @@ async def get_teacher_dashboard_analytics(
             else:
                 poor.append(score)
         
+        # Denominator for performance group percentages: only students who have a numeric final score
+        categorized_count = len(excellent) + len(good) + len(average) + len(weak) + len(poor)
         performance_groups = {
             "excellent": {
                 "count": len(excellent),
-                "percentage": round(len(excellent) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
+                "percentage": round(len(excellent) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
                 "label": "Giỏi (8.0 - 10)",
                 "color": "#059669"
             },
             "good": {
                 "count": len(good),
-                "percentage": round(len(good) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
+                "percentage": round(len(good) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
                 "label": "Khá (6.5 - 7.9)",
                 "color": "#2563EB"
             },
             "average": {
                 "count": len(average),
-                "percentage": round(len(average) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
+                "percentage": round(len(average) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
                 "label": "Trung bình (5.0 - 6.4)",
                 "color": "#D97706"
             },
             "weak": {
                 "count": len(weak),
-                "percentage": round(len(weak) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
+                "percentage": round(len(weak) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
                 "label": "Yếu (3.5 - 4.9)",
                 "color": "#EA580C"
             },
             "poor": {
                 "count": len(poor),
-                "percentage": round(len(poor) * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0,
+                "percentage": round(len(poor) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
                 "label": "Kém (< 3.5)",
                 "color": "#DC2626"
             }
@@ -1818,7 +1841,7 @@ async def get_teacher_dashboard_analytics(
             
             # === THỐNG KÊ ĐẠT/KHÔNG ĐẠT ===
             pass_count = len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and sc >= 5.0])
-            fail_count = total_students_with_scores - pass_count
+            fail_count = len([s for s in scores_data if (sc := get_numeric_score(s)) is not None and sc < 5.0])
         
         analytics_data = {
             "academic_year": academic_year,
@@ -1835,7 +1858,7 @@ async def get_teacher_dashboard_analytics(
                 "lowest_score": round(min([s for s in numeric_scores if s > 0]), 2) if numeric_scores else 0,
                 "pass_count": pass_count,
                 "fail_count": fail_count,
-                "pass_rate": round(pass_count * 100 / total_students_with_scores, 2) if total_students_with_scores > 0 else 0
+                "pass_rate": round(pass_count * 100 / total_students_count, 2) if total_students_count > 0 else 0
             },
             "performance_groups": performance_groups,
             "score_distribution": score_distribution,
@@ -1948,26 +1971,30 @@ async def download_score_template(
             # Fallback to default columns if no score_column_config
             score_columns = ['diem_thuong_xuyen', 'diem_thi_giua_ki', 'diem_thi_cuoi_ki']
         
-        # Lấy danh sách học sinh (bao gồm subject_selected)
-        students = db.table("students").select("id, student_id, full_name, class_name, grade, subject_selected, is_active").eq("class_name", class_info["class_name"]).eq("grade", class_info["grade"]).eq("is_active", True).order("student_id").execute()
+        # Lấy danh sách học sinh qua homeroom_students_history theo class_id
+        hsh_resp = db.table("homeroom_students_history").select("student_id").eq("class_id", class_subject_info["class_id"]).execute()
+        history_student_ids = [r["student_id"] for r in (hsh_resp.data or []) if r.get("student_id") is not None]
+        if history_student_ids:
+            students_resp = db.table("students").select(
+                "id, student_id, full_name, class_name, grade, subject_selected, is_active"
+            ).in_("id", history_student_ids).eq("is_active", True).order("student_id").execute()
+            students_raw = students_resp.data or []
+        else:
+            students_raw = []
         
         # Filter học sinh theo subject_selected
         filtered_students = []
-        if students.data and subject_info:
+        if students_raw and subject_info:
             subject_code = subject_info.get("subject_code")
-            
-            for student in students.data:
+            for student in students_raw:
                 subject_selected = student.get("subject_selected")
                 if subject_selected and isinstance(subject_selected, dict):
                     core_subjects = subject_selected.get("core_subjects", [])
                     elective_subjects = subject_selected.get("elective_subjects", [])
-                    
-                    # Kiểm tra xem học sinh có học môn này không
                     if subject_code in core_subjects or subject_code in elective_subjects:
                         filtered_students.append(student)
         else:
-            # Nếu không có dữ liệu, giữ nguyên danh sách
-            filtered_students = students.data or []
+            filtered_students = students_raw
         
         # Tạo file Excel
         output = io.BytesIO()
@@ -2101,14 +2128,17 @@ async def download_score_template(
         workbook.close()
         output.seek(0)
         
-        # Tên file
+        # Tên file - encode properly for Content-Disposition header
         filename = f"Template_Diem_{class_info['class_name']}_{subject_info['subject_name']}_{len(filtered_students)}HS.xlsx"
+        from urllib.parse import quote
+        encoded_filename = quote(filename, encoding='utf-8')
+        ascii_filename = filename.encode('ascii', errors='replace').decode('ascii')
         
         return StreamingResponse(
             output,
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={
-                'Content-Disposition': f'attachment; filename="{filename}"'
+                'Content-Disposition': f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
             }
         )
         
@@ -2125,11 +2155,13 @@ async def download_score_template(
 @router.post("/bulk-import")
 async def bulk_import_grades(
     import_data: dict,
+    current_user=Depends(get_current_user),
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
     """Nhập điểm hàng loạt từ file Excel/CSV"""
     try:
+        assert_can_edit_grade(current_user, db)
         class_subject_id = import_data.get("class_subject_id")
         scores_data = import_data.get("scores", []) or import_data.get("grades", [])  # Backward compatibility: support both "scores" and "grades"
         
@@ -2153,7 +2185,9 @@ async def bulk_import_grades(
         semester = import_data.get("semester") or get_current_semester()
         
         # Lấy score_column_config từ subjects table
-        subject_resp = db.table("subjects").select("score_column_config, is_active").eq("id", subject_id).eq("is_active", True).execute()
+        # Note: do NOT filter by is_active - an assigned class_subject must remain importable
+        # even if the subject was later deactivated.
+        subject_resp = db.table("subjects").select("score_column_config").eq("id", subject_id).execute()
         
         if not subject_resp.data or not subject_resp.data[0].get("score_column_config"):
             raise HTTPException(
@@ -2292,6 +2326,12 @@ async def bulk_import_grades(
                 # Thêm Mon_hoc vào score_data
                 score_data['Mon_hoc'] = subject_name
                 
+                # Nếu không có điểm nào thực sự, bỏ qua bản ghi này
+                # (tránh ghi đè dữ liệu cũ bằng score_data rỗng)
+                real_score_keys = [k for k in score_data if k != 'Mon_hoc']
+                if not real_score_keys:
+                    continue
+                
                 # Tính final score với transformed data
                 final_score = calculate_final_grade(score_data, score_column_config)
                 
@@ -2402,6 +2442,7 @@ async def get_queue_stats(
 @router.post("/ocr/import-from-parsed")
 async def import_grades_from_parsed_ocr(
     import_data: dict,
+    current_user=Depends(get_current_user),
     current_teacher=Depends(get_current_teacher),
     db=Depends(get_db)
 ):
@@ -2409,8 +2450,7 @@ async def import_grades_from_parsed_ocr(
     Import điểm từ dữ liệu đã parse bởi OCR (sau khi review)
     Tái sử dụng logic bulk_import_grades
     """
-    # Sử dụng lại hàm bulk_import_grades đã có
-    return await bulk_import_grades(import_data, current_teacher, db)
+    return await bulk_import_grades(import_data, current_user, current_teacher, db)
 
 
 @router.post("/ocr/export-parsed-to-excel")

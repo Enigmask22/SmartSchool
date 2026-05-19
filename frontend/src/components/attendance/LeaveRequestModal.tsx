@@ -23,6 +23,7 @@ import logger from "../../utils/logger";
  * - targetDate: string - Ngày điểm danh (YYYY-MM-DD)
  * - existingImageUrl: string|null - URL ảnh đơn xin nghỉ hiện tại (nếu có)
  * - onUploadSuccess: (imageUrl: string) => void - Callback sau khi upload thành công
+ * - uploadDisabled: khi true chỉ xem, không upload/thay ảnh (khóa sửa điểm danh).
  */
 const LeaveRequestModal = ({
   open,
@@ -33,6 +34,7 @@ const LeaveRequestModal = ({
   targetDate,
   existingImageUrl,
   onUploadSuccess,
+  uploadDisabled = false,
 }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(existingImageUrl || null);
   const [uploading, setUploading] = useState(false);
@@ -151,6 +153,13 @@ const LeaveRequestModal = ({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Thông báo khóa sửa */}
+        {uploadDisabled && (
+          <div className="p-3 text-sm border rounded text-amber-800 bg-amber-50 border-amber-200">
+            Đã quá hạn chỉnh sửa điểm danh. Chỉ xem được đơn xin nghỉ đã lưu; không thể tải lên hoặc thay đổi.
+          </div>
+        )}
+
         {/* Thông báo lỗi */}
         {error && (
           <div className="p-3 text-sm border rounded text-destructive bg-destructive/10 border-destructive/20">
@@ -213,17 +222,19 @@ const LeaveRequestModal = ({
         </div>
 
         {/* File input ẩn */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+        {!uploadDisabled && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+        )}
 
         <DialogFooter className="gap-2 sm:gap-0">
           {/* Nút chọn ảnh mới */}
-          {!hasPreview && (
+          {!uploadDisabled && !hasPreview && (
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
@@ -234,7 +245,7 @@ const LeaveRequestModal = ({
           )}
 
           {/* Khi đang preview: nút Upload + Hủy */}
-          {hasPreview && (
+          {!uploadDisabled && hasPreview && (
             <>
               <Button
                 variant="outline"
@@ -257,7 +268,7 @@ const LeaveRequestModal = ({
           )}
 
           {/* Nút đóng */}
-          {!hasPreview && (
+          {(!hasPreview || uploadDisabled) && (
             <Button variant="secondary" onClick={handleClose}>
               Đóng
             </Button>

@@ -4,6 +4,7 @@ Module Auth - Backend Modular
 """
 
 import os
+import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, status, Form, Request
@@ -22,6 +23,8 @@ from core.database import get_db, get_school_db
 from core.logger import setup_logger
 from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from core.dependencies import get_current_user, get_current_user_from_refresh_token
+from core.edit_permissions import enrich_user_for_client
+from core.error_codes import AuthErrorCode, raise_validation_error
 
 logger = setup_logger("auth_api")
 
@@ -124,38 +127,43 @@ async def register(user: UserCreate):
 
 @router.post("/login")
 async def login(user_credentials: UserLogin):
-    """Đăng nhập user"""
+    """Đăng nhập user với username hoặc email"""
     try:
         # Multi-database routing disabled - using single database
         # db = get_school_db(user_credentials.username)
         db = get_db()
         
+        # Backend supports login with both username and email via .or_() query
         user_response = db.table("users").select("*").or_(
             f"username.eq.{user_credentials.username},email.eq.{user_credentials.username}"
         ).execute()
         
         if not user_response.data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Username hoặc password không đúng"
+            # Generic message for security (doesn't reveal if email/username exists)
+            raise_validation_error(
+                AuthErrorCode.LOGIN_INVALID_CREDENTIALS,
+                "Tên đăng nhập/email hoặc mật khẩu không chính xác"
             )
         
         user = user_response.data[0]
         
-        password_valid = verify_password(user_credentials.password, user["password_hash"])
+        # Verify password — run in thread pool to avoid blocking the asyncio event loop
+        password_valid = await asyncio.to_thread(verify_password, user_credentials.password, user["password_hash"])
         
         if not password_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Username hoặc password không đúng"
+            raise_validation_error(
+                AuthErrorCode.LOGIN_INVALID_CREDENTIALS,
+                "Tên đăng nhập/email hoặc mật khẩu không chính xác"
             )
         
+        # Check if account is active
         if not user.get("is_active", True):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Tài khoản đã bị vô hiệu hóa"
+            raise_validation_error(
+                AuthErrorCode.LOGIN_ACCOUNT_INACTIVE,
+                "Tài khoản này không hoạt động"
             )
         
+        # Create tokens
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         
@@ -171,7 +179,9 @@ async def login(user_credentials: UserLogin):
             expires_delta=refresh_token_expires
         )
         
+        # Remove sensitive data before returning
         user.pop("password_hash", None)
+        user_public = enrich_user_for_client(user)
         
         return {
             "success": True,
@@ -180,7 +190,7 @@ async def login(user_credentials: UserLogin):
                 "refresh_token": refresh_token,
                 "token_type": "bearer",
                 "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                "user": user
+                "user": user_public
             }
         }
         
@@ -199,7 +209,7 @@ async def get_current_user_info(request: Request, current_user=Depends(get_curre
     return {
         "success": True,
         "message": "Lấy thông tin user thành công",
-        "data": current_user
+        "data": enrich_user_for_client(current_user)
     }
 
 @router.post("/refresh")
@@ -212,8 +222,7 @@ async def refresh_token(request: Request, current_user=Depends(get_current_user_
             expires_delta=access_token_expires
         )
         
-        user_data = current_user.copy()
-        user_data.pop("password_hash", None)
+        user_data = enrich_user_for_client(current_user)
         
         return {
             "success": True,
@@ -264,13 +273,13 @@ async def change_password(
         
         user = user_response.data[0]
         
-        if not verify_password(current_password, user["password_hash"]):
+        if not await asyncio.to_thread(verify_password, current_password, user["password_hash"]):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password hiện tại không đúng"
             )
         
-        new_password_hash = get_password_hash(new_password)
+        new_password_hash = await asyncio.to_thread(get_password_hash, new_password)
         
         response = db.table("users").update({
             "password_hash": new_password_hash,

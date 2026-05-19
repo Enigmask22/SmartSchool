@@ -12,7 +12,7 @@ export function UsernameField({ value, onChange }: UsernameFieldProps) {
   return (
     <div className="space-y-2">
       <label htmlFor="username" className="text-sm font-medium text-gray-700">
-        Username
+        Email / Tên đăng nhập
       </label>
       <Input
         id="username"
@@ -22,8 +22,11 @@ export function UsernameField({ value, onChange }: UsernameFieldProps) {
         required
         value={value}
         onChange={onChange}
-        placeholder="nguyen_van_an"
+        placeholder="Nhập tên đăng nhập hoặc email"
       />
+      {/* <p className="text-xs text-gray-500">
+        Bạn có thể sử dụng tên đăng nhập hoặc email để đăng nhập
+      </p> */}
     </div>
   );
 }

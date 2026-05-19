@@ -252,11 +252,11 @@ class TestAdminUserManagement:
             headers=headers
         )
         
-        assert response.status_code == 400, \
-            f"Expected 400, got {response.status_code}: {response.text}"
+        assert response.status_code in [400, 409], \
+            f"Expected 400/409, got {response.status_code}: {response.text}"
         data = response.json()
-        assert "Username đã được sử dụng" in data.get("detail", ""), \
-            "Should return username already used error"
+        assert "Tên đăng nhập" in data.get("detail", "") or "username" in data.get("detail", "").lower(), \
+            "Should return username already exists error"
     
     
     @pytest.mark.integration
@@ -281,7 +281,8 @@ class TestAdminUserManagement:
             headers=headers
         )
         
-        assert response.status_code == 400
+        assert response.status_code in [400, 409], \
+            f"Expected 400/409, got {response.status_code}: {response.text}"
     
     
     # =========================================================

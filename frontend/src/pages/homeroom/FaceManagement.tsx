@@ -18,13 +18,13 @@ import { useSystemSettings } from '@/contexts/useSystemSettings';
 import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 import { AuthContext } from '@/contexts/AuthContext';
 import {
-  AIStatusCard,
+  //AIStatusCard,
   StudentsTable,
   Instructions,
   MultipleFaceRegistration,
 } from '@/components/face-management';
 import {
-  AIStatusCardSkeleton,
+  //AIStatusCardSkeleton,
   StudentsTableSkeleton,
 } from '@/components/face-management/FaceManagementSkeleton';
 
@@ -155,7 +155,7 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
       )}
 
       {/* AI Status Card */}
-      {api.loading && !api.aiStatus ? (
+      {/* {api.loading && !api.aiStatus ? (
         <AIStatusCardSkeleton />
       ) : (
         <AIStatusCard
@@ -163,7 +163,7 @@ export default function FaceManagement({ isHomeroom: _isHomeroom = false }: Face
           onReloadModels={api.reloadModels}
           onRefresh={() => api.fetchData(filters.selectedAcademicYear, filters.selectedClass)}
         />
-      )}
+      )} */}
 
       {/* Students Table - Skeleton on initial load */}
       {api.loading && api.students.length === 0 ? (

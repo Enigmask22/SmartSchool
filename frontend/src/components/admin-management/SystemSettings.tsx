@@ -8,7 +8,9 @@ import {
   Download,
   AlertCircle,
   CheckCircle,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  RotateCcw,
 } from "lucide-react";
 import {
   Card,
@@ -18,7 +20,6 @@ import {
   CardTitle,
 } from "../ui/card";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import {
   Select,
   SelectContent,
@@ -27,8 +28,10 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Label } from "../ui/label";
+import { SimpleDatePicker } from "../ui/simple-date-picker";
 import { Alert, AlertDescription } from "../ui/alert";
 import api from "@/utils/api";
+import { ACADEMIC_YEAR_OPTIONS } from "@/utils/constants";
 
 interface Setting {
   setting_key: string;
@@ -47,6 +50,8 @@ interface FormData {
   academic_year: string;
   semester: string;
   attendance_cutoff_time: string;
+  grade_lock_deadline: string;
+  attendance_lock_deadline: string;
 }
 
 const SystemSettings = () => {
@@ -59,6 +64,8 @@ const SystemSettings = () => {
     academic_year: "",
     semester: "",
     attendance_cutoff_time: "",
+    grade_lock_deadline: "",
+    attendance_lock_deadline: "",
   });
   const [cutoffHour, setCutoffHour] = useState("00");
   const [cutoffMinute, setCutoffMinute] = useState("00");
@@ -91,6 +98,9 @@ const SystemSettings = () => {
           semester: settingsMap.semester?.setting_value || "",
           attendance_cutoff_time:
             settingsMap.attendance_cutoff_time?.setting_value || "",
+          grade_lock_deadline: settingsMap.grade_lock_deadline?.setting_value || "",
+          attendance_lock_deadline:
+            settingsMap.attendance_lock_deadline?.setting_value || "",
         });
 
         // Sync hour/minute state from loaded value
@@ -114,6 +124,18 @@ const SystemSettings = () => {
       ...prev,
       [key]: value,
     }));
+  };
+
+  /** Reset 1 setting field về giá trị đang lưu trên server. */
+  const handleReset = (settingKey: keyof FormData) => {
+    const serverValue = settings[settingKey]?.setting_value ?? "";
+    handleChange(settingKey, serverValue);
+
+    if (settingKey === "attendance_cutoff_time") {
+      const [h, m] = (serverValue || "00:00").split(":");
+      setCutoffHour(h?.padStart(2, "0") || "00");
+      setCutoffMinute(m?.padStart(2, "0") || "00");
+    }
   };
 
   const handleSave = async (settingKey: keyof FormData) => {
@@ -350,10 +372,10 @@ const SystemSettings = () => {
           </div>
 
           <div className="flex flex-wrap justify-between gap-2">
-            <Button variant="outline" onClick={() => loadDayoffConfig(g)}>
+            {/* <Button variant="outline" onClick={() => loadDayoffConfig(g)}>
               <Download className="w-4 h-4 mr-2" />
               Tải cấu hình
-            </Button>
+            </Button> */}
             <Button onClick={() => saveDayoffConfig(g)} disabled={saving}>
               <Save className="w-4 h-4 mr-2" />
               Lưu ngày nghỉ khối {g}
@@ -389,7 +411,7 @@ const SystemSettings = () => {
         </Card>
 
         {/* Settings Cards Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-4">
           {/* Academic Year Card */}
           <Card className="transition-shadow hover:shadow-lg">
             <CardHeader>
@@ -408,8 +430,6 @@ const SystemSettings = () => {
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-muted space-y-2">
-                {/* <p className="text-sm text-muted-foreground">Giá trị hiện tại:</p>
-                <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div> */}
                 <div className="h-3 w-56 bg-gray-200 rounded animate-pulse"></div>
               </div>
               <Button disabled={true} className="w-full">
@@ -437,8 +457,6 @@ const SystemSettings = () => {
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-muted space-y-2">
-                {/* <p className="text-sm text-muted-foreground">Giá trị hiện tại:</p>
-                <div className="h-6 w-24 bg-gray-200 rounded animate-pulse"></div> */}
                 <div className="h-3 w-56 bg-gray-200 rounded animate-pulse"></div>
               </div>
               <Button disabled={true} className="w-full">
@@ -470,8 +488,6 @@ const SystemSettings = () => {
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-muted space-y-2">
-                {/* <p className="text-sm text-muted-foreground">Giá trị hiện tại:</p>
-                <div className="h-6 w-20 bg-gray-200 rounded animate-pulse"></div> */}
                 <div className="h-3 w-56 bg-gray-200 rounded animate-pulse"></div>
               </div>
               <Button disabled={true} className="w-full">
@@ -579,7 +595,7 @@ const SystemSettings = () => {
   }
 
   return (
-    <div className="min-h-screen space-y-6 bg-background">
+    <div className="min-h-screen space-y-6">
       {/* Header */}
       <Card>
         <CardHeader>
@@ -620,210 +636,372 @@ const SystemSettings = () => {
         </Alert>
       )}
 
-      {/* Settings Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* Settings Cards - Single Column Band Layout */}
+      <div className="space-y-4">
         {/* Academic Year */}
         <Card className="transition-shadow hover:shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center text-xl">
-              <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-              Năm học
-            </CardTitle>
-            <CardDescription>Năm học hiện tại của hệ thống</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="academic_year">Năm học</Label>
-              <Input
-                id="academic_year"
-                type="text"
-                placeholder="VD: 2024-2025"
-                value={formData.academic_year}
-                onChange={(e) => handleChange("academic_year", e.target.value)}
-                className="text-lg font-semibold"
-              />
-              <p className="text-xs text-muted-foreground">
-                Định dạng: YYYY-YYYY (VD: 2024-2025)
-              </p>
-            </div>
-            {settings.academic_year && (
-              <div className="p-3 rounded-lg bg-muted">
-                {/* <p className="text-sm text-muted-foreground">
-                  Giá trị hiện tại:
-                </p>
-                <Badge variant="secondary" className="mt-1">
-                  {settings.academic_year.setting_value}
-                </Badge> */}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Cập nhật lần cuối:{" "}
-                  {new Date(settings.academic_year.updated_at).toLocaleString(
-                    "vi-VN"
-                  )}
-                </p>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:gap-6">
+              {/* Left: Title & Description */}
+              <div className="flex-shrink-0 mb-4 md:mb-0 md:w-48">
+                <CardTitle className="flex items-center text-lg mb-1">
+                  <Calendar className="w-5 h-5 mr-2 text-blue-600 flex-shrink-0" />
+                  Năm học
+                </CardTitle>
+                <CardDescription className="text-xs">Năm học hiện tại của hệ thống</CardDescription>
               </div>
-            )}
-            <Button
-              onClick={() => handleSave("academic_year")}
-              disabled={
-                saving ||
-                formData.academic_year === settings.academic_year?.setting_value
-              }
-              className="w-full"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Lưu năm học
-            </Button>
+
+              {/* Middle: Select */}
+              <div className="mb-4 md:mb-0">
+                <Select
+                  value={formData.academic_year}
+                  onValueChange={(v) => handleChange("academic_year", v)}
+                >
+                  <SelectTrigger className="w-[160px] text-sm">
+                    <SelectValue placeholder="Chọn năm học" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACADEMIC_YEAR_OPTIONS.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Middle-Right: Updated At */}
+              <div className="flex-1 mb-4 md:mb-0 md:text-right">
+                {settings.academic_year && (
+                  <p className="text-xs text-muted-foreground">
+                    Cập nhật:{" "}
+                    {new Date(settings.academic_year.updated_at).toLocaleString(
+                      "vi-VN"
+                    )}
+                  </p>
+                )}
+              </div>
+
+              {/* Right: Button */}
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("academic_year")}
+                  disabled={
+                    saving ||
+                    formData.academic_year === settings.academic_year?.setting_value
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handleSave("academic_year")}
+                  disabled={
+                    saving ||
+                    formData.academic_year === settings.academic_year?.setting_value
+                  }
+                  size="sm"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         {/* Semester */}
         <Card className="transition-shadow hover:shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center text-xl">
-              <BookOpen className="w-5 h-5 mr-2 text-green-600" />
-              Học kỳ
-            </CardTitle>
-            <CardDescription>Học kỳ hiện tại đang diễn ra</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="semester">Học kỳ</Label>
-              <Select
-                value={formData.semester || ""}
-                onValueChange={(v) => handleChange("semester", v)}
-              >
-                <SelectTrigger id="semester" className="text-lg font-semibold">
-                  <SelectValue placeholder="Chọn học kỳ" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="HK1">Học kỳ 1</SelectItem>
-                  <SelectItem value="HK2">Học kỳ 2</SelectItem>
-                  <SelectItem value="HK3">Học kỳ 3</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Chọn học kỳ hiện tại (HK1, HK2, hoặc HK3)
-              </p>
-            </div>
-            {settings.semester && (
-              <div className="p-3 rounded-lg bg-muted">
-                {/* <p className="text-sm text-muted-foreground">
-                  Giá trị hiện tại:
-                </p>
-                <Badge
-                  variant="secondary"
-                  className={`mt-1 ${
-                    settings.semester.setting_value === "HK1"
-                      ? "bg-blue-100 text-blue-800"
-                      : settings.semester.setting_value === "HK2"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-yellow-100 text-yellow-800"
-                  }`}
-                >
-                  {settings.semester.setting_value === "HK1"
-                    ? "Học kỳ 1"
-                    : settings.semester.setting_value === "HK2"
-                    ? "Học kỳ 2"
-                    : "Học kỳ 3"}
-                </Badge> */}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Cập nhật lần cuối:{" "}
-                  {new Date(settings.semester.updated_at).toLocaleString(
-                    "vi-VN"
-                  )}
-                </p>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:gap-6">
+              {/* Left: Title & Description */}
+              <div className="flex-shrink-0 mb-4 md:mb-0 md:w-48">
+                <CardTitle className="flex items-center text-lg mb-1">
+                  <BookOpen className="w-5 h-5 mr-2 text-green-600 flex-shrink-0" />
+                  Học kỳ
+                </CardTitle>
+                <CardDescription className="text-xs">Học kỳ hiện tại đang diễn ra</CardDescription>
               </div>
-            )}
-            <Button
-              onClick={() => handleSave("semester")}
-              disabled={
-                saving || formData.semester === settings.semester?.setting_value
-              }
-              className="w-full"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Lưu học kỳ
-            </Button>
+
+              {/* Middle: Select & Format */}
+              <div className="mb-4 md:mb-0">
+                <div className="flex items-center gap-3">
+                  <div className="max-w-xs">
+                    <Select
+                      value={formData.semester || ""}
+                      onValueChange={(v) => handleChange("semester", v)}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Chọn học kỳ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="HK1">Học kỳ 1</SelectItem>
+                        <SelectItem value="HK2">Học kỳ 2</SelectItem>
+                        <SelectItem value="HK3">Học kỳ 3</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground whitespace-nowrap">
+                    (HK1, HK2, HK3)
+                  </p>
+                </div>
+              </div>
+
+              {/* Middle-Right: Updated At */}
+              <div className="flex-1 mb-4 md:mb-0 md:text-right">
+                {settings.semester && (
+                  <p className="text-xs text-muted-foreground">
+                    Cập nhật:{" "}
+                    {new Date(settings.semester.updated_at).toLocaleString(
+                      "vi-VN"
+                    )}
+                  </p>
+                )}
+              </div>
+
+              {/* Right: Button */}
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("semester")}
+                  disabled={
+                    saving || formData.semester === settings.semester?.setting_value
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handleSave("semester")}
+                  disabled={
+                    saving || formData.semester === settings.semester?.setting_value
+                  }
+                  size="sm"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         {/* Attendance Cutoff Time */}
         <Card className="transition-shadow hover:shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center text-xl">
-              <Clock className="w-5 h-5 mr-2 text-orange-600" />
-              Giờ điểm danh
-            </CardTitle>
-            <CardDescription>Thời gian giới hạn để điểm danh</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Giờ điểm danh (HH:MM)</Label>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={cutoffHour}
-                  onValueChange={(v) => setCutoffHour(v)}
-                >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {hours.map((h) => (
-                      <SelectItem key={h} value={h}>
-                        {h}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="font-semibold">:</span>
-                <Select
-                  value={cutoffMinute}
-                  onValueChange={(v) => setCutoffMinute(v)}
-                >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {minutes.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:gap-6">
+              {/* Left: Title & Description */}
+              <div className="flex-shrink-0 mb-4 md:mb-0 md:w-48">
+                <CardTitle className="flex items-center text-lg mb-1">
+                  <Clock className="w-5 h-5 mr-2 text-orange-600 flex-shrink-0" />
+                  Giờ điểm danh
+                </CardTitle>
+                <CardDescription className="text-xs">Thời gian giới hạn để điểm danh</CardDescription>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Học sinh đến sau giờ này sẽ bị tính là đi muộn
-              </p>
+
+              {/* Middle: Time Selectors & Format */}
+              <div className="mb-4 md:mb-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <Select
+                      value={cutoffHour}
+                      onValueChange={(v) => setCutoffHour(v)}
+                    >
+                      <SelectTrigger className="w-16 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-64">
+                        {hours.map((h) => (
+                          <SelectItem key={h} value={h}>
+                            {h}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="font-semibold">:</span>
+                    <Select
+                      value={cutoffMinute}
+                      onValueChange={(v) => setCutoffMinute(v)}
+                    >
+                      <SelectTrigger className="w-16 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-64">
+                        {minutes.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground whitespace-nowrap">
+                    (HH:MM)
+                  </p>
+                </div>
+              </div>
+
+              {/* Middle-Right: Updated At */}
+              <div className="flex-1 mb-4 md:mb-0 md:text-right">
+                {settings.attendance_cutoff_time && (
+                  <p className="text-xs text-muted-foreground">
+                    Cập nhật:{" "}
+                    {new Date(
+                      settings.attendance_cutoff_time.updated_at
+                    ).toLocaleString("vi-VN")}
+                  </p>
+                )}
+              </div>
+
+              {/* Right: Button */}
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("attendance_cutoff_time")}
+                  disabled={
+                    saving ||
+                    formData.attendance_cutoff_time ===
+                      settings.attendance_cutoff_time?.setting_value
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handleSave("attendance_cutoff_time")}
+                  disabled={
+                    saving ||
+                    formData.attendance_cutoff_time ===
+                    settings.attendance_cutoff_time?.setting_value
+                  }
+                  size="sm"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu
+                </Button>
+              </div>
             </div>
-            {settings.attendance_cutoff_time && (
-              <div className="p-3 rounded-lg bg-muted">
-                {/* <p className="text-sm text-muted-foreground">
-                  Giá trị hiện tại:
-                </p>
-                <Badge variant="secondary" className="mt-1">
-                  {settings.attendance_cutoff_time.setting_value}
-                </Badge> */}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Cập nhật lần cuối:{" "}
-                  {new Date(
-                    settings.attendance_cutoff_time.updated_at
-                  ).toLocaleString("vi-VN")}
-                </p>
+          </CardContent>
+        </Card>
+
+        {/* Grade lock deadline (YYYY-MM-DD, empty = không khóa theo ngày) */}
+        <Card className="transition-shadow hover:shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:gap-6">
+              <div className="flex-shrink-0 mb-4 md:mb-0 md:w-48">
+                <CardTitle className="flex items-center text-lg mb-1">
+                  <Lock className="w-5 h-5 mr-2 text-rose-600 flex-shrink-0" />
+                  Hạn sửa bảng điểm
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Sau ngày này, giáo viên không được sửa điểm trừ khi được cấp quyền. Để trống = không khóa.
+                </CardDescription>
               </div>
-            )}
-            <Button
-              onClick={() => handleSave("attendance_cutoff_time")}
-              disabled={
-                saving ||
-                formData.attendance_cutoff_time ===
-                settings.attendance_cutoff_time?.setting_value
-              }
-              className="w-full"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Lưu giờ điểm danh
-            </Button>
+              <div className="mb-4 md:mb-0 flex flex-col gap-2">
+                <Label className="text-xs text-muted-foreground">Ngày (DD/MM/YYYY)</Label>
+                <SimpleDatePicker
+                  value={formData.grade_lock_deadline}
+                  onChange={(value) => handleChange("grade_lock_deadline", value)}
+                  placeholder="Chọn hạn sửa bảng điểm"
+                  className="w-[200px]"
+                />
+              </div>
+              <div className="flex-1 mb-4 md:mb-0 md:text-right">
+                {settings.grade_lock_deadline && (
+                  <p className="text-xs text-muted-foreground">
+                    Cập nhật:{" "}
+                    {new Date(settings.grade_lock_deadline.updated_at).toLocaleString("vi-VN")}
+                  </p>
+                )}
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("grade_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.grade_lock_deadline ===
+                      (settings.grade_lock_deadline?.setting_value ?? "")
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handleSave("grade_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.grade_lock_deadline ===
+                      (settings.grade_lock_deadline?.setting_value ?? "")
+                  }
+                  size="sm"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Attendance lock deadline */}
+        <Card className="transition-shadow hover:shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:gap-6">
+              <div className="flex-shrink-0 mb-4 md:mb-0 md:w-48">
+                <CardTitle className="flex items-center text-lg mb-1">
+                  <Lock className="w-5 h-5 mr-2 text-violet-600 flex-shrink-0" />
+                  Hạn sửa điểm danh
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Sau ngày này, không sửa điểm danh / đơn nghỉ thủ công trừ khi được cấp quyền. Để trống = không khóa.
+                </CardDescription>
+              </div>
+              <div className="mb-4 md:mb-0 flex flex-col gap-2">
+                <Label className="text-xs text-muted-foreground">Ngày (DD/MM/YYYY)</Label>
+                <SimpleDatePicker
+                  value={formData.attendance_lock_deadline}
+                  onChange={(value) => handleChange("attendance_lock_deadline", value)}
+                  placeholder="Chọn hạn sửa điểm danh"
+                  className="w-[200px]"
+                />
+              </div>
+              <div className="flex-1 mb-4 md:mb-0 md:text-right">
+                {settings.attendance_lock_deadline && (
+                  <p className="text-xs text-muted-foreground">
+                    Cập nhật:{" "}
+                    {new Date(settings.attendance_lock_deadline.updated_at).toLocaleString("vi-VN")}
+                  </p>
+                )}
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={() => handleReset("attendance_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.attendance_lock_deadline ===
+                      (settings.attendance_lock_deadline?.setting_value ?? "")
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  onClick={() => handleSave("attendance_lock_deadline")}
+                  disabled={
+                    saving ||
+                    formData.attendance_lock_deadline ===
+                      (settings.attendance_lock_deadline?.setting_value ?? "")
+                  }
+                  size="sm"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Lưu
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -879,6 +1057,9 @@ const SystemSettings = () => {
                 </li>
                 <li>
                   • Các thay đổi sẽ ảnh hưởng đến toàn bộ hệ thống ngay lập tức
+                </li>
+                <li>
+                  • Hạn sửa bảng điểm / điểm danh: để trống nghĩa là không khóa theo ngày; có thể cấp ngoại lệ từng user (tab Người dùng).
                 </li>
               </ul>
             </div>

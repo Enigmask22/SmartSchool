@@ -83,7 +83,7 @@ export function SubjectSelectionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" /> Chọn môn học
@@ -99,17 +99,16 @@ export function SubjectSelectionModal({
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Core Subjects */}
             <div className="bg-white border border-gray-200 rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
+              <div className="px-6 py-4 border-b border-gray-200 bg-blue-50 rounded-t-lg">
                 <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
                   <BookOpen className="w-5 h-5 text-blue-600" /> Môn học chính
                   ({mandatorySubjects.length} môn)
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  Bắt buộc: Tất cả môn được đánh dấu "Môn bắt buộc" trong quản
-                  trị
+                  Các môn học chính bắt buộc phải chọn, không thể thay đổi.
                 </p>
               </div>
-              <div className="px-6 py-4 space-y-3 overflow-y-auto max-h-64">
+              <div className="px-6 py-4 space-y-3 max-h-[300px]">
                 {mandatorySubjects.length > 0 ? (
                   mandatorySubjects.map((subject) => {
                     const subjectId = getSubjectId(subject);
@@ -141,7 +140,7 @@ export function SubjectSelectionModal({
                   </p>
                 )}
               </div>
-              <div className="px-6 py-3 border-t border-gray-200 bg-blue-50">
+              <div className="px-6 py-3 border-t border-gray-200 bg-blue-50 rounded-b-lg">
                 <p className="text-xs text-blue-700 font-medium">
                   Đã chọn: {selectedSubjects.core_subjects?.length || 0}/
                   {mandatorySubjects.length} môn chính
@@ -151,14 +150,14 @@ export function SubjectSelectionModal({
 
             {/* Elective Subjects */}
             <div className="bg-white border border-gray-200 rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200 bg-green-50">
+              <div className="px-6 py-4 border-b border-gray-200 bg-green-50 rounded-t-lg">
                 <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
                   <Target className="w-5 h-5 text-green-600" /> Môn tự chọn (4
                   môn)
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">Chọn 4 môn từ danh sách</p>
+                <p className="text-sm text-gray-600 mt-1">Chọn 4 môn từ danh sách các môn học dưới đây.</p>
               </div>
-              <div className="px-6 py-4 space-y-3 overflow-y-auto max-h-64">
+              <div className="px-6 py-4 space-y-3 overflow-y-auto max-h-[300px]">
                 {electiveSubjects.length > 0 ? (
                   electiveSubjects.map((subject) => {
                     const subjectId = getSubjectId(subject);
@@ -192,7 +191,7 @@ export function SubjectSelectionModal({
                   </p>
                 )}
               </div>
-              <div className="px-6 py-3 border-t border-gray-200 bg-green-50">
+              <div className="px-6 py-3 border-t border-gray-200 bg-green-50 rounded-b-lg">
                 <p className="text-xs text-green-700 font-medium">
                   Đã chọn: {selectedSubjects.elective_subjects?.length || 0}/4 môn tự
                   chọn

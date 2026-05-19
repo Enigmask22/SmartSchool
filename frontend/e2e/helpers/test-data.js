@@ -32,6 +32,7 @@ export const ROUTES = {
   DASHBOARD_SELECTOR: '/dashboard-selector',
   ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_MANAGEMENT: '/admin/management',
+  CLASS_MANAGEMENT: '/admin/classes',
   HOMEROOM_DASHBOARD: '/homeroom/dashboard',
   HOMEROOM_STUDENTS: '/homeroom/students',
   HOMEROOM_GRADES: '/homeroom/grades',

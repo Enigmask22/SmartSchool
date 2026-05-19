@@ -22,6 +22,8 @@ interface ScoreTableHeaderProps {
   academicYear: string;
   semester: string;
   hasScoreConfig: boolean;
+  /** Khóa nhập/sửa điểm (import, OCR, template cho nhập). */
+  gradeEditLocked?: boolean;
   onBack: () => void;
   onDownloadTemplate: () => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -34,12 +36,19 @@ function ScoreTableHeader({
   academicYear,
   semester,
   hasScoreConfig,
+  gradeEditLocked = false,
   onBack,
   onDownloadTemplate,
   onFileUpload,
   onExportToExcel,
   onImportSuccess,
 }: ScoreTableHeaderProps) {
+  const mutateBlocked = !hasScoreConfig || gradeEditLocked;
+  const mutateTitle = !hasScoreConfig
+    ? 'Vui lòng cấu hình điểm trước'
+    : gradeEditLocked
+      ? 'Đã quá hạn chỉnh sửa bảng điểm'
+      : '';
   return (
     <Card className="shadow-md">
       <CardContent className="p-5">
@@ -72,8 +81,8 @@ function ScoreTableHeader({
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 onClick={onDownloadTemplate}
-                disabled={!hasScoreConfig}
-                title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi tải template' : ''}
+                disabled={mutateBlocked}
+                title={mutateTitle}
                 className="flex items-center space-x-2"
               >
                 <Download className="w-4 h-4" />
@@ -83,18 +92,18 @@ function ScoreTableHeader({
               <Button
                 asChild
                 variant="outline"
-                disabled={!hasScoreConfig}
-                title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi nhập điểm' : ''}
+                disabled={mutateBlocked}
+                title={mutateTitle}
                 className="flex items-center space-x-2"
               >
-                <label className="cursor-pointer">
+                <label className={mutateBlocked ? 'cursor-not-allowed' : 'cursor-pointer'}>
                   <Upload className="w-4 h-4" />
                   <span>Nhập điểm từ file</span>
                   <input
                     type="file"
                     accept=".xlsx,.xls,.csv"
                     onChange={onFileUpload}
-                    disabled={!hasScoreConfig}
+                    disabled={mutateBlocked}
                     className="hidden"
                   />
                 </label>
@@ -111,13 +120,13 @@ function ScoreTableHeader({
                 <span>Xuất Excel</span>
               </Button>
 
-              <div title={!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi quét ảnh' : ''} className={!hasScoreConfig ? 'opacity-50' : ''}>
+              <div title={mutateTitle || (!hasScoreConfig ? 'Vui lòng cấu hình điểm trước khi quét ảnh' : '')} className={mutateBlocked ? 'opacity-50' : ''}>
                 <OCRScoreSheet
                   selectedClassSubject={selectedClassSubject}
                   academicYear={academicYear}
                   semester={semester}
                   onImportSuccess={onImportSuccess}
-                  disabled={!hasScoreConfig}
+                  disabled={mutateBlocked}
                 />
               </div>
             </div>

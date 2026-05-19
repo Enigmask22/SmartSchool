@@ -106,6 +106,8 @@ const AdminManagement = () => {
     search.setShowDeleted(false);
     // Reset sorting only, preserve tab filters with their defaults
     sorting.resetSort();
+    // Reset pagination to page 1 when switching tabs
+    setCurrentPage(1);
   };
 
   const handleAddNew = () => {
@@ -277,7 +279,7 @@ const AdminManagement = () => {
                   <CardTitle className="text-2xl font-bold mb-1">
                     {hook.currentConfig?.title || 'Quản lý'}
                   </CardTitle>
-                  <CardDescription>Quản lý tài khoản người dùng trong hệ thống</CardDescription>
+                  <CardDescription>{hook.currentConfig?.description || 'Quản lý'}</CardDescription>
                 </div>
                 <ActionButtons
                   activeTab={hook.activeTab}

@@ -3,10 +3,13 @@ import { Settings, BarChart3 } from 'lucide-react';
 
 interface NoScoreConfigStateProps {
   onCreateConfig: () => void;
+  /** Đã quá hạn: không cho tạo cấu hình cột điểm mới. */
+  gradeEditLocked?: boolean;
 }
 
 const NoScoreConfigState = ({
   onCreateConfig,
+  gradeEditLocked = false,
 }: NoScoreConfigStateProps) => {
   return (
     <div className="py-12 text-center bg-white rounded-lg shadow-md">
@@ -20,13 +23,19 @@ const NoScoreConfigState = ({
         Môn học này chưa có cấu hình cột điểm. Hãy tạo cấu hình để bắt đầu
         nhập điểm.
       </p>
-      <button
-        onClick={onCreateConfig}
-        className="inline-flex items-center px-6 py-3 space-x-2 font-medium text-white transition-colors bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 hover:shadow-md"
-      >
-        <Settings className="w-4 h-4" />
-        <span>Tạo cấu hình cột điểm</span>
-      </button>
+      {gradeEditLocked ? (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 max-w-md mx-auto">
+          Đã quá hạn chỉnh sửa bảng điểm. Vui lòng liên hệ quản trị để được cấp quyền hoặc cấu hình thay bạn.
+        </p>
+      ) : (
+        <button
+          onClick={onCreateConfig}
+          className="inline-flex items-center px-6 py-3 space-x-2 font-medium text-white transition-colors bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 hover:shadow-md"
+        >
+          <Settings className="w-4 h-4" />
+          <span>Tạo cấu hình cột điểm</span>
+        </button>
+      )}
     </div>
   );
 };

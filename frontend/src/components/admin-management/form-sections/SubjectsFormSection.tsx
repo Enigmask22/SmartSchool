@@ -66,13 +66,29 @@ export const SubjectsFormSection: React.FC<SubjectsFormSectionProps> = ({
               {scoreColumnHook.scoreColumns.map((col: any, idx: number) => (
                 <div
                   key={col.key || idx}
-                  className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200"
+                  className={`flex items-start justify-between p-3 rounded-md border ${
+                    col.data ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'
+                  }`}
                 >
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">{col.label}</div>
-                    <div className="text-xs text-gray-600">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="text-sm font-medium text-gray-900">{col.label}</div>
+                      {col.data && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                          📦 Có cột con
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">
                       Mã: {col.key} • Hệ số: {col.he_so}
                     </div>
+                    {col.data && Object.keys(col.data).length > 0 && (
+                      <div className="text-xs text-amber-700 pl-2 border-l-2 border-amber-300 mt-1">
+                        {Object.values(col.data).map((subCol: any, i: number) => (
+                          <div key={i}>↳ {subCol.label || '(chưa đặt tên)'} (HS: {subCol.he_so})</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
@@ -153,8 +169,8 @@ export const SubjectsFormSection: React.FC<SubjectsFormSectionProps> = ({
                 </label>
                 <Input
                   type="number"
-                  min="0.1"
-                  step="0.1"
+                  min="0.5"
+                  step="0.5"
                   placeholder="VD: 0.5"
                   value={scoreColumnHook.columnFormData.he_so || 1}
                   onChange={(e) =>
@@ -165,6 +181,122 @@ export const SubjectsFormSection: React.FC<SubjectsFormSectionProps> = ({
                   }
                 />
               </div>
+
+              {/* Checkbox for hasSubColumns */}
+              <div className="flex items-center space-x-2 p-2 bg-white rounded-md border border-gray-200">
+                <input
+                  type="checkbox"
+                  id="hasSubColumns"
+                  checked={scoreColumnHook.columnFormData.hasSubColumns || false}
+                  onChange={(e) => {
+                    scoreColumnHook.setColumnFormData({
+                      ...scoreColumnHook.columnFormData,
+                      hasSubColumns: e.target.checked,
+                      data: e.target.checked ? (scoreColumnHook.columnFormData.data || {}) : undefined,
+                    });
+                  }}
+                  className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                />
+                <label htmlFor="hasSubColumns" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Cột này có cột con (ví dụ: Điểm thường xuyên 1, 2, 3...)
+                </label>
+              </div>
+
+              {/* Sub-columns management section */}
+              {scoreColumnHook.columnFormData.hasSubColumns && (
+                <div className="p-3 bg-amber-50 rounded-md border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-semibold text-amber-900">Cột con</label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newSubCol = {
+                          subKey: `sub_${Date.now()}`,
+                          subLabel: '',
+                          subHeSo: 1,
+                        };
+                        scoreColumnHook.setColumnFormData({
+                          ...scoreColumnHook.columnFormData,
+                          data: {
+                            ...scoreColumnHook.columnFormData.data,
+                            [newSubCol.subKey]: { label: '', he_so: 1 },
+                          },
+                        });
+                      }}
+                      className="text-xs h-7"
+                    >
+                      + Thêm cột con
+                    </Button>
+                  </div>
+
+                  {/* List of sub-columns */}
+                  {scoreColumnHook.columnFormData.data &&
+                    Object.keys(scoreColumnHook.columnFormData.data).length > 0 && (
+                      <div className="space-y-2">
+                        {Object.entries(scoreColumnHook.columnFormData.data).map(([subKey, subValue]: any) => (
+                          <div key={subKey} className="flex items-center gap-2 p-2 bg-white rounded border border-amber-100">
+                            <Input
+                              type="text"
+                              placeholder="Tên cột con"
+                              size="sm"
+                              className="text-xs h-7 flex-1"
+                              value={subValue.label || ''}
+                              onChange={(e) => {
+                                scoreColumnHook.setColumnFormData({
+                                  ...scoreColumnHook.columnFormData,
+                                  data: {
+                                    ...scoreColumnHook.columnFormData.data,
+                                    [subKey]: { ...subValue, label: e.target.value },
+                                  },
+                                });
+                              }}
+                            />
+                            <Input
+                              type="number"
+                              placeholder="HS"
+                              size="sm"
+                              className="text-xs h-7 w-16"
+                              min="0.5"
+                              step="0.5"
+                              value={subValue.he_so || 1}
+                              onChange={(e) => {
+                                scoreColumnHook.setColumnFormData({
+                                  ...scoreColumnHook.columnFormData,
+                                  data: {
+                                    ...scoreColumnHook.columnFormData.data,
+                                    [subKey]: {
+                                      ...subValue,
+                                      he_so: parseFloat(e.target.value) || 1,
+                                    },
+                                  },
+                                });
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newData = { ...scoreColumnHook.columnFormData.data };
+                                delete newData[subKey];
+                                scoreColumnHook.setColumnFormData({
+                                  ...scoreColumnHook.columnFormData,
+                                  data: Object.keys(newData).length > 0 ? newData : {},
+                                });
+                              }}
+                              className="text-destructive hover:text-destructive/90 h-7 px-2"
+                            >
+                              Xóa
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </div>
+              )}
+
               <div className="flex justify-end space-x-2 pt-2">
                 <Button
                   type="button"
@@ -188,18 +320,40 @@ export const SubjectsFormSection: React.FC<SubjectsFormSectionProps> = ({
                   type="button"
                   size="sm"
                   onClick={() => {
-                    const { key, label, he_so } = scoreColumnHook.columnFormData;
+                    const { key, label, he_so, hasSubColumns, data } = scoreColumnHook.columnFormData;
                     if (!key || !label) {
                       alert('Vui lòng nhập đầy đủ thông tin');
                       return;
                     }
 
+                    // Validate sub-columns if parent has them
+                    if (hasSubColumns && data && Object.keys(data).length > 0) {
+                      for (const [subKey, subVal]: any of Object.entries(data)) {
+                        if (!subVal.label) {
+                          alert('Vui lòng nhập tên cho tất cả cột con');
+                          return;
+                        }
+                      }
+                    }
+
+                    // Build the column object with proper structure
+                    const newColumn: any = {
+                      key,
+                      label,
+                      he_so,
+                    };
+
+                    // Add data (sub-columns) if this is a parent column
+                    if (hasSubColumns && data && Object.keys(data).length > 0) {
+                      newColumn.data = data;
+                    }
+
                     if (scoreColumnHook.editingColumnKey) {
-                      // Update existing column
+                      // Update existing column - preserve any existing data if not changing structure
                       scoreColumnHook.setScoreColumns(
                         scoreColumnHook.scoreColumns.map((col: any) =>
                           col.key === scoreColumnHook.editingColumnKey
-                            ? { ...col, key, label, he_so }
+                            ? { ...col, ...newColumn }
                             : col
                         )
                       );
@@ -213,7 +367,7 @@ export const SubjectsFormSection: React.FC<SubjectsFormSectionProps> = ({
                       }
                       scoreColumnHook.setScoreColumns([
                         ...scoreColumnHook.scoreColumns,
-                        { key, label, he_so },
+                        newColumn,
                       ]);
                     }
 
@@ -225,7 +379,7 @@ export const SubjectsFormSection: React.FC<SubjectsFormSectionProps> = ({
                       label: '',
                       he_so: 1,
                       hasSubColumns: false,
-                      subColumns: [],
+                      data: {},
                     });
                   }}
                 >

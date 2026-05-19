@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 
 interface ClassData {
   id: number;
@@ -42,6 +43,7 @@ interface MoveClassModalProps {
   academicYears: string[];
   moveYearClasses: ClassData[];
   selectedStudentIds: number[];
+  currentClass?: ClassData | null;
   onConfirm: () => void;
 }
 
@@ -55,9 +57,9 @@ const MoveClassModal = ({
   moveTargetClassId,
   setMoveTargetClassId,
   moveLoading,
-  academicYears,
   moveYearClasses,
   selectedStudentIds,
+  currentClass,
   onConfirm,
 }: MoveClassModalProps) => {
   return (
@@ -71,7 +73,25 @@ const MoveClassModal = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 mb-6">
+          {/* Current Class & Student Count Info */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-gray-600">Lớp hiện tại</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {currentClass?.class_name} - Khối {currentClass?.grade}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600">Số học sinh sẽ chuyển</p>
+                <p className="text-sm font-semibold text-blue-700">
+                  {selectedStudentIds.length} học sinh
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div>
             <Label>Năm học</Label>
             <Select
@@ -88,7 +108,7 @@ const MoveClassModal = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Chọn năm học</SelectItem>
-                {academicYears.map((year) => (
+                {ACADEMIC_YEAR_OPTIONS.map((year) => (
                   <SelectItem key={year} value={year}>
                     {year}
                   </SelectItem>
@@ -147,7 +167,8 @@ const MoveClassModal = ({
                   .filter(
                     (c) =>
                       String(c.academic_year) === moveYear &&
-                      String(c.grade) === moveGrade
+                      String(c.grade) === moveGrade &&
+                      c.id !== currentClass?.id
                   )
                   .map((cls) => (
                     <SelectItem key={cls.id} value={String(cls.id)}>

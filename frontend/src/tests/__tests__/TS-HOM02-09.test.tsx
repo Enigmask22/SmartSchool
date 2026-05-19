@@ -148,8 +148,8 @@ const createMockAttendanceEdit = (overrides = {}) => {
     cancelEdit: vi.fn(),
     clearEditState: vi.fn(),
 
-    isEditingRecord: vi.fn(() => false),
-    getRecordKey: vi.fn((record) => record?.student_id || null),
+    isEditingRecord: vi.fn((_r?: unknown) => false),
+    getRecordKey: vi.fn((record?: unknown) => (record as { student_id?: string } | null)?.student_id || null),
   };
 
   return { ...defaults, ...overrides };
@@ -412,7 +412,8 @@ describe('TS-HOM02-09: Attendance Management (Frontend Unit Tests)', () => {
         isEditingRecord: vi.fn((r) => r.student_id === 'SV001'),
       });
 
-      //const isEditing = mockEdit.isEditingRecord(record);
+      const isEditing = mockEdit.isEditingRecord(record);
+      expect(isEditing).toBe(true);
 
       expect(mockEdit.isEditingRecord).toHaveBeenCalledWith(record);
     });
@@ -427,7 +428,8 @@ describe('TS-HOM02-09: Attendance Management (Frontend Unit Tests)', () => {
       };
       const mockEdit = createMockAttendanceEdit();
 
-      //const key = mockEdit.getRecordKey(record);
+      const key = mockEdit.getRecordKey(record);
+      expect(key).toBe('SV001');
 
       expect(mockEdit.getRecordKey).toHaveBeenCalledWith(record);
     });
