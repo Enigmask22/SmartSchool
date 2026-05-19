@@ -477,7 +477,8 @@ class TestTeacherDataIntegrity:
             headers={"Authorization": f"Bearer {admin_jwt_token}"}
         )
         
-        assert response.status_code in [200, 400, 403, 409]
+        # Delete must succeed when teacher was just created
+        assert response.status_code == 200
 
 
 # =====================================================
@@ -557,7 +558,7 @@ class TestTeacherValidation:
         )
         
         # Should accept valid format
-        assert response.status_code in [200, 201, 422]
+        assert response.status_code in [200, 201]
         # Track for cleanup if created successfully
         if response.status_code in [200, 201] and response.json().get("data"):
             cleanup_teachers["teacher_ids"].append(response.json()["data"]["id"])
@@ -576,11 +577,8 @@ class TestTeacherValidation:
             headers={"Authorization": f"Bearer {admin_jwt_token}"}
         )
         
-        # May be accepted or rejected depending on validation
-        assert response.status_code in [200, 201, 400, 422]
-        # Track for cleanup if created successfully
-        if response.status_code in [200, 201] and response.json().get("data"):
-            cleanup_teachers["teacher_ids"].append(response.json()["data"]["id"])
+        # Invalid email must be rejected
+        assert response.status_code in [400, 422]
 
 
 # =====================================================

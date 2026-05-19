@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { 
   Card, 
   CardContent, 
@@ -27,6 +28,9 @@ import {
   ForgotPasswordLink,
 } from '@/components/login';
 
+/** Ảnh nền trang đăng nhập — preload trước khi hiển thị form để tránh “nháy” nền trắng */
+const LOGIN_BACKGROUND_URL = '/background_login.jpg';
+
 /**
  * Login Component - Main authentication page
  * 
@@ -41,6 +45,9 @@ export function Login() {
   const navigate = useNavigate();
   const authContext = useContext(AuthContext);
 
+  /** Chỉ hiện form + nền sau khi ảnh background đã tải (hoặc lỗi tải để không kẹt màn hình) */
+  const [isVisualReady, setIsVisualReady] = useState(false);
+
   // Form state stays in component (UI layer)
   const [formData, setFormData] = useState({
     username: '',
@@ -49,6 +56,14 @@ export function Login() {
 
   // Authentication logic delegated to useAuthSubmit hook
   const { isLoading, error, submit } = useAuthSubmit();
+
+  useEffect(() => {
+    const img = new Image();
+    const finish = () => setIsVisualReady(true);
+    img.onload = finish;
+    img.onerror = finish;
+    img.src = LOGIN_BACKGROUND_URL;
+  }, []);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -77,11 +92,25 @@ export function Login() {
     await submit(formData.username, formData.password);
   };
 
+  if (!isVisualReady) {
+    return (
+      <div
+        className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-900 text-slate-100"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
+        <p className="text-sm text-slate-400">Đang tải trang đăng nhập…</p>
+      </div>
+    );
+  }
+
   return (
     <div 
       className="relative flex justify-center items-center min-h-screen bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: 'url(/background_login.jpg)',
+        backgroundImage: `url(${LOGIN_BACKGROUND_URL})`,
       }}
     >
       {/* Background overlay */}
@@ -114,7 +143,7 @@ export function Login() {
               <SubmitButton loading={isLoading} />
 
               {/* Forgot password link */}
-              <ForgotPasswordLink onClick={() => window.location.href = '/forgot-password'} />
+              <ForgotPasswordLink onClick={() => navigate('/forgot-password')} />
             </form>
           </CardContent>
         </Card>

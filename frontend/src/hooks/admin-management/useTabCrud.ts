@@ -5,24 +5,36 @@ import { toast } from 'sonner';
 export const TAB_CONFIG = {
   users: {
     title: 'Quản lý người dùng',
+    description: 'Quản lý tài khoản người dùng trong hệ thống',
     fields: ['username', 'email', 'full_name', 'password', 'role'],
-    displayFields: ['id', 'username', 'email', 'full_name', 'role'], //is_active 
+    displayFields: [
+      'id',
+      'username',
+      'email',
+      'full_name',
+      'role',
+      'can_edit_grade',
+      'can_edit_attendance',
+    ], //is_active
     endpoint: '/admin/users',
   },
   teachers: {
     title: 'Quản lý giáo viên',
+    description: 'Quản lý hồ sơ và thông tin giáo viên',
     fields: ['teacher_code', 'full_name', 'email', 'phone', 'date_of_birth', 'gender'],
     displayFields: ['id', 'teacher_code', 'full_name', 'email', 'phone', 'date_of_birth', 'gender', 'subjects'], //is_active
     endpoint: '/admin/teachers',
   },
   subjects: {
     title: 'Quản lý môn học',
+    description: 'Quản lý danh sách môn học và cấu hình cột điểm',
     fields: ['subject_code', 'subject_name', 'description', 'is_mandatory'],
     displayFields: ['id', 'subject_code', 'subject_name', 'description', 'is_mandatory', 'score_column_config'], //is_active
     endpoint: '/admin/subjects',
   },
   classes: {
     title: 'Quản lý lớp học',
+    description: 'Quản lý danh sách lớp học và giáo viên chủ nhiệm',
     fields: ['class_name', 'grade', 'homeroom_teacher_id', 'room_number', 'academic_year'],
     displayFields: ['id', 'class_name', 'grade', 'homeroom_teacher', 'room_number', 'academic_year', 'total_students'],
     endpoint: '/admin/classes',
@@ -35,6 +47,7 @@ export const TAB_CONFIG = {
   // },
   class_subjects: {
     title: 'Quản lý phân công giảng dạy',
+    description: 'Phân công giáo viên bộ môn cho từng lớp học',
     fields: ['subject_id', 'teacher_id', 'class_id', 'academic_year', 'semester'],
     displayFields: ['id', 'subject_name', 'teacher_name', 'classes', 'academic_year', 'semester'], //is_active
     endpoint: '/admin/class-subjects',

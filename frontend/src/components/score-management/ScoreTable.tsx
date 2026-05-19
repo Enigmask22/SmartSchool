@@ -13,6 +13,7 @@ interface ScoreTableProps {
   onEditScore: (studentData: any) => void;
   getDisplayColumns: (config: Record<string, any>) => any[];
   calculateFinalScore: (scoreData: any) => string | number;
+  gradeEditLocked?: boolean;
 }
 
 export default function ScoreTable({
@@ -26,6 +27,7 @@ export default function ScoreTable({
   onEditScore,
   getDisplayColumns,
   calculateFinalScore,
+  gradeEditLocked = false,
 }
 : ScoreTableProps) 
 {
@@ -33,7 +35,7 @@ export default function ScoreTable({
 
   return (
     <div className="overflow-hidden bg-white rounded-lg shadow-md">
-      <div className="px-6 py-5 border-b border-gray-200 bg-muted/30">
+      <div className="px-6 py-5 border-b border-gray-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
             <Users className="w-5 h-5 text-gray-700" />
@@ -199,7 +201,7 @@ export default function ScoreTable({
                     if (column.hasChildren) {
                       return column.children.map((child: any) => (
                         <td key={child.key} className="px-3 py-4 text-center relative">
-                          {studentData.score?.score_data?.[child.key]?.Diem ? (
+                          {studentData.score?.score_data?.[child.key]?.Diem != null && studentData.score.score_data[child.key].Diem !== '' ? (
                             <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium border border-green-200 min-w-[50px] inline-block">
                               {
                                 studentData.score.score_data[child.key].Diem
@@ -216,7 +218,7 @@ export default function ScoreTable({
                     } else {
                       return (
                         <td key={column.key} className="px-5 py-4 text-center relative">
-                          {studentData.score?.score_data?.[column.key]?.Diem ? (
+                          {studentData.score?.score_data?.[column.key]?.Diem != null && studentData.score.score_data[column.key].Diem !== '' ? (
                             <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium border border-green-200 min-w-[50px] inline-block">
                               {
                                 studentData.score.score_data[column.key].Diem
@@ -246,8 +248,19 @@ export default function ScoreTable({
                   </td>
                   <td className="px-5 py-4">
                     <button
+                      type="button"
                       onClick={() => onEditScore(studentData)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors font-medium text-sm"
+                      disabled={gradeEditLocked}
+                      title={
+                        gradeEditLocked
+                          ? 'Đã khóa sửa bảng điểm sau deadline'
+                          : undefined
+                      }
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 border rounded-lg font-medium text-sm transition-colors ${
+                        gradeEditLocked
+                          ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                          : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                      }`}
                     >
                       {studentData.score ? (
                         <Pencil className="w-4 h-4" />

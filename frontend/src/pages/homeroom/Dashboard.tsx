@@ -86,7 +86,7 @@ export default function HomeroomDashboard() {
       {/* Header with filters */}
       <PageHeader
         title="Tổng quan lớp chủ nhiệm"
-        description={selectedClass ? <Badge variant="secondary">{`Lớp ${selectedClass}`}</Badge> : 'Chưa được phân công chủ nhiệm'}
+        description={selectedClass ? <Badge variant="secondary" className="text-sm px-3 py-1">{`Lớp ${selectedClass}`}</Badge> : 'Chưa được phân công chủ nhiệm'}
         icon={
           <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
             <ChartNoAxesCombined className="w-8 h-8 text-white" />
@@ -134,7 +134,7 @@ export default function HomeroomDashboard() {
       {/* Top Absent/Late Students */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TopAbsentLateCard
-          title="Top vắng nhiều nhất (tháng)"
+          title="Học sinh vắng nhiều nhất (tháng)"
           description={`Top 10 học sinh có số lần vắng cao nhất trong tháng ${selectedMonth}/${selectedYear}`}
           data={topAbsent}
           badgeVariant="destructive"
@@ -142,7 +142,7 @@ export default function HomeroomDashboard() {
           loading={loading}
         />
         <TopAbsentLateCard
-          title="Top đi muộn nhiều nhất (tháng)"
+          title="Học sinh đi muộn nhiều nhất (tháng)"
           description={`Top 10 học sinh có số lần đi muộn cao nhất trong tháng ${selectedMonth}/${selectedYear}`}
           data={topLate}
           badgeVariant="warning"

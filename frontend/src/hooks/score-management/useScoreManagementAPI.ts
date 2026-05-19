@@ -57,6 +57,8 @@ export interface TeacherInfo {
     classes: { class_name: string; grade: string };
     subjects: { subject_name: string };
   }>;
+  /** true = giáo viên không được sửa điểm (đã quá hạn và không có quyền ngoại lệ). */
+  grade_edit_locked?: boolean;
 }
 
 export interface UseScoreManagementAPIReturn {
@@ -293,7 +295,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     // Check if all required score columns are available
     // If any score column is missing, return '-'
     const allColumnsPresent = flatColumns.every(
-      (column) => gradeData[column.key]?.Diem != null
+      (column) => gradeData[column.key]?.Diem != null && gradeData[column.key]?.Diem !== ''
     );
 
     if (!allColumnsPresent) return '-';

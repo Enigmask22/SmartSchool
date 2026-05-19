@@ -168,7 +168,7 @@ export const exportToExcel = async (
           column.children.forEach((child: any) => {
             cellCount++;
             const scoreValue = studentData.score?.score_data?.[child.key]?.Diem;
-            row.getCell(cellCount).value = scoreValue || '';
+            row.getCell(cellCount).value = scoreValue != null && scoreValue !== '' ? scoreValue : '-';
             row.getCell(cellCount).alignment = {
               horizontal: 'center',
               vertical: 'middle',
@@ -178,7 +178,7 @@ export const exportToExcel = async (
         } else {
           cellCount++;
           const scoreValue = studentData.score?.score_data?.[column.key]?.Diem;
-          row.getCell(cellCount).value = scoreValue || '';
+          row.getCell(cellCount).value = scoreValue != null && scoreValue !== '' ? scoreValue : '-';
           row.getCell(cellCount).alignment = {
             horizontal: 'center',
             vertical: 'middle',

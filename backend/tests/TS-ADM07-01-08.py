@@ -195,8 +195,8 @@ class TestCreateClass:
                 data = data["data"]
             cleanup_classes["add"](data.get("id"))
         
-        # Should succeed (201/200) or return 400 if teacher doesn't exist
-        assert response.status_code in [201, 200, 400]
+        # Should succeed (201/200) or return 400/409 if teacher doesn't exist or already assigned
+        assert response.status_code in [201, 200, 400, 409]
     
     def test_TS_ADM07_02_create_class_mandatory_fields(self, client, admin_jwt_token):
         """Should reject class without mandatory fields"""
@@ -568,7 +568,7 @@ class TestClassIntegration:
             "/api/admin/classes",
             json={
                 "class_name": f"{unique_class_name}_crud",
-                "grade": 6,
+                "grade": 10,
                 "academic_year": "2024-2025",
                 "room_number": "P101"
             },

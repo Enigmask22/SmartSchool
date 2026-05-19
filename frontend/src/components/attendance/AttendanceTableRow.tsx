@@ -21,7 +21,7 @@ interface Student {
 interface AttendanceRecord {
   id: number | null;
   student_id: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'excused';
   check_in_time?: string;
   check_out_time?: string;
   confidence_score?: number;
@@ -62,6 +62,11 @@ const getStatusBadge = (status: string) => {
       variant: 'secondary',
       className: 'bg-yellow-100 text-yellow-800 whitespace-nowrap',
       label: 'Muộn',
+    },
+    excused: {
+      variant: 'outline',
+      className: 'bg-indigo-100 text-indigo-800 whitespace-nowrap border-indigo-200',
+      label: 'Vắng có phép',
     },
   };
 
@@ -135,6 +140,7 @@ const AttendanceTableRow = ({
               <SelectItem value="present">Có mặt</SelectItem>
               <SelectItem value="absent">Vắng</SelectItem>
               <SelectItem value="late">Muộn</SelectItem>
+              <SelectItem value="excused">Vắng có phép</SelectItem>
             </SelectContent>
           </Select>
         ) : (

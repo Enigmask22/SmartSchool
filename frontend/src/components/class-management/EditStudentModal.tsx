@@ -108,7 +108,7 @@ const EditStudentModal = ({
                 id="edit-student-id"
                 type="text"
                 value={selectedStudentForEdit?.student_id || ''}
-                className="text-muted-foreground bg-muted"
+                className="text-muted-foreground bg-muted/50"
                 readOnly
               />
             </div>

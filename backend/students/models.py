@@ -23,6 +23,7 @@ class StudentCreate(BaseModel):
     full_name: str
     date_of_birth: Optional[str] = None
     gender: Optional[str] = None
+    academic_year: str  # Required: năm học
     class_name: str
     grade: str
     class_id: Optional[int] = None
@@ -39,6 +40,7 @@ class StudentUpdate(BaseModel):
     full_name: Optional[str] = None
     date_of_birth: Optional[str] = None
     gender: Optional[str] = None
+    academic_year: Optional[str] = None
     class_name: Optional[str] = None
     grade: Optional[str] = None
     email: Optional[str] = None

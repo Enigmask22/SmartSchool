@@ -28,9 +28,9 @@
  * Test Pattern: Vitest + React Testing Library + Mock API
  */
 
-import React, { useState, FormEvent, ChangeEvent } from "react";
+import { useState, FormEvent, ChangeEvent } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter as Router } from "react-router-dom";
 
@@ -99,7 +99,7 @@ const ForgotPasswordStep1 = ({
         <label htmlFor="email">Email nhận OTP</label>
         <input
           id="email"
-          type="email"
+          type="text"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="your@email.com"
@@ -199,7 +199,7 @@ const PasswordResetForm = ({
 
 beforeEach(() => {
   localStorage.clear();
-  global.fetch = vi.fn();
+  globalThis.fetch = vi.fn() as typeof fetch;
 });
 
 afterEach(() => {
@@ -222,7 +222,7 @@ describe("TS-GEN03-FE: OTP Email Form", () => {
 
       const emailInput = screen.getByTestId("email-input");
       expect(emailInput).toBeInTheDocument();
-      expect(emailInput).toHaveAttribute("type", "email");
+      expect(emailInput).toHaveAttribute("type", "text");
     });
 
     it("should render send OTP button", () => {
@@ -519,7 +519,7 @@ describe("TS-GEN04-FE: Password Reset Form", () => {
         </Router>
       );
 
-      const inputs = screen.getAllByDisplayValue("");
+      //const inputs = screen.getAllByDisplayValue("");
       const newPassInput = screen.getByTestId("new-password-input");
       const confirmInput = screen.getByTestId("confirm-password-input");
 

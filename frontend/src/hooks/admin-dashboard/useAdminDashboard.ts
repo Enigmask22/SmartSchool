@@ -9,10 +9,9 @@
  * - Uses usePeriodFilter for period management (reusable logic)
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
-import { usePeriodFilter } from '../usePeriodFilter';
 import { useSystemSettings } from '@/contexts/useSystemSettings';
 import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 
@@ -20,12 +19,20 @@ import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
  * Overview Data Structure
  */
 export interface AdminOverviewData {
-  total_users: number;
   total_students: number;
   total_classes: number;
   total_teachers: number;
   attendance_rate: number;
-  period_days: number;
+  academic_year: string;
+}
+
+/**
+ * Infra Stats Data Structure
+ */
+export interface InfraStatsData {
+  total_subjects: number;
+  total_cameras: number;
+  students_with_face: number;
 }
 
 /**
@@ -63,29 +70,21 @@ export interface TeacherPerformanceData {
 }
 
 /**
- * System Health Data Structure
- */
-export interface SystemHealthData {
-  database_status: string;
-  error_count_24h: number;
-  uptime: string;
-}
-
-/**
  * Hook Return Type
  */
 export interface UseAdminDashboardReturn {
   loading: boolean;
   refreshing: boolean;
-  selectedPeriod: string;
+  /** '7' | '30' | '90' | '0' (0 = full year) — only meaningful for current year */
+  attendancePeriod: string;
+  isCurrentYear: boolean;
   selectedAcademicYear: string;
   academicYears: string[];
   overview: AdminOverviewData | null;
   attendanceTrends: AttendanceTrend[];
   classPerformance: ClassPerformanceData[];
-  teacherPerformance: TeacherPerformanceData[];
-  systemHealth: SystemHealthData | null;
-  handlePeriodChange: (period: string) => void;
+  infraStats: InfraStatsData | null;
+  handleAttendancePeriodChange: (period: string) => void;
   handleAcademicYearChange: (year: string) => void;
   handleRefresh: () => Promise<void>;
   fetchDashboardData: () => Promise<void>;
@@ -106,18 +105,21 @@ export const useAdminDashboard = (): UseAdminDashboardReturn => {
   // Get system settings (current academic year)
   const { settings } = useSystemSettings();
 
-  // Period filtering - using reusable hook
-  const { selectedPeriod, handlePeriodChange } = usePeriodFilter('30');
-
   // Data state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(settings.academic_year || ACADEMIC_YEAR_OPTIONS[0]);
+  const [attendancePeriod, setAttendancePeriod] = useState('30');
   const [overview, setOverview] = useState<AdminOverviewData | null>(null);
   const [attendanceTrends, setAttendanceTrends] = useState<AttendanceTrend[]>([]);
   const [classPerformance, setClassPerformance] = useState<ClassPerformanceData[]>([]);
-  const [teacherPerformance, setTeacherPerformance] = useState<TeacherPerformanceData[]>([]);
-  const [systemHealth, setSystemHealth] = useState<SystemHealthData | null>(null);
+  const [infraStats, setInfraStats] = useState<InfraStatsData | null>(null);
+
+  /** True when the selected year is the same as the system's current academic year */
+  const isCurrentYear = useMemo(
+    () => selectedAcademicYear === (settings.academic_year || ACADEMIC_YEAR_OPTIONS[0]),
+    [selectedAcademicYear, settings.academic_year]
+  );
 
   /**
    * Fetch dashboard data from API
@@ -125,101 +127,60 @@ export const useAdminDashboard = (): UseAdminDashboardReturn => {
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // Ensure we have a valid academic year
+
       const yearToFetch = selectedAcademicYear || settings.academic_year || ACADEMIC_YEAR_OPTIONS[0];
-      const periodDays = parseInt(selectedPeriod);
-      
-      logger.debug(`Fetching dashboard data for ${yearToFetch} (period: ${periodDays} days)`);
-      logger.debug(`Selected academic year: ${selectedAcademicYear}, Settings: ${settings.academic_year}, Default: ${ACADEMIC_YEAR_OPTIONS[0]}`);
-      
-      // Build query string manually (same pattern as homeroom dashboard)
-      const buildQueryString = (params: Record<string, any>) => {
-        const qs = new URLSearchParams();
-        Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            qs.set(key, String(value));
-          }
-        });
-        return qs.toString();
-      };
+      // For past years, force period_days=0 (full academic year)
+      const effectivePeriod = isCurrentYear ? attendancePeriod : '0';
 
-      // Fetch overview
-      try {
-        const params = {
-          academic_year: yearToFetch,
-          period_days: periodDays,
-        };
-        logger.debug(`Overview params: ${JSON.stringify(params)}`);
-        const qs = buildQueryString(params);
-        const overviewResponse = await api.request(`/admin/dashboard/overview?${qs}`);
-        logger.debug(`Overview response: ${JSON.stringify(overviewResponse)}`);
-        if (overviewResponse?.success) {
-          setOverview(overviewResponse.data);
-        }
-      } catch (error) {
-        logger.error('Error fetching overview:', error);
+      logger.debug(`Fetching dashboard bootstrap for ${yearToFetch} (period: ${effectivePeriod})`);
+
+      const qs = new URLSearchParams({
+        academic_year: yearToFetch,
+        period_days: effectivePeriod,
+      }).toString();
+
+      const response = await api.request(`/admin/dashboard/bootstrap?${qs}`);
+      logger.debug('Dashboard bootstrap response:', response);
+
+      if (response?.success && response.data) {
+        const data = response.data;
+        if (data.overview) setOverview(data.overview);
+        if (data.attendance_trends) setAttendanceTrends(data.attendance_trends);
+        if (data.class_performance) setClassPerformance(data.class_performance);
+        if (data.infra_stats) setInfraStats(data.infra_stats);
+      } else {
+        logger.error('Dashboard bootstrap failed:', response?.message);
       }
-
-      // Fetch attendance trends
-      try {
-        const params = {
-          academic_year: yearToFetch,
-          period_days: periodDays,
-        };
-        logger.debug(`Trends params: ${JSON.stringify(params)}`);
-        const qs = buildQueryString(params);
-        const trendsResponse = await api.request(`/admin/dashboard/attendance-trends?${qs}`);
-        logger.debug(`Trends response: ${JSON.stringify(trendsResponse)}`);
-        if (trendsResponse?.success) {
-          setAttendanceTrends(trendsResponse.data || []);
-        }
-      } catch (error) {
-        logger.error('Error fetching attendance trends:', error);
-      }
-
-      // Fetch class performance
-      try {
-        const params = {
-          academic_year: yearToFetch,
-          period_days: periodDays,
-        };
-        logger.debug(`Performance params: ${JSON.stringify(params)}`);
-        const qs = buildQueryString(params);
-        const performanceResponse = await api.request(`/admin/dashboard/class-performance?${qs}`);
-        logger.debug(`Performance response: ${JSON.stringify(performanceResponse)}`);
-        if (performanceResponse?.success) {
-          setClassPerformance(performanceResponse.data || []);
-        }
-      } catch (error) {
-        logger.error('Error fetching class performance:', error);
-      }
-
-      // Fetch system health
-      try {
-        const healthResponse = await api.request('/admin/dashboard/system-health');
-        if (healthResponse?.success) {
-          setSystemHealth(healthResponse.data);
-        }
-      } catch (error) {
-        logger.error('Error fetching system health:', error);
-      }
-
-      // Teacher performance - temporarily set empty (endpoint could be added later)
-      setTeacherPerformance([]);
     } catch (error) {
-      logger.error('Error fetching admin dashboard data:', error);
+      logger.error('Error fetching dashboard bootstrap:', error);
     } finally {
       setLoading(false);
     }
-  }, [selectedAcademicYear, selectedPeriod, settings.academic_year]);
+  }, [selectedAcademicYear, attendancePeriod, isCurrentYear, settings.academic_year]);
 
   /**
-   * Handle academic year change
+   * Handle academic year change — also resets attendance period for past years
    */
   const handleAcademicYearChange = useCallback((year: string) => {
     setSelectedAcademicYear(year);
-  }, []);
+    const currentYear = settings.academic_year || ACADEMIC_YEAR_OPTIONS[0];
+    if (year !== currentYear) {
+      // Past year: lock to full-year
+      setAttendancePeriod('0');
+    } else {
+      // Back to current year: restore default period
+      setAttendancePeriod('30');
+    }
+  }, [settings.academic_year]);
+
+  /**
+   * Handle attendance period change — only functional when viewing current year
+   */
+  const handleAttendancePeriodChange = useCallback((period: string) => {
+    if (isCurrentYear) {
+      setAttendancePeriod(period);
+    }
+  }, [isCurrentYear]);
 
   /**
    * Refresh dashboard data
@@ -254,15 +215,15 @@ export const useAdminDashboard = (): UseAdminDashboardReturn => {
   return {
     loading,
     refreshing,
-    selectedPeriod,
+    attendancePeriod,
+    isCurrentYear,
     selectedAcademicYear,
     academicYears: ACADEMIC_YEAR_OPTIONS,
     overview,
     attendanceTrends,
     classPerformance,
-    teacherPerformance,
-    systemHealth,
-    handlePeriodChange,
+    infraStats,
+    handleAttendancePeriodChange,
     handleAcademicYearChange,
     handleRefresh,
     fetchDashboardData,

@@ -36,6 +36,7 @@ import {
   HOMEROOM_ROUTES,
   SUBJECT_ROUTES,
   COMMON_ROUTES,
+  USER_ROLES,
 } from "@/utils/constants";
 
 const Sidebar = ({
@@ -259,15 +260,15 @@ const Sidebar = ({
                     {user.full_name}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {user.role === "admin"
+                    {user.role === USER_ROLES.ADMIN
                       ? "Quản trị viên"
                       : selectedDashboardType === "homeroom"
                       ? "Giáo viên chủ nhiệm"
                       : selectedDashboardType === "subject"
                       ? "Giáo viên bộ môn"
-                      : user.role === "homeroom_teacher"
+                      : user.role === USER_ROLES.HOMEROOM_TEACHER
                       ? "Giáo viên chủ nhiệm"
-                      : user.role === "teacher"
+                      : user.role === USER_ROLES.SUBJECT_TEACHER
                       ? "Giáo viên bộ môn"
                       : "Nhân viên"}
                   </div>

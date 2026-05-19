@@ -14,59 +14,190 @@ from students.models import StudentCreate, StudentUpdate, ResponseModel, ListRes
 from core.database import get_db
 from core.logger import setup_logger
 from core.dependencies import get_current_user
+from admin.validators import (
+    validate_full_name,
+    validate_email,
+    validate_phone,
+    validate_gender,
+    validate_date_of_birth,
+    validate_academic_year,
+)
 
 logger = setup_logger("students_api")
 router = APIRouter()
 
 @router.post("/")
 async def create_student(student: StudentCreate, db=Depends(get_db)):
-    """Tạo học sinh mới"""
+    print("Received student creation request:", student)
+    """Tạo học sinh mới với validation đầy đủ"""
     try:
-        existing = db.table("students").select("id").eq("student_id", student.student_id).execute()
+        # ===== VALIDATE REQUIRED FIELDS =====
+        # Validate full_name (required)
+        full_name = validate_full_name(student.full_name)
         
-        if existing.data:
-            raise HTTPException(status_code=400, detail="Mã học sinh đã tồn tại")
+        # Validate grade (required)
+        if not student.grade or student.grade not in ['10', '11', '12']:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "success": False,
+                    "code": "STUDENT_001",
+                    "message": "Khối học phải là 10, 11 hoặc 12",
+                    "field": "grade"
+                }
+            )
         
-        if student.gender not in ['Nam', 'Nữ', 'Khác']:
-            raise HTTPException(status_code=400, detail="Giới tính phải là Nam, Nữ hoặc Khác")
+        grade = student.grade
         
-        # NEW: Check for duplicate full_name + date_of_birth (unless force_create=true)
-        if student.date_of_birth and not student.force_create:
+        # Validate class_name (required)
+        if not student.class_name or not student.class_name.strip():
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "success": False,
+                    "code": "STUDENT_002",
+                    "message": "Lớp học là bắt buộc",
+                    "field": "class_name"
+                }
+            )
+        
+        class_name = student.class_name.strip()
+        
+        # Validate academic_year (required)
+        if not student.academic_year or not student.academic_year.strip():
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "success": False,
+                    "code": "STUDENT_003",
+                    "message": "Năm học là bắt buộc",
+                    "field": "academic_year"
+                }
+            )
+        
+        academic_year = validate_academic_year(student.academic_year)
+        
+        # ===== VALIDATE OPTIONAL FIELDS (only if not empty) =====
+        email = None
+        if student.email and student.email.strip():
+            email = validate_email(student.email)
+        
+        phone = None
+        if student.phone and student.phone.strip():
+            phone = validate_phone(student.phone)
+        
+        gender = None
+        if student.gender and student.gender.strip():
+            gender = validate_gender(student.gender)
+        
+        dob = None
+        if student.date_of_birth and student.date_of_birth.strip():
+            # Use student-specific DOB validation (no minimum age requirement)
+            from datetime import date as _date
+            try:
+                from datetime import datetime as _dt
+                dob_parsed = _dt.strptime(student.date_of_birth.strip(), "%Y-%m-%d").date()
+                if dob_parsed >= _date.today():
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "success": False,
+                            "code": "STUDENT_006",
+                            "message": "Ngày sinh phải trước ngày hôm nay",
+                            "field": "date_of_birth"
+                        }
+                    )
+                dob = dob_parsed.isoformat()
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "success": False,
+                        "code": "STUDENT_006",
+                        "message": "Ngày sinh phải có định dạng YYYY-MM-DD",
+                        "field": "date_of_birth"
+                    }
+                )
+        
+        # ===== VALIDATE CLASS EXISTS =====
+        class_resp = db.table("classes").select("id, grade, academic_year").eq("class_name", class_name).eq("academic_year", academic_year).execute()
+        
+        if not class_resp.data:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "success": False,
+                    "code": "STUDENT_004",
+                    "message": f"Lớp học '{class_name}' không tồn tại cho năm học '{academic_year}'",
+                    "field": "class_name"
+                }
+            )
+        
+        class_info = class_resp.data[0]
+        
+        # Verify grade matches class grade
+        if str(class_info.get("grade")) != str(grade):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "success": False,
+                    "code": "STUDENT_005",
+                    "message": f"Khối {grade} không khớp với khối của lớp {class_name} (Khối {class_info.get('grade')})",
+                    "field": "grade"
+                }
+            )
+        
+        # ===== CHECK FOR DUPLICATES =====
+        if dob and not student.force_create:
             duplicate_check = db.table("students").select("id, full_name")\
-                .eq("full_name", student.full_name)\
-                .eq("date_of_birth", student.date_of_birth)\
+                .eq("full_name", full_name)\
+                .eq("date_of_birth", dob)\
                 .eq("is_active", True).execute()
             
             if duplicate_check.data:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"Học sinh cùng tên '{student.full_name}' và cùng ngày sinh đã tồn tại. Vui lòng xác nhận để tiếp tục."
+                    detail={
+                        "success": False,
+                        "code": "STUDENT_006",
+                        "message": f"Học sinh cùng tên '{full_name}' và cùng ngày sinh đã tồn tại. Vui lòng xác nhận để tiếp tục.",
+                        "details": f"Học sinh '{full_name}' có cùng ngày sinh đã được tạo trong hệ thống."
+                    }
                 )
         
-        student_data = student.dict()
+        # ===== CHECK STUDENT_ID UNIQUENESS =====
+        if student.student_id:
+            existing = db.table("students").select("id").eq("student_id", student.student_id).execute()
+            if existing.data:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "success": False,
+                        "code": "STUDENT_007",
+                        "message": f"Mã học sinh '{student.student_id}' đã tồn tại",
+                        "field": "student_id"
+                    }
+                )
         
-        # Remove force_create flag before inserting to DB
-        student_data.pop("force_create", None)
+        # ===== PREPARE DATA FOR INSERT =====
+        student_data = {
+            "student_id": student.student_id,
+            "full_name": full_name,
+            "class_name": class_name,
+            "grade": grade,
+            "email": email,
+            "phone": phone,
+            "received_email": student.received_email if student.received_email else None,
+            "gender": gender,
+            "date_of_birth": dob,
+            "address": student.address if student.address and student.address.strip() else None,
+            "is_active": True,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
         
         # Extract parent_contacts để insert riêng vào bảng parent_info
-        parent_contacts = student_data.pop("parent_contacts", None)
-        
-        # Get class_info if class_id is provided (for homeroom_students_history)
-        class_info = None
-        if student_data.get("class_id"):
-            class_resp = db.table("classes").select("id, class_name, grade, homeroom_teacher_id").eq("id", student_data["class_id"]).execute()
-            if class_resp.data:
-                class_info = class_resp.data[0]
-        
-        # Remove class_id (not a column in students table)
-        student_data.pop("class_id", None)
-        
-        if student_data.get("date_of_birth"):
-            dob_val = student_data["date_of_birth"]
-            student_data["date_of_birth"] = dob_val.isoformat() if hasattr(dob_val, "isoformat") else dob_val
-        
-        student_data["created_at"] = datetime.now().isoformat()
-        student_data["updated_at"] = datetime.now().isoformat()
+        parent_contacts = student.parent_contacts if hasattr(student, 'parent_contacts') else None
         
         # Insert student
         response = db.table("students").insert(student_data).execute()
@@ -89,36 +220,51 @@ async def create_student(student: StudentCreate, db=Depends(get_db)):
                 if parent_records:
                     db.table("parent_info").insert(parent_records).execute()
             
-            # Insert vào homeroom_students_history nếu có class_id
+            # Insert into homeroom_students_history
             if class_info:
-                db.table("homeroom_students_history").insert({
-                    "teacher_id": class_info.get("homeroom_teacher_id"),
-                    "class_id": class_info["id"],
-                    "student_id": student_id
-                }).execute()
+                homeroom_teacher_resp = db.table("classes").select("homeroom_teacher_id").eq("id", class_info.get("id")).execute()
+                if homeroom_teacher_resp.data and homeroom_teacher_resp.data[0].get("homeroom_teacher_id"):
+                    db.table("homeroom_students_history").insert({
+                        "teacher_id": homeroom_teacher_resp.data[0].get("homeroom_teacher_id"),
+                        "class_id": class_info.get("id"),
+                        "student_id": student_id
+                    }).execute()
             
-            # Fetch lại student với parent_info để trả về
-            student_data = response.data[0]
+            # Fetch student with parent_info
+            student_data_response = response.data[0]
             parent_info = db.table("parent_info").select("*").eq("student_id", student_id).execute()
-            student_data["parent_contacts"] = parent_info.data if parent_info.data else []
+            student_data_response["parent_contacts"] = parent_info.data if parent_info.data else []
             
-            # CHANGED: Return 201 Created (not 200)
             return JSONResponse(
                 content=jsonable_encoder({
                     "success": True,
                     "message": "Tạo học sinh thành công",
-                    "data": student_data
+                    "data": student_data_response
                 }),
                 status_code=201
             )
         else:
-            raise HTTPException(status_code=500, detail="Lỗi tạo học sinh")
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "success": False,
+                    "code": "STUDENT_500",
+                    "message": "Lỗi tạo học sinh"
+                }
+            )
             
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating student: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "code": "STUDENT_500",
+                "message": f"Lỗi server: {str(e)}"
+            }
+        )
 
 @router.get("/")
 async def get_students(
@@ -127,7 +273,7 @@ async def get_students(
     search: Optional[str] = Query(None),
     class_name: Optional[str] = Query(None),
     grade: Optional[str] = Query(None),
-    is_active: Optional[bool] = Query(True),
+    is_active: Optional[bool] = Query(None),
     current_user=Depends(get_current_user),
     db=Depends(get_db)
 ):
@@ -148,7 +294,7 @@ async def get_students(
         if grade:
             query = query.eq("grade", grade)
             
-        # Backend gốc sử dụng is_active parameter, không có show_deleted
+        # Only filter by is_active if explicitly provided
         if is_active is not None:
             query = query.eq("is_active", is_active)
         
@@ -326,31 +472,17 @@ async def update_student(
 
 @router.delete("/{student_id}")
 async def delete_student(student_id: int, db=Depends(get_db)):
-    """Xóa học sinh (soft delete) - chỉ được phép nếu học sinh không đang trong lớp"""
+    """Soft delete học sinh - chỉ set is_active = False"""
     try:
         # Kiểm tra student tồn tại
-        existing = db.table("students").select("id, is_active, class_name, grade").eq("id", student_id).execute()
+        existing = db.table("students").select("id, is_active").eq("id", student_id).execute()
         
         if not existing.data:
             raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
         
         student = existing.data[0]
         
-        # NEW: Check if student is currently in a class
-        # Student is "in class" if both class_name and grade are non-empty
-        is_in_class = bool(
-            (student.get("class_name") and str(student.get("class_name")).strip()) and 
-            (student.get("grade") and str(student.get("grade")).strip())
-        )
-        
-        if is_in_class:
-            # Cannot delete student currently in a class
-            raise HTTPException(
-                status_code=409,
-                detail=f"Không thể xóa học sinh đang trong lớp '{student['class_name']}'. Vui lòng chuyển lớp hoặc hủy thôi học trước."
-            )
-        
-        # Soft delete (only for students NOT in a class)
+        # Soft delete: just set is_active to False, no other checks
         response = db.table("students").update({
             "is_active": False,
             "updated_at": datetime.now().isoformat()
@@ -359,17 +491,93 @@ async def delete_student(student_id: int, db=Depends(get_db)):
         if response.data:
             return {
                 "success": True,
-                "message": "Xóa học sinh thành công",
+                "message": "Vô hiệu hóa học sinh thành công",
                 "data": response.data[0]
             }
         else:
-            raise HTTPException(status_code=500, detail="Không thể xóa học sinh")
+            raise HTTPException(status_code=500, detail="Không thể vô hiệu hóa học sinh")
             
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"ERROR: Error deleting student {student_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+
+@router.delete("/{student_id}/from-class/{class_id}")
+async def remove_student_from_class(
+    student_id: int,
+    class_id: int,
+    db=Depends(get_db)
+):
+    """Remove student from a specific class (for distribution tab)"""
+    try:
+        # Kiểm tra student tồn tại
+        student_resp = db.table("students").select("id, class_name, grade").eq("id", student_id).execute()
+        if not student_resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
+        
+        student = student_resp.data[0]
+        
+        # Kiểm tra class tồn tại
+        class_resp = db.table("classes").select("id, class_name, grade").eq("id", class_id).execute()
+        if not class_resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+        
+        current_class = class_resp.data[0]
+        
+        # Kiểm tra xem student có trong lớp này không
+        history_check = db.table("homeroom_students_history").select("id")\
+            .eq("student_id", student_id)\
+            .eq("class_id", class_id).execute()
+        
+        if not history_check.data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Học sinh không có trong lớp {current_class.get('class_name')}"
+            )
+        
+        # Xóa từ homeroom_students_history
+        db.table("homeroom_students_history").delete()\
+            .eq("student_id", student_id)\
+            .eq("class_id", class_id).execute()
+        
+        # Tìm các lớp khác của học sinh trong homeroom_students_history
+        other_classes_resp = db.table("homeroom_students_history").select("class_id")\
+            .eq("student_id", student_id).execute()
+        
+        if other_classes_resp.data and len(other_classes_resp.data) > 0:
+            # Có lớp khác: cập nhật student.class_name và grade thành lớp khác đó
+            next_class_id = other_classes_resp.data[0]["class_id"]
+            next_class_resp = db.table("classes").select("class_name, grade")\
+                .eq("id", next_class_id).execute()
+            
+            if next_class_resp.data:
+                next_class = next_class_resp.data[0]
+                db.table("students").update({
+                    "class_name": next_class["class_name"],
+                    "grade": next_class["grade"],
+                    "updated_at": datetime.now().isoformat()
+                }).eq("id", student_id).execute()
+        else:
+            # Không có lớp khác: không được phép xóa, học sinh phải có ít nhất 1 lớp
+            raise HTTPException(
+                status_code=409,
+                detail="Không thể xóa. Học sinh phải luôn có ít nhất một lớp. Vui lòng phân bổ vào lớp khác trước khi xóa từ lớp này."
+            )
+        
+        return {
+            "success": True,
+            "message": f"Đã xóa học sinh khỏi lớp {current_class.get('class_name')} thành công"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ERROR: Error removing student from class: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+
 
 
 @router.post("/{student_id}/restore")
@@ -554,4 +762,66 @@ async def get_student_stats(db=Depends(get_db)):
         
     except Exception as e:
         logger.error(f"ERROR: Error getting student stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+
+@router.put("/{student_id}/assign-class")
+async def assign_student_to_class(
+    student_id: int,
+    data: dict,
+    db=Depends(get_db)
+):
+    """Phân bổ học sinh vào lớp học (dùng cho Tab 1 Profile Management)"""
+    try:
+        class_id = data.get("class_id")
+        if not class_id:
+            raise HTTPException(status_code=400, detail="class_id là bắt buộc")
+        
+        # Get class information
+        class_resp = db.table("classes").select("id, class_name, grade, homeroom_teacher_id").eq("id", class_id).execute()
+        if not class_resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+        
+        class_info = class_resp.data[0]
+        
+        # Check if student exists
+        student_resp = db.table("students").select("id").eq("id", student_id).execute()
+        if not student_resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
+        
+        # Update student's class_name and grade
+        update_data = {
+            "class_name": class_info["class_name"],
+            "grade": class_info["grade"],
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        db.table("students").update(update_data).eq("id", student_id).execute()
+        
+        # Insert into homeroom_students_history
+        db.table("homeroom_students_history").insert({
+            "teacher_id": class_info.get("homeroom_teacher_id"),
+            "class_id": class_id,
+            "student_id": student_id
+        }).execute()
+        
+        # Fetch updated student
+        student_response = db.table("students").select("*").eq("id", student_id).execute()
+        if student_response.data:
+            student_data = student_response.data[0]
+            parent_info = db.table("parent_info").select("*").eq("student_id", student_id).execute()
+            student_data["parent_contacts"] = parent_info.data if parent_info.data else []
+            
+            return {
+                "success": True,
+                "message": f"Phân bổ {student_data['full_name']} vào lớp {class_info['class_name']} thành công",
+                "data": student_data
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Không tìm thấy học sinh")
+    
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error assigning student to class: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")

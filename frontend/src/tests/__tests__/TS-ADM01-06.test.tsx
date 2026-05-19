@@ -229,10 +229,10 @@ describe('TS-ADM01-06: Admin User Form Email Validation', () => {
   // =========================================================
 
   it('TS-ADM01-06-03: should remove error message when valid email is entered', async () => {
-    //const handleSubmit = vi.fn();
-    // const { container } = render(
-    //   <MockForm onSubmit={handleSubmit} />
-    // );
+    const handleSubmit = vi.fn();
+    render(
+      <MockForm onSubmit={handleSubmit} />
+    );
 
     const emailInput = screen.getByTestId('email-input') as HTMLInputElement;
 

@@ -57,7 +57,7 @@ const PersonalInfo = () => {
   }
 
   return (
-    <div className="min-h-screen p-6 bg-background space-y-6">
+    <div className="min-h-screen p-6 space-y-6">
       {/* Header */}
       <PageHeader
         title="Thông tin cá nhân"
@@ -106,12 +106,14 @@ const PersonalInfo = () => {
         />
       </div>
 
-      {/* Teaching Info Section - Progressive loading with skeletons */}
+      {/* Teaching Info Section — only for teachers/homeroom teachers */}
+      {personalInfo.userData?.role !== 'admin' && (
       <TeachingInfoSection
         homeroomClasses={personalInfo.homeroomClasses}
         subjectClasses={personalInfo.subjectClasses}
         loading={personalInfo.loading}
       />
+      )}
     </div>
   );
 };

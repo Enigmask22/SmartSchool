@@ -22,7 +22,7 @@ export function Step1Form({
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4 pb-5">
         <div>
           <label htmlFor="username" className="block text-sm font-medium text-gray-700">
             Username đăng nhập
@@ -62,7 +62,7 @@ export function Step1Form({
           </p>
         </div>
 
-        <div className="flex space-x-3">
+        <div className="flex space-x-3 pt-3">
           <button
             type="button"
             onClick={onBackClick}

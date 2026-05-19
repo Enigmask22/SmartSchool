@@ -27,6 +27,7 @@ import {
   Save,
   X,
   Loader2,
+  ShieldCheck,
 } from 'lucide-react';
 import { PersonalInfoSkeleton } from './PersonalInfoSkeleton';
 
@@ -46,6 +47,7 @@ export const PersonalInfoSection = ({
   onSave,
 }: PersonalInfoSectionProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const isAdmin = userData?.role === 'admin';
   const [editData, setEditData] = useState<Record<string, any>>({
     full_name: '',
     email: '',
@@ -92,7 +94,7 @@ export const PersonalInfoSection = ({
           </CardTitle>
           <CardDescription>Thông tin cơ bản của tài khoản</CardDescription>
         </div>
-        {!isEditing && !loading && (
+        {!isEditing && !loading && !isAdmin && (
           <Button
             onClick={handleEdit}
             variant="outline"
@@ -175,7 +177,8 @@ export const PersonalInfoSection = ({
               </div>
             </div>
 
-            {/* Phone */}
+            {/* Phone — teacher only */}
+            {!isAdmin && (
             <div className="space-y-2">
               <Label htmlFor="phone">Số điện thoại</Label>
               {isEditing ? (
@@ -198,8 +201,10 @@ export const PersonalInfoSection = ({
                 </div>
               )}
             </div>
+            )}
 
-            {/* Date of Birth */}
+            {/* Date of Birth — teacher only */}
+            {!isAdmin && (
             <div className="space-y-2">
               <Label htmlFor="date_of_birth">Ngày sinh</Label>
               {isEditing ? (
@@ -226,8 +231,10 @@ export const PersonalInfoSection = ({
                 </div>
               )}
             </div>
+            )}
 
-            {/* Gender */}
+            {/* Gender — teacher only */}
+            {!isAdmin && (
             <div className="space-y-2">
               <Label htmlFor="gender">Giới tính</Label>
               {isEditing ? (
@@ -265,8 +272,10 @@ export const PersonalInfoSection = ({
                 </div>
               )}
             </div>
+            )}
 
-            {/* Teacher Code */}
+            {/* Teacher Code — teacher only */}
+            {!isAdmin && (
             <div className="space-y-2">
               <Label htmlFor="teacher_code">Mã giáo viên</Label>
               <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
@@ -279,6 +288,20 @@ export const PersonalInfoSection = ({
                 </Badge>
               </div>
             </div>
+            )}
+
+            {/* Role badge — admin only */}
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label>Vai trò</Label>
+                <div className="flex items-center gap-2 p-3 rounded-md bg-gray-50">
+                  <ShieldCheck className="w-4 h-4 text-purple-500" />
+                  <Badge className="bg-purple-100 text-purple-700 border-purple-200" variant="outline">
+                    Quản trị viên
+                  </Badge>
+                </div>
+              </div>
+            )}
 
             {/* Edit Actions */}
             {isEditing && (

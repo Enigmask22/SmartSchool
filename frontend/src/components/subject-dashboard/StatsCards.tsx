@@ -96,7 +96,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
               {analytics.total_students}
             </h3>
             <p className="mt-1 text-xs text-gray-500">
-              {analytics.students_with_scores} đã có điểm
+              {analytics.students_with_scores}/{analytics.total_students} đã có điểm
             </p>
           </div>
           <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-slate-100">
@@ -136,7 +136,7 @@ export function StatsCards({ analytics, loading = false }: StatsCardsProps) {
               {analytics.overview?.pass_rate || 0}%
             </h3>
             <p className="mt-1 text-xs text-gray-500">
-              {analytics.overview?.pass_count || 0}/{analytics.students_with_scores} học sinh
+              {analytics.overview?.pass_count || 0}/{analytics.total_students} học sinh
             </p>
           </div>
           <div className="flex items-center justify-center w-14 h-14 bg-amber-100 rounded-xl">

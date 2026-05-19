@@ -9,8 +9,10 @@ import AttendanceFilters from '@/components/attendance/AttendanceFilters';
 import AttendanceTable from '@/components/attendance/AttendanceTable';
 import LeaveRequestModal from '@/components/attendance/LeaveRequestModal';
 import { AuthContext } from '@/contexts/AuthContext';
-import { CalendarCheck } from 'lucide-react';
+import { CalendarCheck, Lock } from 'lucide-react';
 import logger from '@/utils/logger';
+import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 /**
  * AttendanceView Component
@@ -72,6 +74,7 @@ export default function AttendanceView() {
     successMessage,
     attendanceBootstrap,
     updateRecord: apiUpdateRecord,
+    attendanceEditLocked,
   } = api;
 
   // For homeroom teachers, use the selected class and its ID from the hook
@@ -101,6 +104,10 @@ export default function AttendanceView() {
    * Handle saving edited record - calls API and updates form state
    */
   const handleSaveEdit = async (): Promise<void> => {
+    if (attendanceEditLocked) {
+      toast.error('Đã quá hạn chỉnh sửa điểm danh.');
+      return;
+    }
     if (!editingRecord) return;
     const success = await apiUpdateRecord(editingRecord, editStatus, editNotes);
     if (success) {
@@ -173,6 +180,15 @@ export default function AttendanceView() {
         </div>
       )}
 
+      {attendanceEditLocked && displayClass && (
+        <Alert className="mb-6 border-amber-200 bg-amber-50">
+          <Lock className="h-4 w-4 text-amber-800" />
+          <AlertDescription className="text-amber-900">
+            Điểm danh đang khóa sửa (đã quá hạn hoặc bạn chưa được cấp quyền). Bạn vẫn xem được danh sách; chỉ xem đơn xin nghỉ đã lưu, không sửa trạng thái hay tải đơn mới.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Statistics */}
       <AttendanceStats stats={stats} loading={loading} />
 
@@ -221,6 +237,10 @@ export default function AttendanceView() {
         editNotes={editNotes}
         updating={updating}
         onEditRecord={(record) => {
+          if (attendanceEditLocked) {
+            toast.error('Đã quá hạn chỉnh sửa điểm danh.');
+            return;
+          }
           logger.debug('🖱️ Click Sửa button', { record });
           startEdit(record);
         }}
@@ -250,6 +270,7 @@ export default function AttendanceView() {
           targetDate={selectedDate}
           existingImageUrl={leaveRequestRecord.leave_request_image || null}
           onUploadSuccess={handleLeaveRequestUploadSuccess}
+          uploadDisabled={attendanceEditLocked}
         />
       )}
     </div>

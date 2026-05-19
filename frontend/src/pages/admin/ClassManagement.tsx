@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Users, ChevronLeft } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import api from '@/utils/api';
 import logger from '@/utils/logger';
@@ -7,7 +8,7 @@ import { useClassManagementAPI, type ClassInfo } from '@/hooks/class-management/
 import { useClassManagementStudentOps } from '@/hooks/class-management/useClassManagementStudentOps';
 import { useClassManagementDialog } from '@/hooks/class-management/useClassManagementDialog';
 import { useSystemSettings } from '@/contexts/useSystemSettings';
-import Header from '@/components/class-management/Header';
+import { PageHeader } from '@/components/common/PageHeader';
 import { ACADEMIC_YEAR_OPTIONS } from '@/utils/constants';
 import {
   ClassManagementSelector,
@@ -16,9 +17,11 @@ import {
   ImportModal,
   EditStudentModal,
   MoveClassModal,
+  ClassManagementTabNavigation,
+  AssignToClassModal,
 } from '@/components/class-management';
 
-const ClassManagement = () => {
+export default function ClassManagement() {
   // ===== State Management =====
   // Filters - use default academic year from settings
   const { settings } = useSystemSettings();
@@ -33,6 +36,12 @@ const ClassManagement = () => {
 
   const [selectedGrade, setSelectedGrade] = useState<string>('10');
   const [selectedClass, setSelectedClass] = useState<ClassInfo | null>(null);
+  const selectedClassRef = useRef<ClassInfo | null>(null);
+
+  // Keep refs in sync with state to avoid stale closure issues
+  useEffect(() => {
+    selectedClassRef.current = selectedClass;
+  }, [selectedClass]);
 
   // Student data
   const [classStudents, setClassStudents] = useState<any[]>([]);
@@ -43,6 +52,12 @@ const ClassManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showInactiveStudents, setShowInactiveStudents] = useState(false);
+
+  // Ref for showInactive to avoid stale closure
+  const showInactiveRef = useRef(showInactiveStudents);
+  useEffect(() => {
+    showInactiveRef.current = showInactiveStudents;
+  }, [showInactiveStudents]);
 
   // Modal visibility
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
@@ -60,6 +75,29 @@ const ClassManagement = () => {
 
   // Edit modal state
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any>(null);
+
+  // ===== Tab State (NEW) =====
+  const [activeTab, setActiveTab] = useState<'profiles' | 'distribution'>('distribution');
+
+  // ===== Tab 1 (Profiles) State (NEW) =====
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [loadingAllStudents, setLoadingAllStudents] = useState(false);
+  const [sortState, setSortState] = useState<{ field: string; direction: 'asc' | 'desc' }>({
+    field: 'student_id',
+    direction: 'asc',
+  });
+  const [profilesFilters, setProfilesFilters] = useState({
+    grade: '',
+    status: 'active', // 'active', 'inactive', 'all'
+  });
+  const [assignToClassModalOpen, setAssignToClassModalOpen] = useState(false);
+  const [selectedStudentForAssign, setSelectedStudentForAssign] = useState<any>(null);
+  const [profilesPage, setProfilesPage] = useState(1);
+  const [profilesPageSize, setProfilesPageSize] = useState(10);
+
+  // ===== Add Student Modal - Available Classes State (NEW) =====
+  const [addStudentAvailableClasses, setAddStudentAvailableClasses] = useState<ClassInfo[]>([]);
+  const [addStudentLoadingClasses, setAddStudentLoadingClasses] = useState(false);
 
   // ===== API & Dialog Hooks =====
   const apiHook = useClassManagementAPI();
@@ -84,6 +122,7 @@ const ClassManagement = () => {
     handleEditStudent,
     submitEditForm: hookSubmitEditForm,
     handleDeleteStudent: hookHandleDeleteStudent,
+    handleRemoveFromClass: hookHandleRemoveFromClass,
     handlePermanentDeleteStudent: hookHandleDeletePermanent,
     handleRestore,
     restoreLoading,
@@ -94,6 +133,7 @@ const ClassManagement = () => {
     handleFileUpload,
     handleConfirmImport,
     handleCloseImportModal,
+    loadAllStudents: hookLoadAllStudents,
   } = useClassManagementStudentOps(selectedAcademicYear, selectedClass?.id);
   const { confirmState, openConfirm, closeConfirm } = useClassManagementDialog();
 
@@ -146,25 +186,71 @@ const ClassManagement = () => {
     }
   }, [settings?.defaultAcademicYear]);
 
+  // ===== Fetch classes for Add Student Modal when academic_year or grade changes =====
+  useEffect(() => {
+    const fetchAddStudentClasses = async () => {
+      if (!studentFormData.academic_year) {
+        setAddStudentAvailableClasses([]);
+        return;
+      }
+
+      setAddStudentLoadingClasses(true);
+      try {
+        const response = await api.request(
+          `/admin/classes?academic_year=${encodeURIComponent(studentFormData.academic_year)}`
+        );
+        if (response.success && response.data) {
+          setAddStudentAvailableClasses(response.data);
+        } else {
+          setAddStudentAvailableClasses([]);
+        }
+      } catch (err) {
+        logger.error('Error fetching classes for add student modal:', err);
+        setAddStudentAvailableClasses([]);
+      } finally {
+        setAddStudentLoadingClasses(false);
+      }
+    };
+
+    fetchAddStudentClasses();
+  }, [studentFormData.academic_year]);
+
+  // ===== Initialize academic_year when add student modal opens =====
+  useEffect(() => {
+    if (showAddStudentModal && !studentFormData.academic_year && settings?.academic_year) {
+      handleStudentFormChange('academic_year', settings.academic_year);
+    }
+  }, [showAddStudentModal]);
+
   // ===== Load class students =====
+  // Using refs to avoid stale closure issues when called from dialog callbacks
   const loadClassStudents = useCallback(async () => {
-    if (!selectedClass) return;
+    const currentClass = selectedClassRef.current;
+    const showInactive = showInactiveRef.current;
+    logger.debug('[loadClassStudents] Called, selectedClass:', currentClass?.id, 'showInactive:', showInactive);
+    if (!currentClass) {
+      logger.debug('[loadClassStudents] No class selected, returning early');
+      return;
+    }
 
     setLoadingClassStudents(true);
     setCurrentPage(1);
 
     try {
       const response = await api.request(
-        `/admin/classes/${selectedClass.id}/students`,
+        `/admin/classes/${currentClass.id}/students`,
       );
+      logger.debug('[loadClassStudents] API response:', response.success, 'data count:', response.data?.length);
       if (response.success) {
         let students = response.data || [];
+        logger.debug('[loadClassStudents] Before filter - total students:', students.length);
 
-        if (showInactiveStudents) {
+        if (showInactive) {
           students = students.filter((student: any) => student.is_active === false);
         } else {
           students = students.filter((student: any) => student.is_active !== false);
         }
+        logger.debug('[loadClassStudents] After filter - active students:', students.length);
 
         students = students.sort((a: any, b: any) => {
           const aId = parseInt(a.student_id) || 0;
@@ -172,14 +258,15 @@ const ClassManagement = () => {
           return aId - bId;
         });
 
+        logger.debug('[loadClassStudents] Setting classStudents state with', students.length, 'students');
         setClassStudents(students);
 
         // Update student form data
         setStudentFormData((prev) => ({
           ...prev,
-          class_name: selectedClass.class_name || '',
-          grade: String(selectedClass.grade || ''),
-          class_id: selectedClass.id,
+          class_name: currentClass.class_name || '',
+          grade: String(currentClass.grade || ''),
+          class_id: currentClass.id,
         }));
       }
     } catch (err) {
@@ -187,7 +274,8 @@ const ClassManagement = () => {
     } finally {
       setLoadingClassStudents(false);
     }
-  }, [selectedClass, showInactiveStudents, setStudentFormData]);
+  // Empty deps - function never recreates, always reads latest values from refs
+  }, []);
 
   // ===== Auto-open import modal when data is imported =====
   useEffect(() => {
@@ -200,7 +288,12 @@ const ClassManagement = () => {
   const handleImportConfirmation = () => {
     handleConfirmImport(() => {
       setShowImportModal(false);
-      loadClassStudents();
+      // Reload appropriate table based on active tab
+      if (activeTab === 'profiles') {
+        loadAllStudents();
+      } else {
+        loadClassStudents();
+      }
     });
   };
 
@@ -216,6 +309,11 @@ const ClassManagement = () => {
     setCurrentPage(1);
   }, [searchTerm]);
 
+  // ===== Reset profiles pagination on search/filter change (Tab 1) =====
+  useEffect(() => {
+    setProfilesPage(1);
+  }, [searchTerm, profilesFilters]);
+
   // ===== Handle class selection =====
   const handleClassSelect = (classInfo: ClassInfo) => {
     setSelectedClass(classInfo);
@@ -230,14 +328,7 @@ const ClassManagement = () => {
     setCurrentPage(1);
   };
 
-  // ===== Wrapper functions for delete operations =====
-  const handleDeleteStudentWrapper = (id: number) => {
-    hookHandleDeleteStudent(id, openConfirm, closeConfirm, loadClassStudents);
-  };
-
-  const handlePermanentDeleteStudentWrapper = (id: number, name: string) => {
-    hookHandleDeletePermanent(id, name, openConfirm, closeConfirm, loadClassStudents);
-  };
+  // (Wrapper functions moved after loadAllStudents definition)
 
   // ===== Submit edit form =====
   const submitEditFormWrapper = () => {
@@ -255,7 +346,12 @@ const ClassManagement = () => {
     e.preventDefault();
     handleSubmitStudentForm(() => {
       setShowAddStudentModal(false);
-      loadClassStudents();
+      // Call appropriate reload function based on active tab
+      if (activeTab === 'profiles') {
+        loadAllStudents();
+      } else {
+        loadClassStudents();
+      }
     }, selectedAcademicYear);
   };
 
@@ -286,90 +382,313 @@ const ClassManagement = () => {
   // ===== Get displayed classes by grade =====
   const displayedClasses = apiHook.filterClassesByGrade(selectedGrade);
 
+  // ===== Tab 1 (Profiles) Methods (NEW) =====
+  const loadAllStudents = useCallback(async () => {
+    setLoadingAllStudents(true);
+    try {
+      const students = await hookLoadAllStudents();
+      setAllStudents(students);
+    } finally {
+      setLoadingAllStudents(false);
+    }
+  }, [hookLoadAllStudents]);
+
+  // ===== Wrapper functions for delete operations =====
+  // Using useCallback with empty deps since loadClassStudents is stable (reads from refs)
+  const handleDeleteStudentWrapper = useCallback((id: number) => {
+    logger.debug('[handleDeleteStudentWrapper] Called, activeTab:', activeTab, 'selectedClassRef.current:', selectedClassRef.current?.id);
+    hookHandleDeleteStudent(id, openConfirm, closeConfirm, () => {
+      logger.debug('[handleDeleteStudentWrapper] onSuccess callback invoked, activeTab:', activeTab);
+      // Call the appropriate reload function based on which tab is active
+      if (activeTab === 'profiles') {
+        logger.debug('[handleDeleteStudentWrapper] Profiles tab - calling loadAllStudents');
+        loadAllStudents();
+      } else if (activeTab === 'distribution' && selectedClassRef.current) {
+        logger.debug('[handleDeleteStudentWrapper] Distribution tab - calling loadClassStudents');
+        loadClassStudents();
+      }
+    });
+  }, [hookHandleDeleteStudent, openConfirm, closeConfirm, loadClassStudents, loadAllStudents, activeTab]);
+
+  const handleRemoveFromClassWrapper = useCallback((id: number) => {
+    const currentClass = selectedClassRef.current;
+    if (!currentClass) return;
+    hookHandleRemoveFromClass(id, currentClass.id, openConfirm, closeConfirm, loadClassStudents);
+  }, [hookHandleRemoveFromClass, openConfirm, closeConfirm, loadClassStudents]);
+
+  const handlePermanentDeleteStudentWrapper = useCallback((id: number, name: string) => {
+    logger.debug('[handlePermanentDeleteStudentWrapper] Called, activeTab:', activeTab, 'selectedClassRef.current:', selectedClassRef.current?.id);
+    hookHandleDeletePermanent(id, name, openConfirm, closeConfirm, () => {
+      logger.debug('[handlePermanentDeleteStudentWrapper] onSuccess callback invoked, activeTab:', activeTab);
+      // Call the appropriate reload function based on which tab is active
+      if (activeTab === 'profiles') {
+        logger.debug('[handlePermanentDeleteStudentWrapper] Profiles tab - calling loadAllStudents');
+        loadAllStudents();
+      } else if (activeTab === 'distribution' && selectedClassRef.current) {
+        logger.debug('[handlePermanentDeleteStudentWrapper] Distribution tab - calling loadClassStudents');
+        loadClassStudents();
+      }
+    });
+  }, [hookHandleDeletePermanent, openConfirm, closeConfirm, loadClassStudents, loadAllStudents, activeTab]);
+
+  // Filter and sort students for Tab 1
+  const filteredProfilesStudents = useMemo(() => {
+    let filtered = allStudents;
+
+    // Apply search term
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (s) =>
+          s.student_id?.toLowerCase().includes(searchLower) ||
+          s.full_name?.toLowerCase().includes(searchLower) ||
+          s.email?.toLowerCase().includes(searchLower) ||
+          s.phone?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply grade filter
+    if (profilesFilters.grade) {
+      filtered = filtered.filter((s) => String(s.grade) === String(profilesFilters.grade));
+    }
+
+    // Apply status filter
+    if (profilesFilters.status === 'active') {
+      filtered = filtered.filter((s) => s.is_active !== false);
+    } else if (profilesFilters.status === 'inactive') {
+      filtered = filtered.filter((s) => s.is_active === false);
+    }
+
+    // Apply sorting
+    if (sortState.field) {
+      filtered.sort((a, b) => {
+        let aVal = a[sortState.field] || '';
+        let bVal = b[sortState.field] || '';
+
+        // Handle numeric fields
+        if (sortState.field === 'student_id') {
+          aVal = parseInt(aVal) || 0;
+          bVal = parseInt(bVal) || 0;
+        } else if (sortState.field === 'grade') {
+          aVal = parseInt(aVal) || 0;
+          bVal = parseInt(bVal) || 0;
+        } else {
+          // String comparison
+          aVal = String(aVal).toLowerCase();
+          bVal = String(bVal).toLowerCase();
+        }
+
+        if (aVal < bVal) return sortState.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortState.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [allStudents, searchTerm, profilesFilters, sortState]);
+
+  // Paginate profiles students
+  const profilesTotalPages = Math.ceil(filteredProfilesStudents.length / profilesPageSize);
+  const profilesStartIndex = (profilesPage - 1) * profilesPageSize;
+  const profilesEndIndex = profilesStartIndex + profilesPageSize;
+  const paginatedProfilesStudents = filteredProfilesStudents.slice(
+    profilesStartIndex,
+    profilesEndIndex
+  );
+
+  // Handle tab switch
+  const handleTabSwitch = (tab: 'profiles' | 'distribution') => {
+    setActiveTab(tab);
+    setSearchTerm('');
+    setCurrentPage(1);
+    setProfilesPage(1);
+
+    if (tab === 'profiles') {
+      // Load all students when switching to profiles tab
+      if (allStudents.length === 0) {
+        loadAllStudents();
+      }
+    } else {
+      // Reset distribution tab state
+      setSelectedClass(null);
+      setClassStudents([]);
+      setSelectedStudentIds([]);
+    }
+  };
+
+  // Handle sort
+  const handleSort = (field: string) => {
+    setSortState((prev) => {
+      if (prev.field === field) {
+        // Toggle direction if same field
+        return {
+          field,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc',
+        };
+      }
+      // New field, default to asc
+      return { field, direction: 'asc' };
+    });
+  };
+
+  // Handle profiles filter change
+  const handleProfilesFilterChange = (filterName: string, value: any) => {
+    setProfilesFilters((prev) => ({
+      ...prev,
+      [filterName]: value,
+    }));
+    setProfilesPage(1); // Reset to first page when filter changes
+  };
+
+  // Handle assign to class
+  const handleOpenAssignModal = (student: any) => {
+    setSelectedStudentForAssign(student);
+    setAssignToClassModalOpen(true);
+  };
+
+  // Callback after successful assignment
+  const handleAssignSuccess = () => {
+    // Reload all students to refresh class_name
+    loadAllStudents();
+  };
+
   return (
-    <div className="min-h-screen p-6 space-y-6">
-      {/* Header with Filters */}
-      <Header
-        selectedAcademicYear={selectedAcademicYear}
-        setSelectedAcademicYear={setSelectedAcademicYear}
-        selectedGrade={selectedGrade}
-        setSelectedGrade={setSelectedGrade}
-        academicYears={ACADEMIC_YEAR_OPTIONS}
-        loading={apiHook.academicYears.length === 0}
+    <div className="min-h-screen p-6 bg-gray-50 space-y-6" style={{ overflow: 'visible' }}>
+      {/* Page Header */}
+      <PageHeader
+        title="Quản lý học sinh"
+        description="Quản lý thông tin học sinh và phân bổ các lớp học"
+        icon={
+          <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-amber-500 flex-shrink-0">
+            <Users className="w-8 h-8 text-white" />
+          </div>
+        }
       />
 
-      {/* Main Content */}
-      {selectedClass ? (
-        // Class Selected - Show Students Management
-        <div className="space-y-6">
+      <div className="space-y-6">
+      {/* Tab Navigation */}
+      <ClassManagementTabNavigation activeTab={activeTab} onTabClick={handleTabSwitch} />
+
+      {/* Tab 1: Student Profiles */}
+      {activeTab === 'profiles' ? (
+        <StudentsTableCard
+          selectedClassForManagement={null}
+          loadingClassData={loadingAllStudents}
+          error={null}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          paginatedStudents={paginatedProfilesStudents}
+          totalStudents={filteredProfilesStudents.length}
+          currentPage={profilesPage}
+          setCurrentPage={setProfilesPage}
+          classManagementPageSize={profilesPageSize}
+          setClassManagementPageSize={setProfilesPageSize}
+          totalPages={profilesTotalPages}
+          selectedStudentIds={selectedStudentIds}
+          setSelectedStudentIds={setSelectedStudentIds}
+          restoreLoading={restoreLoading}
+          downloadStudentTemplate={downloadStudentTemplate}
+          handleFileUpload={handleFileUpload}
+          onAddStudent={() => setShowAddStudentModal(true)}
+          onMoveClass={() => {}}
+          loadClassStudents={loadAllStudents}
+          handleEditStudent={handleEditStudent}
+          onEditStudent={() => setShowEditModal(true)}
+          handleDeleteStudent={handleDeleteStudentWrapper}
+          handleRemoveFromClass={undefined}
+          handleRestore={handleRestore}
+          handlePermanentDeleteStudent={handlePermanentDeleteStudentWrapper}
+          showInactiveStudents={profilesFilters.status !== 'active'}
+          setShowInactiveStudents={(show) => {
+            handleProfilesFilterChange('status', show ? 'all' : 'active');
+          }}
+          initialLoading={false}
+          tabMode="profiles"
+          sortState={sortState}
+          onSort={handleSort}
+          onAssignToClass={handleOpenAssignModal}
+          profilesGradeFilter={profilesFilters.grade}
+          onProfilesGradeFilterChange={(value) => handleProfilesFilterChange('grade', value)}
+          onProfilesClearFilters={() => {
+            handleProfilesFilterChange('grade', '');
+            handleProfilesFilterChange('status', 'active');
+            setSearchTerm('');
+          }}
+          profilesFilterStatus={profilesFilters.status as 'active' | 'inactive' | 'all'}
+          onProfilesFilterStatusChange={(status) => handleProfilesFilterChange('status', status)}
+        />
+      ) : selectedClass ? (
+        // Tab 2: Class Selected - Show Students Management
+        <div className="space-y-4">
           {/* Back Button & Class Info */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleBackToClassSelector}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                ← Quay lại
-              </button>
-              <div>
-                <h2 className="text-lg font-bold text-gray-900">
-                  {selectedClass.class_name} - Khối {selectedClass.grade}
-                </h2>
-                {selectedClass.teachers && (
-                  <p className="text-sm text-gray-600">
-                    Chủ nhiệm: {selectedClass.teachers.full_name}
-                  </p>
-                )}
-              </div>
+          <div className="flex items-center gap-3 p-4 border bg-white rounded-lg shadow-md">
+            <button
+              onClick={handleBackToClassSelector}
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <ChevronLeft className="inline-block w-4 h-4" />
+              Quay lại
+            </button>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">
+                {selectedClass.class_name} - Khối {selectedClass.grade}
+              </h3>
+              {selectedClass.teachers && (
+                <p className="text-xs text-gray-600">
+                  Chủ nhiệm: {selectedClass.teachers.full_name}
+                </p>
+              )}
             </div>
           </div>
 
           {/* Students Table */}
           <StudentsTableCard
-            selectedClassForManagement={String(selectedClass.id)}
-            loadingClassData={loadingClassStudents}
-            error={null}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            paginatedStudents={paginatedStudents}
-            totalStudents={totalStudents}
-            currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
-            classManagementPageSize={pageSize}
-            setClassManagementPageSize={setPageSize}
-            totalPages={totalPages}
-            selectedStudentIds={selectedStudentIds}
-            setSelectedStudentIds={setSelectedStudentIds}
-            restoreLoading={restoreLoading}
-            downloadStudentTemplate={downloadStudentTemplate}
-            handleFileUpload={handleFileUpload}
-            onAddStudent={() => setShowAddStudentModal(true)}
-            onMoveClass={() => {
-              setShowMoveModal(true);
-              setMoveYear(selectedAcademicYear || '');
-              setMoveTargetClassId('');
-            }}
-            loadClassStudents={loadClassStudents}
-            handleEditStudent={handleEditStudent}
-            onEditStudent={() => setShowEditModal(true)}
-            handleDeleteStudent={handleDeleteStudentWrapper}
-            handleRestore={handleRestore}
-            handlePermanentDeleteStudent={handlePermanentDeleteStudentWrapper}
-            showInactiveStudents={showInactiveStudents}
-            setShowInactiveStudents={setShowInactiveStudents}
+                  selectedClassForManagement={String(selectedClass.id)}
+                  loadingClassData={loadingClassStudents}
+                  error={null}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  paginatedStudents={paginatedStudents}
+                  totalStudents={totalStudents}
+                  currentPage={currentPage}
+                  setCurrentPage={setCurrentPage}
+                  classManagementPageSize={pageSize}
+                  setClassManagementPageSize={setPageSize}
+                  totalPages={totalPages}
+                  selectedStudentIds={selectedStudentIds}
+                  setSelectedStudentIds={setSelectedStudentIds}
+                  restoreLoading={restoreLoading}
+                  downloadStudentTemplate={downloadStudentTemplate}
+                  handleFileUpload={handleFileUpload}
+                  onAddStudent={() => setShowAddStudentModal(true)}
+                  onMoveClass={() => {
+                    setShowMoveModal(true);
+                    setMoveYear(selectedAcademicYear || '');
+                    setMoveTargetClassId('');
+                  }}
+                  loadClassStudents={loadClassStudents}
+                  handleEditStudent={handleEditStudent}
+                  onEditStudent={() => setShowEditModal(true)}
+                  handleDeleteStudent={handleDeleteStudentWrapper}
+                  handleRemoveFromClass={handleRemoveFromClassWrapper}
+                  handleRestore={handleRestore}
+                  handlePermanentDeleteStudent={handlePermanentDeleteStudentWrapper}
+                  showInactiveStudents={showInactiveStudents}
+                  setShowInactiveStudents={setShowInactiveStudents}
+            tabMode="distribution"
           />
         </div>
       ) : (
-        // Class Not Selected - Show Class Selector
+        // Tab 2: Class Not Selected - Show Class Selector
         <ClassManagementSelector
           classes={displayedClasses}
           selectedGrade={selectedGrade}
           academicYear={selectedAcademicYear}
           onSelect={handleClassSelect}
           loading={apiHook.loading}
-          downloadStudentTemplate={downloadStudentTemplate}
-          handleFileUpload={handleFileUpload}
-          onAddStudent={() => setShowAddStudentModal(true)}
+          academicYearOptions={ACADEMIC_YEAR_OPTIONS}
+          onAcademicYearChange={setSelectedAcademicYear}
+          onGradeChange={setSelectedGrade}
         />
       )}
 
@@ -386,6 +705,9 @@ const ClassManagement = () => {
         updateParentContactField={updateParentContactField}
         onSubmit={handleAddStudentSubmit}
         onClose={handleCloseAddStudentModal}
+        academicYearOptions={ACADEMIC_YEAR_OPTIONS}
+        availableClasses={addStudentAvailableClasses}
+        loadingClasses={addStudentLoadingClasses}
       />
 
       {/* Import Modal */}
@@ -432,6 +754,7 @@ const ClassManagement = () => {
         academicYears={apiHook.academicYears}
         moveYearClasses={moveYearClasses}
         selectedStudentIds={selectedStudentIds}
+        currentClass={selectedClass}
         onConfirm={async () => {
           if (!moveTargetClassId || !selectedClass || selectedStudentIds.length === 0) return;
 
@@ -451,6 +774,8 @@ const ClassManagement = () => {
             setMoveGrade('');
             setMoveTargetClassId('');
             loadClassStudents();
+            // Refetch classes to update student counts in ClassManagementSelector
+            apiHook.fetchClasses(selectedAcademicYear);
           } catch (err) {
             const message = (err as any)?.detail || 'Lỗi khi chuyển lớp';
             toast.error(`Lỗi chuyển lớp: ${message}`);
@@ -470,8 +795,15 @@ const ClassManagement = () => {
         onConfirm={confirmState.onConfirm}
         onCancel={closeConfirm}
       />
+
+        {/* Assign To Class Modal (NEW) */}
+        <AssignToClassModal
+          open={assignToClassModalOpen}
+          onOpenChange={setAssignToClassModalOpen}
+          student={selectedStudentForAssign}
+          onSuccess={handleAssignSuccess}
+        />
+      </div>
     </div>
   );
 };
-
-export default ClassManagement;

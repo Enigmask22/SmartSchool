@@ -147,10 +147,10 @@ def expired_jwt_token():
 @pytest.fixture
 def new_teacher_data():
     """Data for creating a new teacher user - TS-ADM01-03"""
-    timestamp = str(datetime.now().timestamp()).replace(".", "")
+    ts = str(int(datetime.now().timestamp()))[-6:]
     return {
-        "username": f"test_teacher_{timestamp}",
-        "email": f"test_teacher_{timestamp}@school.edu.vn",
+        "username": f"tch_{ts}",
+        "email": f"tch_{ts}@school.edu.vn",
         "full_name": "Test Teacher User",
         "password": "TestPassword123!@#",
         "role": "teacher"
@@ -160,10 +160,10 @@ def new_teacher_data():
 @pytest.fixture
 def new_admin_data():
     """Data for creating a new admin user - TS-ADM01-03"""
-    timestamp = str(datetime.now().timestamp()).replace(".", "")
+    ts = str(int(datetime.now().timestamp()))[-6:]
     return {
-        "username": f"test_admin_{timestamp}",
-        "email": f"test_admin_{timestamp}@school.edu.vn",
+        "username": f"tad_{ts}",
+        "email": f"tad_{ts}@school.edu.vn",
         "full_name": "Test Admin User",
         "password": "AdminPassword123!@#",
         "role": "admin"
@@ -173,10 +173,10 @@ def new_admin_data():
 @pytest.fixture
 def new_homeroom_data():
     """Data for creating a new homeroom teacher - TS-ADM01-03"""
-    timestamp = str(datetime.now().timestamp()).replace(".", "")
+    ts = str(int(datetime.now().timestamp()))[-6:]
     return {
-        "username": f"test_homeroom_{timestamp}",
-        "email": f"test_homeroom_{timestamp}@school.edu.vn",
+        "username": f"thr_{ts}",
+        "email": f"thr_{ts}@school.edu.vn",
         "full_name": "Test Homeroom Teacher",
         "password": "HomeroomPassword123!@#",
         "role": "homeroom_teacher"
@@ -359,3 +359,83 @@ def cleanup_attendance():
                 print(f"Warning: Failed to cleanup teachers: {e}")
     except Exception as e:
         print(f"Warning: Cleanup fixture encountered error: {e}")
+
+
+# =========================================================
+# SCORE COLUMN CONFIG SETUP FIXTURE
+# =========================================================
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_score_column_config():
+    """
+    Setup score_column_config for all subjects used in tests.
+    This fixture runs once per test session and ensures ALL subjects have
+    a valid score_column_config required by the bulk-import endpoint.
+
+    Unconditionally overwrites any missing/empty/invalid config so tests
+    are never blocked by a partial database state.
+
+    Default config structure:
+    - Diem_thuong_xuyen (weight 0.2): with children Diem_tx1-4
+    - Diem_thi_giua_ki (weight 0.3)
+    - Diem_thi_cuoi_ki (weight 0.5)
+    """
+    try:
+        from core.database import db as database_instance
+        if database_instance is None:
+            return
+        try:
+            supabase = database_instance.client
+        except Exception:
+            return  # DB not available, skip silently
+
+        # Default score_column_config
+        default_config = {
+            "Diem_thuong_xuyen": {
+                "he_so": 0.2,
+                "data": {
+                    "Diem_tx1": {"he_so": 1},
+                    "Diem_tx2": {"he_so": 1},
+                    "Diem_tx3": {"he_so": 1},
+                    "Diem_tx4": {"he_so": 1}
+                }
+            },
+            "Diem_thi_giua_ki": {"he_so": 0.3},
+            "Diem_thi_cuoi_ki": {"he_so": 0.5}
+        }
+
+        def _config_is_valid(config) -> bool:
+            """Return True only when config is a non-empty dict with expected keys."""
+            if not config:
+                return False
+            # Handle JSONB returned as string by some Supabase versions
+            if isinstance(config, str):
+                import json as _json
+                try:
+                    config = _json.loads(config)
+                except Exception:
+                    return False
+            if not isinstance(config, dict) or not config:
+                return False
+            return True
+
+        # Fetch ALL subjects (active + inactive) so we never miss a referenced subject
+        subjects = supabase.table("subjects").select("id, score_column_config, is_active").execute()
+
+        if subjects.data:
+            for subject in subjects.data:
+                subject_id = subject["id"]
+                existing_config = subject.get("score_column_config")
+
+                if not _config_is_valid(existing_config):
+                    try:
+                        supabase.table("subjects").update(
+                            {"score_column_config": default_config}
+                        ).eq("id", subject_id).execute()
+                        print(f"✅ Set score_column_config for subject {subject_id}")
+                    except Exception as e:
+                        print(f"⚠️ Failed to set score_column_config for subject {subject_id}: {e}")
+
+    except Exception as e:
+        print(f"⚠️ setup_score_column_config fixture error: {e}")
+        pass  # Non-fatal - tests can continue

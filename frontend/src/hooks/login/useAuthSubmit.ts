@@ -40,12 +40,29 @@ export const useAuthSubmit = (): UseAuthSubmitReturn => {
   /**
    * Submit login credentials
    * Calls authentication API and redirects based on user role
+   * 
+   * Frontend validation:
+   * - Username/email: required, non-empty
+   * - Password: required, non-empty (min 6 chars as per backend)
    */
   const submit = async (username: string, password: string) => {
     setIsLoading(true);
     setError('');
 
     try {
+      // Frontend validation
+      if (!username || username.trim() === '') {
+        throw new Error('Vui lòng nhập tên đăng nhập hoặc email');
+      }
+
+      if (!password || password.trim() === '') {
+        throw new Error('Vui lòng nhập mật khẩu');
+      }
+
+      if (password.length < 6) {
+        throw new Error('Mật khẩu phải có ít nhất 6 ký tự');
+      }
+
       const user = await login(username, password);
 
       // Redirect based on role

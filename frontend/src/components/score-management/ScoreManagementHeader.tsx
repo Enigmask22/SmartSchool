@@ -1,5 +1,5 @@
 // React already imported by JSX transform
-import { BookOpen, Calendar} from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -20,6 +20,7 @@ interface ScoreManagementHeaderProps {
   onAcademicYearChange: (year: string) => void;
   onSemesterChange: (sem: string) => void;
   loading?: boolean;
+  isFilterLocked?: boolean;
 }
 
 const ScoreManagementHeader = ({
@@ -30,32 +31,30 @@ const ScoreManagementHeader = ({
   onAcademicYearChange,
   onSemesterChange,
   loading = false,
+  isFilterLocked = false,
 }: ScoreManagementHeaderProps) => {
-  const description = (
-    <div className="space-y-2">
-      <div className="flex items-center space-x-3 text-sm flex-wrap gap-2">
-        <Badge variant="secondary" className="text-blue-700 bg-blue-100">
-          <Calendar className="w-3 h-3 mr-1" />
-          {academicYear}
-        </Badge>
-        <Badge variant="secondary" className="bg-slate-100 text-slate-700">
-          <BookOpen className="w-3 h-3 mr-1" />
-          {semester}
-        </Badge>
-        {/* {subjects && subjects.length > 0 && (
-          <Badge variant="secondary" className="text-blue-700 bg-blue-100">
-            <BookOpen className="w-3 h-3 mr-1" />
-            {subjects.join(', ')}
-          </Badge>
-        )} */}
-      </div>
-    </div>
-  );
-
   return (
     <PageHeader
       title="Quản lý điểm số"
-      description={description}
+      description={
+        <div className="space-y-2">
+          {!isFilterLocked ? (
+            <p className="text-muted-foreground text-base">
+              Theo dõi, nhập và cập nhật điểm học sinh theo từng lớp - môn học
+            </p>
+          ) : null}
+          {isFilterLocked ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="secondary" className="text-blue-700 bg-blue-100">
+                Năm học: {academicYear}
+              </Badge>
+              <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                Học kỳ: {semester}
+              </Badge>
+            </div>
+          ) : null}
+        </div>
+      }
       icon={
         <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
           <BookOpen className="w-8 h-8 text-white" />
@@ -78,15 +77,19 @@ const ScoreManagementHeader = ({
             <Skeleton className="h-10 w-[100px]" />
           </div>
         </div>
-      ) : (
+      ) : !isFilterLocked ? (
         // Normal state: Actual Selects
         <PageHeaderControls spacing="md">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">
               Năm học
             </label>
-            <Select value={academicYear} onValueChange={onAcademicYearChange}>
-              <SelectTrigger className="w-[140px] focus-visible:outline-none">
+            <Select
+              value={academicYear}
+              onValueChange={onAcademicYearChange}
+              disabled={isFilterLocked}
+            >
+              <SelectTrigger className="w-[140px] focus-visible:outline-none disabled:opacity-60">
                 <SelectValue placeholder="Chọn năm học" />
               </SelectTrigger>
               <SelectContent>
@@ -103,8 +106,12 @@ const ScoreManagementHeader = ({
             <label className="text-xs font-medium text-gray-500">
               Học kỳ
             </label>
-            <Select value={semester} onValueChange={onSemesterChange}>
-              <SelectTrigger className="w-[100px] focus-visible:outline-none">
+            <Select
+              value={semester}
+              onValueChange={onSemesterChange}
+              disabled={isFilterLocked}
+            >
+              <SelectTrigger className="w-[100px] focus-visible:outline-none disabled:opacity-60">
                 <SelectValue placeholder="Chọn HK" />
               </SelectTrigger>
               <SelectContent>
@@ -117,7 +124,7 @@ const ScoreManagementHeader = ({
             </Select>
           </div>
         </PageHeaderControls>
-      )}
+      ) : null}
     </PageHeader>
   );
 };

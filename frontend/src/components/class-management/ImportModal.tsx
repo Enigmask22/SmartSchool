@@ -23,6 +23,16 @@ interface ImportedGradeRow {
   so_dien_thoai: string;
   lop_hoc: string;
   khoi: string;
+  ngay_sinh?: string;
+  gioi_tinh?: string;
+  dia_chi?: string;
+  nam_nhap_hoc?: string;
+  ten_phu_huynh?: string;
+  sdt_phu_huynh?: string;
+  ten_bo?: string;
+  sdt_bo?: string;
+  ten_me?: string;
+  sdt_me?: string;
   [key: string]: any;
 }
 
@@ -49,7 +59,7 @@ const ImportModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Xem trước dữ liệu import</DialogTitle>
+          <DialogTitle>Xem trước dữ liệu</DialogTitle>
           <DialogDescription>
             Kiểm tra dữ liệu trước khi nhập vào hệ thống ({importedData.length}{' '}
             học sinh)
@@ -75,12 +85,22 @@ const ImportModal = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>STT</TableHead>
-                <TableHead>Họ tên</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>SĐT</TableHead>
-                <TableHead>Lớp</TableHead>
-                <TableHead>Khối</TableHead>
+                <TableHead className="min-w-12">STT</TableHead>
+                <TableHead className="min-w-32">Họ tên</TableHead>
+                <TableHead className="min-w-32">Email</TableHead>
+                <TableHead className="min-w-24">SĐT</TableHead>
+                <TableHead className="min-w-20">Lớp</TableHead>
+                <TableHead className="min-w-16">Khối</TableHead>
+                <TableHead className="min-w-20">Năm nhập học</TableHead>
+                <TableHead className="min-w-20">Ngày sinh</TableHead>
+                <TableHead className="min-w-20">Giới tính</TableHead>
+                <TableHead className="min-w-32">Địa chỉ</TableHead>
+                <TableHead className="min-w-24">Tên phụ huynh</TableHead>
+                <TableHead className="min-w-20">SĐT PH</TableHead>
+                <TableHead className="min-w-20">Tên bố</TableHead>
+                <TableHead className="min-w-20">SĐT bố</TableHead>
+                <TableHead className="min-w-20">Tên mẹ</TableHead>
+                <TableHead className="min-w-20">SĐT mẹ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -97,6 +117,36 @@ const ImportModal = ({
                   </TableCell>
                   <TableCell className="font-medium">
                     {student.khoi}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {student.nam_nhap_hoc || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.ngay_sinh || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.gioi_tinh || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.dia_chi || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.ten_phu_huynh || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.sdt_phu_huynh || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.ten_bo || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.sdt_bo || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.ten_me || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {student.sdt_me || '-'}
                   </TableCell>
                 </TableRow>
               ))}

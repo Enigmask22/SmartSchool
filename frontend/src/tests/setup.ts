@@ -22,13 +22,16 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock window.localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
+// Mock window.localStorage — functional implementation so tests can store/retrieve values
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string): string | null => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => { store[key] = String(value); }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+  };
+})();
 global.localStorage = localStorageMock as any;
 
 // Suppress console errors in tests (optional)
