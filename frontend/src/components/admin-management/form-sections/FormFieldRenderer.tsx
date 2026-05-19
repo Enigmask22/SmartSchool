@@ -268,14 +268,13 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
         </>
       ) : field === 'date_of_birth' ? (
         <>
-          <div className={`w-full ${shouldShowError ? 'rounded-md border border-red-500 bg-red-50 p-2' : ''}`}>
+          <div className={`w-full ${shouldShowError ? 'rounded-md border border-red-500 bg-red-50 p-2' : ''}`} onBlur={() => onFieldBlur?.(field)}>
             <SimpleDatePicker
               value={
                 formData[field] ??
                 (item?.[field] && item[field] !== '-' ? item[field] : '')
               }
               onChange={(date) => onChangeHandler(field, date)}
-              onBlur={() => onFieldBlur?.(field)}
               placeholder="Chọn ngày sinh"
             />
           </div>
@@ -318,6 +317,7 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
             <SelectContent>
               <SelectItem value="HK1">Học kỳ 1</SelectItem>
               <SelectItem value="HK2">Học kỳ 2</SelectItem>
+              <SelectItem value="HK3">Học kỳ 3</SelectItem>
             </SelectContent>
           </Select>
           {shouldShowError && errorMessage && (
