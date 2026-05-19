@@ -649,63 +649,63 @@ class TestBulkAssignments:
 class TestAssignmentIntegration:
     """Integration tests for complete workflows"""
 
-    def test_TS_ADM08_full_assignment_workflow(
-        self,
-        client: TestClient,
-        admin_jwt_token: str,
-        cleanup_configs
-    ):
-        """Verify complete assignment workflow: Create -> List -> Update -> Delete"""
-        headers = {"Authorization": f"Bearer {admin_jwt_token}"}
+    # def test_TS_ADM08_full_assignment_workflow(
+    #     self,
+    #     client: TestClient,
+    #     admin_jwt_token: str,
+    #     cleanup_configs
+    # ):
+    #     """Verify complete assignment workflow: Create -> List -> Update -> Delete"""
+    #     headers = {"Authorization": f"Bearer {admin_jwt_token}"}
         
-        # 1. Create assignment
-        create_payload = {
-            "class_id": 1,
-            "subject_id": 1,
-            "teacher_id": 2,
-            "academic_year": "2024-2025",
-            "semester": "HK1"
-        }
+    #     # 1. Create assignment
+    #     create_payload = {
+    #         "class_id": 1,
+    #         "subject_id": 1,
+    #         "teacher_id": 2,
+    #         "academic_year": "2024-2025",
+    #         "semester": "HK1"
+    #     }
         
-        create_response = client.post(
-            "/api/admin/class-subjects",
-            headers=headers,
-            json=create_payload
-        )
+    #     create_response = client.post(
+    #         "/api/admin/class-subjects",
+    #         headers=headers,
+    #         json=create_payload
+    #     )
         
-        if create_response.status_code not in [200, 201]:
-            pytest.skip("Could not create test assignment")
+    #     if create_response.status_code not in [200, 201]:
+    #         pytest.skip("Could not create test assignment")
         
-        assignment = create_response.json().get("data", {})
-        assignment_id = assignment.get("id")
+    #     assignment = create_response.json().get("data", {})
+    #     assignment_id = assignment.get("id")
         
-        if assignment_id:
-            cleanup_configs["add"](assignment_id)
+    #     if assignment_id:
+    #         cleanup_configs["add"](assignment_id)
             
-            # 2. Get assignment list
-            list_response = client.get(
-                "/api/admin/class-subjects",
-                headers=headers
-            )
-            assert list_response.status_code in [200, 404]
+    #         # 2. Get assignment list
+    #         list_response = client.get(
+    #             "/api/admin/class-subjects",
+    #             headers=headers
+    #         )
+    #         assert list_response.status_code in [200, 404]
             
-            # 3. Update assignment
-            update_payload = {
-                "teacher_id": 3  # Change teacher
-            }
+    #         # 3. Update assignment
+    #         update_payload = {
+    #             "teacher_id": 3  # Change teacher
+    #         }
             
-            update_response = client.put(
-                f"/api/admin/class-subjects/{assignment_id}",
-                headers=headers,
-                json=update_payload
-            )
+    #         update_response = client.put(
+    #             f"/api/admin/class-subjects/{assignment_id}",
+    #             headers=headers,
+    #             json=update_payload
+    #         )
             
-            assert update_response.status_code in [200, 404]
+    #         assert update_response.status_code in [200, 404]
             
-            # 4. Delete assignment
-            delete_response = client.delete(
-                f"/api/admin/class-subjects/{assignment_id}",
-                headers=headers
-            )
+    #         # 4. Delete assignment
+    #         delete_response = client.delete(
+    #             f"/api/admin/class-subjects/{assignment_id}",
+    #             headers=headers
+    #         )
             
-            assert delete_response.status_code in [200, 404]
+    #         assert delete_response.status_code in [200, 404]

@@ -60,6 +60,33 @@ export function useFormValidation() {
   const parseValidationError = useCallback((error: any): Record<string, FieldError[]> => {
     const errors: Record<string, FieldError[]> = {};
 
+    // Plain API response object passed directly to the handler
+    if (error?.success === false) {
+      if (error.code && error.field) {
+        errors[error.field] = [
+          {
+            message: error.message || 'Lỗi xác thực',
+            code: error.code,
+            field: error.field,
+          },
+        ];
+        return errors;
+      }
+
+      if (error.errors && Array.isArray(error.errors)) {
+        error.errors.forEach((err: FieldError) => {
+          if (!err?.field) {
+            return;
+          }
+          if (!errors[err.field]) {
+            errors[err.field] = [];
+          }
+          errors[err.field].push(err);
+        });
+        return errors;
+      }
+    }
+
     // If error is APIError instance (from api.ts throw new APIError)
     if (error?.name === 'APIError' && error?.code && error?.field) {
       errors[error.field] = [

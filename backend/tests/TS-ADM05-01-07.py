@@ -42,13 +42,15 @@ def client(app):
 
 
 @pytest.fixture
-def admin_token():
-    return "mock_admin_token"
+def admin_token(admin_jwt_token):
+    """Proxy to shared real admin JWT from conftest."""
+    return admin_jwt_token
 
 
 @pytest.fixture
-def teacher_token():
-    return "mock_teacher_token"
+def teacher_token(teacher_jwt_token):
+    """Proxy to shared real teacher JWT from conftest."""
+    return teacher_jwt_token
 
 
 VALID_YEAR = "2025-2026"
@@ -68,7 +70,7 @@ class TestDashboardBootstrap:
             headers=headers,
             params={"academic_year": VALID_YEAR, "period_days": 30}
         )
-        assert response.status_code in [200, 401, 403, 422]
+        assert response.status_code == 200
 
     def test_TS_ADM05_01_bootstrap_has_required_keys(self, client: TestClient, admin_token: str):
         """Bootstrap payload contains overview, attendance_trends, class_performance, infra_stats"""

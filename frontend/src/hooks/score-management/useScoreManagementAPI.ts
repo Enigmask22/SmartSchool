@@ -295,7 +295,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     // Check if all required score columns are available
     // If any score column is missing, return '-'
     const allColumnsPresent = flatColumns.every(
-      (column) => gradeData[column.key]?.Diem != null
+      (column) => gradeData[column.key]?.Diem != null && gradeData[column.key]?.Diem !== ''
     );
 
     if (!allColumnsPresent) return '-';
