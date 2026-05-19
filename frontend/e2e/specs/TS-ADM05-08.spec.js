@@ -50,13 +50,11 @@ test.describe('TS-ADM05-08: Admin Dashboard E2E', () => {
     const mainContent = page.locator('main');
     await expect(mainContent).toBeVisible({ timeout: TEST_TIMEOUTS.NORMAL });
 
-    // Step 4: Look for stat widgets (total_students, total_classes, etc.)
-    // The page fetches data and renders summary cards — wait for any numeric content
-    await page.waitForTimeout(2000); // Allow API call to complete
-
-    // Verify page has rendered content (not blank)
-    const pageText = await page.evaluate(() => document.body.innerText);
-    expect(pageText.length).toBeGreaterThan(10);
+    // Step 4: Wait for stats to load and verify overview cards are visible
+    await page.waitForLoadState('networkidle', { timeout: TEST_TIMEOUTS.LONG });
+    await expect(page.locator('h1:has-text("Tổng quan")')).toBeVisible({ timeout: TEST_TIMEOUTS.NORMAL });
+    // Verify at least one stat card label is rendered
+    await expect(page.locator('p.text-sm:has-text("Học Sinh")')).toBeVisible({ timeout: TEST_TIMEOUTS.NORMAL });
 
     // Step 5: Check that an academic year selector exists and is interactive
     const yearSelector = page.locator('[role="combobox"]').first();

@@ -105,22 +105,30 @@ def cleanup_students(db, student_ids: list):
 
 @pytest.fixture
 def test_class_current_year(get_db):
-    """Get a class from current academic year for testing
-    
+    """Get a class that has students enrolled (via homeroom_students_history).
+
     Returns:
         dict with id, class_name, grade, academic_year
     """
     db = get_db()
-    response = (
+    classes = (
         db.table("classes")
         .select("id, class_name, grade, academic_year, homeroom_teacher_id")
         .eq("is_active", True)
-        .limit(1)
+        .order("id", desc=False)
         .execute()
     )
-    if not response.data:
-        pytest.skip("No active classes found in database")
-    return response.data[0]
+    for cls in (classes.data or []):
+        hist = (
+            db.table("homeroom_students_history")
+            .select("student_id")
+            .eq("class_id", cls["id"])
+            .limit(1)
+            .execute()
+        )
+        if hist.data:
+            return cls
+    pytest.skip("No active class with enrolled students found in DB")
 
 
 @pytest.fixture
@@ -142,9 +150,12 @@ def test_class_same_grade_same_year(get_db, test_class_current_year):
     
     # Filter to find a different class
     available = [c for c in (response.data or []) if c["id"] != test_class_current_year["id"]]
-    
+
     if not available:
-        pytest.skip("Need at least 2 classes with same grade in same academic year")
+        pytest.skip(
+            f"No second active class with grade={test_class_current_year['grade']} "
+            f"in year={test_class_current_year['academic_year']}"
+        )
     return available[0]
 
 
@@ -169,8 +180,8 @@ def test_students_in_class(get_db, test_class_current_year):
     student_ids = [r["student_id"] for r in (history_resp.data or []) if r.get("student_id")]
     
     if not student_ids:
-        pytest.skip("No students found in test class")
-    
+        pytest.skip(f"No students enrolled in class {test_class_current_year['id']}")
+
     # Get student details
     students_resp = (
         db.table("students")
@@ -309,11 +320,11 @@ class TestMoveStudentsSameYear:
                 pytest.skip("No active students in test class")
             
             student_ids = [s["id"] for s in active_students[:2]]  # Use up to 2 students
-            
+
             # Record original class for rollback
             original_students = db.table("students").select("id, class_name").in_("id", student_ids).execute()
             original_class_names = {s["id"]: s["class_name"] for s in (original_students.data or [])}
-            
+
             payload = {
                 "student_ids": student_ids,
                 "current_class_id": test_class_current_year["id"],

@@ -201,7 +201,7 @@ export default function ScoreTable({
                     if (column.hasChildren) {
                       return column.children.map((child: any) => (
                         <td key={child.key} className="px-3 py-4 text-center relative">
-                          {studentData.score?.score_data?.[child.key]?.Diem ? (
+                          {studentData.score?.score_data?.[child.key]?.Diem != null && studentData.score.score_data[child.key].Diem !== '' ? (
                             <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium border border-green-200 min-w-[50px] inline-block">
                               {
                                 studentData.score.score_data[child.key].Diem
@@ -218,7 +218,7 @@ export default function ScoreTable({
                     } else {
                       return (
                         <td key={column.key} className="px-5 py-4 text-center relative">
-                          {studentData.score?.score_data?.[column.key]?.Diem ? (
+                          {studentData.score?.score_data?.[column.key]?.Diem != null && studentData.score.score_data[column.key].Diem !== '' ? (
                             <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-md text-sm font-medium border border-green-200 min-w-[50px] inline-block">
                               {
                                 studentData.score.score_data[column.key].Diem

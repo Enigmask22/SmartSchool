@@ -1355,6 +1355,19 @@ async def update_class(
         response = db.table("classes").update(update_data).eq("id", class_id).execute()
         
         if response.data:
+            # Sync homeroom_teacher_id change into homeroom_students_history
+            if class_data.homeroom_teacher_id is not None:
+                new_teacher_id = class_data.homeroom_teacher_id
+                old_teacher_id = current_class_data.get("homeroom_teacher_id")
+                if new_teacher_id != old_teacher_id:
+                    db.table("homeroom_students_history").update(
+                        {"teacher_id": new_teacher_id}
+                    ).eq("class_id", class_id).execute()
+                    logger.info(
+                        f"Synced homeroom_students_history: class_id={class_id}, "
+                        f"teacher_id {old_teacher_id} → {new_teacher_id}"
+                    )
+
             return {"success": True, "data": response.data[0], "message": "Cập nhật lớp học thành công"}
         else:
             raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")

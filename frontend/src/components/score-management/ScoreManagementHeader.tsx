@@ -40,7 +40,7 @@ const ScoreManagementHeader = ({
         <div className="space-y-2">
           {!isFilterLocked ? (
             <p className="text-muted-foreground text-base">
-              Theo dõi, nhập và cập nhật điểm học sinh theo từng lớp - môn học.
+              Theo dõi, nhập và cập nhật điểm học sinh theo từng lớp - môn học
             </p>
           ) : null}
           {isFilterLocked ? (

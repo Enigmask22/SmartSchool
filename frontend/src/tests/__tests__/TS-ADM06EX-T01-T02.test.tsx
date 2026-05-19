@@ -304,7 +304,7 @@ describe('TS-ADM06EX-T01: Score Configuration Form Rendering', () => {
   });
 
   it('TS-ADM06EX-T01-08: Key input should be disabled during edit', () => {
-    //const { rerender } = render(<ScoreConfigForm />);
+    render(<ScoreConfigForm />);
     fireEvent.click(screen.getByTestId('add-column-btn'));
 
     // Add a column first
