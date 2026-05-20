@@ -10,6 +10,8 @@ from email.mime.text import MIMEText
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
+import requests
+
 from core.logger import setup_logger
 
 logger = setup_logger("email_report_card")
@@ -19,11 +21,16 @@ class EmailReportCardService:
     """Service gửi phiếu điểm học sinh qua email cho phụ huynh"""
 
     def __init__(self):
+        self.email_provider = os.getenv("EMAIL_PROVIDER", "smtp").strip().lower()
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_timeout = int(os.getenv("SMTP_TIMEOUT", "20"))
         self.email = os.getenv("SMTP_EMAIL", "your-email@gmail.com")
         self.password = os.getenv("SMTP_PASSWORD", "your-app-password")
         self.sender_name = os.getenv("SMTP_SENDER_NAME", "SynapseS System")
+        self.resend_api_key = os.getenv("RESEND_API_KEY", "")
+        self.resend_api_url = os.getenv("RESEND_API_URL", "https://api.resend.com/emails")
+        self.resend_timeout = int(os.getenv("RESEND_TIMEOUT", "20"))
 
     def _build_score_rows_html(self, scores: List[Dict]) -> str:
         """
@@ -300,11 +307,7 @@ class EmailReportCardService:
                 "CN": "Cả năm",
             }.get(semester, semester)
 
-            # Tạo email
-            msg = MIMEMultipart("alternative")
-            msg["From"] = f"{self.sender_name} <{self.email}>"
-            msg["To"] = recipient_email
-            msg["Subject"] = f"Phiếu điểm {semester_display} - {student_name} ({student_code}) - {class_name}"
+            subject = f"Phiếu điểm {semester_display} - {student_name} ({student_code}) - {class_name}"
 
             # Tạo HTML content
             html_content = self.create_report_card_html(
@@ -320,11 +323,20 @@ class EmailReportCardService:
                 feedback=feedback,
             )
 
+            if self.email_provider == "resend":
+                return self._send_via_resend(recipient_email, subject, html_content)
+
+            # Tạo email
+            msg = MIMEMultipart("alternative")
+            msg["From"] = f"{self.sender_name} <{self.email}>"
+            msg["To"] = recipient_email
+            msg["Subject"] = subject
+
             html_part = MIMEText(html_content, "html", "utf-8")
             msg.attach(html_part)
 
-            # Gửi email qua SMTP
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+            # Gửi email qua SMTP. Một số PaaS (vd: HuggingFace Spaces) chặn outbound SMTP port 587/465.
+            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=self.smtp_timeout) as server:
                 server.starttls()
                 server.login(self.email, self.password)
                 server.send_message(msg)
@@ -347,11 +359,69 @@ class EmailReportCardService:
                 "success": False,
                 "message": f"Địa chỉ email không hợp lệ: {recipient_email}",
             }
+        except OSError as e:
+            logger.error(f"❌ Không thể kết nối SMTP {self.smtp_server}:{self.smtp_port}: {str(e)}")
+            return {
+                "success": False,
+                "message": (
+                    "Không thể kết nối SMTP từ môi trường deploy. "
+                    "Nếu chạy trên HuggingFace Spaces, hãy dùng EMAIL_PROVIDER=resend "
+                    "và RESEND_API_KEY vì outbound SMTP thường bị chặn."
+                ),
+            }
         except Exception as e:
             logger.error(f"❌ Lỗi gửi email phiếu điểm: {str(e)}")
             return {
                 "success": False,
                 "message": f"Lỗi gửi email: {str(e)}",
+            }
+
+    def _send_via_resend(
+        self,
+        recipient_email: str,
+        subject: str,
+        html_content: str,
+    ) -> Dict[str, Any]:
+        """Gửi email qua Resend HTTPS API cho môi trường chặn SMTP."""
+        if not self.resend_api_key:
+            return {
+                "success": False,
+                "message": "Thiếu RESEND_API_KEY cho EMAIL_PROVIDER=resend.",
+            }
+
+        try:
+            response = requests.post(
+                self.resend_api_url,
+                headers={
+                    "Authorization": f"Bearer {self.resend_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": f"{self.sender_name} <{self.email}>",
+                    "to": [recipient_email],
+                    "subject": subject,
+                    "html": html_content,
+                },
+                timeout=self.resend_timeout,
+            )
+
+            if response.status_code >= 400:
+                logger.error(f"❌ Resend API lỗi {response.status_code}: {response.text}")
+                return {
+                    "success": False,
+                    "message": f"Lỗi gửi email qua Resend: HTTP {response.status_code}",
+                }
+
+            logger.info(f"✅ Đã gửi phiếu điểm qua Resend đến {recipient_email}")
+            return {
+                "success": True,
+                "message": f"Đã gửi phiếu điểm đến {recipient_email}",
+            }
+        except requests.RequestException as e:
+            logger.error(f"❌ Lỗi kết nối Resend API: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Lỗi kết nối Resend API: {str(e)}",
             }
 
 
