@@ -45,6 +45,7 @@ continuous_recognition_state = {
     "total_frames_processed": 0,
     "total_recognition_time": 0.0,
     "active_workers": 0,
+    "camera_inflight": {},
 }
 
 def update_continuous_state():
@@ -217,6 +218,32 @@ async def continuous_recognition_stream(websocket: WebSocket):
     continuous_recognition_state["active_connections"].add(websocket)
     
     camera_id = None
+    send_lock = asyncio.Lock()
+    pending_tasks = set()
+
+    async def process_frame_task(image_base64: str, frame_camera_id: str):
+        try:
+            result = await process_continuous_recognition(image_base64, websocket, frame_camera_id)
+            result["camera_id"] = frame_camera_id
+
+            async with send_lock:
+                await websocket.send_text(json.dumps({
+                    "type": "recognition_result",
+                    "data": result,
+                    "service": ai_service.service_name,
+                    "accuracy": ai_service.accuracy,
+                    "camera_id": frame_camera_id
+                }))
+        except Exception as e:
+            logger.error(f"WebSocket frame task error for camera {frame_camera_id}: {e}")
+            async with send_lock:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": f"Error: {str(e)}",
+                    "camera_id": frame_camera_id
+                }))
+        finally:
+            continuous_recognition_state["camera_inflight"].pop(frame_camera_id, None)
     
     try:
         logger.info(f"Client connected to {ai_service.service_name} recognition stream")
@@ -239,11 +266,12 @@ async def continuous_recognition_stream(websocket: WebSocket):
                         # Min 33ms giữa các frame (max 30 FPS per camera)
                         if time_since_last < 0.033:
                             # Skip frame nếu quá nhanh
-                            await websocket.send_text(json.dumps({
-                                "type": "rate_limit",
-                                "message": "Frame rate too high, skipping",
-                                "camera_id": camera_id
-                            }))
+                            async with send_lock:
+                                await websocket.send_text(json.dumps({
+                                    "type": "rate_limit",
+                                    "message": "Frame rate too high, skipping",
+                                    "camera_id": camera_id
+                                }))
                             continue
                     
                     # Update camera tracking
@@ -253,59 +281,63 @@ async def continuous_recognition_stream(websocket: WebSocket):
                     }
                     
                     if continuous_recognition_state["is_running"] and image_base64:
-                        # Process recognition với active service (chạy trong thread pool)
-                        result = await process_continuous_recognition(image_base64, websocket, camera_id)
-                        
-                        # Thêm camera_id vào result
-                        result["camera_id"] = camera_id
-                        
-                        # Send result back
-                        await websocket.send_text(json.dumps({
-                            "type": "recognition_result",
-                            "data": result,
-                            "service": ai_service.service_name,
-                            "accuracy": ai_service.accuracy,
-                            "camera_id": camera_id  # Trả về camera_id để frontend biết
-                        }))
+                        if continuous_recognition_state["camera_inflight"].get(camera_id):
+                            continue
+
+                        task = asyncio.create_task(process_frame_task(image_base64, camera_id))
+                        continuous_recognition_state["camera_inflight"][camera_id] = task
+                        pending_tasks.add(task)
+                        task.add_done_callback(pending_tasks.discard)
                 
                 elif frame_data.get("type") == "control":
                     # Handle control commands
                     command = frame_data.get("command")
                     if command == "start":
                         continuous_recognition_state["is_running"] = True
-                        await websocket.send_text(json.dumps({
-                            "type": "status",
-                            "message": f"Recognition started with {ai_service.service_name}",
-                            "is_running": True,
-                            "service": ai_service.service_name,
-                            "accuracy": ai_service.accuracy
-                        }))
+                        async with send_lock:
+                            await websocket.send_text(json.dumps({
+                                "type": "status",
+                                "message": f"Recognition started with {ai_service.service_name}",
+                                "is_running": True,
+                                "service": ai_service.service_name,
+                                "accuracy": ai_service.accuracy
+                            }))
                     elif command == "stop":
                         continuous_recognition_state["is_running"] = False
-                        await websocket.send_text(json.dumps({
-                            "type": "status", 
-                            "message": f"⏹️ {ai_service.service_name} recognition stopped",
-                            "is_running": False,
-                            "service": ai_service.service_name
-                        }))
+                        async with send_lock:
+                            await websocket.send_text(json.dumps({
+                                "type": "status", 
+                                "message": f"⏹️ {ai_service.service_name} recognition stopped",
+                                "is_running": False,
+                                "service": ai_service.service_name
+                            }))
                 
             except WebSocketDisconnect:
                 break
             except Exception as e:
                 logger.error(f"WebSocket error: {e}")
-                await websocket.send_text(json.dumps({
-                    "type": "error",
-                    "message": f"Error: {str(e)}"
-                }))
+                async with send_lock:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": f"Error: {str(e)}"
+                    }))
                 
     except Exception as e:
         logger.error(f"WebSocket connection error: {e}")
     finally:
         continuous_recognition_state["active_connections"].discard(websocket)
+        for task in pending_tasks:
+            task.cancel()
         # Cleanup camera tracking khi disconnect
-        if camera_id and camera_id in continuous_recognition_state["camera_connections"]:
-            del continuous_recognition_state["camera_connections"][camera_id]
-            logger.info(f"Camera {camera_id} disconnected")
+        disconnected_cameras = [
+            cam_id
+            for cam_id, connection in continuous_recognition_state["camera_connections"].items()
+            if connection.get("websocket") is websocket
+        ]
+        for cam_id in disconnected_cameras:
+            continuous_recognition_state["camera_connections"].pop(cam_id, None)
+            continuous_recognition_state["camera_inflight"].pop(cam_id, None)
+            logger.info(f"Camera {cam_id} disconnected")
 
 @router.post("/recognize")
 async def recognize_face_upload(

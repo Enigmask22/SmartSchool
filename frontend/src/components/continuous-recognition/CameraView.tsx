@@ -1,4 +1,5 @@
-import { Camera, CameraOff, AlertCircle, Pause, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Camera, CameraOff, AlertCircle, Pause, CheckCircle, Maximize2 } from 'lucide-react';
 import {
   CardContent,
   CardHeader,
@@ -14,6 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
+const API_BASE_URL =
+  import.meta.env.VITE_APP_API_URL || "http://localhost:8000/api";
 
 interface CameraViewProps {
   cameraSource: 'webcam' | 'managed';
@@ -49,9 +53,14 @@ const CameraView = ({
   onSelectedCameraChange,
   onMultiCameraToggle,
 }: CameraViewProps) => {
+  const [expandedCameraId, setExpandedCameraId] = useState<string | null>(null);
+  const expandedCamera = availableCameras.find(
+    (camera) => camera.camera_id === expandedCameraId
+  );
+
   return (
     <div className="lg:col-span-2">
-      <Card className="shadow-md rounded-2xl overflow-hidden max-h-[800px]">
+      <Card className="shadow-md rounded-2xl overflow-hidden">
         <CardHeader className="bg-gray-50 border-b border-gray-200 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -183,12 +192,25 @@ const CameraView = ({
               cameraPreviews &&
               (useMultiCamera && selectedMultiCameras.length > 0 ? (
                 // Multi-camera grid view
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-lg border bg-slate-950 p-3">
+                  <div className="mb-3 flex items-center justify-between text-white">
+                    <div>
+                      <p className="text-sm font-semibold">Multi-camera live view</p>
+                      <p className="text-xs text-slate-300">
+                        {selectedMultiCameras.length} camera streams
+                      </p>
+                    </div>
+                    {isRunning && (
+                      <Badge className="bg-green-600 text-white hover:bg-green-600">
+                        Đang nhận diện đa luồng
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {selectedMultiCameras.map((cameraId) => {
                     const camera = availableCameras.find(
                       (c) => c.camera_id === cameraId
                     );
-                    const preview = cameraPreviews[cameraId];
                     const stats = cameraStats[cameraId] || {
                       total: 0,
                       uniqueCount: 0,
@@ -196,53 +218,42 @@ const CameraView = ({
                     };
 
                     return (
-                      <Card key={cameraId} className="overflow-hidden">
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <CardTitle className="text-sm font-medium">
-                                {camera?.name || `Camera ${cameraId}`}
-                              </CardTitle>
-                              {camera?.location && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {camera.location}
-                                </p>
-                              )}
-                            </div>
-                            <Badge
-                              variant={
-                                camera?.status === "active"
-                                  ? "default"
-                                  : "destructive"
-                              }
-                              className="text-xs"
-                            >
-                              {camera?.status === "active"
-                                ? "✓ Active"
-                                : "✗ Inactive"}
-                            </Badge>
-                          </div>
-                          {isRunning && (
-                            <div className="flex items-center gap-2 px-2 py-1 text-xs bg-green-100 rounded">
-                              <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
-                              <span className="font-medium text-green-700">
-                                ĐANG NHẬN DIỆN
-                              </span>
-                            </div>
-                          )}
-                        </CardHeader>
+                      <Card key={cameraId} className="overflow-hidden border-slate-800 bg-slate-900">
                         <CardContent className="p-0">
-                          {preview ? (
-                            <div className="relative bg-black">
+                          {cameraId ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCameraId(cameraId)}
+                              className="group relative block w-full bg-black text-left"
+                            >
                               <img
-                                src={preview}
+                                src={`${API_BASE_URL}/cameras/${cameraId}/stream`}
                                 alt={`Camera ${cameraId}`}
-                                className="w-full h-auto aspect-video object-cover"
+                                className="w-full aspect-video object-cover"
                               />
-                              <div className="absolute bottom-2 right-2 text-xs bg-black/70 text-white px-2 py-1 rounded">
+                              <div className="absolute inset-x-0 top-0 flex items-start justify-between bg-gradient-to-b from-black/80 to-transparent p-2 text-white">
+                                <div>
+                                  <p className="text-xs font-semibold">
+                                    {camera?.name || `Camera ${cameraId}`}
+                                  </p>
+                                  {camera?.location && (
+                                    <p className="text-[11px] text-slate-300">
+                                      {camera.location}
+                                    </p>
+                                  )}
+                                </div>
+                                <Maximize2 className="h-4 w-4 opacity-70 group-hover:opacity-100" />
+                              </div>
+                              <div className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
                                 {stats.total} nhận diện
                               </div>
-                            </div>
+                              {isRunning && (
+                                <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded bg-green-600 px-2 py-1 text-[11px] font-medium text-white">
+                                  <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                                  AI ON
+                                </div>
+                              )}
+                            </button>
                           ) : (
                             <div className="h-48 bg-gray-300 flex items-center justify-center text-gray-600">
                               Đang tải...
@@ -252,12 +263,13 @@ const CameraView = ({
                       </Card>
                     );
                   })}
+                  </div>
                 </div>
-              ) : selectedCameraId && cameraPreviews[selectedCameraId] ? (
+              ) : selectedCameraId ? (
                 // Single managed camera
                 <div className="relative bg-black rounded-lg overflow-hidden">
                   <img
-                    src={cameraPreviews[selectedCameraId]}
+                    src={`${API_BASE_URL}/cameras/${selectedCameraId}/stream`}
                     alt="Camera feed"
                     className="w-full h-auto aspect-video object-cover"
                   />
@@ -277,6 +289,41 @@ const CameraView = ({
                   )}
                 </div>
               ))}
+
+            {expandedCameraId && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+                <button
+                  type="button"
+                  className="absolute inset-0 cursor-default"
+                  onClick={() => setExpandedCameraId(null)}
+                  aria-label="Đóng camera phóng to"
+                />
+                <div className="relative w-full max-w-6xl overflow-hidden rounded-xl bg-black shadow-2xl">
+                  <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+                    <div>
+                      <p className="font-semibold">
+                        {expandedCamera?.name || `Camera ${expandedCameraId}`}
+                      </p>
+                      {expandedCamera?.location && (
+                        <p className="text-sm text-slate-300">{expandedCamera.location}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded bg-white/10 px-3 py-1 text-sm hover:bg-white/20"
+                      onClick={() => setExpandedCameraId(null)}
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                  <img
+                    src={`${API_BASE_URL}/cameras/${expandedCameraId}/stream`}
+                    alt={`Camera ${expandedCameraId}`}
+                    className="w-full max-h-[78vh] object-contain"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Status Overlay Badge - Webcam mode */}
             {cameraSource === "webcam" && (
