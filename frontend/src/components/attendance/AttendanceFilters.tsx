@@ -124,6 +124,7 @@ const AttendanceFilters = ({
                   <SelectItem value="present">Có mặt</SelectItem>
                   <SelectItem value="absent">Vắng mặt</SelectItem>
                   <SelectItem value="late">Muộn</SelectItem>
+                  <SelectItem value="excused">Vắng có phép</SelectItem>
                 </SelectContent>
               </Select>
             )}

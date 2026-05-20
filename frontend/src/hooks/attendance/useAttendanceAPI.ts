@@ -500,14 +500,14 @@ export const useAttendanceAPI = ({
         response = await ApiService.createManualAttendance({
           student_id: record.student_id,
           date: selectedDate,
-          status: newStatus as 'present' | 'absent' | 'late',
+          status: newStatus as 'present' | 'absent' | 'late' | 'excused',
           notes: (newNotes || null) as any,
           method: 'manual',
         });
       } else {
         response = await ApiService.updateAttendanceStatus(
           record.id,
-          newStatus as 'present' | 'absent' | 'late',
+          newStatus as 'present' | 'absent' | 'late' | 'excused',
           (newNotes || null) as any
         );
       }

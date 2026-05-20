@@ -18,9 +18,15 @@ from camera_manager.models import CameraConfig, CameraInfo, CameraStatus
 
 logger = logging.getLogger(__name__)
 
+CAMERA_OPEN_TIMEOUT_MS = 3000
+CAMERA_READ_TIMEOUT_MS = 3000
+CAMERA_CONNECT_TIMEOUT_SECONDS = 5.0
+MAX_CONSECUTIVE_READ_FAILURES = 30
+
 # Suppress FFmpeg warnings (overread, etc.) - chỉ hiển thị errors
 os.environ['OPENCV_FFMPEG_LOGLEVEL'] = '-8'  # Only show errors, hide warnings
 os.environ['OPENCV_LOG_LEVEL'] = 'ERROR'  # Suppress OpenCV verbose logging
+os.environ.setdefault('OPENCV_FFMPEG_CAPTURE_OPTIONS', 'timeout;3000000')
 
 
 class CameraCapture:
@@ -97,23 +103,52 @@ class CameraCapture:
         try:
             camera_url = self._build_camera_url()
             logger.info(f"🔗 Đang thử kết nối với URL: {camera_url}")
-            
-            self.cap = cv2.VideoCapture(camera_url)
-            
-            if not self.cap or not self.cap.isOpened():
-                raise Exception(f"Không thể mở camera từ {self.config.source}. Hãy kiểm tra:\n- App IP Webcam đang chạy\n- URL đúng format: http://IP:port/video\n- Camera và máy tính cùng WiFi")
-            
-            # Set properties
-            if self.config.width:
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.width)
-            if self.config.height:
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.height)
-            self.cap.set(cv2.CAP_PROP_FPS, self.config.fps)
-            
-            # Đọc frame đầu tiên để kiểm tra
-            ret, frame = self.cap.read()
-            if not ret:
+
+            result = {"cap": None, "ret": False, "error": None, "abandoned": False}
+
+            def open_capture():
+                cap = None
+                try:
+                    cap = cv2.VideoCapture(camera_url)
+                    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, CAMERA_OPEN_TIMEOUT_MS)
+                    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, CAMERA_READ_TIMEOUT_MS)
+
+                    if not cap or not cap.isOpened():
+                        raise Exception(f"Không thể mở camera từ {self.config.source}. Hãy kiểm tra:\n- App IP Webcam đang chạy\n- URL đúng format: http://IP:port/video\n- Camera và máy tính cùng WiFi")
+
+                    if self.config.width:
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.width)
+                    if self.config.height:
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.height)
+                    cap.set(cv2.CAP_PROP_FPS, self.config.fps)
+
+                    ret, _ = cap.read()
+                    if not ret:
+                        raise Exception("Không thể đọc frame từ camera")
+
+                    if result["abandoned"]:
+                        cap.release()
+                    else:
+                        result["cap"] = cap
+                        result["ret"] = True
+                except Exception as exc:
+                    result["error"] = exc
+                    if cap:
+                        cap.release()
+
+            connect_thread = threading.Thread(target=open_capture, daemon=True)
+            connect_thread.start()
+            connect_thread.join(timeout=CAMERA_CONNECT_TIMEOUT_SECONDS)
+
+            if connect_thread.is_alive():
+                result["abandoned"] = True
+                raise TimeoutError(f"Timeout kết nối camera sau {CAMERA_CONNECT_TIMEOUT_SECONDS:.0f}s")
+            if result["error"]:
+                raise result["error"]
+            if not result["ret"] or result["cap"] is None:
                 raise Exception("Không thể đọc frame từ camera")
+
+            self.cap = result["cap"]
             
             self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -167,6 +202,7 @@ class CameraCapture:
     def _capture_loop(self):
         """Loop để capture frames liên tục"""
         frame_interval = 1.0 / self.config.fps
+        consecutive_failures = 0
         
         while self.running:
             try:
@@ -193,6 +229,7 @@ class CameraCapture:
                     break
                 
                 if not ret:
+                    consecutive_failures += 1
                     # Chỉ log khi status thay đổi từ ACTIVE sang ERROR (tránh spam logs)
                     previous_status = self.status
                     self.status = CameraStatus.ERROR
@@ -202,6 +239,10 @@ class CameraCapture:
                     if previous_status != CameraStatus.ERROR:
                         logger.warning(f"⚠️ Camera {self.config.camera_id} không đọc được frame")
                     # Nếu đã ở trạng thái ERROR rồi thì không log nữa (tránh spam)
+
+                    if consecutive_failures >= MAX_CONSECUTIVE_READ_FAILURES:
+                        logger.error(f"❌ Camera {self.config.camera_id} lỗi liên tiếp, dừng capture để tránh treo backend")
+                        break
                     
                     # Sleep ngắn hơn để retry nhanh hơn (giảm từ 0.1s xuống 0.05s)
                     for _ in range(5):  # 5 x 0.01s = 0.05s
@@ -211,6 +252,7 @@ class CameraCapture:
                     continue
                 
                 # Update frame info
+                consecutive_failures = 0
                 self.current_frame = frame.copy()
                 self.last_frame_time = datetime.now()
                 self.frame_count += 1
@@ -305,7 +347,7 @@ class CameraManager:
         self.lock = threading.Lock()
         logger.info("📹 CameraManager initialized")
     
-    def add_camera(self, config: CameraConfig, frame_callback: Optional[Callable] = None) -> bool:
+    def add_camera(self, config: CameraConfig, frame_callback: Optional[Callable] = None, auto_start: Optional[bool] = None) -> bool:
         """Thêm camera mới"""
         with self.lock:
             if config.camera_id in self.cameras:
@@ -315,14 +357,16 @@ class CameraManager:
             camera_capture = CameraCapture(config, frame_callback)
             self.cameras[config.camera_id] = camera_capture
             
-            if config.enabled:
-                try:
-                    camera_capture.start()
-                except Exception as e:
-                    logger.error(f"Không thể start camera {config.camera_id}: {e}")
-            
             logger.info(f"✅ Đã thêm camera {config.camera_id}: {config.name}")
-            return True
+
+        should_start = config.enabled if auto_start is None else auto_start
+        if should_start:
+            try:
+                camera_capture.start()
+            except Exception as e:
+                logger.error(f"Không thể start camera {config.camera_id}: {e}")
+
+        return True
     
     def remove_camera(self, camera_id: str) -> bool:
         """Xóa camera - thread-safe"""
@@ -351,7 +395,7 @@ class CameraManager:
         logger.info(f"✅ Đã xóa camera {camera_id_to_remove}")
         return True
     
-    def update_camera(self, camera_id: str, config: CameraConfig) -> bool:
+    def update_camera(self, camera_id: str, config: CameraConfig, auto_start: Optional[bool] = None) -> bool:
         """Cập nhật cấu hình camera"""
         with self.lock:
             if camera_id not in self.cameras:
@@ -360,24 +404,29 @@ class CameraManager:
             
             old_camera = self.cameras[camera_id]
             was_running = old_camera.running
-            
-            # Stop camera cũ
-            old_camera.stop()
+            frame_callback = self.frame_callbacks.get(camera_id)
+
+        # Stop/start bên ngoài lock để tránh block request khác khi camera hỏng.
+        old_camera.stop()
+
+        with self.lock:
+            if camera_id not in self.cameras:
+                return False
             
             # Tạo camera mới với config mới
-            frame_callback = self.frame_callbacks.get(camera_id)
             new_camera = CameraCapture(config, frame_callback)
             self.cameras[camera_id] = new_camera
-            
-            # Start lại nếu đang chạy
-            if was_running or config.enabled:
-                try:
-                    new_camera.start()
-                except Exception as e:
-                    logger.error(f"Không thể start camera {camera_id} sau khi update: {e}")
-            
-            logger.info(f"✅ Đã cập nhật camera {camera_id}")
-            return True
+
+        # Start lại nếu đang chạy hoặc config bật.
+        should_start = (was_running or config.enabled) if auto_start is None else auto_start
+        if should_start:
+            try:
+                new_camera.start()
+            except Exception as e:
+                logger.error(f"Không thể start camera {camera_id} sau khi update: {e}")
+
+        logger.info(f"✅ Đã cập nhật camera {camera_id}")
+        return True
     
     def start_camera(self, camera_id: str) -> bool:
         """Bắt đầu camera"""
@@ -390,13 +439,13 @@ class CameraManager:
             if camera.running:
                 logger.warning(f"Camera {camera_id} đã đang chạy")
                 return True
-            
-            try:
-                camera.start()
-                return True
-            except Exception as e:
-                logger.error(f"Không thể start camera {camera_id}: {e}")
-                return False
+
+        try:
+            camera.start()
+            return True
+        except Exception as e:
+            logger.error(f"Không thể start camera {camera_id}: {e}")
+            return False
     
     def stop_camera(self, camera_id: str) -> bool:
         """Dừng camera"""
@@ -406,8 +455,9 @@ class CameraManager:
                 return False
             
             camera = self.cameras[camera_id]
-            camera.stop()
-            return True
+
+        camera.stop()
+        return True
     
     def get_camera(self, camera_id: str) -> Optional[CameraCapture]:
         """Lấy camera object"""
