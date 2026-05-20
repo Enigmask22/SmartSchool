@@ -15,7 +15,7 @@
  * - useRecognitionControl: Recognition lifecycle & frame capture
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { useRecognitionConnection } from "@/hooks/continuous-recognition/useRecognitionConnection";
@@ -67,6 +67,14 @@ export default function ContinuousRecognitionPage() {
     setUseMultiCamera,
   } = useRecognitionCameraSource();
 
+  const activeMultiCameraIds = useMemo(
+    () =>
+      useMultiCamera
+        ? availableCameras.map((camera) => camera.camera_id)
+        : selectedMultiCameras,
+    [availableCameras, selectedMultiCameras, useMultiCamera]
+  );
+
   // Initialize camera stream operations
   const {
     isCameraOn,
@@ -90,12 +98,11 @@ export default function ContinuousRecognitionPage() {
     isConnected,
     cameraSource,
     selectedCameraId,
-    selectedMultiCameras,
+    activeMultiCameraIds,
     useMultiCamera,
     videoRef,
     canvasRef,
     wsRef,
-    staggerTimeoutsRef,
     captureFromManagedCamera
   );
 
@@ -175,13 +182,13 @@ export default function ContinuousRecognitionPage() {
     };
 
     if (cameraSource === "managed") {
-      if (useMultiCamera && selectedMultiCameras.length > 0) {
-        selectedMultiCameras.forEach((cam) => startCamera(cam));
+      if (useMultiCamera && activeMultiCameraIds.length > 0) {
+        activeMultiCameraIds.forEach((cam) => startCamera(cam));
       } else if (selectedCameraId) {
         startCamera(selectedCameraId);
       }
     }
-  }, [cameraSource, selectedCameraId, selectedMultiCameras, useMultiCamera]);
+  }, [cameraSource, selectedCameraId, activeMultiCameraIds, useMultiCamera]);
 
   // Handle save settings
   const handleSaveSettings = async () => {
@@ -237,7 +244,7 @@ export default function ContinuousRecognitionPage() {
             <CameraView
               cameraSource={cameraSource}
               selectedCameraId={selectedCameraId}
-              selectedMultiCameras={selectedMultiCameras}
+              selectedMultiCameras={activeMultiCameraIds}
               useMultiCamera={useMultiCamera}
               availableCameras={availableCameras}
               isCameraOn={isCameraOn}

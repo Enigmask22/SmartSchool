@@ -44,7 +44,6 @@ export const useRecognitionControl = (
   videoRef: React.MutableRefObject<HTMLVideoElement | null>,
   canvasRef: React.MutableRefObject<HTMLCanvasElement | null>,
   wsRef: React.MutableRefObject<WebSocket | null>,
-  staggerTimeoutsRef: React.MutableRefObject<NodeJS.Timeout[]>,
   captureFromManagedCamera: (cameraId: string, updatePreviewOnly?: boolean) => Promise<void>
 ): UseRecognitionControlReturn => {
   const [isRunning, setIsRunning] = useState(false);
@@ -52,7 +51,7 @@ export const useRecognitionControl = (
   const [cooldownPeriod, setCooldownPeriod] = useState(5);
   const [message, setMessage] = useState("");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const previewIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const managedCaptureInFlightRef = useRef(false);
 
   // Handle start API call
   const handleStart = async () => {
@@ -139,23 +138,24 @@ export const useRecognitionControl = (
 
     // For managed cameras
     if (cameraSource === "managed") {
-      if (useMultiCamera && selectedMultiCameras.length > 0) {
-        staggerTimeoutsRef.current.forEach((timeoutId) =>
-          clearTimeout(timeoutId)
-        );
-        staggerTimeoutsRef.current = [];
+      if (managedCaptureInFlightRef.current) return;
 
-        selectedMultiCameras.forEach((cameraId: string, index: number) => {
-          const staggerDelay = index * 500; // Stagger by 500ms
-          const timeoutId = setTimeout(() => {
-            if (isRunning) {
-              captureFromManagedCamera(cameraId, false);
-            }
-          }, staggerDelay);
-          staggerTimeoutsRef.current.push(timeoutId);
+      if (useMultiCamera && selectedMultiCameras.length > 0) {
+        managedCaptureInFlightRef.current = true;
+        Promise.allSettled(
+          selectedMultiCameras.map((cameraId: string) =>
+            captureFromManagedCamera(cameraId, false)
+          )
+        ).finally(() => {
+          managedCaptureInFlightRef.current = false;
         });
       } else if (selectedCameraId) {
-        captureFromManagedCamera(selectedCameraId, false);
+        managedCaptureInFlightRef.current = true;
+        Promise.resolve(captureFromManagedCamera(selectedCameraId, false)).finally(
+          () => {
+            managedCaptureInFlightRef.current = false;
+          }
+        );
       }
       return;
     }
@@ -206,7 +206,6 @@ export const useRecognitionControl = (
     videoRef,
     canvasRef,
     wsRef,
-    staggerTimeoutsRef,
   ]);
 
   // Start/stop frame capture loop
@@ -215,8 +214,10 @@ export const useRecognitionControl = (
       isRunning && isConnected && (cameraSource === "managed" || isCameraOn);
 
     if (shouldCapture) {
-      console.log("▶️ Starting frame capture (2000ms interval - 0.5 FPS)");
-      intervalRef.current = setInterval(captureAndSendFrame, 2000);
+      const captureInterval = cameraSource === "managed" ? 1000 : 2000;
+      console.log(`▶️ Starting frame capture (${captureInterval}ms interval)`);
+      captureAndSendFrame();
+      intervalRef.current = setInterval(captureAndSendFrame, captureInterval);
     } else {
       if (intervalRef.current) {
         console.log("⏹️ Stopping frame capture");
@@ -232,42 +233,6 @@ export const useRecognitionControl = (
       }
     };
   }, [isRunning, isConnected, isCameraOn, captureAndSendFrame, cameraSource]);
-
-  // Preview-only capture for managed cameras (even when not running recognition)
-  useEffect(() => {
-    const captureForPreview = async () => {
-      if (cameraSource !== "managed") return;
-      
-      if (useMultiCamera && selectedMultiCameras.length > 0) {
-        // Multi-camera preview
-        selectedMultiCameras.forEach((cameraId: string) => {
-          captureFromManagedCamera(cameraId, true); // true = preview only
-        });
-      } else if (selectedCameraId) {
-        // Single camera preview
-        captureFromManagedCamera(selectedCameraId, true); // true = preview only
-      }
-    };
-
-    // Start preview capture if managed camera is selected (regardless of recognition status)
-    if (cameraSource === "managed" && (selectedCameraId || selectedMultiCameras.length > 0)) {
-      console.log("📷 Starting camera preview capture (300ms interval - ~3.3 FPS)");
-      previewIntervalRef.current = setInterval(captureForPreview, 300);
-    } else {
-      if (previewIntervalRef.current) {
-        console.log("📷 Stopping camera preview capture");
-        clearInterval(previewIntervalRef.current);
-        previewIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (previewIntervalRef.current) {
-        clearInterval(previewIntervalRef.current);
-        previewIntervalRef.current = null;
-      }
-    };
-  }, [cameraSource, selectedCameraId, selectedMultiCameras, useMultiCamera, captureFromManagedCamera]);
 
   return {
     isRunning,
