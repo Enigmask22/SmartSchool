@@ -562,7 +562,7 @@ async def update_attendance_status_and_notes(
         assert_can_edit_attendance(current_user, db)
 
         # Validate status
-        valid_statuses = ["present", "absent", "late"]
+        valid_statuses = ["present", "absent", "late", "excused"]
         if status not in valid_statuses:
             raise HTTPException(
                 status_code=400, 

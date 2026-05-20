@@ -398,7 +398,8 @@ export function StudentTableView({
       availableSubjects={subjects.availableSubjects}
       selectedSubjects={(subjects.selectedSubjects as any) || { core_subjects: [], elective_subjects: [] }}
       onToggleSubject={((subjectId: string | number, type?: string) => {
-        subjects.toggleSubjectSelection(String(subjectId), type || "core_subjects");
+        const mappedType = type === "elective" ? "elective_subjects" : "core_subjects";
+        subjects.toggleSubjectSelection(String(subjectId), mappedType);
       }) as any}
       loading={subjects.subjectLoading}
       onSave={subjects.saveSubjectSelection}
