@@ -462,9 +462,9 @@ class InsightFaceRecognitionService:
         # os.makedirs(self.model_path, exist_ok=True)
         
         # Initialize
-        self._initialize_sync()
+        self.is_initialized = self._initialize_sync()
     
-    def _initialize_sync(self):
+    def _initialize_sync(self) -> bool:
         """Khởi tạo InsightFace model với GPU acceleration (fallback to CPU nếu cần)"""
         if not INSIGHTFACE_AVAILABLE:
             logger.error("❌ InsightFace not installed. Run: pip install insightface")
@@ -475,11 +475,21 @@ class InsightFaceRecognitionService:
             logger.info("🚀 Initializing InsightFace (ArcFace) - State-of-the-Art Face Recognition")
             
             # Đọc device preference từ environment variable
-            device_preference = os.getenv("INSIGHTFACE_DEVICE", "cuda").lower()
+            device_preference = os.getenv("INSIGHTFACE_DEVICE", "auto").strip().lower()
             # Options: cuda (GPU only), cpu (CPU only), auto (GPU with CPU fallback)
             
             providers = []
             use_gpu = False
+            available_providers = []
+
+            try:
+                import onnxruntime as ort
+                available_providers = ort.get_available_providers()
+                logger.info(f"InsightFace ONNX providers available: {available_providers}")
+            except ImportError:
+                logger.warning("⚠️  onnxruntime not found; InsightFace may fail to initialize")
+
+            cuda_provider_available = "CUDAExecutionProvider" in available_providers
             
             if device_preference == "cpu":
                 # Force CPU only
@@ -490,14 +500,14 @@ class InsightFaceRecognitionService:
                 # Try GPU only, fail if not available
                 try:
                     import torch
-                    if torch.cuda.is_available():
+                    if torch.cuda.is_available() and cuda_provider_available:
                         providers = ['CUDAExecutionProvider']
                         use_gpu = True
                         gpu_name = torch.cuda.get_device_name(0)
                         logger.info(f"Using GPU: {gpu_name}")
                     else:
                         logger.error("❌ CUDA requested but no GPU available!")
-                        logger.error("   Install CUDA-enabled PyTorch or set INSIGHTFACE_DEVICE=cpu")
+                        logger.error("   Install CUDA-enabled PyTorch + onnxruntime-gpu or set INSIGHTFACE_DEVICE=auto/cpu")
                         return False
                 except ImportError:
                     logger.error("❌ PyTorch not installed. Cannot check GPU availability.")
@@ -508,13 +518,13 @@ class InsightFaceRecognitionService:
                 # Try GPU first, fallback to CPU
                 try:
                     import torch
-                    if torch.cuda.is_available():
+                    if torch.cuda.is_available() and cuda_provider_available:
                         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
                         use_gpu = True
                         logger.info("Using GPU with CPU fallback")
                     else:
                         providers = ['CPUExecutionProvider']
-                        logger.warning("⚠️  No GPU detected, using CPU (slower)")
+                        logger.warning("⚠️  No CUDA ONNX provider/GPU detected, using CPU (slower)")
                 except ImportError:
                     providers = ['CPUExecutionProvider']
                     logger.warning("⚠️  PyTorch not found, using CPU provider")
@@ -535,7 +545,8 @@ class InsightFaceRecognitionService:
                 # CPU: Use smaller size for better performance
                 self.det_size = (640, 640)
             
-            self.app.prepare(ctx_id=0, det_size=self.det_size)
+            ctx_id = 0 if use_gpu else -1
+            self.app.prepare(ctx_id=ctx_id, det_size=self.det_size)
             
             # Summary log
             logger.info(f"✅ InsightFace initialized: {self.det_size} detection, "
@@ -548,7 +559,7 @@ class InsightFaceRecognitionService:
         except Exception as e:
             logger.error(f"❌ Failed to initialize InsightFace: {str(e)}")
             logger.error("   Make sure InsightFace is installed: pip install insightface")
-            logger.error("   For GPU: Install CUDA-enabled PyTorch")
+            logger.error("   For GPU: Install CUDA-enabled PyTorch and onnxruntime-gpu")
             return False
 
     async def initialize(self):
@@ -1279,10 +1290,16 @@ class InsightFaceRecognitionService:
 # Create service instance (will be None if InsightFace not installed)
 try:
     insightface_service = InsightFaceRecognitionService()
-    ACTIVE_SERVICE = insightface_service
-    ACTIVE_SERVICE_NAME = "InsightFace (ArcFace)"
-    ACTIVE_ACCURACY = "95-99%"
-    logger.info(f"✅ AI Service initialized: {ACTIVE_SERVICE_NAME} ({ACTIVE_ACCURACY})")
+    if insightface_service.is_initialized:
+        ACTIVE_SERVICE = insightface_service
+        ACTIVE_SERVICE_NAME = "InsightFace (ArcFace)"
+        ACTIVE_ACCURACY = "95-99%"
+        logger.info(f"✅ AI Service initialized: {ACTIVE_SERVICE_NAME} ({ACTIVE_ACCURACY})")
+    else:
+        ACTIVE_SERVICE = None
+        ACTIVE_SERVICE_NAME = "Not Available"
+        ACTIVE_ACCURACY = "0%"
+        logger.error("❌ AI Service unavailable: InsightFace failed to initialize")
 except Exception as e:
     logger.error(f"❌ Failed to create InsightFace service: {e}")
     insightface_service = None
