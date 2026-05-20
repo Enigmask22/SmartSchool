@@ -68,10 +68,14 @@ export function StudentListPage() {
     if (
       isHomeroomTeacher() &&
       filters.homeroomClasses &&
-      filters.homeroomClasses.length > 0 &&
-      (!filters.selectedClass || filters.selectedClass === "all")
+      filters.homeroomClasses.length > 0
     ) {
-      filters.setSelectedClass(filters.homeroomClasses[0].class_name);
+      const found = filters.homeroomClasses.find(
+        (c) => c.academic_year === filters.selectedAcademicYear,
+      );
+      if (found) {
+        filters.setSelectedClass(found.class_name);
+      }
     }
   }, [filters.selectedAcademicYear, filters.homeroomClasses, isHomeroomTeacher, filters]);
 
