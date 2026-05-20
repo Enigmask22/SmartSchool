@@ -202,7 +202,11 @@ export function StudentListPage() {
         onSaveComment={feedback.saveComment}
         onClose={feedback.closeFeedbackModal}
         smsLoading={feedback.smsLoading}
-        exportStudentReportCard={studentList.exportStudentReportCard}
+        exportStudentReportCard={(student) =>
+          studentList.exportStudentReportCard(student, {
+            generatedFeedback: feedback.generatedFeedback,
+          })
+        }
         openEmailDialog={(student) => {
           if (student) {
             studentList.openEmailDialog(student);
@@ -224,7 +228,12 @@ export function StudentListPage() {
         academicYear={filters.selectedAcademicYear}
         selectedAcademicYear={filters.selectedAcademicYear}
         onEmailRecipientChange={studentList.setEmailRecipient}
-        onSend={studentList.handleSendEmailReportCard}
+        onSend={() =>
+          studentList.handleSendEmailReportCard({
+            generatedFeedback: feedback.generatedFeedback,
+            overallAverage: feedback.feedbackForm.score,
+          })
+        }
         onClose={studentList.closeEmailDialog}
       />
     </div>
