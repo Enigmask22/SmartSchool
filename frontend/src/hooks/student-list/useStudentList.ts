@@ -48,10 +48,10 @@ export const useStudentList = (filters: UseStudentListFilters) => {
   const closeConfirm = useCallback(() =>
     setConfirmState((prev) => ({ ...prev, open: false })), []);
 
-  // When selected class or academic year changes, fetch students
+  // Refetch when academic year changes (homeroom) or class filter changes (other roles)
   useEffect(() => {
     fetchStudents();
-  }, [filters.selectedClass, filters.selectedAcademicYear]);
+  }, [filters.selectedClass, filters.selectedAcademicYear, filters.homeroomClasses]);
 
   // Fetch students
   const fetchStudents = async () => {
@@ -62,25 +62,16 @@ export const useStudentList = (filters: UseStudentListFilters) => {
       let response;
 
       if (isHomeroomTeacher) {
-        if (!filters.selectedClass || filters.selectedClass === "all") {
-          logger.debug(
-            "🚫 No class selected for homeroom teacher, skipping fetch",
-          );
-          setStudents([]);
-          setLoading(false);
-          return;
-        }
-        
-        // Find the class by BOTH name AND academic year to get the correct ID
+        // A homeroom teacher holds at most one class per academic year.
+        // Find that class by academic year alone — class name is irrelevant here.
         const found = filters.homeroomClasses.find(
-          (c) => c.class_name === filters.selectedClass && c.academic_year === filters.selectedAcademicYear,
+          (c) => c.academic_year === filters.selectedAcademicYear,
         );
         const classId = found?.id;
 
-        // If class not found for this year, don't fetch - just clear students
         if (!classId) {
           logger.warn(
-            `❌ No class found for "${filters.selectedClass}" in year ${filters.selectedAcademicYear}`,
+            `❌ No homeroom class found for academic year ${filters.selectedAcademicYear}`,
           );
           setStudents([]);
           setLoading(false);
@@ -88,12 +79,12 @@ export const useStudentList = (filters: UseStudentListFilters) => {
         }
 
         logger.info('🔎 Fetching students for class:', {
-          selectedClass: filters.selectedClass,
           selectedAcademicYear: filters.selectedAcademicYear,
           foundClass: found,
           classId: classId,
         });
 
+        // Backend /homeroom/students queries homeroom_students_history by class_id
         response = await ApiService.request(
           `/homeroom/students?class_id=${classId}`,
         );
