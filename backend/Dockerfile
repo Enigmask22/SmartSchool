@@ -110,6 +110,7 @@ RUN mkdir -p \
 
 # Set environment variables
 ENV INSIGHTFACE_HOME=/app/ai_models
+ENV INSIGHTFACE_DEVICE=auto
 ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
 ENV PORT=7860
