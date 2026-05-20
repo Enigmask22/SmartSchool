@@ -1,13 +1,5 @@
-import {
-  Search,
-  RefreshCw,
-  Download,
-  Upload,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Search, RefreshCw, Download, Upload } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,12 +55,12 @@ export function StudentListTool({
 
   // Initialize import hook locally for template download and subject import
   // Wrap onRefresh to ensure it returns a Promise
-  const importData = useStudentImport({ 
-    filters, 
+  const importData = useStudentImport({
+    filters,
     fetchStudents: async () => {
       await Promise.resolve();
       onRefresh();
-    }
+    },
   });
   return (
     <>
@@ -157,7 +149,11 @@ export function StudentListTool({
             <div className="flex items-center gap-2 flex-wrap pt-6 border-t justify-end">
               <Button
                 onClick={importData.downloadSubjectTemplate}
-                disabled={!isHomeroomTeacher || !selectedClass || selectedClass === "all"}
+                disabled={
+                  !isHomeroomTeacher ||
+                  !selectedClass ||
+                  selectedClass === "all"
+                }
                 variant="outline"
                 size="lg"
                 className="flex items-center gap-2 border-green-600 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -168,7 +164,11 @@ export function StudentListTool({
 
               <Button
                 onClick={() => importData.setShowSubjectImportModal(true)}
-                disabled={!isHomeroomTeacher || !selectedClass || selectedClass === "all"}
+                disabled={
+                  !isHomeroomTeacher ||
+                  !selectedClass ||
+                  selectedClass === "all"
+                }
                 variant="outline"
                 size="lg"
                 className="flex items-center gap-2 border-blue-600 text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -177,16 +177,20 @@ export function StudentListTool({
                 <span>Import môn học</span>
               </Button>
 
-              <Button
+              {/* <Button
                 onClick={onExportComments}
-                disabled={!isHomeroomTeacher || !selectedClass || selectedClass === "all"}
+                disabled={
+                  !isHomeroomTeacher ||
+                  !selectedClass ||
+                  selectedClass === "all"
+                }
                 variant="default"
                 size="lg"
                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="w-4 h-4" />
                 <span>Tải phiếu liên lạc toàn lớp</span>
-              </Button>
+              </Button> */}
             </div>
           </div>
         </CardContent>
