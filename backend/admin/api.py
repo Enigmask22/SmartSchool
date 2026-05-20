@@ -518,7 +518,7 @@ async def update_teacher(
             teacher_data.phone = validate_phone(teacher_data.phone)
         
         if teacher_data.date_of_birth:
-            teacher_data.date_of_birth = validate_date_of_birth(teacher_data.date_of_birth)
+            teacher_data.date_of_birth = validate_date_of_birth(str(teacher_data.date_of_birth))
         
         if teacher_data.gender:
             teacher_data.gender = validate_gender(teacher_data.gender)

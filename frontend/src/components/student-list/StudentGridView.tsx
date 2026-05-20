@@ -82,7 +82,8 @@ export function StudentGridView({
 
   // Wrapper for toggleSubjectSelection to match modal's expected interface
   const handleToggleSubject = (subjectId: string | number, type?: string) => {
-    subjects.toggleSubjectSelection(String(subjectId), type || "core_subjects");
+    const mappedType = type === "elective" ? "elective_subjects" : "core_subjects";
+    subjects.toggleSubjectSelection(String(subjectId), mappedType);
   };
 
   // Handle edit button click
