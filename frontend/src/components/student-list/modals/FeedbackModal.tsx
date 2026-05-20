@@ -164,9 +164,9 @@ export function FeedbackModal({
                     max="10"
                     step="0.1"
                     value={form?.score || ""}
-                    onChange={(e) => onFormChange("score", e.target.value)}
                     placeholder="8.5"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    disabled
+                    className="w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm cursor-not-allowed"
                   />
                 </div>
 

@@ -15,6 +15,64 @@ interface StudentReportData {
   semester: string;
 }
 
+type ScoreCategory = "tx" | "gk" | "ck" | "skip";
+
+/** Phân loại cột điểm theo tên field trong score_data */
+const classifyScoreKey = (key: string): ScoreCategory => {
+  const normalized = String(key || "").toLowerCase();
+  if (normalized === "mon_hoc") return "skip";
+  if (normalized.includes("giua")) return "gk";
+  if (
+    normalized.includes("cuoi") ||
+    normalized.includes("_hk") ||
+    normalized.endsWith("_hk") ||
+    normalized.includes("final")
+  ) {
+    return "ck";
+  }
+  return "tx";
+};
+
+/** Trích xuất điểm thường xuyên, giữa kỳ, cuối kỳ từ score_data */
+export const extractComponentScores = (
+  scoreData: Record<string, any> | null | undefined,
+): { tx: string; gk: string; ck: string } => {
+  const txScores: string[] = [];
+  let gkScore = "";
+  let ckScore = "";
+
+  if (!scoreData || typeof scoreData !== "object") {
+    return { tx: "-", gk: "-", ck: "-" };
+  }
+
+  for (const [key, value] of Object.entries(scoreData)) {
+    const category = classifyScoreKey(key);
+    if (category === "skip" || typeof value !== "object" || value === null) {
+      continue;
+    }
+
+    const rawScore = value.Diem ?? value.diem;
+    if (rawScore === "" || rawScore === null || rawScore === undefined) {
+      continue;
+    }
+
+    const scoreText = String(rawScore);
+    if (category === "gk") {
+      gkScore = scoreText;
+    } else if (category === "ck") {
+      ckScore = scoreText;
+    } else {
+      txScores.push(scoreText);
+    }
+  }
+
+  return {
+    tx: txScores.length > 0 ? txScores.join(", ") : "-",
+    gk: gkScore || "-",
+    ck: ckScore || "-",
+  };
+};
+
 /**
  * Generate an Excel report card for a student
  * Handles layout, formatting, styling, and file download
@@ -138,8 +196,15 @@ export const generateStudentReportCard = async (data: StudentReportData) => {
 
       // Score data rows
       feedbackScores.forEach((score: any) => {
+        const { tx, gk, ck } = extractComponentScores(score.score_data);
         const dataRow = worksheet.getRow(currentRow);
-        dataRow.values = [score.subject_name || "N/A", "", "", "", score.final_score ?? ""];
+        dataRow.values = [
+          score.subject_name || "N/A",
+          tx,
+          gk,
+          ck,
+          score.final_score ?? "",
+        ];
 
         ["A", "B", "C", "D", "E"].forEach((col) => {
           const cell = worksheet.getCell(`${col}${currentRow}`);

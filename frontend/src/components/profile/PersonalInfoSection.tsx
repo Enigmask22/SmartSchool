@@ -205,8 +205,8 @@ export const PersonalInfoSection = ({
 
             {/* Date of Birth — teacher only */}
             {!isAdmin && (
-            <div className="space-y-2">
-              <Label htmlFor="date_of_birth">Ngày sinh</Label>
+            <div className="space-y-2 flex items-center gap-2 ">
+              <Label htmlFor="date_of_birth" className="pt-2">Ngày sinh</Label>
               {isEditing ? (
                 <SimpleDatePicker
                   value={editData.date_of_birth}
