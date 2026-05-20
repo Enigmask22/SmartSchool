@@ -35,7 +35,7 @@ interface Student {
 interface AttendanceRecord {
   id: number | null;
   student_id: string;
-  status: 'present' | 'absent' | 'late';
+  status: 'present' | 'absent' | 'late' | 'excused';
   check_in_time?: string;
   check_out_time?: string;
   confidence_score?: number;

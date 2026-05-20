@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
@@ -108,6 +108,7 @@ const CameraManagement = () => {
   const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false });
+  const loadingCamerasRef = useRef(false);
 
   const openConfirm = useCallback((config: Partial<ConfirmState>) =>
     setConfirmState({ open: true, variant: "destructive", confirmText: "Xác nhận", ...config }), []);
@@ -136,7 +137,10 @@ const CameraManagement = () => {
   }, []);
 
   const loadCameras = async () => {
+    if (loadingCamerasRef.current) return;
+
     try {
+      loadingCamerasRef.current = true;
       setLoading(true);
       setError(null);
       logger.info("Loading cameras from API: /cameras/");
@@ -165,8 +169,8 @@ const CameraManagement = () => {
         apiError?.response?.data?.detail ||
         "Không thể tải danh sách camera";
       setError(errorMessage);
-      setCameras([]);
     } finally {
+      loadingCamerasRef.current = false;
       setLoading(false);
     }
   };

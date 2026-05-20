@@ -90,27 +90,21 @@ async def list_cameras(enabled_only: bool = Query(False), db=Depends(get_db)):
         #for db_cam in db_cameras:
             #logger.info(f"     - {db_cam['camera_id']}: enabled={db_cam.get('enabled')}, name={db_cam.get('name')}")
         
-        # Sync cameras từ DB vào manager
+        # Sync cameras từ DB vào manager. Không auto-start trong list endpoint:
+        # camera hỏng có thể block cv2 connect/read và làm freeze backend.
         for db_camera in db_cameras:
             camera_id = db_camera["camera_id"]
             existing_camera = camera_manager.get_camera(camera_id)
+            config = CameraDBService.dict_to_config(db_camera)
             
             if existing_camera is None:
                 logger.info(f"   Adding {camera_id} to manager from DB")
                 # Load vào manager
-                config = CameraDBService.dict_to_config(db_camera)
-                camera_manager.add_camera(config, frame_callback=None)
+                camera_manager.add_camera(config, frame_callback=None, auto_start=False)
             else:
-                # Only update if enabled status changed
-                db_enabled = db_camera.get("enabled", True)
-                existing_enabled = existing_camera.config.enabled
-                
-                if db_enabled != existing_enabled:
-                    #logger.info(f"   Updating {camera_id}: enabled {existing_enabled} → {db_enabled}")
-                    config = CameraDBService.dict_to_config(db_camera)
-                    camera_manager.update_camera(camera_id, config)
-                #else:
-                    #logger.info(f"   {camera_id} unchanged (enabled={db_enabled})")
+                if existing_camera.config != config:
+                    #logger.info(f"   Updating {camera_id} from DB")
+                    camera_manager.update_camera(camera_id, config, auto_start=existing_camera.running)
         
         # Lấy từ manager (đã có status real-time + fresh enabled status)
         cameras = camera_manager.list_cameras()
