@@ -33,9 +33,10 @@ export const useStudentList = (filters: UseStudentListFilters) => {
   // Email report card states
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
-  const [emailSending, _setEmailSending] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [emailSuccess, setEmailSuccess] = useState(false);
+  const [emailStudent, setEmailStudent] = useState<any>(null);
 
   // Refs (other refs)
   const multipleFileInputRef = useRef<HTMLInputElement>(null);
@@ -202,7 +203,10 @@ export const useStudentList = (filters: UseStudentListFilters) => {
     scoresData: scores,
   });
 
-  const exportStudentReportCard = async (student?: any) => {
+  const exportStudentReportCard = async (
+    student?: any,
+    options?: { generatedFeedback?: string },
+  ) => {
     // Use passed student param if available, otherwise fall back to state
     const selectedStudent = student || feedback.selectedStudentForFeedback;
     if (!selectedStudent) {
@@ -211,34 +215,31 @@ export const useStudentList = (filters: UseStudentListFilters) => {
     }
 
     try {
-      // Use the passed or state student
       const studentData = selectedStudent;
 
-      // Fetch scores if not already loaded
-      let feedbackScores = scores.studentScores;
-      if (!feedbackScores || feedbackScores.length === 0) {
-        const response = await ApiService.getStudentScores(
-          studentData.id,
-          filters.selectedAcademicYear,
-          filters.selectedSemester,
+      // Luôn lấy điểm mới để đảm bảo có đầy đủ score_data
+      let feedbackScores: any[] = [];
+      const response = await ApiService.getStudentScores(
+        studentData.id,
+        filters.selectedAcademicYear,
+        filters.selectedSemester,
+      );
+      if (response.success && response.data?.scores) {
+        feedbackScores = response.data.scores;
+      } else {
+        toast.warning(
+          "Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét.",
         );
-        if (response.success && response.data?.scores) {
-          feedbackScores = response.data.scores;
-        } else {
-          toast.warning(
-            "Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét.",
-          );
-          feedbackScores = [];
-        }
       }
 
       // Generate and download report card
       await generateStudentReportCard({
         student: studentData,
         feedbackScores,
-        generatedFeedback: feedback.generatedFeedback,
-        academicYear,
-        semester,
+        generatedFeedback:
+          options?.generatedFeedback || feedback.generatedFeedback,
+        academicYear: filters.selectedAcademicYear || academicYear,
+        semester: filters.selectedSemester || semester,
       });
     } catch (error) {
       logger.error("Error exporting report card:", error);
@@ -251,6 +252,7 @@ export const useStudentList = (filters: UseStudentListFilters) => {
     // Use passed student param if available, otherwise fall back to state
     const selectedStudent = student || feedback.selectedStudentForFeedback;
     if (!selectedStudent) return;
+    setEmailStudent(selectedStudent);
     setEmailRecipient(
       selectedStudent.received_email ||
         selectedStudent.email ||
@@ -264,8 +266,100 @@ export const useStudentList = (filters: UseStudentListFilters) => {
     setShowEmailDialog(false);
     setEmailError("");
     setEmailSuccess(false);
+    setEmailStudent(null);
   };
-  const handleSendEmailReportCard = async () => {};
+
+  interface SendEmailReportCardOptions {
+    generatedFeedback?: string;
+    overallAverage?: string | number;
+  }
+
+  const handleSendEmailReportCard = async (
+    options?: SendEmailReportCardOptions,
+  ) => {
+    const selectedStudent = emailStudent;
+    if (!selectedStudent) {
+      setEmailError("Không có thông tin học sinh");
+      return;
+    }
+
+    const recipient = emailRecipient.trim();
+    if (!recipient) {
+      setEmailError("Vui lòng nhập email phụ huynh");
+      return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(recipient)) {
+      setEmailError("Email không hợp lệ");
+      return;
+    }
+
+    setEmailSending(true);
+    setEmailError("");
+
+    try {
+      let feedbackScores: any[] = [];
+      const scoresResponse = await ApiService.getStudentScores(
+        selectedStudent.id,
+        filters.selectedAcademicYear,
+        filters.selectedSemester,
+      );
+      if (scoresResponse.success && scoresResponse.data?.scores) {
+        feedbackScores = scoresResponse.data.scores;
+      }
+
+      const formattedScores = feedbackScores.map((score) => ({
+        subject_name: score.subject_name,
+        final_score: score.final_score,
+        score_data: score.score_data,
+      }));
+
+      const parsedAverage = parseFloat(String(options?.overallAverage ?? ""));
+      const overallAverage = Number.isNaN(parsedAverage) ? null : parsedAverage;
+
+      const teacherName =
+        authContext?.user?.full_name || authContext?.user?.name || "";
+
+      const reportData = {
+        student_id: selectedStudent.id,
+        student_code: selectedStudent.student_id,
+        student_name: selectedStudent.full_name,
+        class_name: selectedStudent.class_name || "",
+        grade: selectedStudent.grade || "",
+        teacher_name: teacherName,
+        academic_year: filters.selectedAcademicYear || academicYear,
+        semester: filters.selectedSemester || semester,
+        feedback: options?.generatedFeedback || "",
+        scores: formattedScores,
+        overall_average: overallAverage,
+        received_email: recipient,
+      };
+
+      const response = await ApiService.sendEmailReportCard(reportData);
+
+      if (response.success) {
+        setEmailSuccess(true);
+        setEmailError("");
+        toast.success(`Đã gửi phiếu điểm thành công đến ${recipient}!`);
+      } else {
+        setEmailError(response.message || "Không thể gửi email phiếu điểm");
+      }
+    } catch (error: any) {
+      logger.error("Error sending email report card:", error);
+      const errorMessage =
+        error?.data?.detail ||
+        error?.message ||
+        "Lỗi kết nối server khi gửi email";
+      setEmailError(
+        typeof errorMessage === "string"
+          ? errorMessage
+          : "Lỗi kết nối server khi gửi email",
+      );
+    } finally {
+      setEmailSending(false);
+    }
+  };
 
   // Return only core student list functionality
   return {
