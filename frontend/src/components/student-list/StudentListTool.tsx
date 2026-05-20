@@ -189,7 +189,7 @@ export function StudentListTool({
                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="w-4 h-4" />
-                <span>Tải phiếu liên lạc toàn lớp</span>
+                <span>Tải phiếu liên lạc</span>
               </Button> */}
             </div>
           </div>
