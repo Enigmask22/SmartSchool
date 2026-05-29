@@ -1443,3 +1443,196 @@ async def delete_leave_request_image(
     except Exception as e:
         logger.error(f"Error deleting leave request image: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi xóa đơn xin nghỉ: {str(e)}")
+
+# ===============================================
+# NOTEBOOK - Sổ đầu bài
+# ===============================================
+
+NOTEBOOK_BUCKET = "notebook"
+
+
+@router.post("/attendance/notebook")
+async def upload_notebook_image(
+    class_id: int = Query(..., description="ID lớp học"),
+    target_date: Optional[date] = Query(default=None, description="Ngày điểm danh (YYYY-MM-DD)"),
+    file: UploadFile = File(..., description="Ảnh chụp sổ đầu bài (JPEG/PNG/WebP, tối đa 5MB)"),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Upload ảnh chụp sổ đầu bài cho lớp học trong ngày.
+
+    Tận dụng Supabase Storage bucket 'notebook'.
+    File được lưu theo cấu trúc: {class_id}/{date}_{uuid}.{ext}
+    URL public sẽ được lưu vào bảng notebook.
+    """
+    try:
+        assert_can_edit_attendance(current_user, db)
+
+        if target_date is None:
+            target_date = date.today()
+
+        # Kiểm tra giáo viên có phải chủ nhiệm của lớp này không
+        teacher_resp = db.table("teachers").select("id").eq("user_id", current_user["id"]).execute()
+        teacher_id = teacher_resp.data[0]["id"] if teacher_resp.data else None
+        if not teacher_id:
+            raise HTTPException(status_code=403, detail="Không tìm thấy thông tin giáo viên")
+
+        class_resp = db.table("classes").select("id, homeroom_teacher_id").eq("id", class_id).execute()
+        if not class_resp.data or class_resp.data[0].get("homeroom_teacher_id") != teacher_id:
+            raise HTTPException(status_code=403, detail="Bạn không phải giáo viên chủ nhiệm của lớp này")
+
+        # Validate file
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Chỉ chấp nhận file ảnh (JPEG, PNG, WebP)")
+
+        content = await file.read()
+        max_size = 5 * 1024 * 1024  # 5MB
+        if len(content) > max_size:
+            raise HTTPException(status_code=400, detail="File ảnh vượt quá 5MB")
+
+        # Tạo tên file unique
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "jpg"
+        file_name = f"{class_id}/{target_date.isoformat()}_{uuid.uuid4().hex[:8]}.{ext}"
+
+        # Upload lên Supabase Storage
+        db.storage.from_(NOTEBOOK_BUCKET).upload(
+            path=file_name,
+            file=content,
+            file_options={"content-type": file.content_type, "upsert": "true"},
+        )
+
+        # Lấy public URL
+        public_url = db.storage.from_(NOTEBOOK_BUCKET).get_public_url(file_name)
+
+        # Upsert vào bảng notebook
+        existing = (
+            db.table("notebook")
+            .select("id")
+            .eq("class_id", class_id)
+            .eq("date", target_date.isoformat())
+            .execute()
+        )
+
+        if existing.data:
+            db.table("notebook").update({
+                "image_url": public_url,
+                "updated_at": datetime.now().isoformat(),
+            }).eq("id", existing.data[0]["id"]).execute()
+        else:
+            db.table("notebook").insert({
+                "class_id": class_id,
+                "date": target_date.isoformat(),
+                "image_url": public_url,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            }).execute()
+
+        return {
+            "success": True,
+            "message": "Upload sổ đầu bài thành công",
+            "data": {
+                "class_id": class_id,
+                "date": target_date.isoformat(),
+                "image_url": public_url,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading notebook image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi upload sổ đầu bài: {str(e)}")
+
+
+@router.get("/attendance/notebook")
+async def get_notebook_image(
+    class_id: int = Query(..., description="ID lớp học"),
+    target_date: Optional[date] = Query(default=None, description="Ngày điểm danh (YYYY-MM-DD)"),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Lấy thông tin ảnh sổ đầu bài của lớp trong ngày."""
+    try:
+        if target_date is None:
+            target_date = date.today()
+
+        resp = (
+            db.table("notebook")
+            .select("*")
+            .eq("class_id", class_id)
+            .eq("date", target_date.isoformat())
+            .limit(1)
+            .execute()
+        )
+
+        if resp.data:
+            record = resp.data[0]
+            return {
+                "success": True,
+                "message": "Lấy thông tin sổ đầu bài thành công",
+                "data": {
+                    "id": record["id"],
+                    "class_id": record["class_id"],
+                    "date": record["date"],
+                    "image_url": record.get("image_url"),
+                    "description": record.get("description"),
+                    "created_at": record["created_at"],
+                    "updated_at": record["updated_at"],
+                },
+            }
+
+        return {
+            "success": True,
+            "message": "Chưa có sổ đầu bài cho ngày này",
+            "data": None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting notebook image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi lấy sổ đầu bài: {str(e)}")
+
+
+@router.delete("/attendance/notebook")
+async def delete_notebook_image(
+    class_id: int = Query(..., description="ID lớp học"),
+    target_date: Optional[date] = Query(default=None, description="Ngày điểm danh (YYYY-MM-DD)"),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Xóa ảnh sổ đầu bài (chỉ xóa URL trong DB, giữ file trên storage)."""
+    try:
+        assert_can_edit_attendance(current_user, db)
+
+        if target_date is None:
+            target_date = date.today()
+
+        resp = (
+            db.table("notebook")
+            .select("id")
+            .eq("class_id", class_id)
+            .eq("date", target_date.isoformat())
+            .limit(1)
+            .execute()
+        )
+
+        if not resp.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy sổ đầu bài cho ngày này")
+
+        db.table("notebook").update({
+            "image_url": None,
+            "updated_at": datetime.now().isoformat(),
+        }).eq("id", resp.data[0]["id"]).execute()
+
+        return {
+            "success": True,
+            "message": "Xóa sổ đầu bài thành công",
+            "data": None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting notebook image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi xóa sổ đầu bài: {str(e)}")
