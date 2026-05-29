@@ -1,6 +1,6 @@
-import { useContext, useState } from 'react';
-import { PageHeader } from '@/components/common/PageHeader';
+import { useContext, useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAttendanceAPI } from '@/hooks/attendance/useAttendanceAPI';
 import { useAttendanceFilters } from '@/hooks/attendance/useAttendanceFilters';
 import { useAttendanceEdit } from '@/hooks/attendance/useAttendanceEdit';
@@ -8,8 +8,10 @@ import AttendanceStats from '@/components/attendance/AttendanceStats';
 import AttendanceFilters from '@/components/attendance/AttendanceFilters';
 import AttendanceTable from '@/components/attendance/AttendanceTable';
 import LeaveRequestModal from '@/components/attendance/LeaveRequestModal';
+import NotebookModal from '@/components/attendance/NotebookModal';
 import { AuthContext } from '@/contexts/AuthContext';
-import { CalendarCheck, Lock } from 'lucide-react';
+import { CalendarCheck, Lock, BookOpen } from 'lucide-react';
+import ApiService from '@/utils/api';
 import logger from '@/utils/logger';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -100,6 +102,37 @@ export default function AttendanceView() {
   const [leaveRequestOpen, setLeaveRequestOpen] = useState(false);
   const [leaveRequestRecord, setLeaveRequestRecord] = useState<any>(null);
 
+  // Local state for Notebook Modal (Sổ đầu bài)
+  const [notebookOpen, setNotebookOpen] = useState(false);
+  const [notebookImageUrl, setNotebookImageUrl] = useState<string | null>(null);
+  const [notebookLoading, setNotebookLoading] = useState(false);
+
+  // Fetch notebook image khi thay đổi ngày hoặc lớp
+  useEffect(() => {
+    if (!displayClassId || !selectedDate) {
+      setNotebookImageUrl(null);
+      return;
+    }
+    setNotebookLoading(true);
+    ApiService.getNotebookImage(displayClassId, selectedDate)
+      .then((res: any) => {
+        if (res.success && res.data?.image_url) {
+          setNotebookImageUrl(res.data.image_url);
+        } else {
+          setNotebookImageUrl(null);
+        }
+      })
+      .catch((err: any) => {
+        logger.error('Error fetching notebook:', err);
+        setNotebookImageUrl(null);
+      })
+      .finally(() => setNotebookLoading(false));
+  }, [displayClassId, selectedDate]);
+
+  const handleNotebookUploadSuccess = (imageUrl: string): void => {
+    setNotebookImageUrl(imageUrl);
+  };
+
   /**
    * Handle saving edited record - calls API and updates form state
    */
@@ -147,25 +180,46 @@ export default function AttendanceView() {
   return (
     <div className="attendance-view p-6">
       {/* Header */}
-      <div className="mb-8">
-        <PageHeader
-          title="Điểm danh lớp học"
-          description={
-            displayClass ? (
-              <div className="flex gap-2">
-                <Badge variant="secondary">{selectedAcademicYear}</Badge>
-                <Badge variant="secondary">{`Lớp ${displayClass}`}</Badge>
-              </div>
-            ) : (
-              'Chưa được phân công chủ nhiệm'
-            )
-          }
-          icon={
+      <div className="flex items-start justify-between mb-8">
+        <div className="flex items-center gap-4">
           <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
             <CalendarCheck className="w-8 h-8 text-white" />
           </div>
-          }
-        />
+          <div>
+            <h1 className="text-2xl font-bold">Điểm danh lớp học</h1>
+            <div className="mt-1">
+              {displayClass ? (
+                <div className="flex gap-2">
+                  <Badge variant="secondary">{selectedAcademicYear}</Badge>
+                  <Badge variant="secondary">{`Lớp ${displayClass}`}</Badge>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Chưa được phân công chủ nhiệm</p>
+              )}
+            </div>
+          </div>
+        </div>
+        {displayClass && (
+          <Button
+            size="sm"
+            variant={
+              notebookImageUrl
+                ? 'default'
+                : 'outline'
+            }
+            onClick={() => setNotebookOpen(true)}
+            disabled={notebookLoading}
+            className={`h-9 text-xs ${notebookImageUrl ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+            title={
+              notebookImageUrl
+                ? 'Xem sổ đầu bài'
+                : 'Upload sổ đầu bài'
+            }
+          >
+            <BookOpen className="w-4 h-4 mr-1" />
+            Sổ đầu bài
+          </Button>
+        )}
       </div>
 
       {/* Messages */}
@@ -273,6 +327,18 @@ export default function AttendanceView() {
           uploadDisabled={attendanceEditLocked}
         />
       )}
+
+      {/* Notebook Modal (Sổ đầu bài) */}
+      <NotebookModal
+        open={notebookOpen}
+        onClose={() => setNotebookOpen(false)}
+        classId={displayClassId}
+        className={displayClass}
+        targetDate={selectedDate}
+        existingImageUrl={notebookImageUrl}
+        onUploadSuccess={handleNotebookUploadSuccess}
+        uploadDisabled={attendanceEditLocked}
+      />
     </div>
   );
 };

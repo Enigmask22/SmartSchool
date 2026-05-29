@@ -588,6 +588,65 @@ class ApiService {
     );
   }
 
+  // ===============================================
+  // NOTEBOOK - Sổ đầu bài
+  // ===============================================
+
+  /**
+   * Upload ảnh chụp sổ đầu bài cho lớp học
+   * @param {number} classId - ID lớp học
+   * @param {File} imageFile - File ảnh
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async uploadNotebookImage(classId, imageFile, targetDate) {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const params = new URLSearchParams();
+    params.append("class_id", classId);
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/notebook?${params.toString()}`,
+      {
+        method: "POST",
+        headers: {},
+        body: formData,
+      },
+    );
+  }
+
+  /**
+   * Lấy thông tin ảnh sổ đầu bài cho lớp theo ngày
+   * @param {number} classId - ID lớp học
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async getNotebookImage(classId, targetDate) {
+    const params = new URLSearchParams();
+    params.append("class_id", classId);
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/notebook?${params.toString()}`,
+    );
+  }
+
+  /**
+   * Xóa ảnh sổ đầu bài
+   * @param {number} classId - ID lớp học
+   * @param {string} targetDate - Ngày điểm danh (YYYY-MM-DD)
+   */
+  async deleteNotebookImage(classId, targetDate) {
+    const params = new URLSearchParams();
+    params.append("class_id", classId);
+    if (targetDate) params.append("target_date", targetDate);
+
+    return this.request(
+      `/homeroom/attendance/notebook?${params.toString()}`,
+      { method: "DELETE" },
+    );
+  }
+
   // Get full attendance list (all students with their attendance status)
   async getFullAttendanceList(targetDate = null, className = null) {
     const params = new URLSearchParams();
