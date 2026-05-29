@@ -33,6 +33,7 @@ export const useStudentFeedback = ({
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
+  const [selectedType, setSelectedType] = useState("CK");
 
   const handleFeedbackClick = useCallback(
     async (student: any) => {
@@ -137,7 +138,7 @@ export const useStudentFeedback = ({
       try {
         const token = localStorage.getItem("access_token");
         const commentResponse = await fetch(
-          `${API_BASE_URL}/feedback/comments/${student.id}?semester=${filters.selectedSemester}`,
+          `${API_BASE_URL}/feedback/comments/${student.id}?semester=${filters.selectedSemester}&type=${selectedType}`,
           {
             method: "GET",
             headers: {
@@ -162,7 +163,7 @@ export const useStudentFeedback = ({
       setFeedbackForm(initialForm);
       setShowFeedbackModal(true);
     },
-    [filters.selectedAcademicYear, filters.selectedSemester, filters.selectedSemester, scoresData],
+    [filters.selectedAcademicYear, filters.selectedSemester, selectedType, scoresData],
   );
 
   const closeFeedbackModal = useCallback(() => {
@@ -284,6 +285,7 @@ export const useStudentFeedback = ({
           student_id: selectedStudentForFeedback.id,
           description: generatedFeedback,
           semester: filters.selectedSemester,
+          type: selectedType,
         }),
       });
 
@@ -302,7 +304,7 @@ export const useStudentFeedback = ({
     } finally {
       setSmsLoading(false);
     }
-  }, [generatedFeedback, selectedStudentForFeedback, filters.selectedSemester]);
+  }, [generatedFeedback, selectedStudentForFeedback, filters.selectedSemester, selectedType]);
 
   const exportAllComments = useCallback(async () => {
     if (!filters.selectedClass || filters.selectedClass === "all") {
@@ -324,7 +326,7 @@ export const useStudentFeedback = ({
 
       const token = localStorage.getItem("access_token");
       const response = await fetch(
-        `${API_BASE_URL}/feedback/comments/class/${classId}?semester=${filters.selectedSemester}`,
+        `${API_BASE_URL}/feedback/comments/class/${classId}?semester=${filters.selectedSemester}&type=${selectedType}`,
         {
           method: "GET",
           headers: {
@@ -372,7 +374,7 @@ export const useStudentFeedback = ({
           (error instanceof Error ? error.message : "Unknown error"),
       );
     }
-  }, [filters.selectedClass, filters.selectedSemester, filters.homeroomClasses]);
+  }, [filters.selectedClass, filters.selectedSemester, filters.homeroomClasses, selectedType]);
 
   return {
     showFeedbackModal,
@@ -388,6 +390,8 @@ export const useStudentFeedback = ({
     feedbackSuccess,
     setFeedbackSuccess,
     smsLoading,
+    selectedType,
+    setSelectedType,
     handleFeedbackClick,
     closeFeedbackModal,
     handleFeedbackFormChange,

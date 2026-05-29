@@ -49,6 +49,8 @@ interface FeedbackModalProps {
   onSaveComment: () => void;
   onClose: () => void;
   smsLoading?: boolean;
+  selectedType?: string;
+  onTypeChange?: (type: string) => void;
   exportStudentReportCard?: (student: Student) => void;
   openEmailDialog?: (student: Student) => void;
 }
@@ -69,6 +71,8 @@ export function FeedbackModal({
   onSaveComment,
   onClose,
   smsLoading = false,
+  selectedType = "CK",
+  onTypeChange,
   exportStudentReportCard,
   openEmailDialog,
 }: FeedbackModalProps) {
@@ -128,6 +132,37 @@ export function FeedbackModal({
                 </h3>
               </div>
               <div className="px-6 py-4 space-y-4">
+                {/* Type Selector: GK / CK */}
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
+                    Loại nhận xét
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onTypeChange?.("GK")}
+                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-md border transition-colors ${
+                        selectedType === "GK"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      Giữa kỳ (GK)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onTypeChange?.("CK")}
+                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-md border transition-colors ${
+                        selectedType === "CK"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      Cuối kỳ (CK)
+                    </button>
+                  </div>
+                </div>
+
                 {/* Student Name */}
                 <div>
                   <label

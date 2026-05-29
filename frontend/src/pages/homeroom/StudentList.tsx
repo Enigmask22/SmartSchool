@@ -206,6 +206,8 @@ export function StudentListPage() {
         onSaveComment={feedback.saveComment}
         onClose={feedback.closeFeedbackModal}
         smsLoading={feedback.smsLoading}
+        selectedType={feedback.selectedType}
+        onTypeChange={feedback.setSelectedType}
         exportStudentReportCard={(student) =>
           studentList.exportStudentReportCard(student, {
             generatedFeedback: feedback.generatedFeedback,
