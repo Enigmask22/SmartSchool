@@ -50,6 +50,7 @@ class CommentCreateRequest(BaseModel):
     student_id: int = Field(..., description="ID học sinh")
     description: str = Field(..., description="Nội dung nhận xét")
     semester: str = Field(default="HK1", description="Học kỳ: HK1, HK2, CN")
+    type: str = Field(default="CK", description="Loại nhận xét: GK (giữa kỳ), CK (cuối kỳ)")
 
 class CommentResponse(BaseModel):
     id: int
@@ -57,6 +58,7 @@ class CommentResponse(BaseModel):
     class_id: Optional[int]
     description: str
     semester: str
+    type: str
     created_at: str
     updated_at: str
 

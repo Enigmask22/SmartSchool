@@ -154,8 +154,7 @@ model_*.pkl
 # ==========================================
 # schema files
 # ==========================================
-core/schema/
-*.sql
+# backend/core/schema/
 # ==========================================
 # Docker Build Files (khi chạy locally)
 # ==========================================
@@ -206,3 +205,5 @@ latex
 build_wheel
 .cursor
 test-results/
+.mcp.json
+.claude/
