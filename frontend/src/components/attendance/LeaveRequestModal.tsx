@@ -22,7 +22,7 @@ import logger from "../../utils/logger";
  * - studentCode: string - Mã học sinh
  * - targetDate: string - Ngày điểm danh (YYYY-MM-DD)
  * - existingImageUrl: string|null - URL ảnh đơn xin nghỉ hiện tại (nếu có)
- * - onUploadSuccess: (imageUrl: string) => void - Callback sau khi upload thành công
+ * - onUploadSuccess: (imageUrl: string | null) => void - Callback sau khi upload/xóa thành công
  * - uploadDisabled: khi true chỉ xem, không upload/thay ảnh (khóa sửa điểm danh).
  */
 const LeaveRequestModal = ({
@@ -41,6 +41,7 @@ const LeaveRequestModal = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Đồng bộ imageUrl khi prop thay đổi
@@ -116,6 +117,28 @@ const LeaveRequestModal = ({
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!hasExistingImage) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const response = await ApiService.deleteLeaveRequestImage(studentId, targetDate);
+      if (response.success) {
+        setImageUrl(null);
+        setSuccessMsg("Đã xóa đơn xin nghỉ");
+        setTimeout(() => setSuccessMsg(null), 3000);
+        if (onUploadSuccess) onUploadSuccess(null);
+      } else {
+        setError(response.message || "Không thể xóa đơn xin nghỉ");
+      }
+    } catch (err) {
+      logger.error("Error deleting leave request:", err);
+      setError("Lỗi khi xóa đơn xin nghỉ");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -265,6 +288,18 @@ const LeaveRequestModal = ({
                 )}
               </Button>
             </>
+          )}
+
+          {/* Nút xóa ảnh */}
+          {!uploadDisabled && hasExistingImage && !hasPreview && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="mr-auto"
+            >
+              {deleting ? "Đang xóa..." : "Xóa ảnh"}
+            </Button>
           )}
 
           {/* Nút đóng */}
