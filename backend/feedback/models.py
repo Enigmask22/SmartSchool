@@ -7,12 +7,14 @@ from typing import Optional, List
 
 class StudentFeedbackRequest(BaseModel):
     student_name: str = Field(..., description="Tên học sinh")
-    score: float = Field(..., ge=0, le=10, description="Điểm số (0-10)")
+    score: float = Field(default=0, ge=0, le=10, description="Điểm số (0-10)")
     top_subjects: List[str] = Field(default=[], description="Top 3 môn điểm cao nhất")
     weak_subjects: List[str] = Field(default=[], description="Top 3 môn điểm thấp nhất (< 8.0)")
-    attendance_rate: int = Field(..., ge=0, le=100, description="Tỷ lệ chuyên cần (%)")
+    attendance_rate: int = Field(default=100, ge=0, le=100, description="Tỷ lệ chuyên cần (%)")
     subject: Optional[str] = Field(default=None, description="Môn học (nếu có)")
     notes: Optional[str] = Field(default="", description="Ghi chú thêm")
+    type: Optional[str] = Field(default="CK", description="Loại nhận xét: GK (giữa kỳ), CK (cuối kỳ)")
+    low_score_details: Optional[List[dict]] = Field(default=[], description="Chi tiết cột TX/GK dưới 8 hoặc KĐ (chỉ dùng cho GK)")
 
 class StudentFeedbackResponse(BaseModel):
     success: bool

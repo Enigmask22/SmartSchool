@@ -7,12 +7,15 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import {
   MessageCircle,
   AlertCircle,
   CheckCircle2,
   Download,
   Mail,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 interface Student {
@@ -51,6 +54,7 @@ interface FeedbackModalProps {
   smsLoading?: boolean;
   selectedType?: string;
   onTypeChange?: (type: string) => void;
+  gkLowScoreDetails?: Array<{ subject: string; columns: Array<{ name: string; value: string }> }>;
   exportStudentReportCard?: (student: Student) => void;
   openEmailDialog?: (student: Student) => void;
 }
@@ -73,6 +77,7 @@ export function FeedbackModal({
   smsLoading = false,
   selectedType = "CK",
   onTypeChange,
+  gkLowScoreDetails = [],
   exportStudentReportCard,
   openEmailDialog,
 }: FeedbackModalProps) {
@@ -184,32 +189,35 @@ export function FeedbackModal({
                   />
                 </div>
 
-                {/* Score */}
-                <div>
-                  <label
-                    htmlFor="score"
-                    className="block mb-1 text-sm font-medium text-gray-700"
-                  >
-                    Điểm trung bình học kỳ
-                  </label>
-                  <input
-                    id="score"
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    value={form?.score || ""}
-                    placeholder="8.5"
-                    disabled
-                    className="w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm cursor-not-allowed"
-                  />
-                </div>
+                {/* Score — chỉ hiển thị cho CK */}
+                {selectedType === "CK" && (
+                  <div>
+                    <label
+                      htmlFor="score"
+                      className="block mb-1 text-sm font-medium text-gray-700"
+                    >
+                      Điểm trung bình học kỳ
+                    </label>
+                    <input
+                      id="score"
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      value={form?.score || ""}
+                      placeholder="8.5"
+                      disabled
+                      className="w-full px-3 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm cursor-not-allowed"
+                    />
+                  </div>
+                )}
 
-                {/* Subject Highlights */}
-                {(Array.isArray(form?.top_subjects) &&
-                  form.top_subjects.length > 0) ||
-                (Array.isArray(form?.weak_subjects) &&
-                  form.weak_subjects.length > 0) ? (
+                {/* Subject Highlights — chỉ hiển thị cho CK */}
+                {selectedType === "CK" &&
+                  ((Array.isArray(form?.top_subjects) &&
+                    form.top_subjects.length > 0) ||
+                  (Array.isArray(form?.weak_subjects) &&
+                    form.weak_subjects.length > 0)) && (
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     {Array.isArray(form?.top_subjects) &&
                       form.top_subjects.length > 0 && (
@@ -251,7 +259,12 @@ export function FeedbackModal({
                         </div>
                       )}
                   </div>
-                ) : null}
+                )}
+
+                {/* GK: Low-score details — thay thế Score + Subject Highlights */}
+                {selectedType === "GK" && (
+                  <GKScoreDetails lowScoreDetails={gkLowScoreDetails} />
+                )}
 
                 {/* Notes */}
                 <div>
@@ -431,5 +444,71 @@ export function FeedbackModal({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Component hiển thị chi tiết các cột TX/GK dưới 8 hoặc KĐ cho chế độ GK.
+ * Có thể thu gọn/mở rộng.
+ */
+function GKScoreDetails({
+  lowScoreDetails = [],
+}: {
+  lowScoreDetails?: Array<{ subject: string; columns: Array<{ name: string; value: string }> }>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!lowScoreDetails || lowScoreDetails.length === 0) {
+    return (
+      <div className="p-3 text-sm text-green-700 border border-green-200 rounded bg-green-50">
+        Tất cả các cột điểm thường xuyên và giữa kỳ đều ổn định (≥ 8.0).
+      </div>
+    );
+  }
+
+  const displayItems = expanded ? lowScoreDetails : lowScoreDetails.slice(0, 3);
+  const hiddenCount = lowScoreDetails.length - 3;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-amber-700">
+        Các cột điểm TX/GK cần lưu ý (dưới 8 hoặc KĐ):
+      </p>
+      <div className="space-y-1.5">
+        {displayItems.map((item, idx) => (
+          <div
+            key={idx}
+            className="px-3 py-2 text-sm border rounded bg-amber-50 border-amber-200"
+          >
+            <span className="font-medium">{item.subject}:</span>{" "}
+            {item.columns.map((c, ci) => (
+              <span key={ci}>
+                {ci > 0 && ", "}
+                <span className="text-amber-800">
+                  {c.name} = {c.value}
+                </span>
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+        >
+          {expanded ? (
+            <>
+              <ChevronDown className="w-3 h-3" /> Thu gọn
+            </>
+          ) : (
+            <>
+              <ChevronRight className="w-3 h-3" /> Xem thêm {hiddenCount} môn
+            </>
+          )}
+        </button>
+      )}
+    </div>
   );
 }

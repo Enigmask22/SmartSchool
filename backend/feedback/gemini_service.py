@@ -102,6 +102,91 @@ Dựa trên dữ liệu trên, viết nhận xét cho học sinh này.
 """
         return prompt.strip()
 
+    def create_gk_feedback_prompt(
+        self,
+        student_name: str,
+        attendance_rate: int,
+        low_score_details: Optional[list] = None,
+        notes: str = "",
+    ) -> str:
+        """
+        Tạo prompt nhận xét GIỮA KỲ (GK) — thông báo tình hình cho phụ huynh,
+        không đánh giá điểm số, chỉ liệt kê các cột TX/GK cần lưu ý.
+        """
+        low_score_details = low_score_details or []
+
+        # Build low score details text
+        if low_score_details:
+            details_lines = []
+            for item in low_score_details:
+                subject = item.get("subject", "???")
+                columns = item.get("columns", [])
+                if columns:
+                    col_text = ", ".join(
+                        f"{c['name']} = {c['value']}" for c in columns
+                    )
+                    details_lines.append(f"  - {subject}: {col_text}")
+            details_text = "\n".join(details_lines) if details_lines else "Không có cột điểm nào dưới 8"
+        else:
+            details_text = "Không có cột điểm nào dưới 8 — tất cả các môn đều ổn."
+
+        NEGATIVE_WORDS = ["vắng", "nghỉ", "trốn", "đi trễ", "không chuyên cần", "muộn học", "bỏ tiết", "trốn học", "cúp học"]
+        negative_attendance = any(word in (notes or "").lower() for word in NEGATIVE_WORDS)
+
+        attendance_hint = ""
+        if not negative_attendance:
+            attendance_hint = "- Lưu ý: Nếu không có ghi chú tiêu cực về chuyên cần, hãy thêm một câu ngắn gọn khen em có ý thức đi học đầy đủ, đúng giờ."
+
+        prompt = f"""
+Bạn là trợ lý AI của giáo viên chủ nhiệm. Hãy nhập vai giáo viên và viết nhận xét GIỮA KỲ ngắn gọn, chuyên nghiệp cho học sinh (không phải sinh viên) để THÔNG BÁO TÌNH HÌNH cho phụ huynh.
+
+**MỤC TIÊU:**
+Đây là nhận xét GIỮA KỲ — mục đích là cung cấp thông tin để phụ huynh nắm bắt tình hình học tập và kịp thời nhắc nhở, động viên học sinh trước khi thi cuối kỳ.
+
+**QUY TẮC BẮT BUỘC:**
+- Chỉ trả lời đúng nội dung nhận xét, KHÔNG thêm lời chào hay tiêu đề.
+- Văn phong: thuần túy THÔNG BÁO, trung tính, khách quan. KHÔNG đánh giá, KHÔNG nhận xét điểm cao hay thấp, KHÔNG dùng các từ như "yếu", "kém", "tệ", "cần cố gắng", "cần nỗ lực", "cần cải thiện".
+- PHẢI liệt kê ĐẦY ĐỦ TẤT CẢ các môn và TẤT CẢ các cột điểm được cung cấp trong dữ liệu bên dưới. KHÔNG được bỏ sót bất kỳ môn nào hay cột điểm nào. Đây là yêu cầu BẮT BUỘC.
+- Sau khi liệt kê, kết thúc bằng một câu ngắn gọn mang tính hợp tác: kính mong quý phụ huynh theo dõi, động viên và nhắc nhở học sinh ôn tập chuẩn bị cho kỳ thi cuối kỳ.
+- Nếu tất cả các cột điểm đều ≥ 8 và không có KĐ thì khen ngợi và động viên giữ vững phong độ.
+- Mặc định chuyên cần tốt (đi học đầy đủ, đúng giờ); NẾU ghi chú nêu vắng/đi trễ thì phải đề cập.
+- Ngôn ngữ: Tiếng Việt chuẩn, trang trọng. Độ dài: tối đa 4 câu, không dùng markdown.
+{attendance_hint}
+
+**DỮ LIỆU HỌC SINH:**
+- Tên: {student_name}
+- Danh sách ĐẦY ĐỦ các cột điểm thường xuyên / giữa kỳ dưới 8 hoặc KĐ (PHẢI liệt kê TẤT CẢ):
+{details_text}
+- Chuyên cần (mặc định tốt nếu không ghi chú tiêu cực): {attendance_rate}%
+- Ghi chú của GVCN: {notes if notes else 'Không có'}
+
+Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh này. Nhớ liệt kê ĐẦY ĐỦ TẤT CẢ các môn và cột điểm.
+"""
+        return prompt.strip()
+
+    async def generate_gk_feedback(
+        self,
+        student_name: str,
+        attendance_rate: int,
+        low_score_details: Optional[list] = None,
+        notes: str = "",
+    ) -> str:
+        """Tạo nhận xét GIỮA KỲ qua Gemini API."""
+        prompt = self.create_gk_feedback_prompt(
+            student_name=student_name,
+            attendance_rate=attendance_rate,
+            low_score_details=low_score_details or [],
+            notes=(notes or "").strip(),
+        )
+        response = await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config={"max_output_tokens": 2048, "temperature": 0.7},
+        )
+        if response and response.text:
+            return response.text.strip()
+        raise Exception("Empty response from Gemini for GK feedback")
+
     async def generate_student_feedback(
         self,
         student_name: str,

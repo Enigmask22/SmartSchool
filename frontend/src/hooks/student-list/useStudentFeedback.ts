@@ -1,7 +1,42 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import ApiService from "@/utils/api";
 import logger from "@/utils/logger";
 import { toast } from "sonner";
+
+/** Key name contains TX-related pattern (thường xuyên) */
+const _isGK_TX_column = (keyLower: string) =>
+  keyLower.includes("tx") ||
+  keyLower.includes("thuong_xuyen") ||
+  keyLower.includes("thuong_ky") ||
+  keyLower.includes("giua_ki") ||
+  keyLower.includes("giua_ky") ||
+  keyLower.includes("gk");
+
+/** Key name contains CK-related pattern (cuối kỳ) — should be excluded */
+const _isCK_column = (keyLower: string) =>
+  keyLower.includes("ck") ||
+  keyLower.includes("cuoi_ki") ||
+  keyLower.includes("cuoi_ky");
+
+/** Map raw score_data key → human-readable column label */
+const _columnLabel = (rawKey: string): string => {
+  const k = rawKey.toLowerCase().replace(/^diem_/, "");
+  const MAP: Record<string, string> = {
+    tx1: "TX 1", tx2: "TX 2", tx3: "TX 3", tx4: "TX 4", tx5: "TX 5",
+    thuong_xuyen: "Điểm thường xuyên",
+    thi_giua_ki: "Điểm giữa kỳ", giua_ki: "Điểm giữa kỳ", gk: "Điểm giữa kỳ",
+    thi_cuoi_ki: "Điểm cuối kỳ", cuoi_ki: "Điểm cuối kỳ", ck: "Điểm cuối kỳ",
+    mieng: "Điểm miệng",
+    "15_phut": "Điểm 15 phút", "1_tiet": "Điểm 1 tiết",
+    thuc_hanh: "Điểm thực hành",
+  };
+  if (MAP[k]) return MAP[k];
+  // Try prefix match for keys like "diem_tx1" → lookup "tx1"
+  for (const [pattern, label] of Object.entries(MAP)) {
+    if (k === pattern || k.endsWith("_" + pattern)) return label;
+  }
+  return rawKey.replace(/^Diem_/, "").replace(/_/g, " ");
+};
 
 interface FeedbackHookProps {
   filters: any;
@@ -34,6 +69,75 @@ export const useStudentFeedback = ({
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
   const [selectedType, setSelectedType] = useState("CK");
+  const [gkLowScoreDetails, setGkLowScoreDetails] = useState<any[]>([]);
+  const [allScoresData, setAllScoresData] = useState<any[]>([]);
+
+  // Re-process GK low score details khi selectedType thay đổi
+  useEffect(() => {
+    if (selectedType === "GK" && allScoresData.length > 0) {
+      const lowDetails: any[] = [];
+      for (const subjectScore of allScoresData) {
+        const scoreData = subjectScore.score_data;
+        if (!scoreData || typeof scoreData !== "object") continue;
+        const subjectName = scoreData.Mon_hoc || subjectScore.subject_name || "???";
+        const lowColumns: { name: string; value: string }[] = [];
+        for (const [key, val] of Object.entries(scoreData)) {
+          if (key === "Mon_hoc") continue;
+          const keyLower = key.toLowerCase();
+          if (!_isGK_TX_column(keyLower)) continue;
+          if (_isCK_column(keyLower)) continue;
+          const diem = (val as any)?.Diem;
+          if (diem === undefined || diem === null) continue;
+          const diemNum = typeof diem === "string" ? parseFloat(diem) : diem;
+          const isKD = typeof diem === "string" && diem.toUpperCase() === "KĐ";
+          if (isKD || (!isNaN(diemNum) && diemNum < 8)) {
+            lowColumns.push({ name: _columnLabel(key), value: String(diem) });
+          }
+        }
+        if (lowColumns.length > 0) {
+          lowDetails.push({ subject: subjectName, columns: lowColumns });
+        }
+      }
+      setGkLowScoreDetails(lowDetails);
+    } else {
+      setGkLowScoreDetails([]);
+    }
+  }, [selectedType, allScoresData]);
+
+  // Re-fetch comment khi người dùng đổi loại GK/CK trong modal đang mở
+  useEffect(() => {
+    if (!showFeedbackModal || !selectedStudentForFeedback) return;
+
+    const fetchCommentForType = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        const commentResponse = await fetch(
+          `${API_BASE_URL}/feedback/comments/${selectedStudentForFeedback.id}?semester=${filters.selectedSemester}&type=${selectedType}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (commentResponse.ok) {
+          const commentResult = await commentResponse.json();
+          if (commentResult.success && commentResult.data) {
+            setGeneratedFeedback(commentResult.data.description);
+            logger.debug("✅ Loaded existing comment for type:", selectedType, commentResult.data);
+          } else {
+            setGeneratedFeedback("");
+          }
+        }
+      } catch (error) {
+        logger.error("Error loading comment for type:", selectedType, error);
+      }
+    };
+
+    fetchCommentForType();
+  }, [selectedType, showFeedbackModal, selectedStudentForFeedback, filters.selectedSemester]);
 
   const handleFeedbackClick = useCallback(
     async (student: any) => {
@@ -55,12 +159,14 @@ export const useStudentFeedback = ({
         notes: "",
       };
 
+      let scoresResponse: any = null;
+
       try {
         logger.debug(
           "🎯 Fetching scores for feedback form for student:",
           student,
         );
-        const scoresResponse = await ApiService.getStudentScores(
+        scoresResponse = await ApiService.getStudentScores(
           student.id,
           filters.selectedAcademicYear,
           filters.selectedSemester,
@@ -76,6 +182,11 @@ export const useStudentFeedback = ({
           logger.debug("🔍 First score object:", studentScoresList?.[0]);
 
           if (Array.isArray(studentScoresList) && studentScoresList.length > 0) {
+            // GK mode: chỉ cần có dữ liệu điểm (không cần final_score)
+            if (selectedType === "GK") {
+              scoresData.setHasScoreData(true);
+            }
+
             const validScores = studentScoresList.filter(
               (score) =>
                 score.final_score !== null && score.final_score !== undefined,
@@ -133,6 +244,50 @@ export const useStudentFeedback = ({
       } catch (error) {
         logger.error("Error fetching student scores:", error);
         scoresData.setHasScoreData(false);
+      }
+
+      // GK mode: process raw score_data to extract TX/GK columns below threshold
+      // Always store scores data so it's available when switching to GK later
+      const scoresList = scoresResponse?.data?.scores || [];
+      setAllScoresData(scoresList);
+
+      try {
+        if (selectedType === "GK") {
+
+          const lowDetails: any[] = [];
+          for (const subjectScore of scoresList) {
+            const scoreData = subjectScore.score_data;
+            if (!scoreData || typeof scoreData !== "object") continue;
+
+            const subjectName = scoreData.Mon_hoc || subjectScore.subject_name || "???";
+            const lowColumns: { name: string; value: string }[] = [];
+
+            for (const [key, val] of Object.entries(scoreData)) {
+              if (key === "Mon_hoc") continue;
+              const keyLower = key.toLowerCase();
+              // Only TX and GK columns, exclude CK
+              if (!_isGK_TX_column(keyLower)) continue;
+              if (_isCK_column(keyLower)) continue;
+
+              const diem = (val as any)?.Diem;
+              if (diem === undefined || diem === null) continue;
+
+              const diemNum = typeof diem === "string" ? parseFloat(diem) : diem;
+              const isKD = typeof diem === "string" && diem.toUpperCase() === "KĐ";
+
+              if (isKD || (!isNaN(diemNum) && diemNum < 8)) {
+                lowColumns.push({ name: _columnLabel(key), value: String(diem) });
+              }
+            }
+
+            if (lowColumns.length > 0) {
+              lowDetails.push({ subject: subjectName, columns: lowColumns });
+            }
+          }
+          setGkLowScoreDetails(lowDetails);
+        }
+      } catch (err) {
+        logger.error("Error processing GK score details:", err);
       }
 
       try {
@@ -202,14 +357,18 @@ export const useStudentFeedback = ({
       return false;
     }
 
-    const scoreNum = parseFloat(score);
     if (!scoresData.hasScoreData) {
       setFeedbackError("Cần có dữ liệu điểm của học sinh để tạo nhận xét");
       return false;
     }
-    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
-      setFeedbackError("Điểm số phải từ 0 đến 10");
-      return false;
+
+    // CK mode: validate score range
+    if (selectedType === "CK") {
+      const scoreNum = parseFloat(score);
+      if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
+        setFeedbackError("Điểm số phải từ 0 đến 10");
+        return false;
+      }
     }
 
     const attendanceNum = parseInt(attendance_rate);
@@ -219,7 +378,7 @@ export const useStudentFeedback = ({
     }
 
     return true;
-  }, [feedbackForm, scoresData.hasScoreData]);
+  }, [feedbackForm, scoresData.hasScoreData, selectedType]);
 
   const generateFeedback = useCallback(async () => {
     if (!validateFeedbackForm()) return;
@@ -238,12 +397,14 @@ export const useStudentFeedback = ({
           },
           body: JSON.stringify({
             student_name: feedbackForm.student_name,
-            score: parseFloat(feedbackForm.score),
-            top_subjects: feedbackForm.top_subjects || [],
-            weak_subjects: feedbackForm.weak_subjects || [],
-            attendance_rate: parseInt(feedbackForm.attendance_rate),
+            score: selectedType === "CK" ? parseFloat(feedbackForm.score || "0") : 0,
+            top_subjects: selectedType === "CK" ? (feedbackForm.top_subjects || []) : [],
+            weak_subjects: selectedType === "CK" ? (feedbackForm.weak_subjects || []) : [],
+            attendance_rate: parseInt(feedbackForm.attendance_rate || "100"),
             subject: feedbackForm.subject || null,
             notes: feedbackForm.notes,
+            type: selectedType,
+            low_score_details: selectedType === "GK" ? gkLowScoreDetails : [],
           }),
         },
       );
@@ -262,7 +423,7 @@ export const useStudentFeedback = ({
     } finally {
       setFeedbackLoading(false);
     }
-  }, [feedbackForm, validateFeedbackForm]);
+  }, [feedbackForm, validateFeedbackForm, selectedType, gkLowScoreDetails]);
 
   const saveComment = useCallback(async () => {
     if (!generatedFeedback || !selectedStudentForFeedback) {
@@ -392,6 +553,8 @@ export const useStudentFeedback = ({
     smsLoading,
     selectedType,
     setSelectedType,
+    gkLowScoreDetails,
+    allScoresData,
     handleFeedbackClick,
     closeFeedbackModal,
     handleFeedbackFormChange,
