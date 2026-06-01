@@ -208,6 +208,7 @@ export function StudentListPage() {
         smsLoading={feedback.smsLoading}
         selectedType={feedback.selectedType}
         onTypeChange={feedback.setSelectedType}
+        gkLowScoreDetails={feedback.gkLowScoreDetails}
         exportStudentReportCard={(student) =>
           studentList.exportStudentReportCard(student, {
             generatedFeedback: feedback.generatedFeedback,

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import ApiService from "../../utils/api";
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
+import { ZoomIn, ZoomOut, RotateCcw, X } from "lucide-react";
 import logger from "../../utils/logger";
 
 /**
@@ -41,6 +42,22 @@ const NotebookModal = ({
   const [previewFile, setPreviewFile] = useState<{ file: File; previewUrl: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Lightbox zoom state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+
+  // Reset zoom & pan khi đóng lightbox
+  useEffect(() => {
+    if (!lightboxOpen) {
+      setZoomLevel(1);
+      setPanOffset({ x: 0, y: 0 });
+    }
+  }, [lightboxOpen]);
+
   // Đồng bộ imageUrl khi prop thay đổi
   useEffect(() => {
     setImageUrl(existingImageUrl || null);
@@ -49,17 +66,73 @@ const NotebookModal = ({
     setSuccessMsg(null);
   }, [existingImageUrl, classId, targetDate, open]);
 
+  // Keyboard + wheel handlers cho lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxOpen(false);
+      if (e.key === "+" || e.key === "=") zoomIn();
+      if (e.key === "-") zoomOut();
+      if (e.key === "0") resetZoom();
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY < 0) zoomIn();
+      else zoomOut();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("wheel", handleWheel);
+    };
+  }, [lightboxOpen, zoomLevel]);
+
+  const zoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(prev + 0.5, 5));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoomLevel((prev) => Math.max(prev - 0.5, 0.5));
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoomLevel > 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && zoomLevel > 1) {
+      setPanOffset({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       setError("Vui lòng chọn file ảnh (JPG, PNG, WebP)");
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError("File ảnh vượt quá 5MB");
       return;
@@ -118,6 +191,7 @@ const NotebookModal = ({
 
   const handleClose = () => {
     handleCancelPreview();
+    setLightboxOpen(false);
     onClose();
   };
 
@@ -136,64 +210,69 @@ const NotebookModal = ({
   const hasPreview = !!previewFile;
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Sổ đầu bài</DialogTitle>
-          <DialogDescription>
-            {className && (
-              <span className="font-semibold">Lớp {className}</span>
-            )}
-            {targetDate && <> | Ngày: {formatDisplayDate(targetDate)}</>}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Thông báo khóa sửa */}
-        {uploadDisabled && (
-          <div className="p-3 text-sm border rounded text-amber-800 bg-amber-50 border-amber-200">
-            Đã quá hạn chỉnh sửa điểm danh. Chỉ xem được sổ đầu bài đã lưu; không thể tải lên hoặc thay đổi.
-          </div>
-        )}
-
-        {/* Thông báo lỗi */}
-        {error && (
-          <div className="p-3 text-sm border rounded text-destructive bg-destructive/10 border-destructive/20">
-            {error}
-          </div>
-        )}
-
-        {/* Thông báo thành công */}
-        {successMsg && (
-          <div className="p-3 text-sm text-green-700 bg-green-100 border border-green-400 rounded">
-            {successMsg}
-          </div>
-        )}
-
-        {/* Hiển thị ảnh */}
-        <div className="flex flex-col items-center gap-4">
-          {displayImageUrl ? (
-            <div className="relative w-full">
-              <img
-                src={displayImageUrl}
-                alt="Sổ đầu bài"
-                className="object-contain w-full rounded-lg border max-h-[500px]"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                  setError("Không thể tải ảnh sổ đầu bài");
-                }}
-              />
-              {hasPreview && (
-                <div className="absolute px-2 py-1 text-xs text-white bg-yellow-500 rounded top-2 left-2">
-                  Xem trước - Chưa lưu
-                </div>
+    <>
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sổ đầu bài</DialogTitle>
+            <DialogDescription>
+              {className && (
+                <span className="font-semibold">Lớp {className}</span>
               )}
-              {!hasPreview && hasExistingImage && (
-                <div className="absolute px-2 py-1 text-xs text-white bg-green-600 rounded top-2 left-2">
-                  Đã lưu
-                </div>
-              )}
+              {targetDate && <> | Ngày: {formatDisplayDate(targetDate)}</>}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Thông báo khóa sửa */}
+          {uploadDisabled && (
+            <div className="p-3 text-sm border rounded text-amber-800 bg-amber-50 border-amber-200">
+              Đã quá hạn chỉnh sửa điểm danh. Chỉ xem được sổ đầu bài đã lưu; không thể tải lên hoặc thay đổi.
             </div>
-          ) : (
+          )}
+
+          {/* Thông báo lỗi */}
+          {error && (
+            <div className="p-3 text-sm border rounded text-destructive bg-destructive/10 border-destructive/20">
+              {error}
+            </div>
+          )}
+
+          {/* Thông báo thành công */}
+          {successMsg && (
+            <div className="p-3 text-sm text-green-700 bg-green-100 border border-green-400 rounded">
+              {successMsg}
+            </div>
+          )}
+
+          {/* Hiển thị ảnh */}
+          <div className="flex flex-col items-center gap-4">
+            {displayImageUrl ? (
+              <div className="relative w-full">
+                <img
+                  src={displayImageUrl}
+                  alt="Sổ đầu bài"
+                  className="object-contain w-full rounded-lg border max-h-[70vh] cursor-zoom-in"
+                  onClick={() => setLightboxOpen(true)}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                    setError("Không thể tải ảnh sổ đầu bài");
+                  }}
+                />
+                {hasPreview && (
+                  <div className="absolute px-2 py-1 text-xs text-white bg-yellow-500 rounded top-2 left-2">
+                    Xem trước - Chưa lưu
+                  </div>
+                )}
+                {!hasPreview && hasExistingImage && (
+                  <div className="absolute px-2 py-1 text-xs text-white bg-green-600 rounded top-2 left-2">
+                    Đã lưu
+                  </div>
+                )}
+                <div className="absolute px-2 py-1 text-xs text-white bg-black/50 rounded bottom-2 right-2">
+                  Nhấp vào ảnh để phóng to
+                </div>
+              </div>
+            ) : (
             <div className="flex flex-col items-center justify-center w-full py-12 border-2 border-dashed rounded-lg text-muted-foreground">
               <svg
                 className="w-12 h-12 mb-3 opacity-50"
@@ -271,7 +350,91 @@ const NotebookModal = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+
+    {/* Lightbox zoom overlay */}
+    {lightboxOpen && displayImageUrl && (
+      <div
+        className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setLightboxOpen(false);
+        }}
+      >
+        {/* Top bar */}
+        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 bg-black/60 z-10">
+          <span className="text-sm text-white/80">
+            {Math.round(zoomLevel * 100)}%
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              onClick={zoomOut}
+              title="Thu nhỏ (-)"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              onClick={zoomIn}
+              title="Phóng to (+)"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              onClick={resetZoom}
+              title="Reset (0)"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+            <div className="w-px h-6 mx-1 bg-white/30" />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              onClick={() => setLightboxOpen(false)}
+              title="Đóng (Esc)"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Image container with drag & zoom */}
+        <div
+          ref={imageContainerRef}
+          className="w-full h-full flex items-center justify-center overflow-hidden"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          style={{ cursor: zoomLevel > 1 ? (isDragging ? "grabbing" : "grab") : "default" }}
+        >
+          <img
+            src={displayImageUrl}
+            alt="Sổ đầu bài - Phóng to"
+            className="max-w-[95vw] max-h-[95vh] object-contain select-none"
+            style={{
+              transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+              transition: isDragging ? "none" : "transform 0.2s ease-out",
+            }}
+            draggable={false}
+          />
+        </div>
+
+        {/* Bottom hint */}
+        <div className="absolute bottom-4 text-xs text-white/50">
+          Cuộn chuột để zoom · Kéo để di chuyển · Esc để đóng
+        </div>
+      </div>
+    )}
+  </>
+);
 };
 
 export default NotebookModal;

@@ -36,7 +36,9 @@ async def generate_student_feedback(request: StudentFeedbackRequest):
             subject=request.subject,
             top_subjects=request.top_subjects or [],
             weak_subjects=request.weak_subjects or [],
-            notes=request.notes
+            notes=request.notes,
+            feedback_type=request.type or "CK",
+            low_score_details=request.low_score_details or [],
         )
         
         return StudentFeedbackResponse(
