@@ -129,7 +129,7 @@ export default function AttendanceView() {
       .finally(() => setNotebookLoading(false));
   }, [displayClassId, selectedDate]);
 
-  const handleNotebookUploadSuccess = (imageUrl: string): void => {
+  const handleNotebookUploadSuccess = (imageUrl: string | null): void => {
     setNotebookImageUrl(imageUrl);
   };
 

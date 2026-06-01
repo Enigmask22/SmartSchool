@@ -22,7 +22,7 @@ import logger from "../../utils/logger";
  * - className: string - Tên lớp (hiển thị)
  * - targetDate: string - Ngày điểm danh (YYYY-MM-DD)
  * - existingImageUrl: string|null - URL ảnh sổ đầu bài hiện tại (nếu có)
- * - onUploadSuccess: (imageUrl: string) => void - Callback sau khi upload thành công
+ * - onUploadSuccess: (imageUrl: string | null) => void - Callback sau khi upload/xóa thành công
  * - uploadDisabled: khi true chỉ xem, không upload/thay ảnh (khóa sửa điểm danh).
  */
 const NotebookModal = ({
@@ -40,6 +40,7 @@ const NotebookModal = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Lightbox zoom state
@@ -186,6 +187,28 @@ const NotebookModal = ({
     setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!hasExistingImage) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const response = await ApiService.deleteNotebookImage(classId, targetDate);
+      if (response.success) {
+        setImageUrl(null);
+        setSuccessMsg("Đã xóa sổ đầu bài");
+        setTimeout(() => setSuccessMsg(null), 3000);
+        if (onUploadSuccess) onUploadSuccess(null);
+      } else {
+        setError(response.message || "Không thể xóa sổ đầu bài");
+      }
+    } catch (err) {
+      logger.error("Error deleting notebook:", err);
+      setError("Lỗi khi xóa sổ đầu bài");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -339,6 +362,18 @@ const NotebookModal = ({
                 )}
               </Button>
             </>
+          )}
+
+          {/* Nút xóa ảnh */}
+          {!uploadDisabled && hasExistingImage && !hasPreview && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="mr-auto"
+            >
+              {deleting ? "Đang xóa..." : "Xóa ảnh"}
+            </Button>
           )}
 
           {/* Nút đóng */}
