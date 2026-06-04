@@ -220,19 +220,36 @@ class QwenOCRService:
 		header_note = ""
 		if header_hint:
 			header_note = (
-				"\nHeader chuẩn từ ảnh trước: "
+				"\n\nLƯU Ý: Ảnh hiện tại có thể không có header cột. "
+				"Header chuẩn từ ảnh trước: "
 				+ ", ".join(header_hint)
-				+ ". Giữ nguyên thứ tự/key theo header này nếu ảnh hiện tại thiếu tiêu đề."
+				+ ". Hãy dùng đúng các key này cho các cột điểm, giữ nguyên thứ tự."
 			)
 
-		return (
-			"Bạn là OCR bảng điểm tiếng Việt. "
-			"Hãy trích xuất các dòng học sinh trong ảnh và trả về DUY NHẤT JSON là mảng object. "
-			"Mỗi object gồm id, ho_va_ten và các cột điểm đọc được. "
-			"Điểm có thể là số 0-10 hoặc Đ/KĐ. "
-			"Không trả về markdown, không thêm giải thích."
-			+ header_note
+		prompt = (
+			"Bạn là hệ thống OCR bảng điểm học sinh tiếng Việt.\n\n"
+			"Yêu cầu:\n"
+			"1. Ảnh đầu tiên có header cột, các ảnh sau có thể không có header nhưng giữ nguyên thứ tự cột.\n"
+			"2. Trả về DUY NHẤT JSON là một mảng các object, mỗi object là 1 học sinh.\n"
+			"3. Giữ nguyên key cột theo header OCR được.\n"
+			"4. Hỗ trợ cả điểm số và điểm chữ:\n"
+			"   - Điểm số: 0-10\n"
+			"   - Điểm đạt: Đ, D, DAT, ĐẠT\n"
+			"   - Điểm không đạt: KĐ, KD, KHONG DAT, KHÔNG ĐẠT\n"
+			"5. Không bỏ sót học sinh nào trong ảnh.\n"
+			"6. Không trả về markdown, không thêm giải thích.\n\n"
+			"Ví dụ đầu ra:\n"
+			'[\n'
+			'  {\n'
+			'    "id": "250001",\n'
+			'    "ho_va_ten": "Nguyễn Văn A",\n'
+			'    "Diem_tx1": 8.5,\n'
+			'    "Diem_thi_giua_ki": "Đ",\n'
+			'    "Diem_thi_cuoi_ki": 7.5\n'
+			'  }\n'
+			']'
 		)
+		return prompt + header_note
 
 	def _prepare_image_for_ocr(self, image_path: str) -> tuple[str, Optional[str]]:
 		"""Resize ảnh quá rộng để tăng độ rõ chữ cho Qwen OCR."""
