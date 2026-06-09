@@ -211,6 +211,8 @@ export function StudentListPage() {
         gkLowScoreDetails={feedback.gkLowScoreDetails}
         ketQuaRenLuyen={feedback.ketQuaRenLuyen}
         setKetQuaRenLuyen={feedback.setKetQuaRenLuyen}
+        hocLuc={feedback.hocLuc}
+        setHocLuc={feedback.setHocLuc}
         exportStudentReportCard={(student) =>
           studentList.exportStudentReportCard(student, {
             generatedFeedback: feedback.generatedFeedback,

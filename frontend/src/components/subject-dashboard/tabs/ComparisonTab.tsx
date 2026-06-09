@@ -13,6 +13,7 @@ export function ComparisonTab({ data, loading = false, hidden = false }: Compari
   if (hidden) return null;
   
   const classes = data?.class_comparison || [];
+  const isChar = data?.is_letter_grade_subject;
 
   if (loading) {
     return (
@@ -78,7 +79,7 @@ export function ComparisonTab({ data, loading = false, hidden = false }: Compari
           So sánh thành tích các lớp
         </h3>
         <p className="mt-1 text-sm text-teal-100">
-          Bảng so sánh điểm trung bình và tỷ lệ đạt của các lớp
+          {isChar ? "Bảng so sánh số lượng Đạt / Không Đạt của các lớp" : "Bảng so sánh điểm trung bình và tỷ lệ đạt của các lớp"}
         </p>
       </div>
 
@@ -90,7 +91,7 @@ export function ComparisonTab({ data, loading = false, hidden = false }: Compari
                   Lớp
                 </th>
                 <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
-                  Điểm trung bình
+                  {isChar ? "Đạt / KĐ" : "Điểm trung bình"}
                 </th>
                 <th className="px-6 py-3 text-xs font-semibold tracking-wider text-center text-gray-600 uppercase">
                   Tỷ lệ đạt
@@ -107,11 +108,22 @@ export function ComparisonTab({ data, loading = false, hidden = false }: Compari
                   {classComp.class_name}
                 </td>
                 <td className="px-6 py-4 text-center whitespace-nowrap">
-                  <span className="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white bg-blue-600">
-                    {typeof classComp.average_score === "number"
-                      ? classComp.average_score.toFixed(2)
-                      : classComp.average_score}
-                  </span>
+                  {isChar ? (
+                    <div className="flex justify-center gap-2">
+                      <span className="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white bg-green-600">
+                        {classComp.dat_count} Đ
+                      </span>
+                      <span className="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white bg-red-600">
+                        {classComp.khong_dat_count} KĐ
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white bg-blue-600">
+                      {typeof classComp.average_score === "number"
+                        ? classComp.average_score.toFixed(2)
+                        : classComp.average_score}
+                    </span>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-center whitespace-nowrap">
                   <span className="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white bg-green-600">

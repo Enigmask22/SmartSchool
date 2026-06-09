@@ -53,7 +53,8 @@ class CommentCreateRequest(BaseModel):
     description: str = Field(..., description="Nội dung nhận xét")
     semester: str = Field(default="HK1", description="Học kỳ: HK1, HK2, CN")
     type: str = Field(default="CK", description="Loại nhận xét: GK (giữa kỳ), CK (cuối kỳ)")
-    ket_qua_ren_luyen: Optional[str] = Field(default=None, description="Kết quả rèn luyện: Tốt, Khá, Đạt, Chưa Đạt")
+    ket_qua_ren_luyen: Optional[str] = Field(default=None, description="Kết quả rèn luyện: 1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt")
+    hoc_luc: Optional[str] = Field(default=None, description="Học lực: 1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt (chỉ áp dụng cho CK)")
 
 class CommentResponse(BaseModel):
     id: int
@@ -63,6 +64,7 @@ class CommentResponse(BaseModel):
     semester: str
     type: str
     ket_qua_ren_luyen: Optional[str] = None
+    hoc_luc: Optional[str] = None
     created_at: str
     updated_at: str
 

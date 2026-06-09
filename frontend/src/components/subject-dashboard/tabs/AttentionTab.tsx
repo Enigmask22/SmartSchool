@@ -12,6 +12,7 @@ export function AttentionTab({ data, loading = false, hidden = false }: Attentio
   if (hidden) return null;
   
   const students = data?.students_need_attention || [];
+  const isChar = data?.is_letter_grade_subject;
 
   if (loading) {
     return (
@@ -70,7 +71,7 @@ export function AttentionTab({ data, loading = false, hidden = false }: Attentio
             <AlertTriangle className="w-8 h-8 text-green-500" />
           </div>
           <p className="font-medium text-green-600">
-            Không có học sinh cần quan tâm
+            {isChar ? "Tất cả học sinh đều Đạt" : "Không có học sinh cần quan tâm"}
           </p>
         </div>
       </div>
@@ -85,7 +86,7 @@ export function AttentionTab({ data, loading = false, hidden = false }: Attentio
           Học sinh cần quan tâm ({students.length} học sinh)
         </h3>
         <p className="mt-1 text-sm text-red-100">
-          Danh sách học sinh có điểm yếu và kém cần được hỗ trợ thêm
+          {isChar ? "Danh sách học sinh Không Đạt" : "Danh sách học sinh có điểm yếu và kém cần được hỗ trợ thêm"}
         </p>
       </div>
 
@@ -135,46 +136,56 @@ export function AttentionTab({ data, loading = false, hidden = false }: Attentio
                   </span>
                 </td>
                 <td className="px-6 py-4 text-center whitespace-nowrap">
-                  <span
-                    className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full ${
-                      (() => {
-                        const grade = student.final_score;
-                        const numericGrade =
-                          typeof grade === "string" ? parseFloat(grade) : grade;
-                        if (numericGrade < 5)
-                          return "text-white bg-red-600";
-                        if (numericGrade < 7)
-                          return "text-white bg-orange-600";
-                        return "text-white bg-yellow-600";
-                      })()
-                    }`}
-                  >
-                    {student.final_score}
-                  </span>
+                  {isChar ? (
+                    <span className="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white bg-red-600">
+                      KĐ
+                    </span>
+                  ) : (
+                    <span
+                      className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full ${
+                        (() => {
+                          const grade = student.final_score;
+                          const numericGrade =
+                            typeof grade === "string" ? parseFloat(grade) : grade;
+                          if (numericGrade < 5)
+                            return "text-white bg-red-600";
+                          if (numericGrade < 7)
+                            return "text-white bg-orange-600";
+                          return "text-white bg-yellow-600";
+                        })()
+                      }`}
+                    >
+                      {student.final_score}
+                    </span>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-center whitespace-nowrap">
                   <span
                     className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      (() => {
-                        const grade = student.final_score;
-                        const numericGrade =
-                          typeof grade === "string" ? parseFloat(grade) : grade;
-                        if (numericGrade < 5)
-                          return "text-red-800 bg-red-100";
-                        if (numericGrade < 7)
-                          return "text-orange-800 bg-orange-100";
-                        return "text-yellow-800 bg-yellow-100";
-                      })()
+                      isChar
+                        ? "text-red-800 bg-red-100"
+                        : (() => {
+                            const grade = student.final_score;
+                            const numericGrade =
+                              typeof grade === "string" ? parseFloat(grade) : grade;
+                            if (numericGrade < 5)
+                              return "text-red-800 bg-red-100";
+                            if (numericGrade < 7)
+                              return "text-orange-800 bg-orange-100";
+                            return "text-yellow-800 bg-yellow-100";
+                          })()
                     }`}
                   >
-                    {(() => {
-                      const grade = student.final_score;
-                      const numericGrade =
-                        typeof grade === "string" ? parseFloat(grade) : grade;
-                      if (numericGrade < 5) return "Kém";
-                      if (numericGrade < 7) return "Yếu";
-                      return "TB";
-                    })()}
+                    {isChar
+                      ? "KĐ"
+                      : (() => {
+                          const grade = student.final_score;
+                          const numericGrade =
+                            typeof grade === "string" ? parseFloat(grade) : grade;
+                          if (numericGrade < 5) return "Kém";
+                          if (numericGrade < 7) return "Yếu";
+                          return "TB";
+                        })()}
                   </span>
                 </td>
               </tr>

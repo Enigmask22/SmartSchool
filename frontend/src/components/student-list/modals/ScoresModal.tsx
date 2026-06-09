@@ -143,21 +143,21 @@ export function ScoresModal({
                           <div className="flex flex-wrap justify-center gap-2">
                             {scoreRecord.score_data &&
                               (() => {
-                                const getPriority = (name) => {
-                                  const s = String(name || "").toLowerCase();
-                                  if (s.includes("thuong")) return 0;
-                                  if (s.includes("giua")) return 1;
-                                  if (
-                                    s.includes("cuoi") ||
-                                    s.includes("hk") ||
-                                    s.includes("final")
-                                  )
-                                    return 2;
-                                  return 99;
+                                const getPriority = (name: string) => {
+                                  const s = name.toLowerCase();
+                                  // GK columns
+                                  if (s.includes("giua")) return 2;
+                                  // CK columns
+                                  if (s.includes("cuoi") || s.includes("_hk") || s.includes("final")) return 3;
+                                  // TX columns (thuong, tx, or anything not GK/CK)
+                                  return 1;
                                 };
-                                const keys = Object.keys(
-                                  scoreRecord.score_data,
-                                )
+                                const txNumber = (name: string) => {
+                                  // Extract numeric suffix from tx columns (e.g. Diem_tx1 → 1, TX2 → 2)
+                                  const m = name.match(/(\d+)$/);
+                                  return m ? parseInt(m[1], 10) : 0;
+                                };
+                                const keys = Object.keys(scoreRecord.score_data)
                                   .filter(
                                     (key) =>
                                       key !== "Mon_hoc" &&
@@ -168,14 +168,21 @@ export function ScoresModal({
                                       scoreRecord.score_data[key]?.Diem !== "",
                                   )
                                   .sort((a, b) => {
-                                    const wa = Number(
-                                      scoreRecord.score_data[a]?.He_so ?? 1,
-                                    );
-                                    const wb = Number(
-                                      scoreRecord.score_data[b]?.He_so ?? 1,
-                                    );
+                                    const pa = getPriority(a);
+                                    const pb = getPriority(b);
+                                    // Sort by stage first: TX → GK → CK
+                                    if (pa !== pb) return pa - pb;
+                                    // Within TX: sort by numeric suffix (tx1 < tx2 < tx3)
+                                    if (pa === 1 && pb === 1) {
+                                      const na = txNumber(a);
+                                      const nb = txNumber(b);
+                                      if (na !== nb) return na - nb;
+                                    }
+                                    // Fallback: by weight then by name
+                                    const wa = Number(scoreRecord.score_data[a]?.He_so ?? 1);
+                                    const wb = Number(scoreRecord.score_data[b]?.He_so ?? 1);
                                     if (wa !== wb) return wa - wb;
-                                    return getPriority(a) - getPriority(b);
+                                    return a.localeCompare(b);
                                   });
                                 const LABEL_MAP = {
                                   Diem_thuong_xuyen: "Điểm thường xuyên",
@@ -205,10 +212,7 @@ export function ScoresModal({
                                       {formatLabel(columnName)}
                                     </div>
                                     <div className="text-sm font-bold text-blue-800">
-                                      {
-                                        scoreRecord.score_data[columnName]
-                                          ?.Diem
-                                      }
+                                      {scoreRecord.score_data[columnName]?.Diem}
                                       <span className="ml-1 text-xs text-blue-600">
                                         (HS:{" "}
                                         {
@@ -232,7 +236,10 @@ export function ScoresModal({
                                 typeof score === "string"
                                   ? parseFloat(score)
                                   : score;
-                              if (numericScore === null || isNaN(numericScore)) {
+                              if (
+                                numericScore === null ||
+                                isNaN(numericScore)
+                              ) {
                                 return "bg-gray-100 text-gray-800";
                               }
                               if (numericScore >= 8.0)
@@ -254,57 +261,34 @@ export function ScoresModal({
               </div>
 
               {/* Summary */}
-              <div className="p-6 rounded-lg bg-muted/50">
-                <h4 className="flex items-center gap-2 mb-3 font-medium text-gray-900">
-                  <TrendingUp className="w-5 h-5 text-gray-700" /> Tổng kết
-                </h4>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  {(() => {
-                    // Lọc điểm số (bỏ qua điểm chữ Đ/KĐ)
-                    const numericScores = scores
-                      .map((s) => {
-                        const fs = s.final_score;
-                        if (fs === null || fs === undefined) return null;
-                        if (typeof fs === "string" && (fs === "Đ" || fs === "KĐ")) return null;
-                        const num = typeof fs === "string" ? parseFloat(fs) : fs;
-                        return typeof num === "number" && !isNaN(num) ? num : null;
-                      })
-                      .filter((v) => v !== null) as number[];
+              {(() => {
+                const numericScores = scores
+                  .map((s) => {
+                    const fs = s.final_score;
+                    if (fs === null || fs === undefined) return null;
+                    if (typeof fs === "string" && (fs === "Đ" || fs === "KĐ")) return null;
+                    const num = typeof fs === "string" ? parseFloat(fs) : fs;
+                    return typeof num === "number" && !isNaN(num) ? num : null;
+                  })
+                  .filter((v) => v !== null) as number[];
 
-                    const avgScore = numericScores.length > 0
-                      ? (numericScores.reduce((a, b) => a + b, 0) / numericScores.length).toFixed(2)
-                      : "0.00";
+                const avgScore =
+                  numericScores.length > 0
+                    ? (numericScores.reduce((a, b) => a + b, 0) / numericScores.length).toFixed(2)
+                    : "0.00";
 
-                    const highCount = numericScores.filter((s) => s >= 8.0).length;
-                    const lowCount = numericScores.filter((s) => s < 5.0).length;
-
-                    return (
-                      <>
-                        <div className="text-center">
-                          <p className="text-sm text-gray-600">
-                            Điểm trung bình chung
-                          </p>
-                          <p className="text-2xl font-bold text-purple-600">
-                            {avgScore}
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-gray-600">Số môn &gt;= 8.0</p>
-                          <p className="text-2xl font-bold text-green-600">
-                            {highCount}
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-gray-600">Số môn &lt; 5.0</p>
-                          <p className="text-2xl font-bold text-red-600">
-                            {lowCount}
-                          </p>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
+                return (
+                  <div className="p-6 rounded-lg bg-muted/50">
+                    <h4 className="flex items-center gap-2 mb-3 font-medium text-gray-900">
+                      <TrendingUp className="w-5 h-5 text-gray-700" /> Tổng kết
+                    </h4>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600">Điểm trung bình HK</p>
+                      <p className="text-2xl font-bold text-purple-600">{avgScore}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

@@ -1,14 +1,14 @@
-import { Users, BookOpen, Calendar } from 'lucide-react';
-import { PageHeader } from '@/components/common/PageHeader';
-import { Badge } from '@/components/ui/badge';
+import { Users, BookOpen, Calendar } from "lucide-react";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface StudentListPageHeaderProps {
   selectedClass: string;
@@ -34,8 +34,8 @@ export function StudentListPageHeader({
   // Build description with class badge
   const description = (
     <div className="space-y-2">
-      <div className="flex items-center space-x-3 text-sm flex-wrap gap-2">
-        {selectedClass && selectedClass !== 'all' && (
+      <div className="flex flex-wrap items-center gap-2 space-x-3 text-sm">
+        {selectedClass && selectedClass !== "all" && (
           <Badge variant="secondary" className="text-blue-700 bg-blue-100">
             <BookOpen className="w-3 h-3 mr-1" />
             Lớp {selectedClass}
@@ -54,7 +54,11 @@ export function StudentListPageHeader({
     <div className="flex gap-3">
       <div className="flex flex-col gap-1">
         <Label className="text-xs font-medium text-gray-500">Năm học</Label>
-        <Select value={selectedAcademicYear} onValueChange={onAcademicYearChange} disabled={loading}>
+        <Select
+          value={selectedAcademicYear}
+          onValueChange={onAcademicYearChange}
+          disabled={loading}
+        >
           <SelectTrigger className="w-[140px] focus-visible:outline-none">
             <SelectValue placeholder="Chọn năm học" />
           </SelectTrigger>
@@ -70,7 +74,11 @@ export function StudentListPageHeader({
 
       <div className="flex flex-col gap-1">
         <Label className="text-xs font-medium text-gray-500">Học kỳ</Label>
-        <Select value={selectedSemester} onValueChange={onSemesterChange} disabled={loading}>
+        <Select
+          value={selectedSemester}
+          onValueChange={onSemesterChange}
+          disabled={loading}
+        >
           <SelectTrigger className="w-[120px] focus-visible:outline-none">
             <SelectValue placeholder="Chọn HK" />
           </SelectTrigger>
@@ -95,7 +103,7 @@ export function StudentListPageHeader({
       title="Danh sách học sinh"
       description={description}
       icon={
-        <div className="flex items-center justify-center w-16 h-16 shadow-md rounded-xl bg-primary flex-shrink-0">
+        <div className="flex items-center justify-center flex-shrink-0 w-16 h-16 shadow-md rounded-xl bg-primary">
           <Users className="w-8 h-8 text-white" />
         </div>
       }
