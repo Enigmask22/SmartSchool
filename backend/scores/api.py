@@ -1600,70 +1600,91 @@ async def get_teacher_dashboard_analytics(
             hsh_resp = db.table("homeroom_students_history").select("student_id").eq("class_id", cid).execute()
             total_students_count += len(hsh_resp.data) if hsh_resp.data else 0
         
-        # === PHÂN NHÓM HỌC LỰC (theo tiêu chuẩn giáo dục VN) ===
-        excellent = []  # Giỏi: 8.0 - 10
-        good = []       # Khá: 6.5 - 7.9
-        average = []    # Trung bình: 5.0 - 6.4
-        weak = []       # Yếu: 3.5 - 4.9
-        poor = []       # Kém: < 3.5
-        
+        # === PHÂN NHÓM ĐIỂM ===
+        range_8_10 = []      # 8.0 - 10
+        range_65_79 = []     # 6.5 - 7.9
+        range_5_64 = []      # 5.0 - 6.4
+        range_35_49 = []     # 3.5 - 4.9
+        range_below_35 = []  # < 3.5
+        letter_dat = []      # Đạt (điểm chữ)
+        letter_khong_dat = [] # Không Đạt (điểm chữ)
+
         for score in scores_data:
             final_score = score.get("final_score")
             if final_score is None:
                 continue
-            
+
+            # Điểm chữ: Đ/KĐ
+            if isinstance(final_score, str) and final_score in ["Đ", "KĐ"]:
+                if final_score == "Đ":
+                    letter_dat.append(score)
+                else:
+                    letter_khong_dat.append(score)
+                continue
+
             # Convert to float if string, skip if not convertible
             if isinstance(final_score, str):
                 try:
                     final_score = float(final_score)
                 except (ValueError, TypeError):
-                    continue  # Ignore non-numeric strings like "Đ", "KĐ"
+                    continue
             elif not isinstance(final_score, (int, float)):
-                continue  # Skip other non-numeric types
-            
-            # Now we can safely compare
+                continue
+
             if final_score >= 8.0:
-                excellent.append(score)
+                range_8_10.append(score)
             elif final_score >= 6.5:
-                good.append(score)
+                range_65_79.append(score)
             elif final_score >= 5.0:
-                average.append(score)
+                range_5_64.append(score)
             elif final_score >= 3.5:
-                weak.append(score)
+                range_35_49.append(score)
             else:
-                poor.append(score)
-        
-        # Denominator for performance group percentages: only students who have a numeric final score
-        categorized_count = len(excellent) + len(good) + len(average) + len(weak) + len(poor)
+                range_below_35.append(score)
+
+        categorized_count = len(range_8_10) + len(range_65_79) + len(range_5_64) + len(range_35_49) + len(range_below_35)
+        letter_categorized_count = len(letter_dat) + len(letter_khong_dat)
         performance_groups = {
-            "excellent": {
-                "count": len(excellent),
-                "percentage": round(len(excellent) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "Giỏi (8.0 - 10)",
+            "range_8_10": {
+                "count": len(range_8_10),
+                "percentage": round(len(range_8_10) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                "label": "8.0 - 10",
                 "color": "#059669"
             },
-            "good": {
-                "count": len(good),
-                "percentage": round(len(good) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "Khá (6.5 - 7.9)",
+            "range_65_79": {
+                "count": len(range_65_79),
+                "percentage": round(len(range_65_79) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                "label": "6.5 - 7.9",
                 "color": "#2563EB"
             },
-            "average": {
-                "count": len(average),
-                "percentage": round(len(average) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "Trung bình (5.0 - 6.4)",
+            "range_5_64": {
+                "count": len(range_5_64),
+                "percentage": round(len(range_5_64) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                "label": "5.0 - 6.4",
                 "color": "#D97706"
             },
-            "weak": {
-                "count": len(weak),
-                "percentage": round(len(weak) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "Yếu (3.5 - 4.9)",
+            "range_35_49": {
+                "count": len(range_35_49),
+                "percentage": round(len(range_35_49) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                "label": "3.5 - 4.9",
                 "color": "#EA580C"
             },
-            "poor": {
-                "count": len(poor),
-                "percentage": round(len(poor) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "Kém (< 3.5)",
+            "range_below_35": {
+                "count": len(range_below_35),
+                "percentage": round(len(range_below_35) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                "label": "< 3.5",
+                "color": "#DC2626"
+            },
+            "letter_dat": {
+                "count": len(letter_dat),
+                "percentage": round(len(letter_dat) * 100 / letter_categorized_count, 2) if letter_categorized_count > 0 else 0,
+                "label": "Đạt",
+                "color": "#059669"
+            },
+            "letter_khong_dat": {
+                "count": len(letter_khong_dat),
+                "percentage": round(len(letter_khong_dat) * 100 / letter_categorized_count, 2) if letter_categorized_count > 0 else 0,
+                "label": "Không Đạt",
                 "color": "#DC2626"
             }
         }
@@ -1723,7 +1744,7 @@ async def get_teacher_dashboard_analytics(
         
         # === HỌC SINH CẦN QUAN TÂM (điểm yếu và kém) ===
         students_need_attention = []
-        for score in weak + poor:
+        for score in range_35_49 + range_below_35:
             student_info = score.get("students", {})
             class_info = score.get("class_subjects", {}).get("classes", {})
             
@@ -1781,7 +1802,7 @@ async def get_teacher_dashboard_analytics(
             return 0
         
         top_students = []
-        for score in sorted(excellent, key=top_student_sort_key, reverse=True)[:10]:
+        for score in sorted(range_8_10, key=top_student_sort_key, reverse=True)[:10]:
             student_info = score.get("students", {})
             class_info = score.get("class_subjects", {}).get("classes", {})
             

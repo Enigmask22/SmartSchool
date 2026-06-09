@@ -71,6 +71,7 @@ export const useStudentFeedback = ({
   const [selectedType, setSelectedType] = useState("CK");
   const [gkLowScoreDetails, setGkLowScoreDetails] = useState<any[]>([]);
   const [allScoresData, setAllScoresData] = useState<any[]>([]);
+  const [ketQuaRenLuyen, setKetQuaRenLuyen] = useState("");
 
   // Re-process GK low score details khi selectedType thay đổi
   useEffect(() => {
@@ -126,9 +127,11 @@ export const useStudentFeedback = ({
           const commentResult = await commentResponse.json();
           if (commentResult.success && commentResult.data) {
             setGeneratedFeedback(commentResult.data.description);
+            setKetQuaRenLuyen(commentResult.data.ket_qua_ren_luyen || "");
             logger.debug("✅ Loaded existing comment for type:", selectedType, commentResult.data);
           } else {
             setGeneratedFeedback("");
+            setKetQuaRenLuyen("");
           }
         }
       } catch (error) {
@@ -188,15 +191,28 @@ export const useStudentFeedback = ({
             }
 
             const validScores = studentScoresList.filter(
-              (score) =>
-                score.final_score !== null && score.final_score !== undefined,
+              (score) => {
+                const fs = score.final_score;
+                if (fs === null || fs === undefined) return false;
+                // Lọc bỏ điểm chữ (Đ/KĐ) khỏi danh sách tính trung bình
+                if (typeof fs === "string" && (fs === "Đ" || fs === "KĐ")) return false;
+                // Phải là số hoặc chuỗi số
+                if (typeof fs === "number") return !isNaN(fs);
+                if (typeof fs === "string") return !isNaN(parseFloat(fs));
+                return false;
+              },
             );
             logger.debug("✅ Valid scores with final_score:", validScores);
 
             if (validScores.length > 0) {
               const avgScore = (
                 validScores.reduce(
-                  (sum, score) => sum + (score.final_score || 0),
+                  (sum, score) => {
+                    const val = typeof score.final_score === "string"
+                      ? parseFloat(score.final_score)
+                      : score.final_score;
+                    return sum + (typeof val === "number" && !isNaN(val) ? val : 0);
+                  },
                   0,
                 ) / validScores.length
               ).toFixed(1);
@@ -307,6 +323,7 @@ export const useStudentFeedback = ({
           const commentResult = await commentResponse.json();
           if (commentResult.success && commentResult.data) {
             setGeneratedFeedback(commentResult.data.description);
+            setKetQuaRenLuyen(commentResult.data.ket_qua_ren_luyen || "");
             logger.debug("✅ Loaded existing comment:", commentResult.data);
           }
         }
@@ -336,6 +353,7 @@ export const useStudentFeedback = ({
     setGeneratedFeedback("");
     setFeedbackError("");
     setFeedbackSuccess(false);
+    setKetQuaRenLuyen("");
     scoresData.set_scoreTrendData(null);
     scoresData.set_trendError("");
   }, [scoresData]);
@@ -447,6 +465,7 @@ export const useStudentFeedback = ({
           description: generatedFeedback,
           semester: filters.selectedSemester,
           type: selectedType,
+          ket_qua_ren_luyen: ketQuaRenLuyen || null,
         }),
       });
 
@@ -465,7 +484,7 @@ export const useStudentFeedback = ({
     } finally {
       setSmsLoading(false);
     }
-  }, [generatedFeedback, selectedStudentForFeedback, filters.selectedSemester, selectedType]);
+  }, [generatedFeedback, selectedStudentForFeedback, filters.selectedSemester, selectedType, ketQuaRenLuyen]);
 
   const exportAllComments = useCallback(async () => {
     if (!filters.selectedClass || filters.selectedClass === "all") {
@@ -555,6 +574,8 @@ export const useStudentFeedback = ({
     setSelectedType,
     gkLowScoreDetails,
     allScoresData,
+    ketQuaRenLuyen,
+    setKetQuaRenLuyen,
     handleFeedbackClick,
     closeFeedbackModal,
     handleFeedbackFormChange,
