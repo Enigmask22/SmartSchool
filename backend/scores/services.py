@@ -57,10 +57,15 @@ def calculate_final_grade(score_data: dict, score_config: dict = None) -> float:
 
             # Điểm chữ (Đ/KĐ): chỉ cần 1 cột KĐ là KĐ, không quan tâm hệ số
             if is_all_letter_grades:
+                # Kiểm tra tất cả cột đã có giá trị
                 for column_name in flat_config:
-                    if column_name in score_data and "Diem" in score_data[column_name]:
-                        if score_data[column_name]["Diem"] == "KĐ":
-                            return "KĐ"
+                    val = score_data.get(column_name, {}).get("Diem")
+                    if val is None or val == "":
+                        return None
+                # Nếu có bất kỳ KĐ → KĐ, ngược lại Đ
+                for column_name in flat_config:
+                    if score_data[column_name]["Diem"] == "KĐ":
+                        return "KĐ"
                 return "Đ"
 
             for column_name, column_config in flat_config.items():
@@ -137,6 +142,13 @@ def calculate_final_grade(score_data: dict, score_config: dict = None) -> float:
 
             # Điểm chữ (Đ/KĐ): chỉ cần 1 cột KĐ là KĐ, không quan tâm hệ số
             if is_all_letter_grades:
+                # Kiểm tra tất cả cột đã có giá trị
+                for column_name, value in score_data.items():
+                    if isinstance(value, dict):
+                        val = value.get("Diem")
+                        if val is None or val == "":
+                            return None
+                # Nếu có bất kỳ KĐ → KĐ, ngược lại Đ
                 for column_name, value in score_data.items():
                     if isinstance(value, dict) and "Diem" in value:
                         if value["Diem"] == "KĐ":
