@@ -27,6 +27,63 @@ logger = setup_logger("feedback_api")
 router = APIRouter()
 
 
+@router.get("/student-summary/{student_id}")
+async def get_student_academic_summary(
+    student_id: int,
+    academic_year: Optional[str] = Query(default=None, description="Năm học, VD: 2025-2026"),
+    db=Depends(get_db),
+):
+    """Lấy dữ liệu tổng kết cả năm của học sinh từ materialized view"""
+    try:
+        query = db.table("student_academic_summary").select("*").eq("student_id", student_id)
+        if academic_year:
+            query = query.eq("academic_year", academic_year)
+        response = query.execute()
+
+        rows = response.data if response.data else []
+        if not rows:
+            return {"success": True, "message": "Chưa có dữ liệu tổng kết", "data": None}
+
+        row = rows[0]
+        import json as _json
+        details = row.get("subject_details")
+        if isinstance(details, str):
+            details = _json.loads(details)
+
+        def _float(v):
+            try:
+                return float(v) if v is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        return {
+            "success": True,
+            "message": "Lấy dữ liệu tổng kết thành công",
+            "data": {
+                "student_id": row["student_id"],
+                "student_name": row["student_name"],
+                "student_code": row.get("student_code"),
+                "class_name": row.get("class_name"),
+                "grade": row.get("grade"),
+                "academic_year": row.get("academic_year"),
+                "hk1_avg_score": _float(row.get("hk1_avg_score")),
+                "hk1_hoc_luc": row.get("hk1_hoc_luc"),
+                "hk1_ren_luyen": row.get("hk1_ren_luyen"),
+                "hk2_avg_score": _float(row.get("hk2_avg_score")),
+                "hk2_hoc_luc": row.get("hk2_hoc_luc"),
+                "hk2_ren_luyen": row.get("hk2_ren_luyen"),
+                "year_avg_score": _float(row.get("year_avg_score")),
+                "subject_details": details,
+                "year_hoc_luc": row.get("year_hoc_luc"),
+                "year_ren_luyen": row.get("year_ren_luyen"),
+                "title": row.get("title"),
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error getting student summary: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+
+
 def _parse_description(description: str) -> tuple[str, Optional[str], Optional[str]]:
     """Parse description field: nếu là JSON trả về (note, ket_qua_ren_luyen, hoc_luc), ngược lại coi là plain text note."""
     if not description:
@@ -65,6 +122,7 @@ async def generate_student_feedback(request: StudentFeedbackRequest):
             low_score_details=request.low_score_details or [],
             ket_qua_ren_luyen=request.ket_qua_ren_luyen,
             hoc_luc=request.hoc_luc,
+            summary_data=request.summary_data,
         )
         
         return StudentFeedbackResponse(
@@ -528,6 +586,8 @@ async def send_email_report_card(request: EmailReportCardRequest, db=Depends(get
             feedback=request.feedback,
             ket_qua_ren_luyen=request.ket_qua_ren_luyen,
             hoc_luc=request.hoc_luc,
+            feedback_type=request.feedback_type or "CK",
+            summary_data=request.summary_data,
         )
 
         if result["success"]:

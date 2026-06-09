@@ -13,10 +13,11 @@ class StudentFeedbackRequest(BaseModel):
     attendance_rate: int = Field(default=100, ge=0, le=100, description="Tỷ lệ chuyên cần (%)")
     subject: Optional[str] = Field(default=None, description="Môn học (nếu có)")
     notes: Optional[str] = Field(default="", description="Ghi chú thêm")
-    type: Optional[str] = Field(default="CK", description="Loại nhận xét: GK (giữa kỳ), CK (cuối kỳ)")
+    type: Optional[str] = Field(default="CK", description="Loại nhận xét: GK (giữa kỳ), CK (cuối kỳ), CN (cả năm)")
     low_score_details: Optional[List[dict]] = Field(default=[], description="Chi tiết cột TX/GK dưới 8 hoặc KĐ (chỉ dùng cho GK)")
     ket_qua_ren_luyen: Optional[str] = Field(default=None, description="Kết quả rèn luyện: 1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt")
     hoc_luc: Optional[str] = Field(default=None, description="Học lực: 1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt (chỉ áp dụng cho CK)")
+    summary_data: Optional[dict] = Field(default=None, description="Dữ liệu tổng kết cả năm từ student_academic_summary (chỉ dùng cho CN)")
 
 class StudentFeedbackResponse(BaseModel):
     success: bool
@@ -92,3 +93,5 @@ class EmailReportCardRequest(BaseModel):
     received_email: Optional[str] = Field(default=None, description="Email phụ huynh (override từ DB)")
     ket_qua_ren_luyen: Optional[str] = Field(default=None, description="Kết quả rèn luyện: 1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt")
     hoc_luc: Optional[str] = Field(default=None, description="Học lực: 1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt (chỉ áp dụng cho CK)")
+    feedback_type: Optional[str] = Field(default="CK", description="Loại nhận xét: GK, CK, CN")
+    summary_data: Optional[dict] = Field(default=None, description="Dữ liệu tổng kết cả năm (chỉ dùng cho CN)")

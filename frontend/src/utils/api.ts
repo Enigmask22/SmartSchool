@@ -1365,6 +1365,14 @@ class ApiService {
     });
   }
 
+  /**
+   * Lấy dữ liệu tổng kết cả năm của học sinh từ materialized view
+   */
+  async getStudentAcademicSummary(studentId: number, academicYear?: string) {
+    const params = academicYear ? `?academic_year=${encodeURIComponent(academicYear)}` : "";
+    return this.request(`/feedback/student-summary/${studentId}${params}`);
+  }
+
   // ===============================================
   // BULK STUDENT IMPORT APIs
   // ===============================================

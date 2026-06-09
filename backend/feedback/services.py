@@ -69,6 +69,7 @@ class FeedbackService:
         low_score_details: List[dict] = None,
         ket_qua_ren_luyen: str = None,
         hoc_luc: str = None,
+        summary_data: dict = None,
     ) -> str:
         """
         Tạo nhận xét cho học sinh sử dụng Gemini AI
@@ -103,6 +104,14 @@ class FeedbackService:
                         )
                         logger.info(f"🤖 [{self.provider_name}] AI-generated GK feedback for {student_name}")
                         return feedback
+                    elif feedback_type == "CN":
+                        feedback = await self.ai_service.generate_cn_feedback(
+                            student_name=student_name,
+                            summary_data=summary_data or {},
+                            notes=(notes or "").strip(),
+                        )
+                        logger.info(f"🤖 [{self.provider_name}] AI-generated CN feedback for {student_name}")
+                        return feedback
                     else:
                         # CK: prompt hiện tại
                         feedback = await self.ai_service.generate_student_feedback(
@@ -126,6 +135,9 @@ class FeedbackService:
 
             if feedback_type == "GK":
                 return _build_gk_template_fallback(student_name, attendance_rate, low_score_details, notes)
+
+            if feedback_type == "CN":
+                return _build_cn_template_fallback(student_name, summary_data or {}, notes)
 
             # CK template fallback (giữ nguyên)
             feedback_parts = []
@@ -198,8 +210,37 @@ def _build_gk_template_fallback(
         parts.append(notes)
 
     return " ".join(parts)
-    
-    async def generate_batch_feedback(self, students_data: List[Dict]) -> Dict:
+
+
+def _build_cn_template_fallback(
+    student_name: str,
+    summary_data: dict,
+    notes: str = "",
+) -> str:
+    """Template fallback cho CN (Cả năm) khi không có AI."""
+    label_map = {"1": "Tốt", "2": "Khá", "3": "Đạt", "4": "Chưa Đạt"}
+    title_map = {"1": "Học sinh Xuất sắc", "2": "Học sinh Giỏi"}
+
+    year_avg = summary_data.get("year_avg_score", "N/A")
+    hl = label_map.get(summary_data.get("year_hoc_luc", ""), "Chưa có")
+    rl = label_map.get(summary_data.get("year_ren_luyen", ""), "Chưa có")
+    title_val = summary_data.get("title")
+    title_str = title_map.get(title_val, "") if title_val else ""
+
+    parts = [
+        f"Kính gửi quý phụ huynh em {student_name},"
+        f"giáo viên chủ nhiệm xin thông báo kết quả tổng kết cả năm học:",
+        f"Điểm trung bình cả năm đạt {year_avg},",
+        f"học lực {hl}, kết quả rèn luyện {rl}.",
+    ]
+    if title_str:
+        parts.append(f"Em đạt danh hiệu {title_str}.")
+    if notes:
+        parts.append(notes)
+    return " ".join(parts)
+
+
+async def generate_batch_feedback(self, students_data: List[Dict]) -> Dict:
         """
         Tạo nhận xét hàng loạt cho nhiều học sinh sử dụng Gemini AI
         

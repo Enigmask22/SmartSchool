@@ -20,6 +20,8 @@ interface StudentReportData {
   semester: string;
   ketQuaRenLuyen?: string;
   hocLuc?: string;
+  summaryData?: any;
+  feedbackType?: string;
 }
 
 type ScoreCategory = "tx" | "gk" | "ck" | "skip";
@@ -153,9 +155,143 @@ export const generateStudentReportCard = async (data: StudentReportData) => {
     studentIdCell.alignment = { horizontal: "right", vertical: "middle" };
     currentRow += 2;
 
-    // Scores section
-    if (feedbackScores.length > 0) {
-      // Section title
+    // Scores section — CN có format riêng
+    if (data.feedbackType === "CN" && data.summaryData) {
+      const sd = data.summaryData;
+      const lbl = (v: string) => mapRenLuyen(v);
+      const titleMap: Record<string, string> = { "1": "Học sinh Xuất sắc", "2": "Học sinh Giỏi" };
+
+      // ── Section header ──
+      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+      const cnHeader = worksheet.getCell(`A${currentRow}`);
+      cnHeader.value = "TỔNG KẾT CẢ NĂM";
+      cnHeader.font = { bold: true, size: 14, color: { argb: "FF065F46" } };
+      cnHeader.alignment = { horizontal: "center", vertical: "middle" };
+      cnHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1FAE5" } };
+      worksheet.getRow(currentRow).height = 28;
+      currentRow += 2;
+
+      // ── Summary table ──
+      // A = Kỳ, B = Điểm TB, C = Học lực, D = KQRL, E = (spacer)
+      const shCols = ["A", "B", "C", "D"];
+      const shLabels = ["Kỳ", "Điểm trung bình", "Học lực", "KQ Rèn luyện"];
+      shCols.forEach((col, i) => {
+        const c = worksheet.getCell(`${col}${currentRow}`);
+        c.value = shLabels[i];
+        c.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+        c.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF047857" } };
+        c.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      });
+      worksheet.mergeCells(`E${currentRow}:E${currentRow}`);
+      const spacerHdr = worksheet.getCell(`E${currentRow}`);
+      spacerHdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF047857" } };
+      spacerHdr.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+
+      const summaryRows = [
+        { label: "HK1", vals: [sd.hk1_avg_score ?? "—", lbl(sd.hk1_hoc_luc) || "—", lbl(sd.hk1_ren_luyen) || "—"] },
+        { label: "HK2", vals: [sd.hk2_avg_score ?? "—", lbl(sd.hk2_hoc_luc) || "—", lbl(sd.hk2_ren_luyen) || "—"] },
+        { label: "Cả năm", vals: [sd.year_avg_score ?? "—", lbl(sd.year_hoc_luc) || "—", lbl(sd.year_ren_luyen) || "—"] },
+      ];
+
+      summaryRows.forEach((row, ri) => {
+        const isYear = ri === 2;
+        const bgColor = isYear ? "FFF0FDF4" : "FFFFFFFF";
+        const textColor = isYear ? "FF065F46" : "FF1F2937";
+
+        ["A", "B", "C", "D", "E"].forEach((col) => {
+          const c = worksheet.getCell(`${col}${currentRow}`);
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgColor } };
+          c.border = { left: { style: "thin" }, right: { style: "thin" }, bottom: { style: isYear ? "medium" : "thin" } };
+          c.alignment = { horizontal: "center", vertical: "middle" };
+          c.font = { bold: isYear, size: 11, color: { argb: textColor } };
+        });
+
+        worksheet.getCell(`A${currentRow}`).value = row.label;
+        worksheet.getCell(`A${currentRow}`).font = { bold: true, size: 10, color: { argb: textColor } };
+        row.vals.forEach((val, vi) => {
+          worksheet.getCell(`${["B", "C", "D"][vi]}${currentRow}`).value = val;
+        });
+
+        worksheet.getRow(currentRow).height = 20;
+        currentRow++;
+      });
+      currentRow++;
+
+      // Danh hiệu row
+      if (sd.title && titleMap[sd.title]) {
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        const titleCell = worksheet.getCell(`A${currentRow}`);
+        titleCell.value = `Danh hiệu: ${titleMap[sd.title]}`;
+        titleCell.font = { bold: true, size: 12, color: { argb: "FFB45309" } };
+        titleCell.alignment = { horizontal: "center", vertical: "middle" };
+        titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF3C7" } };
+        titleCell.border = { left: { style: "thin" }, right: { style: "thin" }, bottom: { style: "thin" } };
+        worksheet.getRow(currentRow).height = 24;
+        currentRow++;
+      }
+      currentRow++;
+
+      // ── Subject details table ──
+      const subjects = sd.subject_details || [];
+      if (subjects.length > 0) {
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        const subTitle = worksheet.getCell(`A${currentRow}`);
+        subTitle.value = "CHI TIẾT TỪNG MÔN";
+        subTitle.font = { bold: true, size: 12, color: { argb: "FF065F46" } };
+        subTitle.alignment = { horizontal: "center", vertical: "middle" };
+        subTitle.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1FAE5" } };
+        worksheet.getRow(currentRow).height = 24;
+        currentRow++;
+
+        // Header row
+        const hdrCols = [
+          { col: "A", w: 22, label: "Môn học" },
+          { col: "B", w: 10, label: "HK1" },
+          { col: "C", w: 10, label: "HK2" },
+          { col: "D", w: 12, label: "Cả năm" },
+          { col: "E", w: 10, label: "Ghi chú" },
+        ];
+        hdrCols.forEach(({ col, label }) => {
+          const c = worksheet.getCell(`${col}${currentRow}`);
+          c.value = label;
+          c.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+          c.alignment = { horizontal: "center", vertical: "middle" };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF047857" } };
+          c.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "medium" }, right: { style: "thin" } };
+        });
+        worksheet.getRow(currentRow).height = 22;
+        currentRow++;
+
+        // Data rows
+        subjects.forEach((s: any, i: number) => {
+          const yearAvg = s.year_avg;
+          const note = s.is_char ? "(Điểm chữ)" : "";
+          const isLast = i === subjects.length - 1;
+          const bg = i % 2 === 0 ? "FFFFFFFF" : "FFF9FAFB";
+
+          const vals = [s.subject_name, s.hk1_score || "—", s.hk2_score || "—", yearAvg || "—", note];
+          ["A", "B", "C", "D", "E"].forEach((col, ci) => {
+            const c = worksheet.getCell(`${col}${currentRow}`);
+            c.value = vals[ci];
+            c.alignment = { horizontal: col === "A" ? "left" : "center", vertical: "middle" };
+            c.font = { size: 10, bold: col === "D" };
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+            c.border = {
+              left: { style: "thin" },
+              right: { style: "thin" },
+              bottom: { style: isLast ? "medium" : "thin" },
+            };
+          });
+          worksheet.getRow(currentRow).height = 18;
+          currentRow++;
+        });
+        currentRow++;
+      }
+    } else if (feedbackScores.length > 0) {
+      // GK / CK: Bảng điểm học kỳ
       worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
       const scoreTitleCell = worksheet.getCell(`A${currentRow}`);
       scoreTitleCell.value = "BẢNG ĐIỂM TỔNG KẾT";
@@ -163,89 +299,58 @@ export const generateStudentReportCard = async (data: StudentReportData) => {
       scoreTitleCell.alignment = { horizontal: "center", vertical: "middle" };
       currentRow += 2;
 
-      // Calculate overall average
       const validScores = feedbackScores.filter(
         (g: any) => g.final_score !== null && g.final_score !== undefined,
       );
       const overallAverage =
         validScores.length > 0
-          ? (
-              validScores.reduce((sum: number, g: any) => sum + g.final_score, 0) /
-              validScores.length
-            ).toFixed(2)
+          ? (validScores.reduce((sum: number, g: any) => sum + g.final_score, 0) / validScores.length).toFixed(2)
           : "N/A";
 
       worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
       worksheet.getCell(`A${currentRow}`).value = `Điểm trung bình học kỳ: ${overallAverage}`;
       currentRow++;
 
-      // Kết quả rèn luyện & Học lực (bên cạnh điểm trung bình)
       const ketQuaRenLuyen = data.ketQuaRenLuyen;
       const hocLuc = data.hocLuc;
       if (ketQuaRenLuyen) {
         worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
         worksheet.getCell(`A${currentRow}`).value = `Kết quả rèn luyện: ${mapRenLuyen(ketQuaRenLuyen)}`;
-        worksheet.getCell(`A${currentRow}`).font = { bold: false, size: 11 };
-        worksheet.getCell(`A${currentRow}`).alignment = { horizontal: "left", vertical: "middle" };
+        worksheet.getRow(currentRow).font = { bold: false, size: 11 };
+        worksheet.getRow(currentRow).alignment = { horizontal: "left", vertical: "middle" };
         currentRow++;
       }
       if (hocLuc) {
         worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
         worksheet.getCell(`A${currentRow}`).value = `Học lực: ${mapRenLuyen(hocLuc)}`;
-        worksheet.getCell(`A${currentRow}`).font = { bold: false, size: 11 };
-        worksheet.getCell(`A${currentRow}`).alignment = { horizontal: "left", vertical: "middle" };
+        worksheet.getRow(currentRow).font = { bold: false, size: 11 };
+        worksheet.getRow(currentRow).alignment = { horizontal: "left", vertical: "middle" };
         currentRow++;
       }
       currentRow++;
 
-      // Table headers
       const headerRow = worksheet.getRow(currentRow);
       headerRow.values = ["Môn học", "Điểm thường xuyên", "GK", "CK", "TBM HK"];
       headerRow.font = { bold: true };
-      headerRow.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFE8E8E8" },
-      };
-
+      headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };
       ["A", "B", "C", "D", "E"].forEach((col) => {
         const cell = worksheet.getCell(`${col}${currentRow}`);
         cell.alignment = { horizontal: "left", vertical: "middle" };
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
+        cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
       });
       currentRow++;
 
-      // Score data rows
       feedbackScores.forEach((score: any) => {
         const { tx, gk, ck } = extractComponentScores(score.score_data);
         const dataRow = worksheet.getRow(currentRow);
-        dataRow.values = [
-          score.subject_name || "N/A",
-          tx,
-          gk,
-          ck,
-          score.final_score ?? "",
-        ];
-
+        dataRow.values = [score.subject_name || "N/A", tx, gk, ck, score.final_score ?? ""];
         ["A", "B", "C", "D", "E"].forEach((col) => {
           const cell = worksheet.getCell(`${col}${currentRow}`);
           cell.alignment = { horizontal: "left", vertical: "middle" };
-          cell.border = {
-            top: { style: "thin" },
-            left: { style: "thin" },
-            bottom: { style: "thin" },
-            right: { style: "thin" },
-          };
+          cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
         });
-
         currentRow++;
       });
-
       currentRow++;
     }
 

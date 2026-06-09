@@ -23,6 +23,12 @@ def _map_ren_luyen(value: str) -> str:
     return mapping.get(value, "") if value else ""
 
 
+def _map_title(value: str) -> str:
+    """Ánh xạ mã danh hiệu sang nhãn hiển thị."""
+    mapping = {"1": "Học sinh Xuất sắc", "2": "Học sinh Giỏi"}
+    return mapping.get(value, "—") if value else "—"
+
+
 class EmailReportCardService:
     """Service gửi phiếu điểm học sinh qua email cho phụ huynh"""
 
@@ -139,6 +145,8 @@ class EmailReportCardService:
         feedback: str,
         ket_qua_ren_luyen: Optional[str] = None,
         hoc_luc: Optional[str] = None,
+        feedback_type: str = "CK",
+        summary_data: Optional[Dict] = None,
     ) -> str:
         """
         Tạo HTML email phiếu điểm chuyên nghiệp (education format)
@@ -227,8 +235,8 @@ class EmailReportCardService:
                     </table>
                 </div>''') if ket_qua_ren_luyen or hoc_luc else ""}
 
-                <!-- SCORE TABLE -->
-                <div style="padding: 24px 30px;">
+                <!-- SCORE TABLE (chỉ hiển thị cho GK/CK, CN đã có bảng riêng) -->
+                {(f'''<div style="padding: 24px 30px;">
                     <h2 style="font-size: 16px; color: #1f2937; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb;">📊 Bảng điểm chi tiết</h2>
                     <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                         <thead>
@@ -244,7 +252,52 @@ class EmailReportCardService:
                             {score_rows}
                         </tbody>
                     </table>
+                </div>''') if feedback_type != "CN" else ""}
+
+                <!-- CN YEAR SUMMARY -->
+                {(f'''
+                <div style="padding: 24px 30px 0;">
+                    <h2 style="font-size: 16px; color: #1f2937; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb;">🏆 Tổng kết cả năm</h2>
+                    <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px 20px; margin-bottom: 12px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 4px 0; color: #6b7280; width: 160px;">Điểm TB HK1:</td>
+                                <td style="padding: 4px 0; font-weight: 600;">{summary_data.get("hk1_avg_score", "N/A") if summary_data else "N/A"}</td>
+                                <td style="padding: 4px 0; color: #6b7280; width: 160px;">Học lực HK1:</td>
+                                <td style="padding: 4px 0; font-weight: 600;">{_map_ren_luyen(summary_data.get("hk1_hoc_luc", "")) if summary_data else "N/A"}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; color: #6b7280;">Điểm TB HK2:</td>
+                                <td style="padding: 4px 0; font-weight: 600;">{summary_data.get("hk2_avg_score", "N/A") if summary_data else "N/A"}</td>
+                                <td style="padding: 4px 0; color: #6b7280;">Học lực HK2:</td>
+                                <td style="padding: 4px 0; font-weight: 600;">{_map_ren_luyen(summary_data.get("hk2_hoc_luc", "")) if summary_data else "N/A"}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; color: #6b7280;">Điểm TB cả năm:</td>
+                                <td style="padding: 4px 0; font-weight: 700; font-size: 15px; color: #1f2937;">{summary_data.get("year_avg_score", "N/A") if summary_data else "N/A"}</td>
+                                <td style="padding: 4px 0; color: #6b7280;">KQRL cả năm:</td>
+                                <td style="padding: 4px 0; font-weight: 600;">{_map_ren_luyen(summary_data.get("year_ren_luyen", "")) if summary_data else "N/A"}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; color: #6b7280;">Học lực cả năm:</td>
+                                <td style="padding: 4px 0; font-weight: 600;">{_map_ren_luyen(summary_data.get("year_hoc_luc", "")) if summary_data else "N/A"}</td>
+                                <td style="padding: 4px 0; color: #6b7280;">Danh hiệu:</td>
+                                <td style="padding: 4px 0; font-weight: 700; color: #b45309;">{_map_title(summary_data.get("title", "")) if summary_data else "—"}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    {f'''<h3 style="font-size: 14px; color: #374151; margin: 12px 0 6px;">Chi tiết từng môn:</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px;">
+                        <thead><tr style="background-color: #e5e7eb;">
+                            <th style="padding: 6px 8px; text-align: left;">Môn</th><th style="padding: 6px 8px; text-align: center;">HK1</th><th style="padding: 6px 8px; text-align: center;">HK2</th><th style="padding: 6px 8px; text-align: center;">Cả năm</th>
+                        </tr></thead>
+                        <tbody>{"".join(
+                            f'<tr><td style="padding: 4px 8px;">{s.get("subject_name","???")}</td><td style="padding: 4px 8px; text-align: center;">{s.get("hk1_score","-")}</td><td style="padding: 4px 8px; text-align: center;">{s.get("hk2_score","-")}</td><td style="padding: 4px 8px; text-align: center; font-weight: 600;">{s.get("year_avg","-")}</td></tr>'
+                            for s in (summary_data.get("subject_details", []) if summary_data else [])
+                        )}</tbody>
+                    </table>''' if summary_data and summary_data.get("subject_details") else ""}
                 </div>
+                ''') if feedback_type == "CN" else ""}
 
                 <!-- FEEDBACK -->
                 <div style="padding: 0 30px 24px;">
@@ -292,6 +345,8 @@ class EmailReportCardService:
         feedback: str,
         ket_qua_ren_luyen: Optional[str] = None,
         hoc_luc: Optional[str] = None,
+        feedback_type: str = "CK",
+        summary_data: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """
         Gửi email phiếu điểm tới phụ huynh
@@ -324,6 +379,8 @@ class EmailReportCardService:
                 feedback=feedback,
                 ket_qua_ren_luyen=ket_qua_ren_luyen,
                 hoc_luc=hoc_luc,
+                feedback_type=feedback_type,
+                summary_data=summary_data,
             )
 
             if self.email_provider == "resend":

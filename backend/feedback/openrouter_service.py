@@ -224,6 +224,86 @@ Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh nà
             return response.choices[0].message.content.strip()
         raise Exception("Empty response from OpenRouter for GK feedback")
 
+    def create_cn_feedback_prompt(
+        self,
+        student_name: str,
+        summary_data: dict,
+        notes: str = "",
+    ) -> str:
+        """Tạo prompt nhận xét CẢ NĂM (CN)."""
+        label_map = {"1": "Tốt", "2": "Khá", "3": "Đạt", "4": "Chưa Đạt"}
+        title_map = {"1": "Học sinh Xuất sắc", "2": "Học sinh Giỏi"}
+
+        year_avg = summary_data.get("year_avg_score", "N/A")
+        hl = label_map.get(summary_data.get("year_hoc_luc", ""), "Chưa có")
+        rl = label_map.get(summary_data.get("year_ren_luyen", ""), "Chưa có")
+        hk1_avg = summary_data.get("hk1_avg_score", "N/A")
+        hk2_avg = summary_data.get("hk2_avg_score", "N/A")
+        hk1_hl = label_map.get(summary_data.get("hk1_hoc_luc", ""), "Chưa có")
+        hk2_hl = label_map.get(summary_data.get("hk2_hoc_luc", ""), "Chưa có")
+        hk1_rl = label_map.get(summary_data.get("hk1_ren_luyen", ""), "Chưa có")
+        hk2_rl = label_map.get(summary_data.get("hk2_ren_luyen", ""), "Chưa có")
+        title_val = summary_data.get("title")
+        title_str = title_map.get(title_val, "") if title_val else ""
+
+        subject_lines = ""
+        details = summary_data.get("subject_details", [])
+        if isinstance(details, list) and details:
+            subject_lines = "\n".join(
+                f"  - {s.get('subject_name', '???')}: HK1={s.get('hk1_score', '-')}, HK2={s.get('hk2_score', '-')}, CN={s.get('year_avg', '-')}"
+                for s in details
+            )
+
+        prompt = f"""Bạn là trợ lý AI của giáo viên chủ nhiệm. Hãy nhập vai giáo viên và viết nhận xét TỔNG KẾT CẢ NĂM ngắn gọn, chuyên nghiệp cho học sinh (không phải sinh viên) để gửi cho phụ huynh.
+
+**MỤC TIÊU:**
+Đây là nhận xét TỔNG KẾT CẢ NĂM — tổng hợp toàn bộ kết quả học tập và rèn luyện trong năm học để thông báo cho phụ huynh.
+
+**QUY TẮC BẮT BUỘC:**
+- Chỉ trả lời đúng nội dung nhận xét, KHÔNG thêm lời chào hay tiêu đề.
+- Văn phong: trang trọng, tích cực, mang tính động viên và ghi nhận.
+- PHẢI đề cập CHÍNH XÁC: điểm trung bình cả năm, học lực, kết quả rèn luyện, danh hiệu (nếu có).
+- Có thể nhận xét ngắn gọn về sự tiến bộ hoặc ổn định giữa HK1 và HK2 dựa trên số liệu.
+- Nếu có danh hiệu (Học sinh Xuất sắc / Học sinh Giỏi) thì mở đầu bằng lời chúc mừng.
+- Ngôn ngữ: Tiếng Việt chuẩn, trang trọng. Độ dài: 3–5 câu, không dùng markdown.
+- Các giá trị học lực và rèn luyện là do giáo viên xác định. PHẢI đề cập CHÍNH XÁC, KHÔNG tự ý thay đổi.
+
+**DỮ LIỆU HỌC SINH:**
+- Tên: {student_name}
+- Điểm trung bình HK1: {hk1_avg} — Học lực HK1: {hk1_hl} — KQRL HK1: {hk1_rl}
+- Điểm trung bình HK2: {hk2_avg} — Học lực HK2: {hk2_hl} — KQRL HK2: {hk2_rl}
+- Điểm trung bình cả năm: {year_avg}
+- Học lực cả năm: {hl}
+- Kết quả rèn luyện cả năm: {rl}
+- Danh hiệu: {title_str if title_str else 'Không có'}
+{f'- Chi tiết từng môn:\n{subject_lines}' if subject_lines else ''}
+- Ghi chú của GVCN: {notes if notes else 'Không có'}
+
+Dựa trên dữ liệu trên, viết nhận xét TỔNG KẾT CẢ NĂM cho học sinh này."""
+        return prompt.strip()
+
+    async def generate_cn_feedback(
+        self,
+        student_name: str,
+        summary_data: dict,
+        notes: str = "",
+    ) -> str:
+        """Tạo nhận xét CẢ NĂM qua OpenRouter API."""
+        prompt = self.create_cn_feedback_prompt(
+            student_name=student_name,
+            summary_data=summary_data or {},
+            notes=(notes or "").strip(),
+        )
+        response = await self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
+            temperature=0.7,
+        )
+        if response and response.choices and response.choices[0].message.content:
+            return response.choices[0].message.content.strip()
+        raise Exception("Empty response from OpenRouter for CN feedback")
+
     async def generate_student_feedback(
         self,
         student_name: str,
