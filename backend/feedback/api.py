@@ -63,6 +63,8 @@ async def generate_student_feedback(request: StudentFeedbackRequest):
             notes=request.notes,
             feedback_type=request.type or "CK",
             low_score_details=request.low_score_details or [],
+            ket_qua_ren_luyen=request.ket_qua_ren_luyen,
+            hoc_luc=request.hoc_luc,
         )
         
         return StudentFeedbackResponse(
@@ -349,6 +351,7 @@ async def get_comment(
                     class_id=comment.get("class_id"),
                     description=note,
                     ket_qua_ren_luyen=ket_qua,
+                    hoc_luc=hoc_luc,
                     semester=comment["semester"],
                     type=comment.get("type", "CK"),
                     created_at=comment["created_at"],
@@ -523,6 +526,8 @@ async def send_email_report_card(request: EmailReportCardRequest, db=Depends(get
             scores=request.scores,
             overall_average=request.overall_average,
             feedback=request.feedback,
+            ket_qua_ren_luyen=request.ket_qua_ren_luyen,
+            hoc_luc=request.hoc_luc,
         )
 
         if result["success"]:

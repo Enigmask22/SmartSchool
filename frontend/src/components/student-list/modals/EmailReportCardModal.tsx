@@ -17,6 +17,11 @@ interface Student {
   student_id?: string;
 }
 
+function mapRenLuyenLabel(value: string): string {
+  const mapping: Record<string, string> = { "1": "Tốt", "2": "Khá", "3": "Đạt", "4": "Chưa Đạt" };
+  return mapping[value] || "";
+}
+
 interface EmailReportCardModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,6 +35,8 @@ interface EmailReportCardModalProps {
   selectedSemester?: string;
   academicYear?: string;
   selectedAcademicYear?: string;
+  ketQuaRenLuyen?: string;
+  hocLuc?: string;
   onEmailRecipientChange: (email: string) => void;
   onSend: () => void;
   onClose: () => void;
@@ -48,6 +55,8 @@ export function EmailReportCardModal({
   selectedSemester,
   academicYear,
   selectedAcademicYear,
+  ketQuaRenLuyen = "",
+  hocLuc = "",
   onEmailRecipientChange,
   onSend,
   onClose,
@@ -129,6 +138,12 @@ export function EmailReportCardModal({
                   ? `"${generatedFeedback.substring(0, 60)}..."`
                   : "Chưa có"}
               </li>
+              {ketQuaRenLuyen && (
+                <li>🏅 Kết quả rèn luyện: {mapRenLuyenLabel(ketQuaRenLuyen)}</li>
+              )}
+              {hocLuc && (
+                <li>📚 Học lực: {mapRenLuyenLabel(hocLuc)}</li>
+              )}
               <li>🎓 Năm học: {displayAcademicYear || "N/A"}</li>
             </ul>
           </div>

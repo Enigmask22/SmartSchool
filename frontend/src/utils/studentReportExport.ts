@@ -2,6 +2,11 @@ import ExcelJS from "exceljs";
 import logger from "@/utils/logger";
 import { toast } from "sonner";
 
+function mapRenLuyen(value: string): string {
+  const mapping: Record<string, string> = { "1": "Tốt", "2": "Khá", "3": "Đạt", "4": "Chưa Đạt" };
+  return mapping[value] || "";
+}
+
 interface StudentReportData {
   student: {
     id: number;
@@ -13,6 +18,8 @@ interface StudentReportData {
   generatedFeedback: string;
   academicYear: string;
   semester: string;
+  ketQuaRenLuyen?: string;
+  hocLuc?: string;
 }
 
 type ScoreCategory = "tx" | "gk" | "ck" | "skip";
@@ -170,7 +177,26 @@ export const generateStudentReportCard = async (data: StudentReportData) => {
 
       worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
       worksheet.getCell(`A${currentRow}`).value = `Điểm trung bình học kỳ: ${overallAverage}`;
-      currentRow += 2;
+      currentRow++;
+
+      // Kết quả rèn luyện & Học lực (bên cạnh điểm trung bình)
+      const ketQuaRenLuyen = data.ketQuaRenLuyen;
+      const hocLuc = data.hocLuc;
+      if (ketQuaRenLuyen) {
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = `Kết quả rèn luyện: ${mapRenLuyen(ketQuaRenLuyen)}`;
+        worksheet.getCell(`A${currentRow}`).font = { bold: false, size: 11 };
+        worksheet.getCell(`A${currentRow}`).alignment = { horizontal: "left", vertical: "middle" };
+        currentRow++;
+      }
+      if (hocLuc) {
+        worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = `Học lực: ${mapRenLuyen(hocLuc)}`;
+        worksheet.getCell(`A${currentRow}`).font = { bold: false, size: 11 };
+        worksheet.getCell(`A${currentRow}`).alignment = { horizontal: "left", vertical: "middle" };
+        currentRow++;
+      }
+      currentRow++;
 
       // Table headers
       const headerRow = worksheet.getRow(currentRow);

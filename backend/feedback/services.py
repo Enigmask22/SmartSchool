@@ -67,6 +67,8 @@ class FeedbackService:
         notes: str = "",
         feedback_type: str = "CK",
         low_score_details: List[dict] = None,
+        ket_qua_ren_luyen: str = None,
+        hoc_luc: str = None,
     ) -> str:
         """
         Tạo nhận xét cho học sinh sử dụng Gemini AI
@@ -81,6 +83,8 @@ class FeedbackService:
             notes: Ghi chú thêm từ giáo viên
             feedback_type: "GK" hoặc "CK"
             low_score_details: Chi tiết cột TX/GK dưới 8 hoặc KĐ (GK only)
+            ket_qua_ren_luyen: Kết quả rèn luyện (1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt)
+            hoc_luc: Học lực (1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt) — CK only
 
         Returns:
             Nhận xét được tạo bởi AI hoặc template
@@ -95,6 +99,7 @@ class FeedbackService:
                             attendance_rate=attendance_rate,
                             low_score_details=low_score_details or [],
                             notes=(notes or "").strip(),
+                            ket_qua_ren_luyen=ket_qua_ren_luyen,
                         )
                         logger.info(f"🤖 [{self.provider_name}] AI-generated GK feedback for {student_name}")
                         return feedback
@@ -107,6 +112,8 @@ class FeedbackService:
                             top_subjects=top_subjects,
                             weak_subjects=weak_subjects,
                             notes=(notes or "").strip(),
+                            ket_qua_ren_luyen=ket_qua_ren_luyen,
+                            hoc_luc=hoc_luc,
                         )
                         logger.info(f"🤖 [{self.provider_name}] AI-generated CK feedback for {student_name}")
                         return feedback

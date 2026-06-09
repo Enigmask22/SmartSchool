@@ -238,6 +238,8 @@ export function StudentListPage() {
         selectedSemester={filters.selectedSemester}
         academicYear={filters.selectedAcademicYear}
         selectedAcademicYear={filters.selectedAcademicYear}
+        ketQuaRenLuyen={feedback.ketQuaRenLuyen}
+        hocLuc={feedback.selectedType === "CK" ? feedback.hocLuc : ""}
         onEmailRecipientChange={studentList.setEmailRecipient}
         onSend={() =>
           studentList.handleSendEmailReportCard({

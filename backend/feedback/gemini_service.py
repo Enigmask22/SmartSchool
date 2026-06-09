@@ -9,6 +9,12 @@ from typing import Optional
 from google import genai
 
 
+def _map_ren_luyen(value: str) -> str:
+    """Ánh xạ mã kết quả rèn luyện / học lực sang nhãn hiển thị."""
+    mapping = {"1": "Tốt", "2": "Khá", "3": "Đạt", "4": "Chưa Đạt"}
+    return mapping.get(value, "") if value else ""
+
+
 class GeminiFeedbackService:
     """
     Service tạo nhận xét học sinh sử dụng Google Gemini API
@@ -49,6 +55,8 @@ class GeminiFeedbackService:
         top_subjects: Optional[list] = None,
         weak_subjects: Optional[list] = None,
         notes: str = "",
+        ket_qua_ren_luyen: Optional[str] = None,
+        hoc_luc: Optional[str] = None,
     ) -> str:
         """
         Tạo ra một prompt chi tiết để yêu cầu model viết nhận xét
@@ -88,6 +96,7 @@ Bạn là trợ lý AI của giáo viên chủ nhiệm. Hãy nhập vai giáo vi
 - Mặc định chuyên cần tốt (đi học đầy đủ, đúng giờ); NẾU ghi chú nêu vắng/đi trễ thì phải đề cập và khuyến nghị khắc phục.
 - Ưu tiên sử dụng thông tin môn mạnh/yếu nếu có; không suy diễn ngoài dữ liệu.
 - Ngôn ngữ: Tiếng Việt chuẩn, trang trọng. Độ dài: 2–3 câu, không dùng markdown.
+- Kết quả rèn luyện và Học lực là thông tin do giáo viên xác định. PHẢI đề cập CHÍNH XÁC các giá trị này trong nhận xét, KHÔNG được tự ý thay đổi hay đánh giá lại.
 {attendance_hint}
 
 **DỮ LIỆU HỌC SINH:**
@@ -96,6 +105,8 @@ Bạn là trợ lý AI của giáo viên chủ nhiệm. Hãy nhập vai giáo vi
 - Môn học tốt: {top_text}
 - Môn học chưa tốt: {weak_text}
 - Chuyên cần (mặc định tốt nếu không ghi chú tiêu cực): {attendance_rate}%
+- Kết quả rèn luyện: {_map_ren_luyen(ket_qua_ren_luyen) if ket_qua_ren_luyen else 'Chưa có'}
+- Học lực: {_map_ren_luyen(hoc_luc) if hoc_luc else 'Chưa có'}
 - Ghi chú của GVCN (ưu tiên về chuyên cần): {notes if notes else 'Không có'}
 
 Dựa trên dữ liệu trên, viết nhận xét cho học sinh này.
@@ -108,6 +119,7 @@ Dựa trên dữ liệu trên, viết nhận xét cho học sinh này.
         attendance_rate: int,
         low_score_details: Optional[list] = None,
         notes: str = "",
+        ket_qua_ren_luyen: Optional[str] = None,
     ) -> str:
         """
         Tạo prompt nhận xét GIỮA KỲ (GK) — thông báo tình hình cho phụ huynh,
@@ -150,6 +162,7 @@ Bạn là trợ lý AI của giáo viên chủ nhiệm. Hãy nhập vai giáo vi
 - Sau khi liệt kê, kết thúc bằng một câu ngắn gọn mang tính hợp tác: kính mong quý phụ huynh theo dõi, động viên và nhắc nhở học sinh ôn tập chuẩn bị cho kỳ thi cuối kỳ.
 - Nếu tất cả các cột điểm đều ≥ 8 và không có KĐ thì khen ngợi và động viên giữ vững phong độ.
 - Mặc định chuyên cần tốt (đi học đầy đủ, đúng giờ); NẾU ghi chú nêu vắng/đi trễ thì phải đề cập.
+- Kết quả rèn luyện là thông tin do giáo viên xác định. PHẢI đề cập CHÍNH XÁC giá trị này trong nhận xét, KHÔNG được tự ý thay đổi hay đánh giá lại.
 - Ngôn ngữ: Tiếng Việt chuẩn, trang trọng. Độ dài: tối đa 4 câu, không dùng markdown.
 {attendance_hint}
 
@@ -158,6 +171,7 @@ Bạn là trợ lý AI của giáo viên chủ nhiệm. Hãy nhập vai giáo vi
 - Danh sách ĐẦY ĐỦ các cột điểm thường xuyên / giữa kỳ dưới 8 hoặc KĐ (PHẢI liệt kê TẤT CẢ):
 {details_text}
 - Chuyên cần (mặc định tốt nếu không ghi chú tiêu cực): {attendance_rate}%
+- Kết quả rèn luyện: {_map_ren_luyen(ket_qua_ren_luyen) if ket_qua_ren_luyen else 'Chưa có'}
 - Ghi chú của GVCN: {notes if notes else 'Không có'}
 
 Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh này. Nhớ liệt kê ĐẦY ĐỦ TẤT CẢ các môn và cột điểm.
@@ -170,6 +184,7 @@ Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh nà
         attendance_rate: int,
         low_score_details: Optional[list] = None,
         notes: str = "",
+        ket_qua_ren_luyen: Optional[str] = None,
     ) -> str:
         """Tạo nhận xét GIỮA KỲ qua Gemini API."""
         prompt = self.create_gk_feedback_prompt(
@@ -177,6 +192,7 @@ Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh nà
             attendance_rate=attendance_rate,
             low_score_details=low_score_details or [],
             notes=(notes or "").strip(),
+            ket_qua_ren_luyen=ket_qua_ren_luyen,
         )
         response = await self.client.aio.models.generate_content(
             model=self.model_name,
@@ -195,6 +211,8 @@ Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh nà
         top_subjects: Optional[list] = None,
         weak_subjects: Optional[list] = None,
         notes: str = "",
+        ket_qua_ren_luyen: Optional[str] = None,
+        hoc_luc: Optional[str] = None,
     ) -> str:
         """
         Tạo nhận xét cho học sinh dựa trên dữ liệu đầu vào
@@ -206,6 +224,8 @@ Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh nà
             top_subjects: Danh sách môn học tốt (nếu có)
             weak_subjects: Danh sách môn học chưa tốt (nếu có)
             notes: Ghi chú thêm từ giáo viên
+            ket_qua_ren_luyen: Kết quả rèn luyện (1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt)
+            hoc_luc: Học lực (1=Tốt, 2=Khá, 3=Đạt, 4=Chưa Đạt)
 
         Returns:
             Nhận xét học sinh
@@ -225,6 +245,8 @@ Dựa trên dữ liệu trên, viết nhận xét GIỮA KỲ cho học sinh nà
                 top_subjects=top_subjects,
                 weak_subjects=weak_subjects,
                 notes=notes,
+                ket_qua_ren_luyen=ket_qua_ren_luyen,
+                hoc_luc=hoc_luc,
             )
 
             response = await self.client.aio.models.generate_content(
