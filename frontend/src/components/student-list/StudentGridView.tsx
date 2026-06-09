@@ -70,7 +70,6 @@ export function StudentGridView({
   loading = false,
 }: StudentGridViewProps) {
   // Local modal state for view component
-  const [editModalOpen, setEditModalOpen] = useState(false);
   //const [faceModalOpen, setFaceModalOpen] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
   const [selectedStudentForModal, setSelectedStudentForModal] = useState<Student | null>(null);
@@ -90,7 +89,6 @@ export function StudentGridView({
   const handleEditClick = (student: Student) => {
     setSelectedStudentForModal(student);
     edit.handleEdit(student);
-    setEditModalOpen(true);
     onEdit?.(student);
   };
 
@@ -395,8 +393,8 @@ export function StudentGridView({
 
       {/* Modals */}
       <EditStudentModal
-        open={editModalOpen}
-        onOpenChange={setEditModalOpen}
+        open={edit.showEditModal}
+        onOpenChange={(open) => { if (!open) edit.closeEditModal(); }}
         selectedStudent={edit.selectedStudentForEdit || undefined}
         editForm={edit.editForm}
         editLoading={edit.editLoading}
@@ -406,10 +404,7 @@ export function StudentGridView({
         onRemoveParentContact={edit.removeParentContactRow}
         onUpdateParentContactField={edit.updateParentContactField}
         onSubmit={edit.submitEditForm}
-        onClose={() => {
-          setEditModalOpen(false);
-          edit.closeEditModal();
-        }}
+        onClose={edit.closeEditModal}
       />
 
       {/* <FaceRegistrationModal
