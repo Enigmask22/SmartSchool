@@ -131,7 +131,7 @@ function ScoreConfigPortal({
 
             {/* Content - no scroll, let it expand */}
             <div className="space-y-2">
-              {Object.entries(scoreConfig).map(([key, value]: any) => {
+              {Object.entries(scoreConfig).filter(([key]) => key !== "is_char").map(([key, value]: any) => {
                 const isParent = value.data && Object.keys(value.data).length > 0;
                 return (
                   <div key={key}>
