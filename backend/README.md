@@ -1,3 +1,12 @@
+---
+title: Smart School Backend
+emoji: 🏫
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # Smart School — Backend
 
 <div align="center">
@@ -97,13 +106,13 @@ backend/
 
 ### Design Principles
 
-| Principle | Implementation |
-|-----------|---------------|
-| **Module Isolation** | Each module has its own router, service layer, and models — can be developed and tested independently |
-| **Dependency Injection** | FastAPI's `Depends()` for database sessions, current user, and permissions |
-| **Thin Routes** | Route handlers delegate to service functions; no business logic in `api.py` |
-| **Shared Core** | Database client, auth utilities, and middleware live in `core/` — imported by all modules |
-| **Database-Agnostic API** | All DB access goes through Supabase client; switch to any PostgreSQL-compatible backend |
+| Principle                 | Implementation                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Module Isolation**      | Each module has its own router, service layer, and models — can be developed and tested independently |
+| **Dependency Injection**  | FastAPI's `Depends()` for database sessions, current user, and permissions                            |
+| **Thin Routes**           | Route handlers delegate to service functions; no business logic in `api.py`                           |
+| **Shared Core**           | Database client, auth utilities, and middleware live in `core/` — imported by all modules             |
+| **Database-Agnostic API** | All DB access goes through Supabase client; switch to any PostgreSQL-compatible backend               |
 
 ---
 
@@ -299,23 +308,23 @@ directory=/path/to/backend
 
 ### Environment Variables Reference
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `SUPABASE_URL` | Yes | — | Supabase project URL |
-| `SUPABASE_KEY` | Yes | — | Supabase service role key |
-| `SECRET_KEY` | Yes | — | HMAC-SHA256 32-byte hex key |
-| `HOST` | No | `0.0.0.0` | Server bind address |
-| `PORT` | No | `8000` | Server port |
-| `DEBUG` | No | `true` | Debug mode (set `false` in production) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `60` | JWT access token TTL |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | No | `1` | JWT refresh token TTL |
-| `GEMINI_API_KEY` | No* | — | Google Gemini API key (*required for AI feedback & cloud OCR) |
-| `OPENROUTER_API_KEY` | No | — | OpenRouter fallback for AI feedback |
-| `FEEDBACK_PROVIDER` | No | `gemini` | AI feedback provider (`gemini` or `openrouter`) |
-| `INSIGHTFACE_DEVICE` | No | `cuda` | Face recognition device (`cuda` or `cpu`) |
-| `RESEND_API_KEY` | No* | — | Resend API key (*required for email report cards) |
-| `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server for email fallback |
-| `OCR_DEFAULT_ENGINE` | No | `gemini` | OCR engine (`gemini` or `qwen`) |
+| Variable                      | Required | Default          | Description                                                    |
+| ----------------------------- | -------- | ---------------- | -------------------------------------------------------------- |
+| `SUPABASE_URL`                | Yes      | —                | Supabase project URL                                           |
+| `SUPABASE_KEY`                | Yes      | —                | Supabase service role key                                      |
+| `SECRET_KEY`                  | Yes      | —                | HMAC-SHA256 32-byte hex key                                    |
+| `HOST`                        | No       | `0.0.0.0`        | Server bind address                                            |
+| `PORT`                        | No       | `8000`           | Server port                                                    |
+| `DEBUG`                       | No       | `true`           | Debug mode (set `false` in production)                         |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No       | `60`             | JWT access token TTL                                           |
+| `REFRESH_TOKEN_EXPIRE_DAYS`   | No       | `1`              | JWT refresh token TTL                                          |
+| `GEMINI_API_KEY`              | No\*     | —                | Google Gemini API key (\*required for AI feedback & cloud OCR) |
+| `OPENROUTER_API_KEY`          | No       | —                | OpenRouter fallback for AI feedback                            |
+| `FEEDBACK_PROVIDER`           | No       | `gemini`         | AI feedback provider (`gemini` or `openrouter`)                |
+| `INSIGHTFACE_DEVICE`          | No       | `cuda`           | Face recognition device (`cuda` or `cpu`)                      |
+| `RESEND_API_KEY`              | No\*     | —                | Resend API key (\*required for email report cards)             |
+| `SMTP_SERVER`                 | No       | `smtp.gmail.com` | SMTP server for email fallback                                 |
+| `OCR_DEFAULT_ENGINE`          | No       | `gemini`         | OCR engine (`gemini` or `qwen`)                                |
 
 ---
 
