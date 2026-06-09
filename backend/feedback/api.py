@@ -27,24 +27,26 @@ logger = setup_logger("feedback_api")
 router = APIRouter()
 
 
-def _parse_description(description: str) -> tuple[str, Optional[str]]:
-    """Parse description field: nếu là JSON trả về (note, ket_qua_ren_luyen), ngược lại coi là plain text note."""
+def _parse_description(description: str) -> tuple[str, Optional[str], Optional[str]]:
+    """Parse description field: nếu là JSON trả về (note, ket_qua_ren_luyen, hoc_luc), ngược lại coi là plain text note."""
     if not description:
-        return "", None
+        return "", None, None
     try:
         data = json.loads(description)
         if isinstance(data, dict) and "note" in data:
-            return data.get("note", ""), data.get("ket_qua_ren_luyen")
+            return data.get("note", ""), data.get("ket_qua_ren_luyen"), data.get("hoc_luc")
     except (json.JSONDecodeError, TypeError):
         pass
-    return description, None
+    return description, None, None
 
 
-def _build_description(note: str, ket_qua_ren_luyen: Optional[str]) -> str:
-    """Build JSON description từ note và ket_qua_ren_luyen."""
+def _build_description(note: str, ket_qua_ren_luyen: Optional[str], hoc_luc: Optional[str] = None) -> str:
+    """Build JSON description từ note, ket_qua_ren_luyen và hoc_luc."""
     payload = {"note": note}
     if ket_qua_ren_luyen:
         payload["ket_qua_ren_luyen"] = ket_qua_ren_luyen
+    if hoc_luc:
+        payload["hoc_luc"] = hoc_luc
     return json.dumps(payload, ensure_ascii=False)
 
 @router.post("/generate-feedback")
@@ -239,7 +241,7 @@ async def save_comment(
         # Kiểm tra xem đã có comment cho semester + type này chưa
         existing_comment_response = db.table("comments").select("*").eq("student_id", request.student_id).eq("class_id", class_id).eq("semester", request.semester).eq("type", request.type).execute()
 
-        json_description = _build_description(request.description, request.ket_qua_ren_luyen)
+        json_description = _build_description(request.description, request.ket_qua_ren_luyen, request.hoc_luc)
 
         comment_data = {
             "student_id": request.student_id,
@@ -260,7 +262,7 @@ async def save_comment(
             if response.data and len(response.data) > 0:
                 logger.info(f"✅ Đã cập nhật nhận xét cho học sinh ID: {request.student_id}, Semester: {request.semester}, Type: {request.type}")
                 comment = response.data[0]
-                note, ket_qua = _parse_description(comment["description"])
+                note, ket_qua, hoc_luc = _parse_description(comment["description"])
                 return CommentResponseModel(
                     success=True,
                     message="Cập nhật nhận xét thành công",
@@ -270,6 +272,7 @@ async def save_comment(
                         class_id=comment.get("class_id"),
                         description=note,
                         ket_qua_ren_luyen=ket_qua,
+                        hoc_luc=hoc_luc,
                         semester=comment["semester"],
                         type=comment.get("type", "CK"),
                         created_at=comment["created_at"],
@@ -287,7 +290,7 @@ async def save_comment(
             if response.data and len(response.data) > 0:
                 logger.info(f"✅ Đã tạo nhận xét mới cho học sinh ID: {request.student_id}, Semester: {request.semester}, Type: {request.type}")
                 comment = response.data[0]
-                note, ket_qua = _parse_description(comment["description"])
+                note, ket_qua, hoc_luc = _parse_description(comment["description"])
                 return CommentResponseModel(
                     success=True,
                     message="Lưu nhận xét thành công",
@@ -297,6 +300,7 @@ async def save_comment(
                         class_id=comment.get("class_id"),
                         description=note,
                         ket_qua_ren_luyen=ket_qua,
+                        hoc_luc=hoc_luc,
                         semester=comment["semester"],
                         type=comment.get("type", "CK"),
                         created_at=comment["created_at"],
@@ -335,7 +339,7 @@ async def get_comment(
         
         if response.data and len(response.data) > 0:
             comment = response.data[0]
-            note, ket_qua = _parse_description(comment["description"])
+            note, ket_qua, hoc_luc = _parse_description(comment["description"])
             return CommentResponseModel(
                 success=True,
                 message="Lấy nhận xét thành công",
@@ -447,7 +451,7 @@ async def get_class_comments(
             
             # Kiểm tra học sinh có thuộc lớp này không
             if student_info.get("class_name") == class_name and student_info.get("grade") == grade:
-                note, ket_qua = _parse_description(comment["description"])
+                note, ket_qua, hoc_luc = _parse_description(comment["description"])
                 comments_list.append({
                     "id": comment["id"],
                     "student_id": comment["student_id"],
@@ -456,6 +460,7 @@ async def get_class_comments(
                     "class_id": comment.get("class_id") or class_id,
                     "description": note,
                     "ket_qua_ren_luyen": ket_qua,
+                    "hoc_luc": hoc_luc,
                     "semester": comment.get("semester", "HK1"),
                     "created_at": comment["created_at"],
                     "updated_at": comment["updated_at"]

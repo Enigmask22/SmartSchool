@@ -9,8 +9,6 @@ export const exportToExcel = async (
   academicYear: string,
   semester: string,
   getDisplayColumns: (config: Record<string, any>) => any[],
-  // _flattenScoreColumns: (config: Record<string, any>) => any[],
-  calculateFinalScore: (scoreData: any) => string | number
 ) => {
   try {
     const workbook = new ExcelJS.Workbook();
@@ -187,23 +185,23 @@ export const exportToExcel = async (
         }
       });
 
-      // Average score
+      // Average score - use final_score from DB
       cellCount++;
-      if (studentData.score?.score_data) {
-        const avgScore = calculateFinalScore(studentData.score.score_data);
-        row.getCell(cellCount).value = avgScore;
-        
-        // Only bold if it's an actual score, not a dash (incomplete data)
-        if (avgScore !== '-') {
-          row.getCell(cellCount).font = { bold: true };
-        }
-        
+      const finalScore = studentData.score?.final_score;
+      if (finalScore != null && finalScore !== '') {
+        row.getCell(cellCount).value = finalScore;
+        row.getCell(cellCount).font = { bold: true };
         row.getCell(cellCount).alignment = {
           horizontal: 'center',
           vertical: 'middle',
         };
         row.getCell(cellCount).border = borders;
       } else {
+        row.getCell(cellCount).value = '-';
+        row.getCell(cellCount).alignment = {
+          horizontal: 'center',
+          vertical: 'middle',
+        };
         row.getCell(cellCount).border = borders;
       }
     });

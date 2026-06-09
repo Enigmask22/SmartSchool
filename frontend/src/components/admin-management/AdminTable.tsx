@@ -112,14 +112,16 @@ export function AdminTable({
     } else if (hook.activeTab === 'score_settings') {
       form.setFormData(item);
       if (item.score_column_config) {
-        const columnsArray = Object.entries(item.score_column_config as Record<string, any>).map(
-          ([key, value]) => ({
-            key,
-            label: value.label as string,
-            he_so: value.he_so as number,
-            data: (value.data as any) || null,
-          })
-        );
+        const columnsArray = Object.entries(item.score_column_config as Record<string, any>)
+          .filter(([key]) => key !== "is_char")
+          .map(
+            ([key, value]) => ({
+              key,
+              label: value.label as string,
+              he_so: value.he_so as number,
+              data: (value.data as any) || null,
+            })
+          );
         scoreColumnHookLocal?.setScoreColumns(columnsArray);
       } else {
         scoreColumnHookLocal?.setScoreColumns([]);
@@ -129,13 +131,15 @@ export function AdminTable({
       hook.fetchSubjectScoreSettings(item.id);
       if (item.score_column_config) {
         const sc = item.score_column_config as Record<string, any>;
-        const columnsArray = Object.entries(sc).map(([key, value]) => ({
-          key,
-          label: value.label as string,
-          he_so: value.he_so as number,
-          data: (value.data as any) || undefined,
-          hasSubColumns: !!(value.data && Object.keys(value.data).length > 0),
-        }));
+        const columnsArray = Object.entries(sc)
+          .filter(([key]) => key !== "is_char")
+          .map(([key, value]) => ({
+            key,
+            label: value.label as string,
+            he_so: value.he_so as number,
+            data: (value.data as any) || undefined,
+            hasSubColumns: !!(value.data && Object.keys(value.data).length > 0),
+          }));
         scoreColumnHookLocal?.setScoreColumns(columnsArray);
       } else {
         scoreColumnHookLocal?.setScoreColumns([]);

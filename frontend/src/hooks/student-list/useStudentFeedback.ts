@@ -18,6 +18,42 @@ const _isCK_column = (keyLower: string) =>
   keyLower.includes("cuoi_ki") ||
   keyLower.includes("cuoi_ky");
 
+/** Tính học lực tự động cho CK dựa trên điểm các môn */
+function calculateHocLuc(scoresData: any[]): string {
+  if (!scoresData || scoresData.length === 0) return "";
+
+  const letterScores = scoresData.filter(
+    (s) => s.final_score === "Đ" || s.final_score === "KĐ",
+  );
+  const numericScores: number[] = [];
+  for (const s of scoresData) {
+    const fs = s.final_score;
+    if (fs === null || fs === undefined) continue;
+    if (typeof fs === "string" && (fs === "Đ" || fs === "KĐ")) continue;
+    const num = typeof fs === "string" ? parseFloat(fs) : fs;
+    if (typeof num === "number" && !isNaN(num)) numericScores.push(num);
+  }
+
+  if (numericScores.length === 0 && letterScores.length === 0) return "";
+
+  const allLetterDat = letterScores.length === 0 || letterScores.every((s) => s.final_score === "Đ");
+  const kdCount = letterScores.filter((s) => s.final_score === "KĐ").length;
+
+  const allNumericAbove = (t: number) =>
+    numericScores.length === 0 || numericScores.every((s) => s >= t);
+  const countAbove = (t: number) => numericScores.filter((s) => s >= t).length;
+  const anyBelow = (t: number) => numericScores.some((s) => s < t);
+
+  // Tốt (1)
+  if (allLetterDat && allNumericAbove(6.5) && countAbove(8.0) >= 6) return "1";
+  // Khá (2)
+  if (allLetterDat && allNumericAbove(5.0) && countAbove(6.5) >= 6) return "2";
+  // Đạt (3)
+  if (kdCount <= 1 && allNumericAbove(5.0) && !anyBelow(3.5)) return "3";
+  // Chưa Đạt (4)
+  return "4";
+}
+
 /** Map raw score_data key → human-readable column label */
 const _columnLabel = (rawKey: string): string => {
   const k = rawKey.toLowerCase().replace(/^diem_/, "");
@@ -72,6 +108,17 @@ export const useStudentFeedback = ({
   const [gkLowScoreDetails, setGkLowScoreDetails] = useState<any[]>([]);
   const [allScoresData, setAllScoresData] = useState<any[]>([]);
   const [ketQuaRenLuyen, setKetQuaRenLuyen] = useState("");
+  const [hocLuc, setHocLuc] = useState("");
+
+  // Auto-calculate học lực khi CK mode + có dữ liệu điểm
+  useEffect(() => {
+    if (selectedType !== "CK" || allScoresData.length === 0) {
+      if (selectedType !== "CK") setHocLuc("");
+      return;
+    }
+    const calc = calculateHocLuc(allScoresData);
+    setHocLuc(calc);
+  }, [selectedType, allScoresData]);
 
   // Re-process GK low score details khi selectedType thay đổi
   useEffect(() => {
@@ -128,10 +175,12 @@ export const useStudentFeedback = ({
           if (commentResult.success && commentResult.data) {
             setGeneratedFeedback(commentResult.data.description);
             setKetQuaRenLuyen(commentResult.data.ket_qua_ren_luyen || "");
+            if (commentResult.data.hoc_luc) setHocLuc(commentResult.data.hoc_luc);
             logger.debug("✅ Loaded existing comment for type:", selectedType, commentResult.data);
           } else {
             setGeneratedFeedback("");
             setKetQuaRenLuyen("");
+            setHocLuc("");
           }
         }
       } catch (error) {
@@ -324,6 +373,7 @@ export const useStudentFeedback = ({
           if (commentResult.success && commentResult.data) {
             setGeneratedFeedback(commentResult.data.description);
             setKetQuaRenLuyen(commentResult.data.ket_qua_ren_luyen || "");
+            if (commentResult.data.hoc_luc) setHocLuc(commentResult.data.hoc_luc);
             logger.debug("✅ Loaded existing comment:", commentResult.data);
           }
         }
@@ -354,6 +404,7 @@ export const useStudentFeedback = ({
     setFeedbackError("");
     setFeedbackSuccess(false);
     setKetQuaRenLuyen("");
+    setHocLuc("");
     scoresData.set_scoreTrendData(null);
     scoresData.set_trendError("");
   }, [scoresData]);
@@ -466,6 +517,7 @@ export const useStudentFeedback = ({
           semester: filters.selectedSemester,
           type: selectedType,
           ket_qua_ren_luyen: ketQuaRenLuyen || null,
+          hoc_luc: selectedType === "CK" ? (hocLuc || null) : null,
         }),
       });
 
@@ -484,7 +536,7 @@ export const useStudentFeedback = ({
     } finally {
       setSmsLoading(false);
     }
-  }, [generatedFeedback, selectedStudentForFeedback, filters.selectedSemester, selectedType, ketQuaRenLuyen]);
+  }, [generatedFeedback, selectedStudentForFeedback, filters.selectedSemester, selectedType, ketQuaRenLuyen, hocLuc]);
 
   const exportAllComments = useCallback(async () => {
     if (!filters.selectedClass || filters.selectedClass === "all") {
@@ -576,6 +628,8 @@ export const useStudentFeedback = ({
     allScoresData,
     ketQuaRenLuyen,
     setKetQuaRenLuyen,
+    hocLuc,
+    setHocLuc,
     handleFeedbackClick,
     closeFeedbackModal,
     handleFeedbackFormChange,

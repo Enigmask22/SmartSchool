@@ -29,6 +29,47 @@ export const SubjectsFormSection: React.FC<SubjectsFormSectionProps> = ({
         filteredFields={['score_column_config']}
       />
 
+      {/* is_char toggle — loại môn học: điểm chữ hay điểm số */}
+      <div className="pt-4 mt-4 border-t border-gray-200">
+        <label className="block text-sm font-semibold text-gray-800 mb-2">
+          Loại điểm
+        </label>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="is_char"
+              value="FALSE"
+              checked={form.score_column_config?.is_char !== "TRUE"}
+              onChange={() => {
+                form.setFieldValue("score_column_config", {
+                  ...(form.score_column_config || {}),
+                  is_char: "FALSE",
+                });
+              }}
+              className="w-4 h-4 text-blue-600"
+            />
+            <span className="text-sm">Điểm số (0 - 10)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="is_char"
+              value="TRUE"
+              checked={form.score_column_config?.is_char === "TRUE"}
+              onChange={() => {
+                form.setFieldValue("score_column_config", {
+                  ...(form.score_column_config || {}),
+                  is_char: "TRUE",
+                });
+              }}
+              className="w-4 h-4 text-blue-600"
+            />
+            <span className="text-sm">Điểm chữ (Đ / KĐ)</span>
+          </label>
+        </div>
+      </div>
+
       {/* Score Column Configuration */}
       {isEdit && scoreColumnHook && (
         <div className="pt-4 mt-4 border-t border-gray-200">

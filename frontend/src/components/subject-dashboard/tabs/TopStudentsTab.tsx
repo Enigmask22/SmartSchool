@@ -13,6 +13,7 @@ export function TopStudentsTab({ data, loading = false, hidden = false }: TopStu
   if (hidden) return null;
   
   const students = data?.top_students || [];
+  const isChar = data?.is_letter_grade_subject;
 
   if (loading) {
     return (
@@ -71,7 +72,7 @@ export function TopStudentsTab({ data, loading = false, hidden = false }: TopStu
             <Trophy className="w-8 h-8 text-amber-500" />
           </div>
           <p className="font-medium text-amber-600">
-            Chưa có học sinh xuất sắc
+            {isChar ? "Chưa có học sinh Đạt" : "Chưa có học sinh xuất sắc"}
           </p>
         </div>
       </div>
@@ -83,10 +84,10 @@ export function TopStudentsTab({ data, loading = false, hidden = false }: TopStu
       <div className="px-6 py-4 bg-amber-600">
         <h3 className="flex items-center text-xl font-bold text-white">
           <Trophy className="w-5 h-5 mr-2" />
-          Học sinh xuất sắc ({students.length} học sinh)
+          {isChar ? "Học sinh Đạt" : "Học sinh xuất sắc"} ({students.length} học sinh)
         </h3>
         <p className="mt-1 text-sm text-amber-100">
-          Danh sách học sinh có thành tích học tập xuất sắc
+          {isChar ? "Danh sách học sinh đạt yêu cầu" : "Danh sách học sinh có thành tích học tập xuất sắc"}
         </p>
       </div>
 
@@ -149,17 +150,21 @@ export function TopStudentsTab({ data, loading = false, hidden = false }: TopStu
                   </span>
                 </td>
                 <td className="px-6 py-4 text-center whitespace-nowrap">
-                  <span className="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white bg-green-600">
-                    {student.final_score}
+                  <span className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full text-white ${isChar ? "bg-green-600" : "bg-green-600"}`}>
+                    {isChar ? "Đ" : student.final_score}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <Badge variant="outline" className="text-amber-700">
-                    {index === 0 && "🥇 Vàng"}
-                    {index === 1 && "🥈 Bạc"}
-                    {index === 2 && "🥉 Đồng"}
-                    {index > 2 && `Thứ ${index + 1}`}
-                  </Badge>
+                  {isChar ? (
+                    <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">Đạt</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-700">
+                      {index === 0 && "🥇 Vàng"}
+                      {index === 1 && "🥈 Bạc"}
+                      {index === 2 && "🥉 Đồng"}
+                      {index > 2 && `Thứ ${index + 1}`}
+                    </Badge>
+                  )}
                 </td>
               </tr>
             ))}

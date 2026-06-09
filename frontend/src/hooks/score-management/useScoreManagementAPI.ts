@@ -100,10 +100,6 @@ export interface UseScoreManagementAPIReturn {
   getDisplayColumns: (scoreColumnConfig: ScoreColumnConfig) => DisplayColumn[];
   flattenScoreColumns: (config: ScoreColumnConfig) => FlatColumn[];
   getSortedColumnNames: (scoreColumnConfig: ScoreColumnConfig) => string[];
-  calculateFinalScore: (
-    gradeData: Record<string, { Diem: number | string }>,
-    scoreColumnConfig: ScoreColumnConfig
-  ) => number | string;
   initializeScoreForm: (
     student: Student,
     score: Score | null
@@ -219,9 +215,11 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
       diem_thi_cuoi_ki: 3,
     };
 
-    const sortedKeys = Object.keys(scoreColumnConfig).sort(
-      (a, b) => (priorityOrder[a] || 999) - (priorityOrder[b] || 999)
-    );
+    const sortedKeys = Object.keys(scoreColumnConfig)
+      .filter((k) => k !== "is_char")
+      .sort(
+        (a, b) => (priorityOrder[a] || 999) - (priorityOrder[b] || 999)
+      );
 
     sortedKeys.forEach((columnName) => {
       const columnConfig = scoreColumnConfig[columnName];
@@ -255,7 +253,7 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
   const flattenScoreColumns = (config: ScoreColumnConfig): FlatColumn[] => {
     const flatColumns: FlatColumn[] = [];
 
-    Object.keys(config).forEach((columnName) => {
+    Object.keys(config).filter((k) => k !== "is_char").forEach((columnName) => {
       const column = config[columnName];
 
       if (column.data && typeof column.data === 'object' && Object.keys(column.data).length > 0) {
@@ -279,117 +277,11 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
   };
 
   const getSortedColumnNames = (scoreColumnConfig: ScoreColumnConfig): string[] => {
-    return Object.keys(scoreColumnConfig).sort((a, b) => {
+    return Object.keys(scoreColumnConfig).filter((k) => k !== "is_char").sort((a, b) => {
       const aHeSo = scoreColumnConfig[a].he_so;
       const bHeSo = scoreColumnConfig[b].he_so;
       return aHeSo - bHeSo;
     });
-  };
-
-  const calculateFinalScore = (
-    gradeData: Record<string, { Diem: number | string }>,
-    scoreColumnConfig: ScoreColumnConfig
-  ): number | string => {
-    const flatColumns = flattenScoreColumns(scoreColumnConfig);
-
-    // Check if all required score columns are available
-    // If any score column is missing, return '-'
-    const allColumnsPresent = flatColumns.every(
-      (column) => gradeData[column.key]?.Diem != null && gradeData[column.key]?.Diem !== ''
-    );
-
-    if (!allColumnsPresent) return '-';
-
-    let txScores: number[] = [];
-    let giuaKiScore: number | null = null;
-    let giuaKiWeight = 0;
-    let cuoiKiScore: number | null = null;
-    let cuoiKiWeight = 0;
-
-    let isAllLetterGrades = true;
-    let hasAnyGrade = false;
-
-    flatColumns.forEach((column) => {
-      if (gradeData[column.key]?.Diem != null) {
-        hasAnyGrade = true;
-        const diemValue = gradeData[column.key].Diem;
-        const isLetter =
-          typeof diemValue === 'string' && (diemValue === 'Đ' || diemValue === 'KĐ');
-        if (!isLetter) {
-          isAllLetterGrades = false;
-        }
-      }
-    });
-
-    if (!hasAnyGrade) return 0;
-
-    flatColumns.forEach((column) => {
-      if (gradeData[column.key]?.Diem != null) {
-        const diemValue = gradeData[column.key].Diem;
-
-        let score: number;
-
-        if (
-          isAllLetterGrades &&
-          typeof diemValue === 'string' &&
-          (diemValue === 'Đ' || diemValue === 'KĐ')
-        ) {
-          score = diemValue === 'Đ' ? 1 : 0;
-        } else if (
-          typeof diemValue === 'string' &&
-          (diemValue === 'Đ' || diemValue === 'KĐ')
-        ) {
-          return;
-        } else {
-          score = parseFloat(String(diemValue));
-        }
-
-        if (isNaN(score)) {
-          return;
-        }
-
-        const weight = parseFloat(String(column.he_so));
-
-        if (column.key.startsWith('Diem_tx')) {
-          txScores.push(score);
-        } else if (column.key === 'Diem_thi_giua_ki') {
-          giuaKiScore = score;
-          giuaKiWeight = weight;
-        } else if (column.key === 'Diem_thi_cuoi_ki') {
-          cuoiKiScore = score;
-          cuoiKiWeight = weight;
-        }
-      }
-    });
-
-    let txAverage = 0;
-    if (txScores.length > 0) {
-      txAverage = txScores.reduce((sum, score) => sum + score, 0) / txScores.length;
-    }
-
-    let totalScore = 0;
-    let totalWeight = 0;
-
-    if (txScores.length > 0) {
-      totalScore += txAverage * 1;
-      totalWeight += 1;
-    }
-
-    if (giuaKiScore !== null) {
-      totalScore += giuaKiScore * giuaKiWeight;
-      totalWeight += giuaKiWeight;
-    }
-
-    if (cuoiKiScore !== null) {
-      totalScore += cuoiKiScore * cuoiKiWeight;
-      totalWeight += cuoiKiWeight;
-    }
-
-    if (isAllLetterGrades) {
-      return totalScore >= 5 ? 'Đ' : 'KĐ';
-    }
-
-    return totalWeight > 0 ? parseFloat((totalScore / totalWeight).toFixed(2)) : 0;
   };
 
   const initializeScoreForm = (
@@ -661,7 +553,6 @@ export const useScoreManagementAPI = (): UseScoreManagementAPIReturn => {
     getDisplayColumns,
     flattenScoreColumns,
     getSortedColumnNames,
-    calculateFinalScore,
     initializeScoreForm,
   };
 };

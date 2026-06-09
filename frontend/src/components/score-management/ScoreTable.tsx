@@ -12,7 +12,6 @@ interface ScoreTableProps {
   onPageSizeChange: (size: number) => void;
   onEditScore: (studentData: any) => void;
   getDisplayColumns: (config: Record<string, any>) => any[];
-  calculateFinalScore: (scoreData: any) => string | number;
   gradeEditLocked?: boolean;
 }
 
@@ -26,7 +25,6 @@ export default function ScoreTable({
   onPageSizeChange,
   onEditScore,
   getDisplayColumns,
-  calculateFinalScore,
   gradeEditLocked = false,
 }
 : ScoreTableProps) 
@@ -235,9 +233,9 @@ export default function ScoreTable({
                     }
                   })}
                   <td className="px-5 py-4 relative text-center">
-                    {studentData.score?.score_data ? (
+                    {studentData.score?.final_score != null && studentData.score?.final_score !== "" ? (
                       <span className="bg-blue-50 text-blue-700 text-center px-3 py-1.5 rounded-md text-sm font-bold border border-blue-200 min-w-[60px] inline-block">
-                        {calculateFinalScore(studentData.score.score_data)}
+                        {studentData.score.final_score}
                       </span>
                     ) : (
                       <span className="bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md text-sm border border-gray-200 min-w-[50px] inline-block">

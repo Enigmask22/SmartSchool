@@ -1601,6 +1601,10 @@ async def get_teacher_dashboard_analytics(
             total_students_count += len(hsh_resp.data) if hsh_resp.data else 0
         
         # === PHÂN NHÓM ĐIỂM ===
+        # Detect sớm loại môn (điểm chữ hay điểm số)
+        _letter_count = sum(1 for s in scores_data if isinstance(s.get("final_score"), str) and s.get("final_score") in ["Đ", "KĐ"])
+        _is_char_subject = _letter_count == len(scores_data) and len(scores_data) > 0
+
         range_8_10 = []      # 8.0 - 10
         range_65_79 = []     # 6.5 - 7.9
         range_5_64 = []      # 5.0 - 6.4
@@ -1642,177 +1646,207 @@ async def get_teacher_dashboard_analytics(
             else:
                 range_below_35.append(score)
 
-        categorized_count = len(range_8_10) + len(range_65_79) + len(range_5_64) + len(range_35_49) + len(range_below_35)
-        letter_categorized_count = len(letter_dat) + len(letter_khong_dat)
-        performance_groups = {
-            "range_8_10": {
-                "count": len(range_8_10),
-                "percentage": round(len(range_8_10) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "8.0 - 10",
-                "color": "#059669"
-            },
-            "range_65_79": {
-                "count": len(range_65_79),
-                "percentage": round(len(range_65_79) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "6.5 - 7.9",
-                "color": "#2563EB"
-            },
-            "range_5_64": {
-                "count": len(range_5_64),
-                "percentage": round(len(range_5_64) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "5.0 - 6.4",
-                "color": "#D97706"
-            },
-            "range_35_49": {
-                "count": len(range_35_49),
-                "percentage": round(len(range_35_49) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "3.5 - 4.9",
-                "color": "#EA580C"
-            },
-            "range_below_35": {
-                "count": len(range_below_35),
-                "percentage": round(len(range_below_35) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
-                "label": "< 3.5",
-                "color": "#DC2626"
-            },
-            "letter_dat": {
-                "count": len(letter_dat),
-                "percentage": round(len(letter_dat) * 100 / letter_categorized_count, 2) if letter_categorized_count > 0 else 0,
-                "label": "Đạt",
-                "color": "#059669"
-            },
-            "letter_khong_dat": {
-                "count": len(letter_khong_dat),
-                "percentage": round(len(letter_khong_dat) * 100 / letter_categorized_count, 2) if letter_categorized_count > 0 else 0,
-                "label": "Không Đạt",
-                "color": "#DC2626"
+        if _is_char_subject:
+            letter_categorized_count = len(letter_dat) + len(letter_khong_dat)
+            performance_groups = {
+                "letter_dat": {
+                    "count": len(letter_dat),
+                    "percentage": round(len(letter_dat) * 100 / letter_categorized_count, 2) if letter_categorized_count > 0 else 0,
+                    "label": "Đạt",
+                    "color": "#059669"
+                },
+                "letter_khong_dat": {
+                    "count": len(letter_khong_dat),
+                    "percentage": round(len(letter_khong_dat) * 100 / letter_categorized_count, 2) if letter_categorized_count > 0 else 0,
+                    "label": "Không Đạt",
+                    "color": "#DC2626"
+                }
             }
-        }
+        else:
+            categorized_count = len(range_8_10) + len(range_65_79) + len(range_5_64) + len(range_35_49) + len(range_below_35)
+            performance_groups = {
+                "range_8_10": {
+                    "count": len(range_8_10),
+                    "percentage": round(len(range_8_10) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                    "label": "8.0 - 10",
+                    "color": "#059669"
+                },
+                "range_65_79": {
+                    "count": len(range_65_79),
+                    "percentage": round(len(range_65_79) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                    "label": "6.5 - 7.9",
+                    "color": "#2563EB"
+                },
+                "range_5_64": {
+                    "count": len(range_5_64),
+                    "percentage": round(len(range_5_64) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                    "label": "5.0 - 6.4",
+                    "color": "#D97706"
+                },
+                "range_35_49": {
+                    "count": len(range_35_49),
+                    "percentage": round(len(range_35_49) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                    "label": "3.5 - 4.9",
+                    "color": "#EA580C"
+                },
+                "range_below_35": {
+                    "count": len(range_below_35),
+                    "percentage": round(len(range_below_35) * 100 / categorized_count, 2) if categorized_count > 0 else 0,
+                    "label": "< 3.5",
+                    "color": "#DC2626"
+                }
+            }
         
         # === SO SÁNH GIỮA CÁC LỚP ===
         class_comparison = []
-        class_scores_map = {}
-        
-        for score in scores_data:
-            # Chỉ xử lý điểm số (bỏ qua giá trị chữ như "Đ", "KĐ")
-            final_score = score.get("final_score")
-            if final_score is None:
-                continue
-            # Convert to float if string
-            if isinstance(final_score, str):
-                try:
-                    final_score = float(final_score)
-                except (ValueError, TypeError):
-                    continue  # Ignore non-numeric strings like "Đ", "KĐ"
-            
-            class_name = score["class_subjects"]["classes"]["class_name"]
-            if class_name not in class_scores_map:
-                class_scores_map[class_name] = []
-            class_scores_map[class_name].append(final_score)
-        
-        for class_name, scores_list in class_scores_map.items():
-            # All scores in list are already validated and converted to numeric in the loop above
-            # Double-check to ensure all are numeric before processing
-            valid_scores = []
-            for s in scores_list:
-                if s is None:
-                    continue
-                if isinstance(s, str):
-                    try:
-                        valid_scores.append(float(s))
-                    except (ValueError, TypeError):
-                        continue
-                elif isinstance(s, (int, float)):
-                    valid_scores.append(s)
-            
-            if valid_scores:
-                avg = sum(valid_scores) / len(valid_scores)
-                highest = max(valid_scores)
-                lowest = min(valid_scores)
-                
+
+        if _is_char_subject:
+            class_letter_map = {}
+            for score in scores_data:
+                class_name = score["class_subjects"]["classes"]["class_name"]
+                if class_name not in class_letter_map:
+                    class_letter_map[class_name] = {"total": 0, "dat": 0}
+                class_letter_map[class_name]["total"] += 1
+                if score.get("final_score") == "Đ":
+                    class_letter_map[class_name]["dat"] += 1
+
+            for class_name, counts in class_letter_map.items():
                 class_comparison.append({
                     "class_name": class_name,
-                    "student_count": len(valid_scores),
-                    "average_score": round(avg, 2),
-                    "highest_score": round(highest, 2),
-                    "lowest_score": round(lowest, 2),
-                    "pass_rate": round(sum(1 for s in valid_scores if s >= 5.0) * 100 / len(valid_scores), 2)
+                    "student_count": counts["total"],
+                    "dat_count": counts["dat"],
+                    "khong_dat_count": counts["total"] - counts["dat"],
+                    "pass_rate": round(counts["dat"] * 100 / counts["total"], 2) if counts["total"] > 0 else 0,
+                    "is_char": True
                 })
+            class_comparison.sort(key=lambda x: x["pass_rate"], reverse=True)
+        else:
+            class_scores_map = {}
+            for score in scores_data:
+                final_score = score.get("final_score")
+                if final_score is None:
+                    continue
+                if isinstance(final_score, str):
+                    try:
+                        final_score = float(final_score)
+                    except (ValueError, TypeError):
+                        continue
+                elif not isinstance(final_score, (int, float)):
+                    continue
+
+                class_name = score["class_subjects"]["classes"]["class_name"]
+                if class_name not in class_scores_map:
+                    class_scores_map[class_name] = []
+                class_scores_map[class_name].append(final_score)
+
+            for class_name, scores_list in class_scores_map.items():
+                valid_scores = [s for s in scores_list if isinstance(s, (int, float))]
+                if valid_scores:
+                    avg = sum(valid_scores) / len(valid_scores)
+                    class_comparison.append({
+                        "class_name": class_name,
+                        "student_count": len(valid_scores),
+                        "average_score": round(avg, 2),
+                        "highest_score": round(max(valid_scores), 2),
+                        "lowest_score": round(min(valid_scores), 2),
+                        "pass_rate": round(sum(1 for s in valid_scores if s >= 5.0) * 100 / len(valid_scores), 2),
+                        "is_char": False
+                    })
+
+            class_comparison.sort(key=lambda x: x["average_score"], reverse=True)
         
-        # Sắp xếp theo điểm trung bình giảm dần
-        class_comparison.sort(key=lambda x: x["average_score"], reverse=True)
-        
-        # === HỌC SINH CẦN QUAN TÂM (điểm yếu và kém) ===
+        # === HỌC SINH CẦN QUAN TÂM ===
         students_need_attention = []
-        for score in range_35_49 + range_below_35:
-            student_info = score.get("students", {})
-            class_info = score.get("class_subjects", {}).get("classes", {})
-            
-            # Helper để xác định category (Kém hoặc Yếu)
-            final_score = score.get("final_score")
-            numeric_grade = None
-            if isinstance(final_score, (int, float)):
-                numeric_grade = final_score
-            elif isinstance(final_score, str):
-                try:
-                    numeric_grade = float(final_score)
-                except (ValueError, TypeError):
-                    numeric_grade = None
-            
-            category = "Yếu"  # default
-            if numeric_grade is not None and numeric_grade < 3.5:
-                category = "Kém"
-            
-            students_need_attention.append({
-                "student_id": student_info.get("student_id"),
-                "student_name": student_info.get("full_name"),
-                "class_name": class_info.get("class_name"),
-                "final_score": score.get("final_score"),
-                "category": category,
-                "score_data": score.get("score_data", {})
-            })
-        
-        # Sắp xếp theo điểm tăng dần (yếu nhất lên đầu)
-        def get_sort_key(item):
-            final_score = item["final_score"]
-            if final_score is None:
+        if _is_char_subject:
+            for score in letter_khong_dat:
+                student_info = score.get("students", {})
+                class_info = score.get("class_subjects", {}).get("classes", {})
+                students_need_attention.append({
+                    "student_id": student_info.get("student_id"),
+                    "student_name": student_info.get("full_name"),
+                    "class_name": class_info.get("class_name"),
+                    "final_score": score.get("final_score"),
+                    "category": "KĐ",
+                    "score_data": score.get("score_data", {})
+                })
+        else:
+            for score in range_35_49 + range_below_35:
+                student_info = score.get("students", {})
+                class_info = score.get("class_subjects", {}).get("classes", {})
+
+                final_score = score.get("final_score")
+                numeric_grade = None
+                if isinstance(final_score, (int, float)):
+                    numeric_grade = final_score
+                elif isinstance(final_score, str):
+                    try:
+                        numeric_grade = float(final_score)
+                    except (ValueError, TypeError):
+                        numeric_grade = None
+
+                category = "Yếu"
+                if numeric_grade is not None and numeric_grade < 3.5:
+                    category = "Kém"
+
+                students_need_attention.append({
+                    "student_id": student_info.get("student_id"),
+                    "student_name": student_info.get("full_name"),
+                    "class_name": class_info.get("class_name"),
+                    "final_score": score.get("final_score"),
+                    "category": category,
+                    "score_data": score.get("score_data", {})
+                })
+
+            def get_sort_key(item):
+                final_score = item["final_score"]
+                if final_score is None:
+                    return 0
+                if isinstance(final_score, (int, float)):
+                    return final_score
+                if isinstance(final_score, str):
+                    try:
+                        return float(final_score)
+                    except (ValueError, TypeError):
+                        return 0
                 return 0
-            if isinstance(final_score, (int, float)):
-                return final_score
-            if isinstance(final_score, str):
-                try:
-                    return float(final_score)
-                except (ValueError, TypeError):
-                    return 0
-            return 0
-        
-        students_need_attention.sort(key=get_sort_key)
-        
+
+            students_need_attention.sort(key=get_sort_key)
+
         # === TOP HỌC SINH XUẤT SẮC ===
-        # Sort key helper để xử lý TEXT column
-        def top_student_sort_key(x):
-            final_score = x.get("final_score", 0)
-            if isinstance(final_score, (int, float)):
-                return final_score
-            if isinstance(final_score, str):
-                try:
-                    return float(final_score)
-                except (ValueError, TypeError):
-                    return 0
-            return 0
-        
         top_students = []
-        for score in sorted(range_8_10, key=top_student_sort_key, reverse=True)[:10]:
-            student_info = score.get("students", {})
-            class_info = score.get("class_subjects", {}).get("classes", {})
-            
-            top_students.append({
-                "student_id": student_info.get("student_id"),
-                "student_name": student_info.get("full_name"),
-                "class_name": class_info.get("class_name"),
-                "final_score": score.get("final_score"),
-                "score_data": score.get("score_data", {})
-            })
+        if _is_char_subject:
+            for score in letter_dat[:10]:
+                student_info = score.get("students", {})
+                class_info = score.get("class_subjects", {}).get("classes", {})
+                top_students.append({
+                    "student_id": student_info.get("student_id"),
+                    "student_name": student_info.get("full_name"),
+                    "class_name": class_info.get("class_name"),
+                    "final_score": score.get("final_score"),
+                    "score_data": score.get("score_data", {})
+                })
+        else:
+            def top_student_sort_key(x):
+                final_score = x.get("final_score", 0)
+                if isinstance(final_score, (int, float)):
+                    return final_score
+                if isinstance(final_score, str):
+                    try:
+                        return float(final_score)
+                    except (ValueError, TypeError):
+                        return 0
+                return 0
+
+            for score in sorted(range_8_10, key=top_student_sort_key, reverse=True)[:10]:
+                student_info = score.get("students", {})
+                class_info = score.get("class_subjects", {}).get("classes", {})
+                top_students.append({
+                    "student_id": student_info.get("student_id"),
+                    "student_name": student_info.get("full_name"),
+                    "class_name": class_info.get("class_name"),
+                    "final_score": score.get("final_score"),
+                    "score_data": score.get("score_data", {})
+                })
         
         # === PHÂN BỐ ĐIỂM SỐ (Distribution) ===
         # Helper function to safely convert score to float (handle TEXT column type)
@@ -1829,20 +1863,11 @@ async def get_teacher_dashboard_analytics(
                     return None
             return None
         
-        # Check if all scores are letter grades (Đ/KĐ)
-        letter_score_count = 0
-        for s in scores_data:
-            final_score = s.get("final_score")
-            if isinstance(final_score, str) and final_score in ['Đ', 'KĐ']:
-                letter_score_count += 1
-        
-        is_all_letter_grades = letter_score_count == total_students_with_scores and total_students_with_scores > 0
-        
-        if is_all_letter_grades:
+        if _is_char_subject:
             # Trường hợp môn học với toàn điểm chữ (vd: GDTC)
             score_distribution = {
-                "Đ (Đạt)": letter_score_count,  # Tất cả đạt
-                "KĐ (Không đạt)": total_students_with_scores - letter_score_count,  # Không đạt
+                "Đ (Đạt)": len(letter_dat),
+                "KĐ (Không đạt)": len(letter_khong_dat),
             }
             
             # Count Đ and KĐ
@@ -1872,7 +1897,7 @@ async def get_teacher_dashboard_analytics(
             "total_students": total_students_count,
             "students_with_scores": total_students_with_scores,
             "students_without_scores": total_students_count - total_students_with_scores,
-            "is_letter_grade_subject": is_all_letter_grades,  # Flag để frontend biết loại điểm
+            "is_letter_grade_subject": _is_char_subject,  # Flag để frontend biết loại điểm
             "overview": {
                 "average_score": round(average_score, 2) if numeric_scores else 0,
                 "highest_score": round(max(numeric_scores), 2) if numeric_scores else 0,
@@ -1963,7 +1988,7 @@ async def download_score_template(
             
             # Sort parent columns first
             sorted_columns = sorted(
-                score_column_config.items(),
+                ((k, v) for k, v in score_column_config.items() if k != "is_char"),
                 key=lambda x: priority_order.get(x[0], 999)
             )
             
@@ -2217,41 +2242,43 @@ async def bulk_import_grades(
             )
         
         score_column_config = subject_resp.data[0].get("score_column_config")
-        
+
         if not score_column_config:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cấu hình cột điểm không hợp lệ"
             )
-        
+
+        is_char = str(score_column_config.get("is_char", "FALSE")).upper() == "TRUE"
+
         imported_count = 0
         errors = []
         
         # Helper function to normalize score values (support both numbers and letter scores)
-        def normalize_score_value(value):
+        def normalize_score_value(value, is_char=False):
             """
             Convert raw value to either float (numeric score) or string (letter score: Đ/KĐ)
             Returns: (normalized_value, is_valid)
             """
             if value is None or value == '':
                 return None, True
-            
+
             # Convert to string and normalize
             value_str = str(value).strip().upper()
-            
-            # Check for letter grades (Đ - Pass)
-            if value_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
-                return 'Đ', True
-            
-            # Check for letter grades (KĐ - Not Pass)
-            if value_str in ['KĐ', 'KD', 'KHONG_DAT', 'KHÔNG_ĐẠT', 'KHONGDAT', 'KHÔNG ĐẠT']:
-                return 'KĐ', True
-            
-            # Try to parse as number
+
+            if is_char:
+                # Only Đ/KĐ allowed
+                if value_str in ['Đ', 'D', 'DAT', 'ĐẠT']:
+                    return 'Đ', True
+                if value_str in ['KĐ', 'KD', 'KHONG_DAT', 'KHÔNG_ĐẠT', 'KHONGDAT', 'KHÔNG ĐẠT']:
+                    return 'KĐ', True
+                return None, False
+
+            # Numeric only
             try:
                 numeric_value = float(value)
                 if 0 <= numeric_value <= 10:
-                    return numeric_value, True
+                    return round(numeric_value * 2) / 2, True  # Round to nearest 0.5
                 else:
                     return None, False
             except (ValueError, TypeError):
@@ -2264,6 +2291,8 @@ async def bulk_import_grades(
             
             # Flatten the score_column_config to get all column names
             for column_name, column_config in score_column_config.items():
+                if column_name == "is_char":
+                    continue
                 if isinstance(column_config, dict) and 'data' in column_config:
                     # Parent column with children
                     for child_key in column_config['data'].keys():
@@ -2300,12 +2329,13 @@ async def bulk_import_grades(
                         continue  # Skip student info columns
                     
                     # Normalize the score value
-                    normalized_value, is_valid = normalize_score_value(import_value)
-                    
+                    normalized_value, is_valid = normalize_score_value(import_value, is_char)
+
                     if not is_valid:
+                        valid_hint = "Đ/KĐ" if is_char else "số (0-10, bước 0.5)"
                         errors.append(
                             f"Học sinh {student_id}: Điểm {import_col_name} không hợp lệ ({import_value}). "
-                            f"Phải là số (0-10) hoặc Đ/KĐ."
+                            f"Phải là {valid_hint}."
                         )
                         continue
                     
@@ -2525,7 +2555,7 @@ async def export_parsed_ocr_to_excel(
             }
 
             sorted_columns = sorted(
-                score_column_config.items(),
+                ((k, v) for k, v in score_column_config.items() if k != "is_char"),
                 key=lambda item: priority_order.get(str(item[0]).lower(), 999)
             )
 

@@ -13,8 +13,8 @@ export interface UseScoreEditFormReturn {
   scoreForm: ScoreFormData;
   setEditingStudent: (student: StudentWithScore | null) => void;
   setScoreForm: (form: ScoreFormData) => void;
-  updateScoreField: (columnName: string, value: string | number) => void;
-  normalizeScoreInput: (value: string) => string;
+  updateScoreField: (columnName: string, value: string | number, isChar?: boolean) => void;
+  normalizeScoreInput: (value: string, isChar?: boolean) => string;
   resetForm: () => void;
 }
 
@@ -27,20 +27,21 @@ export const useScoreEditForm = (): UseScoreEditFormReturn => {
   const [editingStudent, setEditingStudent] = useState<StudentWithScore | null>(null);
   const [scoreForm, setScoreForm] = useState<ScoreFormData>({});
 
-  const normalizeScoreInput = (value: string): string => {
+  const normalizeScoreInput = (value: string, isChar: boolean = false): string => {
     let normalizedValue = value.trim();
+    if (!normalizedValue) return "";
 
-    if (normalizedValue !== '') {
+    if (isChar) {
       const upperValue = normalizedValue.toUpperCase();
-
       if (
         upperValue === 'Đ' ||
         upperValue === 'D' ||
         upperValue === 'DAT' ||
         upperValue === 'ĐẠT'
       ) {
-        normalizedValue = 'Đ';
-      } else if (
+        return 'Đ';
+      }
+      if (
         upperValue === 'KĐ' ||
         upperValue === 'KD' ||
         upperValue === 'KHONG_DAT' ||
@@ -48,16 +49,21 @@ export const useScoreEditForm = (): UseScoreEditFormReturn => {
         upperValue === 'KHÔNG_ĐẠT' ||
         upperValue === 'KHÔNG ĐẠT'
       ) {
-        normalizedValue = 'KĐ';
+        return 'KĐ';
       }
+      return ""; // Invalid for char type, reject
     }
 
-    return normalizedValue;
+    // Numeric: only 0-10, step 0.5
+    const num = parseFloat(normalizedValue);
+    if (isNaN(num) || num < 0 || num > 10) return "";
+    // Round to nearest 0.5
+    return String(Math.round(num * 2) / 2);
   };
 
-  const updateScoreField = (columnName: string, value: string | number) => {
-    const normalizedValue = typeof value === 'string' ? normalizeScoreInput(value) : value;
-    
+  const updateScoreField = (columnName: string, value: string | number, isChar: boolean = false) => {
+    const normalizedValue = typeof value === 'string' ? normalizeScoreInput(value, isChar) : value;
+
     setScoreForm((prev) => ({
       ...prev,
       [columnName]: {

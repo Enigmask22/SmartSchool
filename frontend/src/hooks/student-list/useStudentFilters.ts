@@ -21,7 +21,7 @@ export const useStudentFilters = () => {
   const [homeroomClasses, setHomeroomClasses] = useState<any[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(settings.academic_year || '');
   const [selectedSemester, setSelectedSemester] = useState(settings.semester || 'HK1');
-  const [availableSemesters] = useState(['HK1', 'HK2', 'CN']);
+  const [availableSemesters] = useState(['HK1', 'HK2']);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);

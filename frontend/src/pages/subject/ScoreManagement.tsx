@@ -79,7 +79,6 @@ export default function ScoreManagement() {
       filters.academicYear,
       filters.semester,
       api.getDisplayColumns,
-      calculateFinalScoreWrapper
     );
   };
 
@@ -122,11 +121,6 @@ export default function ScoreManagement() {
     (filters.currentPage - 1) * filters.pageSize,
     filters.currentPage * filters.pageSize
   );
-
-  // Wrapper function to adapt calculateFinalScore for components expecting single-argument function
-  const calculateFinalScoreWrapper = (scoreData: any) => {
-    return api.calculateFinalScore(scoreData, api.scoreConfig?.score_column_config || {});
-  };
 
   // Error state - only block if teacher info fails to load
   if (!api.loading && !api.teacherInfo) {
@@ -337,7 +331,6 @@ export default function ScoreManagement() {
                   editForm.setScoreForm(form);
                 }}
                 getDisplayColumns={api.getDisplayColumns}
-                calculateFinalScore={calculateFinalScoreWrapper}
                 gradeEditLocked={gradeEditLocked}
               />
             ) : (
@@ -362,7 +355,8 @@ export default function ScoreManagement() {
           editingStudent={editForm.editingStudent}
           scoreConfig={api.scoreConfig}
           scoreForm={editForm.scoreForm}
-          onScoreInputChange={(columnName, value) => editForm.updateScoreField(columnName, value)}
+          onScoreInputChange={(columnName, value) => editForm.updateScoreField(columnName, value, api.scoreConfig?.score_column_config?.is_char === "TRUE" || api.scoreConfig?.score_column_config?.is_char === true)}
+          isChar={api.scoreConfig?.score_column_config?.is_char === "TRUE" || api.scoreConfig?.score_column_config?.is_char === true}
           onSaveScore={() => {
             if (gradeEditLocked) {
               toast.error('Đã quá hạn chỉnh sửa bảng điểm.');
