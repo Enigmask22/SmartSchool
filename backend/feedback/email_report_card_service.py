@@ -17,6 +17,12 @@ from core.logger import setup_logger
 logger = setup_logger("email_report_card")
 
 
+def _map_ren_luyen(value: str) -> str:
+    """Ánh xạ mã kết quả rèn luyện / học lực sang nhãn hiển thị."""
+    mapping = {"1": "Tốt", "2": "Khá", "3": "Đạt", "4": "Chưa Đạt"}
+    return mapping.get(value, "") if value else ""
+
+
 class EmailReportCardService:
     """Service gửi phiếu điểm học sinh qua email cho phụ huynh"""
 
@@ -131,6 +137,8 @@ class EmailReportCardService:
         scores: List[Dict],
         overall_average: Optional[float],
         feedback: str,
+        ket_qua_ren_luyen: Optional[str] = None,
+        hoc_luc: Optional[str] = None,
     ) -> str:
         """
         Tạo HTML email phiếu điểm chuyên nghiệp (education format)
@@ -205,6 +213,20 @@ class EmailReportCardService:
                     </table>
                 </div>
 
+                <!-- Rèn luyện & Học lực -->
+                {(f'''<div style="margin: 12px 30px 0; padding: 12px 20px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 4px 0; color: #6b7280; width: 140px;">Kết quả rèn luyện:</td>
+                            <td style="padding: 4px 0; font-weight: 600; color: #166534;">{_map_ren_luyen(ket_qua_ren_luyen) if ket_qua_ren_luyen else 'Chưa có'}</td>
+                        </tr>''' + (f'''
+                        <tr>
+                            <td style="padding: 4px 0; color: #6b7280;">Học lực:</td>
+                            <td style="padding: 4px 0; font-weight: 600; color: #166534;">{_map_ren_luyen(hoc_luc) if hoc_luc else 'Chưa có'}</td>
+                        </tr>''' if hoc_luc else '') + f'''
+                    </table>
+                </div>''') if ket_qua_ren_luyen or hoc_luc else ""}
+
                 <!-- SCORE TABLE -->
                 <div style="padding: 24px 30px;">
                     <h2 style="font-size: 16px; color: #1f2937; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb;">📊 Bảng điểm chi tiết</h2>
@@ -268,6 +290,8 @@ class EmailReportCardService:
         scores: List[Dict],
         overall_average: Optional[float],
         feedback: str,
+        ket_qua_ren_luyen: Optional[str] = None,
+        hoc_luc: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Gửi email phiếu điểm tới phụ huynh
@@ -298,6 +322,8 @@ class EmailReportCardService:
                 scores=scores,
                 overall_average=overall_average,
                 feedback=feedback,
+                ket_qua_ren_luyen=ket_qua_ren_luyen,
+                hoc_luc=hoc_luc,
             )
 
             if self.email_provider == "resend":

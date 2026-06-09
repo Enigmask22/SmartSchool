@@ -231,6 +231,8 @@ export const useStudentList = (filters: UseStudentListFilters) => {
           options?.generatedFeedback || feedback.generatedFeedback,
         academicYear: filters.selectedAcademicYear || academicYear,
         semester: filters.selectedSemester || semester,
+        ketQuaRenLuyen: feedback.ketQuaRenLuyen,
+        hocLuc: feedback.selectedType === "CK" ? feedback.hocLuc : undefined,
       });
     } catch (error) {
       logger.error("Error exporting report card:", error);
@@ -325,6 +327,8 @@ export const useStudentList = (filters: UseStudentListFilters) => {
         scores: formattedScores,
         overall_average: overallAverage,
         received_email: recipient,
+        ket_qua_ren_luyen: feedback.ketQuaRenLuyen || null,
+        hoc_luc: feedback.selectedType === "CK" ? (feedback.hocLuc || null) : null,
       };
 
       const response = await ApiService.sendEmailReportCard(reportData);

@@ -474,6 +474,8 @@ export const useStudentFeedback = ({
             notes: feedbackForm.notes,
             type: selectedType,
             low_score_details: selectedType === "GK" ? gkLowScoreDetails : [],
+            ket_qua_ren_luyen: ketQuaRenLuyen || null,
+            hoc_luc: selectedType === "CK" ? (hocLuc || null) : null,
           }),
         },
       );
