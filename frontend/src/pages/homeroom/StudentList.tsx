@@ -213,9 +213,13 @@ export function StudentListPage() {
         setKetQuaRenLuyen={feedback.setKetQuaRenLuyen}
         hocLuc={feedback.hocLuc}
         setHocLuc={feedback.setHocLuc}
+        summaryData={feedback.summaryData}
+        summaryLoading={feedback.summaryLoading}
         exportStudentReportCard={(student) =>
           studentList.exportStudentReportCard(student, {
             generatedFeedback: feedback.generatedFeedback,
+            selectedType: feedback.selectedType,
+            summaryData: feedback.summaryData,
           })
         }
         openEmailDialog={(student) => {
@@ -245,6 +249,8 @@ export function StudentListPage() {
           studentList.handleSendEmailReportCard({
             generatedFeedback: feedback.generatedFeedback,
             overallAverage: feedback.feedbackForm.score,
+            selectedType: feedback.selectedType,
+            summaryData: feedback.summaryData,
           })
         }
         onClose={studentList.closeEmailDialog}

@@ -16,6 +16,7 @@ import {
   Mail,
   ChevronDown,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 
 interface Student {
@@ -59,6 +60,8 @@ interface FeedbackModalProps {
   setKetQuaRenLuyen?: (value: string) => void;
   hocLuc?: string;
   setHocLuc?: (value: string) => void;
+  summaryData?: any;
+  summaryLoading?: boolean;
   exportStudentReportCard?: (student: Student) => void;
   openEmailDialog?: (student: Student) => void;
 }
@@ -86,6 +89,8 @@ export function FeedbackModal({
   setKetQuaRenLuyen,
   hocLuc = "",
   setHocLuc,
+  summaryData = null,
+  summaryLoading = false,
   exportStudentReportCard,
   openEmailDialog,
 }: FeedbackModalProps) {
@@ -173,10 +178,27 @@ export function FeedbackModal({
                     >
                       Cuối kỳ (CK)
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => onTypeChange?.("CN")}
+                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-md border transition-colors ${
+                        selectedType === "CN"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      Cả năm (CN)
+                    </button>
                   </div>
                 </div>
 
+                {/* CN: Hiển thị dữ liệu tổng kết cả năm */}
+                {selectedType === "CN" && (
+                  <CNSummaryDisplay summaryData={summaryData} loading={summaryLoading} />
+                )}
+
                 {/* Student Name */}
+                {selectedType !== "CN" && <>
                 <div>
                   <label
                     htmlFor="student_name"
@@ -292,15 +314,17 @@ export function FeedbackModal({
                   />
                 </div>
 
+                </>}
+
                 {/* Generate Button */}
-                {!hasScoreData && (
+                {!hasScoreData && selectedType !== "CN" && (
                   <div className="p-3 mb-2 text-sm text-yellow-800 border border-yellow-200 rounded bg-yellow-50">
                     ⚠️ Cần có dữ liệu điểm của học sinh để tạo nhận xét.
                   </div>
                 )}
                 <button
                   onClick={onGenerateFeedback}
-                  disabled={feedbackLoading || !hasScoreData}
+                  disabled={feedbackLoading || (!hasScoreData && selectedType !== "CN") || (selectedType === "CN" && summaryLoading)}
                   className="flex items-center justify-center w-full px-4 py-2 font-medium text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
                 >
                   {feedbackLoading ? (
@@ -366,7 +390,8 @@ export function FeedbackModal({
                             gửi cho phụ huynh hoặc xuất phiếu điểm.
                           </p>
 
-                          {/* Kết quả rèn luyện */}
+                          {/* Kết quả rèn luyện — ẩn cho CN vì đã có trong tổng kết */}
+                          {selectedType !== "CN" && (
                           <div className="mt-4">
                             <label className="block mb-1 text-sm font-medium text-gray-700">
                               Kết quả rèn luyện
@@ -383,6 +408,7 @@ export function FeedbackModal({
                               <option value="4">Chưa Đạt</option>
                             </select>
                           </div>
+                          )}
 
                           {/* Học lực (chỉ hiển thị cho CK) */}
                           {selectedType === "CK" && (
@@ -555,6 +581,120 @@ function GKScoreDetails({
             </>
           )}
         </button>
+      )}
+    </div>
+  );
+}
+
+/** Component hiển thị dữ liệu tổng kết cả năm cho chế độ CN */
+function CNSummaryDisplay({
+  summaryData,
+  loading,
+}: {
+  summaryData?: any;
+  loading?: boolean;
+}) {
+  const labelMap: Record<string, string> = { "1": "Tốt", "2": "Khá", "3": "Đạt", "4": "Chưa Đạt" };
+  const titleMap: Record<string, string> = { "1": "Học sinh Xuất sắc", "2": "Học sinh Giỏi" };
+
+  if (loading) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
+        Đang tải dữ liệu tổng kết...
+      </div>
+    );
+  }
+
+  if (!summaryData) {
+    return (
+      <div className="p-4 text-sm text-yellow-800 border border-yellow-200 rounded bg-yellow-50">
+        Chưa có dữ liệu tổng kết cả năm. Vui lòng nhập điểm HK1 và HK2 cho học sinh này.
+      </div>
+    );
+  }
+
+  const subjects = summaryData.subject_details || [];
+
+  return (
+    <div className="space-y-3">
+      <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg">
+        <h4 className="mb-2 text-sm font-semibold text-emerald-800">Tổng kết cả năm</h4>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div>
+            <span className="text-gray-500">HK1:</span>{" "}
+            <span className="font-semibold">{summaryData.hk1_avg_score ?? "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">HK2:</span>{" "}
+            <span className="font-semibold">{summaryData.hk2_avg_score ?? "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Cả năm:</span>{" "}
+            <span className="font-bold text-emerald-700">{summaryData.year_avg_score ?? "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">HL HK1:</span>{" "}
+            <span className="font-semibold">{labelMap[summaryData.hk1_hoc_luc] || "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">HL HK2:</span>{" "}
+            <span className="font-semibold">{labelMap[summaryData.hk2_hoc_luc] || "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">HL CN:</span>{" "}
+            <span className="font-bold text-emerald-700">{labelMap[summaryData.year_hoc_luc] || "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">KQRL HK1:</span>{" "}
+            <span className="font-semibold">{labelMap[summaryData.hk1_ren_luyen] || "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">KQRL HK2:</span>{" "}
+            <span className="font-semibold">{labelMap[summaryData.hk2_ren_luyen] || "—"}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">KQRL CN:</span>{" "}
+            <span className="font-bold text-emerald-700">{labelMap[summaryData.year_ren_luyen] || "—"}</span>
+          </div>
+        </div>
+        {summaryData.title && (
+          <div className="mt-2 pt-2 border-t border-emerald-200 text-center">
+            <span className="text-sm font-bold text-amber-700">
+              {titleMap[summaryData.title] || ""}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {subjects.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer font-medium text-gray-600 hover:text-gray-800">
+            Chi tiết từng môn ({subjects.length} môn)
+          </summary>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-1 text-left border">Môn</th>
+                  <th className="p-1 text-center border">HK1</th>
+                  <th className="p-1 text-center border">HK2</th>
+                  <th className="p-1 text-center border">Cả năm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subjects.map((s: any, i: number) => (
+                  <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="p-1 border">{s.subject_name}</td>
+                    <td className="p-1 text-center border">{s.hk1_score || "—"}</td>
+                    <td className="p-1 text-center border">{s.hk2_score || "—"}</td>
+                    <td className="p-1 text-center border font-semibold">{s.year_avg || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       )}
     </div>
   );

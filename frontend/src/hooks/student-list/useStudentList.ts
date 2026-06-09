@@ -196,9 +196,8 @@ export const useStudentList = (filters: UseStudentListFilters) => {
 
   const exportStudentReportCard = async (
     student?: any,
-    options?: { generatedFeedback?: string },
+    options?: { generatedFeedback?: string; selectedType?: string; summaryData?: any },
   ) => {
-    // Use passed student param if available, otherwise fall back to state
     const selectedStudent = student || feedback.selectedStudentForFeedback;
     if (!selectedStudent) {
       toast.error("Không có thông tin học sinh!");
@@ -207,38 +206,58 @@ export const useStudentList = (filters: UseStudentListFilters) => {
 
     try {
       const studentData = selectedStudent;
+      // Dùng selectedType từ options (từ instance cha) thay vì từ hook local
+      const effectiveType = options?.selectedType || feedback.selectedType;
+      const isCnType = effectiveType === "CN";
 
-      // Luôn lấy điểm mới để đảm bảo có đầy đủ score_data
+      // Fetch scores (cho GK/CK)
       let feedbackScores: any[] = [];
-      const response = await ApiService.getStudentScores(
-        studentData.id,
-        filters.selectedAcademicYear,
-        filters.selectedSemester,
-      );
-      if (response.success && response.data?.scores) {
-        feedbackScores = response.data.scores;
-      } else {
-        toast.warning(
-          "Không tìm thấy điểm của học sinh. Phiếu điểm sẽ chỉ hiển thị thông tin và nhận xét.",
+      if (!isCnType) {
+        const response = await ApiService.getStudentScores(
+          studentData.id,
+          filters.selectedAcademicYear,
+          filters.selectedSemester,
         );
+        if (response.success && response.data?.scores) {
+          feedbackScores = response.data.scores;
+        }
       }
 
-      // Generate and download report card
+      // Fetch summary data (cho CN)
+      let summaryData: any = options?.summaryData || undefined;
+      if (isCnType && !summaryData) {
+        try {
+          const summaryResp = await ApiService.getStudentAcademicSummary(
+            studentData.id,
+            filters.selectedAcademicYear,
+          );
+          if (summaryResp.success && summaryResp.data) {
+            summaryData = summaryResp.data;
+          } else {
+            toast.warning("Không có dữ liệu tổng kết cả năm. Vui lòng kiểm tra lại.");
+            return;
+          }
+        } catch (err) {
+          logger.error("Error fetching summary for export:", err);
+          toast.error("Lỗi khi lấy dữ liệu tổng kết cả năm.");
+          return;
+        }
+      }
+
       await generateStudentReportCard({
         student: studentData,
         feedbackScores,
-        generatedFeedback:
-          options?.generatedFeedback || feedback.generatedFeedback,
+        generatedFeedback: options?.generatedFeedback || feedback.generatedFeedback,
         academicYear: filters.selectedAcademicYear || academicYear,
         semester: filters.selectedSemester || semester,
-        ketQuaRenLuyen: feedback.ketQuaRenLuyen,
-        hocLuc: feedback.selectedType === "CK" ? feedback.hocLuc : undefined,
+        ketQuaRenLuyen: isCnType ? undefined : feedback.ketQuaRenLuyen,
+        hocLuc: isCnType ? undefined : (effectiveType === "CK" ? feedback.hocLuc : undefined),
+        summaryData,
+        feedbackType: effectiveType,
       });
     } catch (error) {
       logger.error("Error exporting report card:", error);
-      toast.error(
-        "Lỗi khi xuất phiếu điểm: " + (error instanceof Error ? error.message : "Unknown error"),
-      );
+      toast.error("Lỗi khi xuất phiếu điểm: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
   const openEmailDialog = (student?: any) => {
@@ -265,6 +284,8 @@ export const useStudentList = (filters: UseStudentListFilters) => {
   interface SendEmailReportCardOptions {
     generatedFeedback?: string;
     overallAverage?: string | number;
+    selectedType?: string;
+    summaryData?: any;
   }
 
   const handleSendEmailReportCard = async (
@@ -292,14 +313,40 @@ export const useStudentList = (filters: UseStudentListFilters) => {
     setEmailError("");
 
     try {
+      const effectiveType = options?.selectedType || feedback.selectedType;
+      const isCnType = effectiveType === "CN";
       let feedbackScores: any[] = [];
-      const scoresResponse = await ApiService.getStudentScores(
-        selectedStudent.id,
-        filters.selectedAcademicYear,
-        filters.selectedSemester,
-      );
-      if (scoresResponse.success && scoresResponse.data?.scores) {
-        feedbackScores = scoresResponse.data.scores;
+      let summaryData: any = options?.summaryData || null;
+      let overallAverage: number | null = null;
+
+      if (isCnType) {
+        if (!summaryData) {
+          // CN: fetch summary data trực tiếp từ API nếu chưa được truyền
+          const summaryResp = await ApiService.getStudentAcademicSummary(
+            selectedStudent.id,
+            filters.selectedAcademicYear,
+          );
+          if (summaryResp.success && summaryResp.data) {
+            summaryData = summaryResp.data;
+          } else {
+            setEmailError("Không có dữ liệu tổng kết cả năm.");
+            setEmailSending(false);
+            return;
+          }
+        }
+        overallAverage = summaryData.year_avg_score ?? null;
+      } else {
+        // GK/CK: fetch scores
+        const scoresResponse = await ApiService.getStudentScores(
+          selectedStudent.id,
+          filters.selectedAcademicYear,
+          filters.selectedSemester,
+        );
+        if (scoresResponse.success && scoresResponse.data?.scores) {
+          feedbackScores = scoresResponse.data.scores;
+        }
+        const parsedAverage = parseFloat(String(options?.overallAverage ?? ""));
+        overallAverage = Number.isNaN(parsedAverage) ? null : parsedAverage;
       }
 
       const formattedScores = feedbackScores.map((score) => ({
@@ -307,9 +354,6 @@ export const useStudentList = (filters: UseStudentListFilters) => {
         final_score: score.final_score,
         score_data: score.score_data,
       }));
-
-      const parsedAverage = parseFloat(String(options?.overallAverage ?? ""));
-      const overallAverage = Number.isNaN(parsedAverage) ? null : parsedAverage;
 
       const teacherName =
         authContext?.user?.full_name || authContext?.user?.name || "";
@@ -327,8 +371,10 @@ export const useStudentList = (filters: UseStudentListFilters) => {
         scores: formattedScores,
         overall_average: overallAverage,
         received_email: recipient,
-        ket_qua_ren_luyen: feedback.ketQuaRenLuyen || null,
-        hoc_luc: feedback.selectedType === "CK" ? (feedback.hocLuc || null) : null,
+        ket_qua_ren_luyen: isCnType ? null : (feedback.ketQuaRenLuyen || null),
+        hoc_luc: isCnType ? null : (effectiveType === "CK" ? (feedback.hocLuc || null) : null),
+        feedback_type: effectiveType || "CK",
+        summary_data: summaryData,
       };
 
       const response = await ApiService.sendEmailReportCard(reportData);

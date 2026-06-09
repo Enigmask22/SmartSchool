@@ -109,6 +109,33 @@ export const useStudentFeedback = ({
   const [allScoresData, setAllScoresData] = useState<any[]>([]);
   const [ketQuaRenLuyen, setKetQuaRenLuyen] = useState("");
   const [hocLuc, setHocLuc] = useState("");
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
+  // Fetch summary data khi chọn CN
+  useEffect(() => {
+    if (selectedType !== "CN" || !selectedStudentForFeedback) return;
+    const fetchSummary = async () => {
+      setSummaryLoading(true);
+      try {
+        const resp = await ApiService.getStudentAcademicSummary(
+          selectedStudentForFeedback.id,
+          filters.selectedAcademicYear,
+        );
+        if (resp.success && resp.data) {
+          setSummaryData(resp.data);
+        } else {
+          setSummaryData(null);
+        }
+      } catch (err) {
+        logger.error("Error fetching student summary:", err);
+        setSummaryData(null);
+      } finally {
+        setSummaryLoading(false);
+      }
+    };
+    fetchSummary();
+  }, [selectedType, selectedStudentForFeedback, filters.selectedAcademicYear]);
 
   // Auto-calculate học lực khi CK mode + có dữ liệu điểm
   useEffect(() => {
@@ -405,6 +432,7 @@ export const useStudentFeedback = ({
     setFeedbackSuccess(false);
     setKetQuaRenLuyen("");
     setHocLuc("");
+    setSummaryData(null);
     scoresData.set_scoreTrendData(null);
     scoresData.set_trendError("");
   }, [scoresData]);
@@ -476,6 +504,7 @@ export const useStudentFeedback = ({
             low_score_details: selectedType === "GK" ? gkLowScoreDetails : [],
             ket_qua_ren_luyen: ketQuaRenLuyen || null,
             hoc_luc: selectedType === "CK" ? (hocLuc || null) : null,
+            summary_data: selectedType === "CN" ? summaryData : null,
           }),
         },
       );
@@ -632,6 +661,8 @@ export const useStudentFeedback = ({
     setKetQuaRenLuyen,
     hocLuc,
     setHocLuc,
+    summaryData,
+    summaryLoading,
     handleFeedbackClick,
     closeFeedbackModal,
     handleFeedbackFormChange,
