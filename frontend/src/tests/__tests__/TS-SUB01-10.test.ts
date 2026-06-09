@@ -22,32 +22,32 @@ const createMockAnalyticsData = (overrides = {}) => ({
     pass_rate: 80.0,
   },
   performance_groups: {
-    excellent: {
-      label: "Giỏi (8.0 - 10)",
+    range_8_10: {
+      label: "8.0 - 10",
       count: 25,
       percentage: 29.41,
       color: "#059669",
     },
-    good: {
-      label: "Khá (6.5 - 7.9)",
+    range_65_79: {
+      label: "6.5 - 7.9",
       count: 30,
       percentage: 35.29,
       color: "#2563EB",
     },
-    average: {
-      label: "Trung bình (5.0 - 6.4)",
+    range_5_64: {
+      label: "5.0 - 6.4",
       count: 20,
       percentage: 23.53,
       color: "#D97706",
     },
-    weak: {
-      label: "Yếu (3.5 - 4.9)",
+    range_35_49: {
+      label: "3.5 - 4.9",
       count: 8,
       percentage: 9.41,
       color: "#EA580C",
     },
-    poor: {
-      label: "Kém (< 3.5)",
+    range_below_35: {
+      label: "< 3.5",
       count: 2,
       percentage: 2.35,
       color: "#DC2626",
@@ -283,34 +283,34 @@ describe("useSubjectDashboard Hook", () => {
   describe("Performance groups accuracy", () => {
     it("should correctly categorize students by performance tier", () => {
       const data = createMockAnalyticsData();
-      expect(data.performance_groups.excellent.count).toBe(25);
-      expect(data.performance_groups.good.count).toBe(30);
-      expect(data.performance_groups.average.count).toBe(20);
-      expect(data.performance_groups.weak.count).toBe(8);
-      expect(data.performance_groups.poor.count).toBe(2);
+      expect(data.performance_groups.range_8_10.count).toBe(25);
+      expect(data.performance_groups.range_65_79.count).toBe(30);
+      expect(data.performance_groups.range_5_64.count).toBe(20);
+      expect(data.performance_groups.range_35_49.count).toBe(8);
+      expect(data.performance_groups.range_below_35.count).toBe(2);
     });
 
     it("should calculate percentages correctly", () => {
       const data = createMockAnalyticsData();
       const totalCount =
-        data.performance_groups.excellent.count +
-        data.performance_groups.good.count +
-        data.performance_groups.average.count +
-        data.performance_groups.weak.count +
-        data.performance_groups.poor.count;
+        data.performance_groups.range_8_10.count +
+        data.performance_groups.range_65_79.count +
+        data.performance_groups.range_5_64.count +
+        data.performance_groups.range_35_49.count +
+        data.performance_groups.range_below_35.count;
 
-      // Total = 85, excellent = 25 => percentage = 25/85*100 = 29.41%
-      expect(data.performance_groups.excellent.percentage).toBe(29.41);
+      // Total = 85, range_8_10 = 25 => percentage = 25/85*100 = 29.41%
+      expect(data.performance_groups.range_8_10.percentage).toBe(29.41);
       expect(totalCount).toBe(85);
     });
 
     it("should assign correct colors to performance groups", () => {
       const data = createMockAnalyticsData();
-      expect(data.performance_groups.excellent.color).toBe("#059669"); // Green
-      expect(data.performance_groups.good.color).toBe("#2563EB"); // Blue
-      expect(data.performance_groups.average.color).toBe("#D97706"); // Amber
-      expect(data.performance_groups.weak.color).toBe("#EA580C"); // Orange
-      expect(data.performance_groups.poor.color).toBe("#DC2626"); // Red
+      expect(data.performance_groups.range_8_10.color).toBe("#059669"); // Green
+      expect(data.performance_groups.range_65_79.color).toBe("#2563EB"); // Blue
+      expect(data.performance_groups.range_5_64.color).toBe("#D97706"); // Amber
+      expect(data.performance_groups.range_35_49.color).toBe("#EA580C"); // Orange
+      expect(data.performance_groups.range_below_35.color).toBe("#DC2626"); // Red
     });
   });
 

@@ -259,40 +259,50 @@ export function ScoresModal({
                   <TrendingUp className="w-5 h-5 text-gray-700" /> Tổng kết
                 </h4>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">
-                      Điểm trung bình chung
-                    </p>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {scores.length > 0
-                        ? (
-                            scores.reduce(
-                              (sum, score) => sum + (score.final_score || 0),
-                              0,
-                            ) / scores.length
-                          ).toFixed(2)
-                        : "0.00"}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Số môn &gt;= 8.0</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {
-                        scores.filter(
-                          (score) => (score.final_score || 0) >= 8.0,
-                        ).length
-                      }
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600">Số môn &lt; 5.0</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {
-                        scores.filter((score) => (score.final_score || 0) < 5.0)
-                          .length
-                      }
-                    </p>
-                  </div>
+                  {(() => {
+                    // Lọc điểm số (bỏ qua điểm chữ Đ/KĐ)
+                    const numericScores = scores
+                      .map((s) => {
+                        const fs = s.final_score;
+                        if (fs === null || fs === undefined) return null;
+                        if (typeof fs === "string" && (fs === "Đ" || fs === "KĐ")) return null;
+                        const num = typeof fs === "string" ? parseFloat(fs) : fs;
+                        return typeof num === "number" && !isNaN(num) ? num : null;
+                      })
+                      .filter((v) => v !== null) as number[];
+
+                    const avgScore = numericScores.length > 0
+                      ? (numericScores.reduce((a, b) => a + b, 0) / numericScores.length).toFixed(2)
+                      : "0.00";
+
+                    const highCount = numericScores.filter((s) => s >= 8.0).length;
+                    const lowCount = numericScores.filter((s) => s < 5.0).length;
+
+                    return (
+                      <>
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600">
+                            Điểm trung bình chung
+                          </p>
+                          <p className="text-2xl font-bold text-purple-600">
+                            {avgScore}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600">Số môn &gt;= 8.0</p>
+                          <p className="text-2xl font-bold text-green-600">
+                            {highCount}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600">Số môn &lt; 5.0</p>
+                          <p className="text-2xl font-bold text-red-600">
+                            {lowCount}
+                          </p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

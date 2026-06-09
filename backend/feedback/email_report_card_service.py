@@ -140,29 +140,9 @@ class EmailReportCardService:
         """
         score_rows = self._build_score_rows_html(scores)
 
-        # Xếp loại học lực
         if overall_average is not None and isinstance(overall_average, (int, float)):
-            if overall_average >= 8.0:
-                rank = "Giỏi"
-                rank_color = "#059669"
-                rank_bg = "#ecfdf5"
-            elif overall_average >= 6.5:
-                rank = "Khá"
-                rank_color = "#2563eb"
-                rank_bg = "#eff6ff"
-            elif overall_average >= 5.0:
-                rank = "Trung bình"
-                rank_color = "#d97706"
-                rank_bg = "#fffbeb"
-            else:
-                rank = "Yếu"
-                rank_color = "#dc2626"
-                rank_bg = "#fef2f2"
             avg_display = f"{overall_average:.2f}"
         else:
-            rank = "Chưa xếp loại"
-            rank_color = "#6b7280"
-            rank_bg = "#f3f4f6"
             avg_display = "N/A"
 
         semester_display = {
@@ -215,14 +195,11 @@ class EmailReportCardService:
                 </div>
 
                 <!-- OVERALL AVERAGE -->
-                <div style="margin: 0 30px; padding: 16px 20px; background-color: {rank_bg}; border-radius: 8px; border-left: 4px solid {rank_color};">
+                <div style="margin: 0 30px; padding: 16px 20px; background-color: #f3f4f6; border-radius: 8px; border-left: 4px solid #4f46e5;">
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
                             <td style="font-size: 14px; color: #4b5563;">
-                                Điểm trung bình: <strong style="color: {rank_color}; font-size: 20px;">{avg_display}</strong>
-                            </td>
-                            <td style="text-align: right;">
-                                <span style="display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: {rank_color}; background-color: rgba(255,255,255,0.7); border: 1px solid {rank_color};">{rank}</span>
+                                Điểm trung bình: <strong style="color: #1f2937; font-size: 20px;">{avg_display}</strong>
                             </td>
                         </tr>
                     </table>

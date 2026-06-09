@@ -209,6 +209,8 @@ export function StudentListPage() {
         selectedType={feedback.selectedType}
         onTypeChange={feedback.setSelectedType}
         gkLowScoreDetails={feedback.gkLowScoreDetails}
+        ketQuaRenLuyen={feedback.ketQuaRenLuyen}
+        setKetQuaRenLuyen={feedback.setKetQuaRenLuyen}
         exportStudentReportCard={(student) =>
           studentList.exportStudentReportCard(student, {
             generatedFeedback: feedback.generatedFeedback,

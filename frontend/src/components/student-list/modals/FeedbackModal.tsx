@@ -55,6 +55,8 @@ interface FeedbackModalProps {
   selectedType?: string;
   onTypeChange?: (type: string) => void;
   gkLowScoreDetails?: Array<{ subject: string; columns: Array<{ name: string; value: string }> }>;
+  ketQuaRenLuyen?: string;
+  setKetQuaRenLuyen?: (value: string) => void;
   exportStudentReportCard?: (student: Student) => void;
   openEmailDialog?: (student: Student) => void;
 }
@@ -78,6 +80,8 @@ export function FeedbackModal({
   selectedType = "CK",
   onTypeChange,
   gkLowScoreDetails = [],
+  ketQuaRenLuyen = "",
+  setKetQuaRenLuyen,
   exportStudentReportCard,
   openEmailDialog,
 }: FeedbackModalProps) {
@@ -357,6 +361,24 @@ export function FeedbackModal({
                             Bạn có thể điều chỉnh nội dung trước khi
                             gửi cho phụ huynh hoặc xuất phiếu điểm.
                           </p>
+
+                          {/* Kết quả rèn luyện */}
+                          <div className="mt-4">
+                            <label className="block mb-1 text-sm font-medium text-gray-700">
+                              Kết quả rèn luyện
+                            </label>
+                            <select
+                              value={ketQuaRenLuyen}
+                              onChange={(e) => setKetQuaRenLuyen?.(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                              <option value="">-- Chọn kết quả rèn luyện --</option>
+                              <option value="1">Tốt</option>
+                              <option value="2">Khá</option>
+                              <option value="3">Đạt</option>
+                              <option value="4">Chưa Đạt</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>
