@@ -85,7 +85,7 @@ const ScoreEditModal = ({
                                   <button
                                     type="button"
                                     disabled={readOnly}
-                                    onClick={() => onScoreInputChange(child.key, "Đ")}
+                                    onClick={() => onScoreInputChange(child.key, scoreForm[child.key]?.Diem === "Đ" ? "" : "Đ")}
                                     className={`flex-1 px-4 py-2 text-sm font-bold rounded-md border transition-colors ${
                                       scoreForm[child.key]?.Diem === "Đ"
                                         ? "bg-green-600 text-white border-green-600"
@@ -97,7 +97,7 @@ const ScoreEditModal = ({
                                   <button
                                     type="button"
                                     disabled={readOnly}
-                                    onClick={() => onScoreInputChange(child.key, "KĐ")}
+                                    onClick={() => onScoreInputChange(child.key, scoreForm[child.key]?.Diem === "KĐ" ? "" : "KĐ")}
                                     className={`flex-1 px-4 py-2 text-sm font-bold rounded-md border transition-colors ${
                                       scoreForm[child.key]?.Diem === "KĐ"
                                         ? "bg-red-600 text-white border-red-600"
@@ -150,7 +150,7 @@ const ScoreEditModal = ({
                               <button
                                 type="button"
                                 disabled={readOnly}
-                                onClick={() => onScoreInputChange(column.key, "Đ")}
+                                onClick={() => onScoreInputChange(column.key, scoreForm[column.key]?.Diem === "Đ" ? "" : "Đ")}
                                 className={`flex-1 px-4 py-2 text-sm font-bold rounded-md border transition-colors ${
                                   scoreForm[column.key]?.Diem === "Đ"
                                     ? "bg-green-600 text-white border-green-600"
@@ -162,7 +162,7 @@ const ScoreEditModal = ({
                               <button
                                 type="button"
                                 disabled={readOnly}
-                                onClick={() => onScoreInputChange(column.key, "KĐ")}
+                                onClick={() => onScoreInputChange(column.key, scoreForm[column.key]?.Diem === "KĐ" ? "" : "KĐ")}
                                 className={`flex-1 px-4 py-2 text-sm font-bold rounded-md border transition-colors ${
                                   scoreForm[column.key]?.Diem === "KĐ"
                                     ? "bg-red-600 text-white border-red-600"

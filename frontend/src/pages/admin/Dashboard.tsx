@@ -30,14 +30,16 @@ export default function AdminDashboard() {
   } = useAdminDashboard();
 
   // UI state
-  const [activeTab, setActiveTab] = useState<"attendance" | "performance">("attendance");
+  const [activeTab, setActiveTab] = useState<"attendance" | "performance">(
+    "attendance",
+  );
   const dashboardTabs = [
     { key: "attendance", label: "Điểm danh", icon: BarChart3 },
-    { key: "performance", label: "Học lực theo lớp", icon: Award },
+    // { key: "performance", label: "Học lực theo lớp", icon: Award },
   ];
 
   return (
-    <div className="space-y-6 p-6 min-h-screen">
+    <div className="min-h-screen p-6 space-y-6">
       {/* Header — only academic year selector here */}
       <Header
         selectedAcademicYear={selectedAcademicYear}
@@ -76,7 +78,10 @@ export default function AdminDashboard() {
         />
       )}
       {activeTab === "performance" && (
-        <ClassPerformanceTab classPerformance={classPerformance} loading={loading} />
+        <ClassPerformanceTab
+          classPerformance={classPerformance}
+          loading={loading}
+        />
       )}
     </div>
   );
