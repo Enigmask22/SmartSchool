@@ -179,6 +179,29 @@ export const useStudentFeedback = ({
     }
   }, [selectedType, allScoresData]);
 
+  // Re-evaluate hasScoreData khi selectedType hoặc allScoresData thay đổi
+  useEffect(() => {
+    if (allScoresData.length === 0) return;
+    if (selectedType === "CN") {
+      scoresData.setHasScoreData(true);
+      return;
+    }
+    if (selectedType === "GK") {
+      scoresData.setHasScoreData(true);
+      return;
+    }
+    // CK: cần ít nhất một final_score dạng số hợp lệ
+    const hasValidNumericScore = allScoresData.some((s) => {
+      const fs = s.final_score;
+      if (fs === null || fs === undefined) return false;
+      if (typeof fs === "string" && (fs === "Đ" || fs === "KĐ")) return false;
+      if (typeof fs === "number") return !isNaN(fs);
+      if (typeof fs === "string") return !isNaN(parseFloat(fs));
+      return false;
+    });
+    scoresData.setHasScoreData(hasValidNumericScore);
+  }, [selectedType, allScoresData, scoresData]);
+
   // Re-fetch comment khi người dùng đổi loại GK/CK trong modal đang mở
   useEffect(() => {
     if (!showFeedbackModal || !selectedStudentForFeedback) return;
@@ -217,6 +240,50 @@ export const useStudentFeedback = ({
 
     fetchCommentForType();
   }, [selectedType, showFeedbackModal, selectedStudentForFeedback, filters.selectedSemester]);
+
+  // Đồng bộ điểm trung bình HK + subject highlights cho CK khi allScoresData thay đổi
+  useEffect(() => {
+    if (selectedType !== "CK" || allScoresData.length === 0) return;
+
+    const validScores = allScoresData.filter((score) => {
+      const fs = score.final_score;
+      if (fs === null || fs === undefined) return false;
+      if (typeof fs === "string" && (fs === "Đ" || fs === "KĐ")) return false;
+      if (typeof fs === "number") return !isNaN(fs);
+      if (typeof fs === "string") return !isNaN(parseFloat(fs));
+      return false;
+    });
+
+    if (validScores.length > 0) {
+      const avgScore = (
+        validScores.reduce((sum, score) => {
+          const val = typeof score.final_score === "string"
+            ? parseFloat(score.final_score)
+            : score.final_score;
+          return sum + (typeof val === "number" && !isNaN(val) ? val : 0);
+        }, 0) / validScores.length
+      ).toFixed(1);
+
+      const sortedScores = [...validScores]
+        .map((g) => ({
+          subject: g.subject_name,
+          score: typeof g.final_score === "string"
+            ? parseFloat(g.final_score)
+            : g.final_score,
+        }))
+        .filter((g) => typeof g.score === "number" && !isNaN(g.score));
+
+      const byDesc = [...sortedScores].sort((a, b) => b.score - a.score);
+      const byAsc = [...sortedScores].sort((a, b) => a.score - b.score);
+
+      setFeedbackForm((prev) => ({
+        ...prev,
+        score: avgScore,
+        top_subjects: byDesc.slice(0, 3).map((g) => `${g.subject} (${g.score})`),
+        weak_subjects: byAsc.filter((g) => g.score < 8.0).slice(0, 3).map((g) => `${g.subject} (${g.score})`),
+      }));
+    }
+  }, [selectedType, allScoresData]);
 
   const handleFeedbackClick = useCallback(
     async (student: any) => {
@@ -319,7 +386,9 @@ export const useStudentFeedback = ({
                 .map((g) => `${g.subject} (${g.score})`);
             } else {
               logger.debug("⚠️ No valid final_score found in scores");
-              scoresData.setHasScoreData(false);
+              if (selectedType !== "GK") {
+                scoresData.setHasScoreData(false);
+              }
             }
           } else {
             logger.debug(
@@ -454,7 +523,7 @@ export const useStudentFeedback = ({
       return false;
     }
 
-    if (!scoresData.hasScoreData) {
+    if (!scoresData.hasScoreData && selectedType !== "CN") {
       setFeedbackError("Cần có dữ liệu điểm của học sinh để tạo nhận xét");
       return false;
     }
@@ -523,7 +592,7 @@ export const useStudentFeedback = ({
     } finally {
       setFeedbackLoading(false);
     }
-  }, [feedbackForm, validateFeedbackForm, selectedType, gkLowScoreDetails]);
+  }, [feedbackForm, validateFeedbackForm, selectedType, gkLowScoreDetails, ketQuaRenLuyen, hocLuc, summaryData]);
 
   const saveComment = useCallback(async () => {
     if (!generatedFeedback || !selectedStudentForFeedback) {
